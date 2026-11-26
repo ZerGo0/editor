@@ -43,6 +43,7 @@ type repo interface {
 	Pull(ctx context.Context, o git.PullOptions) (git.OpResult, error)
 	Push(ctx context.Context, o git.PushOptions) error
 	OutgoingCommits(ctx context.Context) ([]git.Commit, error)
+	IncomingCommits(ctx context.Context) ([]git.Commit, error)
 	Checkout(ctx context.Context, ref string, force bool) error
 	CheckoutNewTracking(ctx context.Context, remoteBranch string) error
 	CreateBranch(ctx context.Context, name, start string, checkout bool) error

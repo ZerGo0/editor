@@ -99,3 +99,45 @@ func (g *Git) update() {
 		},
 	})
 }
+
+func (g *Git) pushUpstream() {
+	g.do(op{
+		title:   "Push",
+		banner:  true,
+		network: true,
+		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
+			return git.OpResult{}, r.Push(ctx, git.PushOptions{Progress: progress})
+		},
+		done: func(git.OpResult) { g.h.Notify("Pushed " + g.headLabel()) },
+	})
+}
+
+func (g *Git) pushOrOpen() {
+	if st := g.snap.status; st != nil && st.Upstream != "" {
+		g.pushUpstream()
+		return
+	}
+	g.openPush()
+}
+
+func (g *Git) syncChanges() {
+	g.do(op{
+		title:  "Sync",
+		banner: true,
+		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
+			o := g.pullOptions()
+			o.Progress = progress
+			res, err := r.Pull(ctx, o)
+			if err != nil || res.Stopped {
+				return res, err
+			}
+			return res, r.Push(ctx, git.PushOptions{Progress: progress})
+		},
+		done: func(res git.OpResult) {
+			if !res.Stopped {
+				g.h.Notify("Synced " + g.headLabel())
+			}
+			g.headChanged()
+		},
+	})
+}

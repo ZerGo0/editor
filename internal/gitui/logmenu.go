@@ -6,7 +6,19 @@ import (
 )
 
 func (s *logState) commitMenu(c *ui.Context, m *ui.Menu, cm git.Commit) {
-	g := s.g
+	s.g.commitActions(c, m, cm)
+	m.Separator()
+	root := len(cm.Parents) == 0
+	if m.Item("Go to Parent Commit").Disabled(root).Chosen() {
+		s.focusCommit(cm.Parents[0])
+	}
+	if m.Item("Go to Child Commit").Disabled(s.childOf(cm.OID) < 0).Chosen() {
+		s.selected = s.childOf(cm.OID)
+		s.list.ScrollIntoView(s.selected)
+	}
+}
+
+func (g *Git) commitActions(c *ui.Context, m *ui.Menu, cm git.Commit) {
 	busy := g.busy != ""
 	root := len(cm.Parents) == 0
 	merge := len(cm.Parents) > 1
@@ -61,14 +73,6 @@ func (s *logState) commitMenu(c *ui.Context, m *ui.Menu, cm git.Commit) {
 	}
 	if m.Item("New Tag...").Chosen() {
 		g.newTag(cm.OID)
-	}
-	m.Separator()
-	if m.Item("Go to Parent Commit").Disabled(root).Chosen() {
-		s.focusCommit(cm.Parents[0])
-	}
-	if m.Item("Go to Child Commit").Disabled(s.childOf(cm.OID) < 0).Chosen() {
-		s.selected = s.childOf(cm.OID)
-		s.list.ScrollIntoView(s.selected)
 	}
 }
 

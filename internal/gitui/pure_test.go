@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -69,37 +70,96 @@ func testStatus() *git.Status {
 	}}
 }
 
-func TestBuildRows(t *testing.T) {
+func TestChangeGroups(t *testing.T) {
+	groups := changeGroups(testStatus())
+	var got []string
+	for gi, rows := range groups {
+		for _, r := range rows {
+			got = append(got, groupIDs[gi]+":"+r.file.Path+":"+string(r.code()))
+		}
+	}
+	want := "merge:conflict.go:U,staged:both.go:M,staged:staged.go:M,changes:both.go:M,changes:new.go:?,changes:work.go:M"
+	if strings.Join(got, ",") != want {
+		t.Fatalf("groups = %s", strings.Join(got, ","))
+	}
+	if gitStatus('?') != token.GitUntracked || gitStatus('U') != token.GitConflict || gitStatus('.') != token.GitNone || gitStatus('T') != token.GitModified {
+		t.Fatal("gitStatus maps codes wrong")
+	}
+	empty := flattenChanges(changeGroups(nil), true, nil)
+	if len(empty) != 1 || empty[0].group != groupChanges || len(empty[0].rows) != 0 {
+		t.Fatalf("empty status = %+v", empty)
+	}
+}
+
+func TestChangeTree(t *testing.T) {
+	files := []string{"src/ui/a.go", "src/ui/b.go", "README.md", "docs/guide/intro.md", "src/main.go"}
+	st := &git.Status{}
+	for _, f := range files {
+		st.Files = append(st.Files, git.FileStatus{Path: f, Index: '.', WorkTree: 'M'})
+	}
+	groups := changeGroups(st)
+	describe := func(entries []changeEntry) string {
+		var out []string
+		for _, e := range entries {
+			out = append(out, strings.Repeat(">", e.depth)+e.label)
+		}
+		return strings.Join(out, ",")
+	}
+	tree := flattenChanges(groups, true, nil)
+	want := "Changes,>docs/guide,>>intro.md,>src,>>ui,>>>a.go,>>>b.go,>>main.go,>README.md"
+	if got := describe(tree); got != want {
+		t.Fatalf("tree = %s", got)
+	}
+	if tree[3].kind != entryDir || len(tree[3].rows) != 3 {
+		t.Fatalf("src rows = %+v", tree[3])
+	}
+	closed := map[string]bool{tree[3].key: true}
+	if got := describe(flattenChanges(groups, true, closed)); got != "Changes,>docs/guide,>>intro.md,>src,>README.md" {
+		t.Fatalf("collapsed = %s", got)
+	}
+	closed = map[string]bool{groupKey(groupChanges): true}
+	if got := describe(flattenChanges(groups, true, closed)); got != "Changes" {
+		t.Fatalf("collapsed group = %s", got)
+	}
+	list := flattenChanges(groups, false, nil)
+	if got := describe(list); got != "Changes,>README.md,>intro.md,>main.go,>a.go,>b.go" || list[2].path != "docs/guide" {
+		t.Fatalf("list = %s, dir %q", got, list[2].path)
+	}
+	sel := map[string]bool{tree[3].key: true, tree[5].key: true, tree[8].key: true}
+	rows := selectedRows(tree, func(k string) bool { return sel[k] })
+	if paths := strings.Join(rowPaths(rows), ","); paths != "src/ui/a.go,src/ui/b.go,src/main.go,README.md" {
+		t.Fatalf("selected rows = %s", paths)
+	}
+}
+
+func TestCommitPaths(t *testing.T) {
 	st := testStatus()
-	rows := buildRows(st, [groupCount]bool{})
-	var headers []string
-	for _, r := range rows {
-		if r.header {
-			headers = append(headers, groupTitles[r.group])
-		}
+	if got := commitPaths(st, commitSmart, false); got != nil {
+		t.Fatalf("smart with staged files = %v", got)
 	}
-	if strings.Join(headers, ",") != "Merge Conflicts,Staged,Changes,Unversioned Files" {
-		t.Fatalf("headers = %v", headers)
+	if got := commitPaths(st, commitStaged, false); got != nil {
+		t.Fatalf("staged = %v", got)
 	}
-	collapsed := buildRows(st, [groupCount]bool{groupStaged: true})
-	for _, r := range collapsed {
-		if !r.header && r.group == groupStaged {
-			t.Fatalf("collapsed group shows %s", r.file.Path)
-		}
+	if got := strings.Join(commitPaths(st, commitAllFiles, false), ","); got != "staged.go,both.go,work.go" {
+		t.Fatalf("all = %s", got)
 	}
-	if buildRows(nil, [groupCount]bool{}) != nil {
-		t.Fatal("rows for nil status")
+	unstaged := &git.Status{Files: []git.FileStatus{{Path: "new.go", OrigPath: "old.go", Index: '.', WorkTree: 'M'}}}
+	if got := strings.Join(commitPaths(unstaged, commitSmart, false), ","); got != "new.go,old.go" {
+		t.Fatalf("smart without staged files = %s", got)
+	}
+	if got := commitPaths(unstaged, commitSmart, true); got != nil {
+		t.Fatalf("amend = %v", got)
 	}
 }
 
 func TestPlanRollback(t *testing.T) {
 	rows := []changeRow{
-		{group: groupUntracked, file: git.FileStatus{Path: "u"}},
-		{group: groupUnstaged, file: git.FileStatus{Path: "w"}},
+		{group: groupChanges, file: git.FileStatus{Path: "u", Index: '?', WorkTree: '?'}},
+		{group: groupChanges, file: git.FileStatus{Path: "w"}},
 		{group: groupStaged, file: git.FileStatus{Path: "a", Index: 'A'}},
 		{group: groupStaged, file: git.FileStatus{Path: "r", OrigPath: "o", Index: 'R'}},
 		{group: groupStaged, file: git.FileStatus{Path: "m", Index: 'M'}},
-		{group: groupConflicts, file: git.FileStatus{Path: "c"}},
+		{group: groupMerge, file: git.FileStatus{Path: "c"}},
 	}
 	p := planRollback(rows)
 	check := func(name string, got []string, want string) {
@@ -175,15 +235,6 @@ func TestBranchEntries(t *testing.T) {
 	filtered := buildBranchEntries(branches, tags, "alp")
 	if len(filtered) != 2 || filtered[1].name != "alpha" {
 		t.Fatalf("filtered = %+v", filtered)
-	}
-	if i := nextEntry(entries, -1, 1); i != 1 {
-		t.Fatalf("first entry = %d", i)
-	}
-	if i := nextEntry(entries, 2, 1); i != 4 {
-		t.Fatalf("next entry skips header: %d", i)
-	}
-	if i := nextEntry(entries, 1, -1); i != 1 {
-		t.Fatalf("previous at top = %d", i)
 	}
 }
 
@@ -293,10 +344,11 @@ func TestLogHelpers(t *testing.T) {
 }
 
 func TestGraphWidth(t *testing.T) {
-	if graphWidth(nil) != laneWidth+graphPadding {
+	lane, pad := token.GraphLaneWidth.Px(), token.Space6.Px()
+	if graphWidth(nil) != lane+pad {
 		t.Fatal("empty graph width")
 	}
-	if graphWidth([]git.GraphRow{{Width: maxLanes * 2}}) != maxLanes*laneWidth+graphPadding {
+	if graphWidth([]git.GraphRow{{Width: maxLanes * 2}}) != maxLanes*lane+pad {
 		t.Fatal("graph width not capped")
 	}
 }

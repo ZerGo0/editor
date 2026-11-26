@@ -8,7 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -147,8 +153,8 @@ func (g *Git) shelfDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Shelf", wideDialog, func() {
-		muted(c, "The shelf keeps patches of chosen files in the editor. They are not stored in Git.")
+	modal(c, &s.open, "Shelf", token.DialogWidthWide, func() {
+		paragraph(c, "The shelf keeps patches of chosen files in the editor. They are not stored in Git.")
 		switch {
 		case s.err != nil:
 			errorState(c, "Cannot load the shelf", s.err, g.loadShelf)
@@ -161,34 +167,30 @@ func (g *Git) shelfDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].ID }
 			s.list.Label = func(i int) string { return items[i].Name }
 			s.list.Selected = &s.selected
-			list := ui.List(c.Key("shelf"), &s.list, len(items)).FillWidth().Height(listHeight).Label("Shelved Changes")
-			list.Rows(func(row ui.ListRow) {
-				e := items[row.Index]
-				rc := row.Context
-				ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Text(rc, e.Name).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-					muted(rc, formatTime(e.Created, rc.Now())).SingleLine().Shrink(0)
-				})
+			l := boxedList(c, "Shelved Changes", &s.list, len(items), func(i int) list.Item {
+				e := items[i]
+				return list.Item{Label: e.Name, Icon: icons.Stash, Trailing: func(c *ui.Context) { secondary(c, formatTime(e.Created, c.Now())).SingleLine() },
+					OnDoubleClick: func() { g.showShelf(e) }}
 			})
-			if list.Submitted() {
+			if l.Submitted() {
 				g.showShelf(s.selectedEntry())
 			}
 		}
 		e, ok := s.selectedEntry(), s.selected >= 0 && s.selected < len(s.items)
 		busy := g.busy != ""
-		ui.Checkbox(c, &s.remove, "Remove from the shelf after unshelve")
-		ui.Row(c).FillWidth().Gap(6).Children(func() {
-			if ui.Button(c, "Show Diff").Disabled(!ok).Clicked() {
+		action.Checkbox(c, "Remove from the shelf after unshelve", &s.remove, action.ChoiceOptions{})
+		dialog.Actions(c, func() {
+			if button(c, "Show Diff", !ok) {
 				g.showShelf(e)
 			}
-			if ui.Button(c, "Delete").Disabled(!ok || busy).Clicked() {
+			if button(c, "Delete", !ok || busy) {
 				g.deleteShelf(e)
 			}
-			ui.Box(c).Grow(1)
-			if ui.Button(c, "Close").Clicked() {
+			design.Spacer(c)
+			if button(c, "Close", false) {
 				s.open = false
 			}
-			if ui.PrimaryButton(c, "Unshelve").Disabled(!ok || busy).Clicked() {
+			if primaryButton(c, "Unshelve", !ok || busy) {
 				g.unshelve(e, s.remove)
 			}
 		})

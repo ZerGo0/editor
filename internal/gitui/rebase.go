@@ -4,11 +4,13 @@ import (
 	"context"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
-
-const actionWidth = 96
 
 type rebaseState struct {
 	open     bool
@@ -70,7 +72,7 @@ func (g *Git) rebaseDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Rebase Commits onto "+displayRev(s.onto), wideDialog, func() {
+	modal(c, &s.open, "Rebase Commits onto "+displayRev(s.onto), token.DialogWidthWide, func() {
 		switch {
 		case s.err != nil:
 			errorState(c, "Cannot list the commits to rebase", s.err, g.loadTodo)
@@ -87,7 +89,7 @@ func (g *Git) rebaseDialog(c *ui.Context) {
 		g.rewordEditor(c)
 		_, problem := buildTodo(s.items, s.actions)
 		if problem != nil {
-			ui.Text(c, problem.Error()).FontSize(smallFont).TextColor(c.Theme().Danger)
+			errorText(c, problem.Error())
 		}
 		dialogButtons(c, func() { s.open = false }, "Start Rebasing", problem != nil || g.busy != "", g.runRebase)
 	})
@@ -96,30 +98,50 @@ func (g *Git) rebaseDialog(c *ui.Context) {
 func (g *Git) todoList(c *ui.Context) {
 	s := &g.rebase
 	items := s.items
-	ui.Row(c).FillWidth().Gap(6).Children(func() {
-		muted(c, "Commits are applied from top to bottom.").Grow(1)
-		if textButton(c, "Move Up", s.selected <= 0).Clicked() {
+	ui.Row(c).FillWidth().Gap(token.GapTight.Px()).AlignItems(ui.Center).Children(func() {
+		secondary(c, "Commits are applied from top to bottom.").Grow(1)
+		if iconButton(c, "Move Up", icons.ChevronUp, s.selected <= 0) {
 			s.selected = moveTodo(s.items, s.actions, s.selected, -1)
 		}
-		if textButton(c, "Move Down", s.selected < 0 || s.selected >= len(items)-1).Clicked() {
+		if iconButton(c, "Move Down", icons.ChevronDown, s.selected < 0 || s.selected >= len(items)-1) {
 			s.selected = moveTodo(s.items, s.actions, s.selected, 1)
 		}
 	})
 	s.list.Key = func(i int) any { return items[i].OID }
 	s.list.Label = func(i int) string { return items[i].Subject }
 	s.list.Selected = &s.selected
-	list := ui.List(c.Key("todo"), &s.list, len(items)).FillWidth().Height(listHeight).Label("Rebase Commits")
-	list.Rows(func(row ui.ListRow) {
-		i := row.Index
-		it := items[i]
-		rc := row.Context
-		ui.Row(rc).Height(rowHeight+4).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-			ui.Select(rc.Key("action"), &s.actions[i], todoActions).Width(actionWidth).Label("Action for " + shortHash(it.OID)).Shrink(0)
-			subject := ui.Text(rc, s.subject(i)).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-			if s.actions[i] == string(git.ActionDrop) {
-				subject.Strikethrough().TextColor(rc.Theme().TextMuted)
+	options := make([]action.Option[string], len(todoActions))
+	for i, a := range todoActions {
+		options[i] = action.Option[string]{Value: a, Label: a}
+	}
+	p := token.Of(c)
+	var list ui.Element
+	ui.Column(c).FillWidth().Height(token.ListHeightMax.Px()).Radius(token.RadiusControl.Px()).Clip().
+		Border(token.BorderWidth.Px(), p.Border.Input).Children(func() {
+		list = ui.List(c.Key("todo"), &s.list, len(items)).Fill().Label("Rebase Commits").Background(ui.Transparent)
+		list.Rows(func(row ui.ListRow) {
+			i := row.Index
+			it := items[i]
+			rc := row.Context
+			el := ui.Row(rc).FillWidth().Padding(token.Space2.Px(), token.PadRow.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center)
+			switch {
+			case row.Selected() && row.ListFocused():
+				el.Background(p.List.ActiveSelection)
+			case row.Selected():
+				el.Background(p.List.InactiveSelection)
+			case row.Hovered():
+				el.Background(p.List.Hover)
 			}
-			muted(rc, shortHash(it.OID)).SingleLine().Shrink(0)
+			el.Children(func() {
+				ui.Row(rc).Width(token.ColumnMedium.Px()).Shrink(0).Children(func() {
+					action.Select(rc, "Action for "+shortHash(it.OID), &s.actions[i], options, action.SelectOptions{ID: "action"})
+				})
+				subject := token.TextBody.Apply(ui.Text(rc, s.subject(i))).TextColor(p.Text.Primary).SingleLine().Grow(1).Shrink(1).MinWidth(0)
+				if s.actions[i] == string(git.ActionDrop) {
+					subject.Strikethrough().TextColor(p.Text.Muted)
+				}
+				secondary(rc, shortHash(it.OID)).SingleLine().Shrink(0)
+			})
 		})
 	})
 	if list.Shortcut(ui.Alt, ui.KeyUp) {
@@ -147,8 +169,9 @@ func (g *Git) rewordEditor(c *ui.Context) {
 	if !ok {
 		msg = it.Subject
 	}
-	muted(c, "New message for "+shortHash(it.OID))
-	if ui.TextArea(c.Key("reword-"+it.OID), &msg).Lines(2, 6).FillWidth().Label("New Commit Message").Changed() || !ok {
+	secondary(c, "New message for "+shortHash(it.OID))
+	in := field.TextArea(c, "New Commit Message", &msg, field.AreaOptions{MinLines: tagMessageMinLines, MaxLines: tagMessageMaxLines, ID: "reword-" + it.OID})
+	if in.Changed() || !ok {
 		s.messages[it.OID] = msg
 	}
 }

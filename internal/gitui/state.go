@@ -124,8 +124,17 @@ func (g *Git) applySnapshot(s snapshot) {
 	if s.status == nil || old == nil {
 		return
 	}
-	if old.OID != s.status.OID || old.Branch != s.status.Branch {
+	switch {
+	case old.OID != s.status.OID || old.Branch != s.status.Branch:
 		g.headChanged()
+	case old.Upstream != s.status.Upstream || old.Ahead != s.status.Ahead || old.Behind != s.status.Behind:
+		g.reloadGraphIfStarted()
+	}
+}
+
+func (g *Git) reloadGraphIfStarted() {
+	if g.graph.started {
+		g.reloadGraph()
 	}
 }
 
@@ -138,6 +147,7 @@ func (g *Git) headChanged() {
 	if g.log.started {
 		g.log.reload()
 	}
+	g.reloadGraphIfStarted()
 }
 
 func (g *Git) currentBranch() string {

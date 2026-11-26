@@ -4,7 +4,15 @@ import (
 	"context"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
+)
+
+const (
+	tagMessageMinLines = 2
+	tagMessageMaxLines = 6
 )
 
 type newBranchState struct {
@@ -30,7 +38,7 @@ func (g *Git) newBranch(start string) {
 
 func (g *Git) newBranchDialog(c *ui.Context) {
 	s := &g.newBranchDlg
-	modal(c, &s.open, "New Branch", dialogWidth, func() {
+	modal(c, &s.open, "New Branch", token.DialogWidth, func() {
 		name := strings.TrimSpace(s.name)
 		var problem string
 		if name != "" {
@@ -38,14 +46,11 @@ func (g *Git) newBranchDialog(c *ui.Context) {
 				problem = err.Error()
 			}
 		}
-		input := ui.TextInput(c.Key("new-branch"), &s.name).AutoFocus().FillWidth().Placeholder("Branch name").Label("Branch Name")
-		if problem != "" {
-			ui.Text(c, problem).FontSize(smallFont).TextColor(c.Theme().Danger)
-		}
+		input := field.TextInput(c, "Branch Name", &s.name, field.InputOptions{Placeholder: "Branch name", Error: problem, AutoFocus: true, ID: "new-branch"})
 		if s.start != "" {
-			muted(c, "From "+displayRev(s.start))
+			secondary(c, "From "+displayRev(s.start))
 		}
-		ui.Checkbox(c, &s.checkout, "Checkout branch")
+		action.Checkbox(c, "Checkout branch", &s.checkout, action.ChoiceOptions{})
 		create := func() {
 			if name == "" || problem != "" {
 				return
@@ -87,7 +92,7 @@ func (g *Git) newTag(rev string) {
 
 func (g *Git) tagDialog(c *ui.Context) {
 	s := &g.tagDlg
-	modal(c, &s.open, "New Tag", dialogWidth, func() {
+	modal(c, &s.open, "New Tag", token.DialogWidth, func() {
 		name, rev := strings.TrimSpace(s.name), strings.TrimSpace(s.rev)
 		var problem string
 		if name != "" {
@@ -95,13 +100,10 @@ func (g *Git) tagDialog(c *ui.Context) {
 				problem = "Enter a tag name without spaces."
 			}
 		}
-		ui.TextInput(c.Key("tag-name"), &s.name).AutoFocus().FillWidth().Placeholder("Tag name").Label("Tag Name")
-		if problem != "" {
-			ui.Text(c, problem).FontSize(smallFont).TextColor(c.Theme().Danger)
-		}
-		ui.TextInput(c.Key("tag-rev"), &s.rev).FillWidth().Placeholder("Commit, branch or expression").Label("Tag Commit")
-		ui.TextArea(c.Key("tag-message"), &s.message).Lines(2, 6).FillWidth().
-			Placeholder("Message (an empty message makes a lightweight tag)").Label("Tag Message")
+		field.TextInput(c, "Tag Name", &s.name, field.InputOptions{Placeholder: "Tag name", Error: problem, AutoFocus: true, ID: "tag-name"})
+		field.TextInput(c, "Tag Commit", &s.rev, field.InputOptions{Placeholder: "Commit, branch or expression", ID: "tag-rev"})
+		field.TextArea(c, "Tag Message", &s.message, field.AreaOptions{Placeholder: "Message (an empty message makes a lightweight tag)",
+			MinLines: tagMessageMinLines, MaxLines: tagMessageMaxLines, ID: "tag-message"})
 		disabled := name == "" || rev == "" || problem != ""
 		dialogButtons(c, func() { s.open = false }, "Create Tag", disabled, func() {
 			s.open = false

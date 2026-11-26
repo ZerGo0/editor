@@ -6,6 +6,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -13,8 +18,6 @@ import (
 
 const (
 	pushPreviewLimit = 100
-	pushListHeight   = 220
-	pushListWidth    = 330
 	forcePushNote    = "Force push replaces the remote history. The lease stops it if the remote changed since the last fetch."
 )
 
@@ -97,22 +100,19 @@ func (g *Git) pushDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Push Commits", wideDialog, func() {
+	modal(c, &s.open, "Push Commits", token.DialogWidthWide, func() {
 		if len(g.snap.remotes) == 0 {
 			g.defineRemote(c)
 			return
 		}
 		g.pushTarget(c)
 		g.pushPreview(c)
-		ui.Row(c).Gap(stateGap).Wrap().Children(func() {
-			ui.Checkbox(c, &s.force, "Force push (with lease)")
-			ui.Checkbox(c, &s.tags, "Push tags")
+		ui.Row(c).Gap(token.GapGroup.Px()).Wrap().Children(func() {
+			action.Checkbox(c, "Force push (with lease)", &s.force, action.ChoiceOptions{})
+			action.Checkbox(c, "Push tags", &s.tags, action.ChoiceOptions{})
 		})
 		if s.force {
-			ui.Row(c).Gap(stateGap).AlignItems(ui.Center).Children(func() {
-				ui.Icon(c, icons.ForcePush).Size(iconSize, iconSize).TextColor(c.Theme().Warning).Shrink(0)
-				muted(c, forcePushNote)
-			})
+			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: forcePushNote})
 		}
 		target := strings.TrimSpace(s.target)
 		action := "Push"
@@ -126,19 +126,21 @@ func (g *Git) pushDialog(c *ui.Context) {
 
 func (g *Git) pushTarget(c *ui.Context) {
 	s := &g.push
-	remotes := make([]string, len(g.snap.remotes))
+	remotes := make([]action.Option[string], len(g.snap.remotes))
 	for i, r := range g.snap.remotes {
-		remotes[i] = r.Name
+		remotes[i] = action.Option[string]{Value: r.Name, Label: r.Name}
 	}
-	ui.Row(c).FillWidth().Gap(6).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, g.headLabel()).FontSize(bodyFont).Bold().SingleLine().Shrink(0)
-		muted(c, "\u2192").Shrink(0)
-		ui.Select(c.Key("push-remote"), &s.remote, remotes).Label("Push Remote").Shrink(0)
-		muted(c, ":").Shrink(0)
-		ui.TextInput(c.Key("push-target"), &s.target).Grow(1).MinWidth(0).Placeholder("Target branch").Label("Target Branch")
+	ui.Row(c).FillWidth().Gap(token.GapControl.Px()).AlignItems(ui.Center).Children(func() {
+		token.TextStrong.Apply(ui.Text(c, g.headLabel())).SingleLine().Shrink(0)
+		secondary(c, "\u2192").Shrink(0)
+		action.Select(c, "Push Remote", &s.remote, remotes, action.SelectOptions{Width: token.FieldWidthSmall})
+		secondary(c, ":").Shrink(0)
+		ui.Row(c).Grow(1).MinWidth(0).Children(func() {
+			field.TextInput(c, "Target Branch", &s.target, field.InputOptions{Placeholder: "Target branch", ID: "push-target"})
+		})
 	})
 	if s.newBranch {
-		muted(c, "New branch: the branch has no upstream yet, so it is set on push.")
+		secondary(c, "New branch: the branch has no upstream yet, so it is set on push.")
 	}
 }
 
@@ -159,20 +161,18 @@ func (g *Git) pushPreview(c *ui.Context) {
 	if s.selected >= 0 && s.selected < len(commits) && s.filesFor != commits[s.selected].OID {
 		g.loadPushFiles(commits[s.selected].OID)
 	}
-	ui.Row(c).FillWidth().Height(pushListHeight).Gap(6).Children(func() {
+	ui.Row(c).FillWidth().Height(token.ListHeightMax.Px()).Gap(token.GapControl.Px()).Children(func() {
 		s.list.Key = func(i int) any { return commits[i].OID }
 		s.list.Label = func(i int) string { return commits[i].Subject }
 		s.list.Selected = &s.selected
-		ui.List(c.Key("push-commits"), &s.list, len(commits)).Width(pushListWidth).FillHeight().Label("Outgoing Commits").
-			Rows(func(row ui.ListRow) {
-				cm := commits[row.Index]
-				rc := row.Context
-				ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Text(rc, cm.Subject).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-					muted(rc, shortHash(cm.OID)).SingleLine().Shrink(0)
-				}).Tooltip(fmt.Sprintf("%s, %s", cm.Author, formatTime(cm.AuthorTime, rc.Now())))
+		pushColumn(c, func() {
+			list.View(c.Key("push-commits"), &s.list, len(commits), list.ViewOptions{Label: "Outgoing Commits"}, func(i int) list.Item {
+				cm := commits[i]
+				return list.Item{Label: cm.Subject, Icon: icons.Commit, Description: shortHash(cm.OID),
+					Tooltip: fmt.Sprintf("%s, %s", cm.Author, formatTime(cm.AuthorTime, c.Now()))}
 			})
-		ui.Column(c).Grow(1).FillHeight().MinWidth(0).Children(func() {
+		})
+		pushColumn(c, func() {
 			switch {
 			case s.filesErr != nil:
 				errorState(c, "Cannot load the files", s.filesErr, func() { g.loadPushFiles(s.filesFor) })
@@ -181,16 +181,20 @@ func (g *Git) pushPreview(c *ui.Context) {
 			default:
 				files := s.files
 				s.fileList.Label = func(i int) string { return files[i].Path }
-				ui.List(c.Key("push-files"), &s.fileList, len(files)).Fill().Label("Commit Files").Rows(func(row ui.ListRow) {
-					f := files[row.Index]
+				list.View(c.Key("push-files"), &s.fileList, len(files), list.ViewOptions{Label: "Commit Files"}, func(i int) list.Item {
+					f := files[i]
 					cm := commits[s.selected]
-					if g.fileRow(row.Context, f.Path, f.Status).RowDoubleClicked() {
-						g.openDiffSource(commitSource(cm, f))
-					}
+					return changedFileItem(f.Path, f.Status, func(preview, focus bool) { g.openDiffWith(commitSource(cm, f), preview, focus) })
 				})
 			}
 		})
 	})
+}
+
+func pushColumn(c *ui.Context, body func()) {
+	p := token.Of(c)
+	ui.Column(c).Grow(1).Basis(0).FillHeight().MinWidth(0).Radius(token.RadiusControl.Px()).Clip().
+		Border(token.BorderWidth.Px(), p.Border.Input).Children(body)
 }
 
 func (g *Git) runPush(target string) {
@@ -228,9 +232,9 @@ func (g *Git) runPush(target string) {
 
 func (g *Git) defineRemote(c *ui.Context) {
 	s := &g.push
-	muted(c, "This repository has no remote. Define one to push.")
-	ui.TextInput(c.Key("remote-name"), &s.remoteName).FillWidth().Placeholder("Name").Label("Remote Name")
-	ui.TextInput(c.Key("remote-url"), &s.remoteURL).AutoFocus().FillWidth().Placeholder("URL").Label("Remote URL")
+	paragraph(c, "This repository has no remote. Define one to push.")
+	field.TextInput(c, "Remote Name", &s.remoteName, field.InputOptions{Placeholder: "Name", ID: "remote-name"})
+	field.TextInput(c, "Remote URL", &s.remoteURL, field.InputOptions{Placeholder: "URL", AutoFocus: true, ID: "remote-url"})
 	name, url := strings.TrimSpace(s.remoteName), strings.TrimSpace(s.remoteURL)
 	disabled := checkName(name) != nil || checkURL(url) != nil
 	dialogButtons(c, func() { s.open = false }, "Define Remote", disabled, func() {

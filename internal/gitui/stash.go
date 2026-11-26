@@ -5,7 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -35,11 +42,11 @@ func (g *Git) openStash() {
 
 func (g *Git) stashDialog(c *ui.Context) {
 	s := &g.stash
-	modal(c, &s.open, "Stash Changes", dialogWidth, func() {
-		muted(c, "Stash saves all uncommitted changes in Git and reverts them from the work tree.")
-		input := ui.TextInput(c.Key("stash-message"), &s.message).AutoFocus().FillWidth().Placeholder("Message").Label("Stash Message")
-		ui.Checkbox(c, &s.untracked, "Include untracked files")
-		ui.Checkbox(c, &s.keepIndex, "Keep index")
+	modal(c, &s.open, "Stash Changes", token.DialogWidth, func() {
+		paragraph(c, "Stash saves all uncommitted changes in Git and reverts them from the work tree.")
+		input := field.TextInput(c, "Stash Message", &s.message, field.InputOptions{Placeholder: "Message", AutoFocus: true, ID: "stash-message"})
+		action.Checkbox(c, "Include untracked files", &s.untracked, action.ChoiceOptions{})
+		action.Checkbox(c, "Keep index", &s.keepIndex, action.ChoiceOptions{})
 		run := func() {
 			s.open = false
 			msg, untracked, keep := strings.TrimSpace(s.message), s.untracked, s.keepIndex
@@ -99,7 +106,7 @@ func (g *Git) stashesDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Stashes", wideDialog, func() {
+	modal(c, &s.open, "Stashes", token.DialogWidthWide, func() {
 		switch {
 		case s.err != nil:
 			errorState(c, "Cannot load the stashes", s.err, g.loadStashes)
@@ -112,40 +119,36 @@ func (g *Git) stashesDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].OID }
 			s.list.Label = func(i int) string { return items[i].Message }
 			s.list.Selected = &s.selected
-			list := ui.List(c.Key("stashes"), &s.list, len(items)).FillWidth().Height(listHeight).Label("Stashes")
-			list.Rows(func(row ui.ListRow) {
-				st := items[row.Index]
-				rc := row.Context
-				ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-					muted(rc, st.Ref).SingleLine().Shrink(0)
-					ui.Text(rc, st.Message).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-					muted(rc, formatTime(st.Time, rc.Now())).SingleLine().Shrink(0)
-				})
+			l := boxedList(c, "Stashes", &s.list, len(items), func(i int) list.Item {
+				st := items[i]
+				return list.Item{Label: st.Message, Icon: icons.Stash, Description: st.Ref,
+					Trailing:      func(c *ui.Context) { secondary(c, formatTime(st.Time, c.Now())).SingleLine() },
+					OnDoubleClick: func() { g.showStash(st) }}
 			})
-			if list.Submitted() {
+			if l.Submitted() {
 				g.showStash(s.selectedStash())
 			}
 		}
 		st, ok := s.selectedStash(), s.selected >= 0 && s.selected < len(s.items)
 		busy := g.busy != ""
-		ui.Row(c).FillWidth().Gap(6).Children(func() {
-			if ui.Button(c, "Show Diff").Disabled(!ok).Clicked() {
+		dialog.Actions(c, func() {
+			if button(c, "Show Diff", !ok) {
 				g.showStash(st)
 			}
-			if ui.Button(c, "Drop").Disabled(!ok || busy).Clicked() {
+			if button(c, "Drop", !ok || busy) {
 				g.dropStash(st)
 			}
-			if ui.Button(c, "Clear").Disabled(len(s.items) == 0 || busy).Clicked() {
+			if button(c, "Clear", len(s.items) == 0 || busy) {
 				g.clearStashes()
 			}
-			ui.Box(c).Grow(1)
-			if ui.Button(c, "Close").Clicked() {
+			design.Spacer(c)
+			if button(c, "Close", false) {
 				s.open = false
 			}
-			if ui.Button(c, "Apply").Disabled(!ok || busy).Clicked() {
+			if button(c, "Apply", !ok || busy) {
 				g.applyStash(st, false)
 			}
-			if ui.PrimaryButton(c, "Pop").Disabled(!ok || busy).Clicked() {
+			if primaryButton(c, "Pop", !ok || busy) {
 				g.applyStash(st, true)
 			}
 		})

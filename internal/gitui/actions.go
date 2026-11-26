@@ -89,7 +89,7 @@ func (g *Git) notReady() {
 func (g *Git) actionTable() map[string]func() {
 	return map[string]func(){
 		"git.commit":            g.focusCommit,
-		"git.commitAndPush":     func() { g.doCommit(true) },
+		"git.commitAndPush":     func() { g.doCommit(commitSmart, afterPush) },
 		"git.amend":             g.toggleAmend,
 		"git.refresh":           g.refreshNow,
 		"git.fetch":             g.fetch,
@@ -166,14 +166,14 @@ func (g *Git) statusRows(rel string) []changeRow {
 		}
 		switch {
 		case f.Conflict:
-		case f.Index == '?':
-			rows = append(rows, changeRow{group: groupUntracked, file: f})
+		case f.Index == codeUntracked:
+			rows = append(rows, changeRow{group: groupChanges, file: f})
 		default:
 			if isChanged(f.Index) {
 				rows = append(rows, changeRow{group: groupStaged, file: f})
 			}
 			if isChanged(f.WorkTree) {
-				rows = append(rows, changeRow{group: groupUnstaged, file: f})
+				rows = append(rows, changeRow{group: groupChanges, file: f})
 			}
 		}
 	}

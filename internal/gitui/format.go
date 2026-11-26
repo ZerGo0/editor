@@ -5,8 +5,6 @@ import (
 	"path"
 	"strings"
 	"time"
-
-	"github.com/egoist/mygo/ui"
 )
 
 const (
@@ -44,32 +42,6 @@ func formatTime(t, now time.Time) string {
 		return t.Format(sameYearFormat)
 	}
 	return t.Format(otherYearFormat)
-}
-
-func statusLetter(code byte) string {
-	switch code {
-	case '?':
-		return "U"
-	case 'T':
-		return "M"
-	case 0, ' ', '.':
-		return ""
-	}
-	return string(code)
-}
-
-func statusColor(t *ui.Theme, code byte) ui.Color {
-	switch code {
-	case 'A', 'C':
-		return t.Success
-	case 'D':
-		return t.TextMuted
-	case '?':
-		return t.Warning
-	case 'U':
-		return t.Danger
-	}
-	return t.Accent
 }
 
 func statusName(code byte) string {

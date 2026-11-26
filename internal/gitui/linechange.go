@@ -3,13 +3,11 @@ package gitui
 import (
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
-)
-
-const (
-	changePopupWidth  = 640
-	changePopupHeight = 280
 )
 
 type changeState struct {
@@ -92,41 +90,47 @@ func (g *Git) changePopup(c *ui.Context) {
 		s.open = false
 		return
 	}
-	t := c.Theme()
+	p := token.Of(c)
 	ui.Overlay(c, func() {
-		back := ui.Column(c).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Modal()
+		back := ui.Column(c).Absolute().Left(token.Space0.Px()).Top(token.Space0.Px()).Right(token.Space0.Px()).Bottom(token.Space0.Px()).
+			AlignItems(ui.Center).Modal()
 		back.Children(func() {
-			panel := ui.Column(c).Margin(popupTop, 0, 0, 0).Width(changePopupWidth).Padding(popupPad).Gap(4).
-				Background(t.Background).Radius(popupRadius).BorderWidth(1).BorderColor(t.Border).
-				Role(ui.RoleDialog).Label("Change")
+			panel := ui.Column(c).Margin(token.TitleBarHeight.Px()+token.OffsetQuickOpen.Px(), token.Space0.Px(), token.Space0.Px(), token.Space0.Px()).
+				Width(token.DialogWidthWide.Px()).Padding(token.PadPopover.Px()).Gap(token.GapStack.Px()).
+				Background(p.Layer.Widget).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).
+				ZIndex(token.LayerPopover.Z()).Role(ui.RoleDialog).Label("Change")
+			token.ElevationPopover.Apply(panel, p)
 			panel.Children(func() {
-				ui.Row(c).FillWidth().Gap(4).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, fmt.Sprintf("Change %d of %d", s.index+1, len(hunks))).FontSize(smallFont).Bold()
-					if textButton(c, "Previous Change", s.index <= 0).Clicked() {
+				ui.Row(c).FillWidth().Gap(token.GapTight.Px()).AlignItems(ui.Center).Children(func() {
+					token.TextStrong.Apply(ui.Text(c, fmt.Sprintf("Change %d of %d", s.index+1, len(hunks)))).TextColor(p.Text.Primary).SingleLine()
+					if iconButton(c, "Previous Change", icons.ChevronUp, s.index <= 0) {
 						s.index--
 						s.diff.GoToHunk(s.index)
 					}
-					if textButton(c, "Next Change", s.index >= len(hunks)-1).Clicked() {
+					if iconButton(c, "Next Change", icons.ChevronDown, s.index >= len(hunks)-1) {
 						s.index++
 						s.diff.GoToHunk(s.index)
 					}
-					ui.Box(c).Grow(1)
+					design.Spacer(c)
 					h := hunks[s.index]
-					if textButton(c, "Copy Old Text", h.OldStart == h.OldEnd).Clicked() {
+					if iconButton(c, "Copy Old Text", icons.Copy, h.OldStart == h.OldEnd) {
 						c.WriteClipboard(s.diff.Old.Slice(lineOffset(s.diff.Old, h.OldStart), lineOffset(s.diff.Old, h.OldEnd)))
 					}
-					if textButton(c, "Show Diff", false).Clicked() {
+					if iconButton(c, "Show Diff", icons.Preview, false) {
 						s.open = false
 						if rel, ok := g.paths.rel(s.path); ok {
 							g.openDiff(diffHead, rel)
 						}
 					}
-					if textButton(c, "Rollback", false).Clicked() {
+					if iconButton(c, "Rollback", icons.Undo, false) {
 						rollbackHunk(s.diff.New, s.diff.Old, h)
 						s.open = false
 					}
+					if iconButton(c, "Close", icons.Close, false) {
+						s.open = false
+					}
 				})
-				editor.DiffView(c.Key("change"), s.diff).FillWidth().Height(changePopupHeight)
+				editor.DiffView(c.Key("change"), s.diff).FillWidth().Height(token.PeekHeight.Px())
 			})
 			if panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape) {
 				s.open = false

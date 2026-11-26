@@ -3,8 +3,13 @@ package gitui
 import (
 	"context"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -162,29 +167,22 @@ func (t *patchTab) listView(c *ui.Context) {
 	t.list.Label = func(i int) string { return items[i].title }
 	t.list.Header = func(i int) bool { return items[i].header }
 	t.list.Selected = &t.selected
-	list := ui.List(c.Key("items"), &t.list, len(items)).Fill().Label(t.title)
-	list.Rows(func(row ui.ListRow) {
-		rc := row.Context
-		it := items[row.Index]
+	list.View(c.Key("items"), &t.list, len(items), list.ViewOptions{Label: t.title}, func(i int) list.Item {
+		it := items[i]
 		switch {
 		case it.header:
-			ui.Column(rc).FillWidth().Padding(4, rowPadding).Gap(2).Background(rc.Theme().Background).Children(func() {
-				ui.Text(rc, it.title).FontSize(bodyFont).Bold().SingleLine()
-				if it.detail != "" {
-					muted(rc, it.detail).SingleLine()
-				}
-			})
+			return list.Item{Label: it.title, Strong: true, Description: it.detail, Icon: icons.Commit}
 		case it.commit != nil:
-			ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(rc, it.title).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-				muted(rc, shortHash(it.commit.OID)).SingleLine().Shrink(0)
-			})
-		default:
-			el := t.g.fileRow(rc, it.title, it.code)
-			if it.src != nil && el.RowDoubleClicked() {
-				t.g.openDiffSource(*it.src)
-			}
+			return list.Item{Label: it.title, Icon: icons.Commit, Description: shortHash(it.commit.OID)}
 		}
+		item := changedFileItem(it.title, it.code, func(preview, focus bool) {
+			if it.src != nil {
+				t.g.openDiffWith(*it.src, preview, focus)
+			}
+		})
+		item.Description = it.detail
+		item.OnClick = nil
+		return item
 	})
 }
 
@@ -203,8 +201,8 @@ func (t *patchTab) detailView(c *ui.Context) {
 		cm := *it.commit
 		ui.Scroll(c).Fill().Children(func() {
 			t.g.commitInfo(c, cm, nil, nil)
-			ui.Row(c).Padding(0, rowPadding).Children(func() {
-				if ui.Button(c, "Show in Log").Clicked() {
+			ui.Row(c).Padding(token.Space0.Px(), token.PadView.Px()).Children(func() {
+				if button(c, "Show in Log", false) {
 					t.g.showCommit(cm.OID)
 				}
 			})
@@ -245,12 +243,11 @@ func (t *patchTab) patchView(c *ui.Context, it patchItem) {
 	t.state.Annotations = t.engine.Annotations(nil)
 	t.g.diffOpts.apply(t.state)
 	ui.Column(c).Fill().Children(func() {
-		ui.Row(c).FillWidth().Height(toolbarHeight).Shrink(0).Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).
-			BorderWidth(0, 0, 1, 0).BorderColor(c.Theme().Border).Children(func() {
-			ui.Text(c, it.title).FontSize(smallFont).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
-			ui.Box(c).Grow(1)
-			ui.Segmented(c, &t.layout, layoutNames...).Label("Diff Layout")
-			diffmode.Controls(c, t.engine)
+		toolbarRow(c, "Diff Toolbar", func() {
+			secondary(c, it.title).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+			design.Spacer(c)
+			action.Segmented(c, "Diff Layout", &t.layout, layoutNames, action.SegmentedOptions{})
+			diffModeControls(c, t.engine)
 			t.g.diffOptionsButton(c)
 		})
 		if len(t.state.Hunks()) == 0 && mode != git.WhitespaceNone {

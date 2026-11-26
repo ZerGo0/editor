@@ -5,6 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -77,7 +84,7 @@ func (g *Git) worktreesDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Worktrees", wideDialog, func() {
+	modal(c, &s.open, "Worktrees", token.DialogWidthWide, func() {
 		if s.adding {
 			g.worktreeForm(c)
 			return
@@ -92,18 +99,18 @@ func (g *Git) worktreesDialog(c *ui.Context) {
 		}
 		w, ok := s.selectedWorktree()
 		main := ok && s.selected == 0
-		ui.Row(c).FillWidth().Gap(6).Children(func() {
-			if ui.Button(c, "New Worktree...").Clicked() {
+		dialog.Actions(c, func() {
+			if button(c, "New Worktree...", false) {
 				s.adding, s.path, s.branch, s.newBranch = true, g.suggestWorktreePath(""), "", false
 			}
-			if ui.Button(c, "Copy Path").Disabled(!ok).Clicked() {
+			if button(c, "Copy Path", !ok) {
 				c.WriteClipboard(w.Path)
 			}
-			if ui.Button(c, "Remove").Disabled(!ok || main || g.busy != "").Clicked() {
+			if button(c, "Remove", !ok || main || g.busy != "") {
 				g.removeWorktree(w)
 			}
-			ui.Box(c).Grow(1)
-			if ui.Button(c, "Close").Clicked() {
+			design.Spacer(c)
+			if button(c, "Close", false) {
 				s.open = false
 			}
 		})
@@ -120,27 +127,20 @@ func (g *Git) worktreeList(c *ui.Context) {
 	s.list.Key = func(i int) any { return items[i].Path }
 	s.list.Label = func(i int) string { return items[i].Path }
 	s.list.Selected = &s.selected
-	ui.List(c.Key("worktrees"), &s.list, len(items)).FillWidth().Height(listHeight).Label("Worktrees").Rows(func(row ui.ListRow) {
-		w := items[row.Index]
-		rc := row.Context
-		ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-			path := ui.Text(rc, w.Path).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0).TruncateStart()
-			if row.Index == 0 {
-				path.Bold()
-			}
-			if w.Prunable {
-				path.TextColor(rc.Theme().TextMuted)
-			}
-			label := w.Branch
-			if w.Detached {
-				label = shortHash(w.HEAD)
-			}
-			muted(rc, label).SingleLine().Shrink(0)
+	boxedList(c, "Worktrees", &s.list, len(items), func(i int) list.Item {
+		w := items[i]
+		label := w.Branch
+		if w.Detached {
+			label = shortHash(w.HEAD)
+		}
+		it := list.Item{Label: w.Path, Icon: icons.Folder, Strong: i == 0, Muted: w.Prunable, Tooltip: w.Path}
+		it.Trailing = func(c *ui.Context) {
+			secondary(c, label).SingleLine()
 			if w.Locked {
-				ui.Icon(rc, icons.Lock).Size(iconSize, iconSize).TextColor(rc.Theme().Warning).Shrink(0)
-				badge(rc, lockedReason, rc.Theme().Warning)
+				badge.Tag(c, lockedReason, badge.TagOptions{Tone: token.ToneWarning, Icon: icons.Lock})
 			}
-		})
+		}
+		return it
 	})
 }
 
@@ -153,14 +153,15 @@ func (s *worktreeState) selectedWorktree() (git.Worktree, bool) {
 
 func (g *Git) worktreeForm(c *ui.Context) {
 	s := &g.worktrees
-	ui.TextInput(c.Key("wt-path"), &s.path).AutoFocus().FillWidth().Placeholder("Location").Label("Worktree Location")
-	ui.TextInput(c.Key("wt-branch"), &s.branch).FillWidth().Placeholder("Branch or commit").Label("Worktree Branch")
-	ui.Checkbox(c, &s.newBranch, "Create a new branch with this name")
 	path, branch := strings.TrimSpace(s.path), strings.TrimSpace(s.branch)
-	disabled := !filepath.IsAbs(path) || (branch != "" && checkName(branch) != nil) || (s.newBranch && branch == "") || g.busy != ""
+	problem := ""
 	if path != "" && !filepath.IsAbs(path) {
-		ui.Text(c, "Enter an absolute path.").FontSize(smallFont).TextColor(c.Theme().Danger)
+		problem = "Enter an absolute path."
 	}
+	field.TextInput(c, "Worktree Location", &s.path, field.InputOptions{Placeholder: "Location", Error: problem, AutoFocus: true, ID: "wt-path"})
+	field.TextInput(c, "Worktree Branch", &s.branch, field.InputOptions{Placeholder: "Branch or commit", ID: "wt-branch"})
+	action.Checkbox(c, "Create a new branch with this name", &s.newBranch, action.ChoiceOptions{})
+	disabled := !filepath.IsAbs(path) || (branch != "" && checkName(branch) != nil) || (s.newBranch && branch == "") || g.busy != ""
 	dialogButtons(c, func() { s.adding = false }, "Create Worktree", disabled, func() {
 		s.adding = false
 		newBranch := s.newBranch

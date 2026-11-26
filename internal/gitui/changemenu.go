@@ -18,48 +18,56 @@ const (
 	excludeFile    = "exclude"
 )
 
-func (g *Git) fileMenu(c *ui.Context, m *ui.Menu, r changeRow) {
-	abs := g.paths.abs(r.file.Path)
-	if m.Item("Show Diff").Chosen() {
-		g.openRowDiff(r)
-	}
-	if m.Item("Open File").Disabled(r.code() == 'D').Chosen() {
-		g.h.OpenAt(abs, -1, -1)
+func (g *Git) changeMenu(c *ui.Context, m *ui.Menu, e changeEntry) {
+	rows := g.targets(e)
+	busy := g.busy != ""
+	merge, staged, changes := rowsIn(rows, groupMerge), rowsIn(rows, groupStaged), rowsIn(rows, groupChanges)
+	single := e.kind == entryFile && len(rows) == 1
+	if single {
+		r := rows[0]
+		if r.group == groupMerge {
+			if m.Item("Open Merge Editor").Chosen() {
+				g.openMergeTool(r.file.Path)
+			}
+		} else if m.Item("Open Changes").Chosen() {
+			g.openRowDiff(r)
+		}
+		if m.Item("Open File").Disabled(r.code() == codeDeleted).Chosen() {
+			g.openFile(r)
+		}
+	} else if e.kind == entryGroup && e.group != groupMerge {
+		if m.Item("Open Changes").Disabled(len(rows) == 0).Chosen() {
+			g.openGroupChanges(e.group, rows)
+		}
 	}
 	m.Separator()
-	switch r.group {
-	case groupStaged:
-		if m.Item("Unstage").Chosen() {
-			g.unstage(r.file.Path)
+	if single && e.group == groupMerge {
+		path := rows[0].file.Path
+		if m.Item("Accept Yours").Disabled(busy).Chosen() {
+			g.acceptSide(path, true)
 		}
-	case groupUnstaged, groupUntracked:
-		if m.Item("Stage").Chosen() {
-			g.stage(r.file.Path)
-		}
-	case groupConflicts:
-		if m.Item("Merge...").Chosen() {
-			g.openMergeTool(r.file.Path)
-		}
-		if m.Item("Accept Yours").Chosen() {
-			g.acceptSide(r.file.Path, true)
-		}
-		if m.Item("Accept Theirs").Chosen() {
-			g.acceptSide(r.file.Path, false)
+		if m.Item("Accept Theirs").Disabled(busy).Chosen() {
+			g.acceptSide(path, false)
 		}
 	}
-	if r.group != groupConflicts {
-		label := "Rollback..."
-		if r.group == groupUntracked {
-			label = "Delete..."
-		}
-		if m.Item(label).Danger().Chosen() {
-			g.rollback([]changeRow{r})
-		}
-		if m.Item("Shelve Changes...").Disabled(r.group == groupUntracked).Chosen() {
-			g.askShelve([]string{r.file.Path})
-		}
+	if len(merge)+len(changes) > 0 && m.Item("Stage Changes").Disabled(busy).Chosen() {
+		g.stage(rowPaths(append(merge, changes...))...)
 	}
-	if r.group == groupUntracked {
+	if len(staged) > 0 && m.Item("Unstage Changes").Disabled(busy).Chosen() {
+		g.unstage(rowPaths(staged)...)
+	}
+	if len(changes) > 0 && m.Item(discardLabel(changes)).Danger().Disabled(busy).Chosen() {
+		g.rollback(changes)
+	}
+	if paths := shelvable(append(staged, changes...)); len(paths) > 0 && m.Item("Shelve Changes...").Disabled(busy).Chosen() {
+		g.askShelve(paths)
+	}
+	if !single {
+		return
+	}
+	r := rows[0]
+	if r.untracked() {
+		m.Separator()
 		if m.Item("Add to .gitignore").Chosen() {
 			g.addToIgnore(r.file.Path)
 		}
@@ -68,44 +76,36 @@ func (g *Git) fileMenu(c *ui.Context, m *ui.Menu, r changeRow) {
 		}
 	}
 	m.Separator()
-	if m.Item("Show History").Disabled(r.group == groupUntracked).Chosen() {
+	if m.Item("Show History").Disabled(r.untracked()).Chosen() {
 		g.fileHistory(r.file.Path)
 	}
 	if m.Item("Copy Path").Chosen() {
-		c.WriteClipboard(abs)
+		c.WriteClipboard(g.paths.abs(r.file.Path))
 	}
 	if m.Item("Copy Relative Path").Chosen() {
 		c.WriteClipboard(r.file.Path)
 	}
 }
 
-type rollbackPlan struct {
-	unstage   []string
-	discard   []string
-	untracked []string
-}
-
-func planRollback(rows []changeRow) rollbackPlan {
-	var p rollbackPlan
+func discardLabel(rows []changeRow) string {
 	for _, r := range rows {
-		f := r.file
-		switch {
-		case r.group == groupUntracked:
-			p.untracked = append(p.untracked, f.Path)
-		case r.group == groupConflicts:
-		case r.group == groupUnstaged:
-			p.discard = append(p.discard, f.Path)
-		case f.Index == 'A':
-			p.unstage = append(p.unstage, f.Path)
-		case f.OrigPath != "":
-			p.unstage = append(p.unstage, f.Path, f.OrigPath)
-			p.discard = append(p.discard, f.OrigPath)
-		default:
-			p.unstage = append(p.unstage, f.Path)
-			p.discard = append(p.discard, f.Path)
+		if !r.untracked() {
+			return "Discard Changes"
 		}
 	}
-	return p
+	return "Delete Files"
+}
+
+func shelvable(rows []changeRow) []string {
+	seen := map[string]bool{}
+	var paths []string
+	for _, r := range rows {
+		if !r.untracked() && !seen[r.file.Path] {
+			seen[r.file.Path] = true
+			paths = append(paths, r.file.Path)
+		}
+	}
+	return paths
 }
 
 func (g *Git) rollback(rows []changeRow) {
@@ -114,19 +114,19 @@ func (g *Git) rollback(rows []changeRow) {
 	}
 	p := planRollback(rows)
 	q := question{
-		message:     fmt.Sprintf("Roll back the changes in %d files?", len(rows)),
+		message:     fmt.Sprintf("Discard the changes in %d files?", len(rows)),
 		detail:      "Your local changes are lost.",
-		action:      "Rollback",
+		action:      "Discard",
 		destructive: true,
 	}
 	if len(rows) == 1 {
-		q.message = fmt.Sprintf("Roll back the changes in %s?", rows[0].file.Path)
+		q.message = fmt.Sprintf("Discard the changes in %s?", rows[0].file.Path)
 	}
 	if len(p.untracked) == len(rows) {
 		q.message, q.detail, q.action = fmt.Sprintf("Delete %d untracked files?", len(rows)), "The files are deleted from the disk.", "Delete"
 	}
 	g.confirm(q, func() {
-		g.doSimple("Rollback", func(ctx context.Context, r repo) error {
+		g.doSimple("Discard", func(ctx context.Context, r repo) error {
 			if err := r.UnstageFiles(ctx, p.unstage...); err != nil {
 				return err
 			}

@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	detailsMaxHeight = 220
-	containsShown    = 6
-	filesSplit       = 55
+	containsShown = 6
+	filesSplit    = 55
 )
 
 type commitDetails struct {
@@ -87,36 +89,15 @@ func (s *logState) filesView(c *ui.Context, cm git.Commit) {
 	d.list.Key = func(i int) any { return files[i].Path }
 	d.list.Label = func(i int) string { return files[i].Path }
 	d.list.Selected = &d.selected
-	list := ui.List(c.Key("files"), &d.list, len(files)).Fill().Label("Changed Files")
-	list.Rows(func(row ui.ListRow) {
-		f := files[row.Index]
-		el := s.g.fileRow(row.Context, f.Path, f.Status)
-		if el.RowDoubleClicked() {
-			s.g.openDiffSource(commitSource(cm, f))
-		}
-		el.ContextMenu(func(m *ui.Menu) { s.g.commitFileMenu(row.Context, m, cm, f) })
+	l := list.View(c.Key("files"), &d.list, len(files), list.ViewOptions{Label: "Changed Files"}, func(i int) list.Item {
+		f := files[i]
+		it := changedFileItem(f.Path, f.Status, func(preview, focus bool) { s.g.openDiffWith(commitSource(cm, f), preview, focus) })
+		it.Menu = func(m *ui.Menu) { s.g.commitFileMenu(c, m, cm, f) }
+		return it
 	})
-	if list.Submitted() && d.selected >= 0 && d.selected < len(files) {
+	if l.Submitted() && d.selected >= 0 && d.selected < len(files) {
 		s.g.openDiffSource(commitSource(cm, files[d.selected]))
 	}
-}
-
-func (g *Git) fileRow(c *ui.Context, rel string, code byte) ui.Element {
-	t := c.Theme()
-	name, dir := splitPath(rel)
-	el := ui.Row(c).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).
-		Tooltip(statusName(code) + ": " + rel)
-	el.Children(func() {
-		ui.Text(c, statusLetter(code)).FontSize(smallFont).Bold().TextColor(statusColor(t, code)).Width(statusWidth).Shrink(0)
-		text := ui.Text(c, name).FontSize(bodyFont).SingleLine().Shrink(0)
-		if code == 'D' {
-			text.Strikethrough()
-		}
-		if dir != "" {
-			muted(c, dir).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
-		}
-	})
-	return el
 }
 
 func (g *Git) commitFileMenu(c *ui.Context, m *ui.Menu, cm git.Commit, f git.ChangedFile) {
@@ -178,29 +159,29 @@ func (g *Git) revertCommitFile(cm git.Commit, f git.ChangedFile) {
 }
 
 func (g *Git) commitInfo(c *ui.Context, cm git.Commit, contains []string, focus func(string)) {
-	t := c.Theme()
+	p := token.Of(c)
 	now := c.Now()
-	ui.Column(c).FillWidth().Padding(rowPadding).Gap(6).Children(func() {
-		ui.Text(c, cm.Subject).FontSize(bodyFont).Bold().Selectable()
+	ui.Column(c).FillWidth().Padding(token.PadView.Px()).Gap(token.GapStack.Px()).Children(func() {
+		token.TextStrong.Apply(ui.Text(c, cm.Subject)).TextColor(p.Text.Primary).Wrap().Selectable()
 		if body := strings.TrimSpace(cm.Body); body != "" {
-			ui.Text(c, body).FontSize(smallFont).Selectable()
+			paragraph(c, body).Selectable()
 		}
-		ui.Row(c).Gap(6).AlignItems(ui.Center).Wrap().Children(func() {
-			ui.Text(c, cm.OID).FontSize(smallFont).TextColor(t.TextMuted).Selectable()
-			if textButton(c, "Copy Hash", false).Clicked() {
+		ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Wrap().Children(func() {
+			token.TextMono.Apply(ui.Text(c, cm.OID)).TextColor(p.Text.Secondary).Selectable()
+			if iconButton(c, "Copy Hash", icons.Copy, false) {
 				c.WriteClipboard(cm.OID)
 			}
 		})
-		muted(c, fmt.Sprintf("%s <%s>, %s", cm.Author, cm.AuthorEmail, formatTime(cm.AuthorTime, now))).Selectable()
+		secondary(c, fmt.Sprintf("%s <%s>, %s", cm.Author, cm.AuthorEmail, formatTime(cm.AuthorTime, now))).Wrap().Selectable()
 		if cm.Committer != "" && cm.Committer != cm.Author {
-			muted(c, fmt.Sprintf("Committed by %s, %s", cm.Committer, formatTime(cm.CommitTime, now)))
+			secondary(c, fmt.Sprintf("Committed by %s, %s", cm.Committer, formatTime(cm.CommitTime, now))).Wrap()
 		}
 		if len(cm.Parents) > 0 {
-			ui.Row(c).Gap(4).AlignItems(ui.Center).Wrap().Children(func() {
-				muted(c, "Parents:")
-				for _, p := range cm.Parents {
-					if textButton(c, shortHash(p), focus == nil).Clicked() && focus != nil {
-						focus(p)
+			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Wrap().Children(func() {
+				secondary(c, "Parents:")
+				for _, parent := range cm.Parents {
+					if smallButton(c, shortHash(parent), focus == nil) && focus != nil {
+						focus(parent)
 					}
 				}
 			})
@@ -211,7 +192,7 @@ func (g *Git) commitInfo(c *ui.Context, cm git.Commit, contains []string, focus 
 			if more := len(contains) - len(shown); more > 0 {
 				label += fmt.Sprintf(" and %d more", more)
 			}
-			muted(c, label)
+			secondary(c, label).Wrap()
 		}
 	})
 }

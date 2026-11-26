@@ -4,12 +4,15 @@ import (
 	"context"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
-
-const remoteNameWidth = 120
 
 type remotesState struct {
 	open     bool
@@ -34,7 +37,7 @@ func (g *Git) remotesDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Manage Remotes", dialogWidth, func() {
+	modal(c, &s.open, "Manage Remotes", token.DialogWidth, func() {
 		if s.editing {
 			g.remoteForm(c)
 			return
@@ -46,41 +49,51 @@ func (g *Git) remotesDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return remotes[i].Name }
 			s.list.Label = func(i int) string { return remotes[i].Name }
 			s.list.Selected = &s.selected
-			ui.List(c.Key("remotes"), &s.list, len(remotes)).FillWidth().Height(listHeight).Label("Remotes").Rows(func(row ui.ListRow) {
-				g.remoteRow(row, remotes[row.Index])
-			})
+			boxedList(c, "Remotes", &s.list, len(remotes), func(i int) list.Item { return g.remoteItem(remotes[i]) })
 		}
-		ui.Row(c).FillWidth().Gap(6).Children(func() {
-			if ui.Button(c, "Add Remote...").Clicked() {
+		dialog.Actions(c, func() {
+			if button(c, "Add Remote...", false) {
 				s.editing, s.original, s.name, s.url = true, "", "", ""
 			}
-			ui.Box(c).Grow(1)
-			if ui.Button(c, "Close").Clicked() {
+			design.Spacer(c)
+			if button(c, "Close", false) {
 				s.open = false
 			}
 		})
 	})
 }
 
-func (g *Git) remoteRow(row ui.ListRow, rm git.Remote) {
-	c := row.Context
+func (g *Git) remoteItem(rm git.Remote) list.Item {
 	s := &g.remotes
-	ui.Row(c).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, rm.Name).FontSize(bodyFont).Bold().SingleLine().Width(remoteNameWidth).Shrink(0)
-		muted(c, rm.FetchURL).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-		if iconButton(c, "Edit Remote "+rm.Name, icons.Edit, false).Clicked() {
-			s.editing, s.original, s.name, s.url = true, rm.Name, rm.Name, rm.FetchURL
-		}
-		if iconButton(c, "Remove Remote "+rm.Name, icons.Close, g.busy != "").Clicked() {
-			g.removeRemote(rm.Name)
-		}
-	})
+	return list.Item{
+		Label:       rm.Name,
+		Strong:      true,
+		Icon:        icons.Github,
+		Description: rm.FetchURL,
+		Tooltip:     rm.FetchURL,
+		Actions: func(c *ui.Context) {
+			if iconButton(c, "Edit Remote "+rm.Name, icons.Edit, false) {
+				s.editing, s.original, s.name, s.url = true, rm.Name, rm.Name, rm.FetchURL
+			}
+			if iconButton(c, "Remove Remote "+rm.Name, icons.Close, g.busy != "") {
+				g.removeRemote(rm.Name)
+			}
+		},
+		Menu: func(m *ui.Menu) {
+			if m.Item("Edit Remote...").Chosen() {
+				s.editing, s.original, s.name, s.url = true, rm.Name, rm.Name, rm.FetchURL
+			}
+			if m.Item("Remove Remote").Danger().Disabled(g.busy != "").Chosen() {
+				g.removeRemote(rm.Name)
+			}
+		},
+	}
 }
 
 func (g *Git) remoteForm(c *ui.Context) {
 	s := &g.remotes
-	ui.TextInput(c.Key("remote-form-name"), &s.name).FillWidth().Placeholder("Name").Label("Remote Name")
-	ui.TextInput(c.Key("remote-form-url"), &s.url).AutoFocus().FillWidth().Placeholder("URL").Label("Remote URL")
+	field.TextInput(c, "Remote Name", &s.name, field.InputOptions{Placeholder: "Name", ID: "remote-form-name"})
+	field.TextInput(c, "Remote URL", &s.url, field.InputOptions{Placeholder: "URL", AutoFocus: true, ID: "remote-form-url"})
 	name, url := strings.TrimSpace(s.name), strings.TrimSpace(s.url)
 	disabled := checkName(name) != nil || checkURL(url) != nil
 	action := "Add"

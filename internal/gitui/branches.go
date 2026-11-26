@@ -1,26 +1,20 @@
 package gitui
 
 import (
+	"strings"
+
+	"github.com/ZerGo0/editor/internal/design/quickinput"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	popupTop    = 60
-	popupWidth  = 460
-	popupRadius = 8
-	popupPad    = 6
-)
-
 type branchesState struct {
 	open      bool
 	query     string
-	sel       int
-	list      ui.ListState
+	input     quickinput.State
 	page      *branchEntry
-	actSel    int
-	actList   ui.ListState
+	actions   quickinput.State
 	tags      []git.Tag
 	tagsErr   error
 	gen       int
@@ -41,7 +35,8 @@ func (g *Git) openBranchPopup(title string, pick func(ref string)) {
 		return
 	}
 	s := &g.branches
-	s.open, s.query, s.page, s.sel, s.actSel = true, "", nil, -1, 0
+	s.open, s.query, s.page = true, "", nil
+	s.input, s.actions = quickinput.State{}, quickinput.State{}
 	s.pick, s.pickTitle = pick, title
 	g.refreshNow()
 	g.loadTags()
@@ -61,6 +56,25 @@ func (g *Git) loadTags() {
 	}()
 }
 
+type popupCommand struct {
+	label string
+	icon  *ui.SVG
+	run   func()
+}
+
+func (g *Git) popupCommands() []popupCommand {
+	s := &g.branches
+	if s.pick != nil || strings.TrimSpace(s.query) != "" {
+		return nil
+	}
+	return []popupCommand{
+		{label: "New Branch...", icon: icons.Plus, run: func() { g.newBranch("") }},
+		{label: "Checkout Tag or Revision...", icon: icons.Tag, run: g.checkoutRevision},
+		{label: "Manage Remotes...", icon: icons.Settings, run: g.openRemotes},
+		{label: "Fetch", icon: icons.Fetch, run: g.fetch},
+	}
+}
+
 func (g *Git) branchesPopup(c *ui.Context) {
 	s := &g.branches
 	if !s.open {
@@ -70,152 +84,67 @@ func (g *Git) branchesPopup(c *ui.Context) {
 		s.open = false
 		return
 	}
-	t := c.Theme()
+	if s.page != nil {
+		g.branchPage(c, *s.page)
+		return
+	}
+	cmds := g.popupCommands()
 	entries := buildBranchEntries(g.snap.branches, s.tags, s.query)
-	if s.sel < 0 || s.sel >= len(entries) || entries[s.sel].header {
-		s.sel = nextEntry(entries, -1, 1)
+	items := make([]quickinput.Item, 0, len(cmds)+len(entries))
+	refs := make([]int, 0, len(entries))
+	for _, cmd := range cmds {
+		items = append(items, quickinput.Item{Label: cmd.label, Icon: cmd.icon})
 	}
-	ui.Overlay(c, func() {
-		back := ui.Column(c).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Modal()
-		back.Children(func() {
-			panel := ui.Column(c).Margin(popupTop, 0, 0, 0).Width(popupWidth).Padding(popupPad).Gap(4).
-				Background(t.Background).Radius(popupRadius).BorderWidth(1).BorderColor(t.Border).
-				Role(ui.RoleDialog).Label(s.pickTitle)
-			panel.Children(func() {
-				if s.page != nil {
-					g.branchPage(c, *s.page)
-					return
-				}
-				g.branchList(c, entries)
-			})
-			escape := back.OverlayShortcut(0, ui.KeyEscape)
-			switch {
-			case escape && s.page != nil:
-				s.page = nil
-			case escape, panel.PressedOutside():
-				s.open = false
-			}
-		})
-	})
-}
-
-func (g *Git) branchList(c *ui.Context, entries []branchEntry) {
-	s := &g.branches
-	ui.Row(c).FillWidth().Gap(4).AlignItems(ui.Center).Children(func() {
-		input := ui.TextInput(c.Key("branch-query"), &s.query).AutoFocus().Grow(1).MinWidth(0).
-			Placeholder("Search branches and tags").Label("Search Branches")
-		switch {
-		case input.Shortcut(0, ui.KeyDown):
-			s.sel = nextEntry(entries, s.sel, 1)
-			s.list.ScrollIntoView(s.sel)
-		case input.Shortcut(0, ui.KeyUp):
-			s.sel = nextEntry(entries, s.sel, -1)
-			s.list.ScrollIntoView(s.sel)
+	group := ""
+	for i, e := range entries {
+		if e.header {
+			group = e.title
+			continue
 		}
-		if input.Submitted() && s.sel >= 0 && s.sel < len(entries) {
-			g.chooseEntry(entries[s.sel])
-		}
-		if s.pick == nil {
-			if iconButton(c, "Fetch", icons.Fetch, g.busy != "").Clicked() {
-				g.fetch()
-			}
-		}
-	})
-	if s.pick == nil {
-		ui.Row(c).FillWidth().Gap(2).Wrap().Children(func() {
-			if textButton(c, "New Branch...", false).Clicked() {
-				s.open = false
-				g.newBranch("")
-			}
-			if textButton(c, "Checkout Tag or Revision...", g.busy != "").Clicked() {
-				s.open = false
-				g.checkoutRevision()
-			}
-			if textButton(c, "Manage Remotes...", false).Clicked() {
-				s.open = false
-				g.openRemotes()
-			}
-		})
+		items = append(items, branchItem(e, group))
+		refs = append(refs, i)
 	}
+	empty := "No matching branches"
 	if s.tagsErr != nil {
-		ui.Text(c, "Cannot load tags: "+s.tagsErr.Error()).FontSize(smallFont).TextColor(c.Theme().Danger)
+		empty = "Cannot load tags: " + s.tagsErr.Error()
 	}
-	if len(entries) == 0 {
-		emptyState(c, "No matching branches", "")
-		return
+	placeholder := "Select a branch or tag to check out"
+	if s.pick != nil {
+		placeholder = s.pickTitle
 	}
-	s.list.Key = func(i int) any { return entries[i].key() }
-	s.list.Label = func(i int) string {
-		if entries[i].header {
-			return entries[i].title
-		}
-		return entries[i].name
-	}
-	s.list.Header = func(i int) bool { return entries[i].header }
-	s.list.Selected = &s.sel
-	list := ui.List(c.Key("branch-list"), &s.list, len(entries)).FillWidth().Height(listHeight).Label("Branches")
-	list.Rows(func(row ui.ListRow) { g.branchRow(row, entries[row.Index]) })
-	if list.Submitted() && s.sel >= 0 && s.sel < len(entries) {
-		g.chooseEntry(entries[s.sel])
+	res := quickinput.View(c, s.pickTitle, &s.input, items, quickinput.Options{Placeholder: placeholder, Busy: g.busy != "", Empty: empty})
+	s.query = s.input.Query
+	switch {
+	case res.Closed:
+		s.open = false
+	case res.Accepted >= 0 && res.Accepted < len(cmds):
+		s.open = false
+		cmds[res.Accepted].run()
+	case res.Accepted >= len(cmds):
+		g.chooseEntry(entries[refs[res.Accepted-len(cmds)]])
 	}
 }
 
-func (g *Git) branchRow(row ui.ListRow, e branchEntry) {
-	c := row.Context
-	t := c.Theme()
-	if e.header {
-		ui.Row(c).Height(rowHeight).FillWidth().Padding(0, rowPadding).AlignItems(ui.Center).Children(func() {
-			sectionTitle(c, e.title)
-		})
-		return
+func branchItem(e branchEntry, group string) quickinput.Item {
+	it := quickinput.Item{Label: e.name, Group: group, Icon: icons.GitBranch}
+	var details []string
+	switch {
+	case e.kind == kindTag:
+		it.Icon = icons.Tag
+	case e.branch.Current:
+		it.Icon = icons.Check
 	}
-	el := ui.Row(c).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center)
-	el.Children(func() {
-		icon := icons.GitBranch
-		if e.kind == kindTag {
-			icon = icons.Tag
-		}
-		color := t.TextMuted
-		if e.branch.Current {
-			color = t.Accent
-		}
-		ui.Icon(c, icon).Size(iconSize, iconSize).TextColor(color).Shrink(0)
-		name := ui.Text(c, e.name).FontSize(bodyFont).SingleLine().Shrink(1).MinWidth(0)
-		if e.branch.Current {
-			name.Bold()
-		}
-		if s := syncLabel(e.branch.Ahead, e.branch.Behind); s != "" {
-			muted(c, s).SingleLine().Shrink(0)
-		}
-		if e.branch.Gone {
-			ui.Text(c, "gone").FontSize(smallFont).TextColor(t.Warning).SingleLine().Shrink(0)
-		}
-		ui.Box(c).Grow(1)
-		if e.branch.Upstream != "" {
-			muted(c, e.branch.Upstream).SingleLine().Shrink(1).MinWidth(0)
-		}
-	})
-	if el.RowClicked() {
-		g.chooseEntry(e)
+	if s := syncLabel(e.branch.Ahead, e.branch.Behind); s != "" {
+		details = append(details, s)
 	}
-	if g.branches.pick == nil {
-		el.ContextMenu(func(m *ui.Menu) {
-			for _, a := range g.branchActions(e) {
-				if a.separator {
-					m.Separator()
-					continue
-				}
-				it := m.Item(a.label).Disabled(a.disabled)
-				if a.danger {
-					it.Danger()
-				}
-				if it.Chosen() {
-					g.branches.open = false
-					a.run()
-				}
-			}
-		})
+	if e.branch.Upstream != "" {
+		details = append(details, e.branch.Upstream)
 	}
+	if e.branch.Gone {
+		details = append(details, "gone")
+	}
+	it.Description = strings.Join(details, " \u2022 ")
+	return it
 }
 
 func (g *Git) chooseEntry(e branchEntry) {
@@ -228,55 +157,33 @@ func (g *Git) chooseEntry(e branchEntry) {
 		s.pick(e.name)
 		return
 	}
-	s.page, s.actSel = &e, firstAction(g.branchActions(e))
-}
-
-func firstAction(acts []branchAction) int {
-	for i, a := range acts {
-		if !a.separator && !a.disabled {
-			return i
-		}
-	}
-	return 0
+	s.page, s.actions = &e, quickinput.State{}
 }
 
 func (g *Git) branchPage(c *ui.Context, e branchEntry) {
 	s := &g.branches
-	acts := g.branchActions(e)
-	ui.Row(c).FillWidth().Gap(6).AlignItems(ui.Center).Children(func() {
-		if iconButton(c, "Back", icons.ChevronLeft, false).Clicked() {
-			s.page = nil
+	var acts []branchAction
+	for _, a := range g.branchActions(e) {
+		if !a.separator && !a.disabled {
+			acts = append(acts, a)
 		}
-		ui.Text(c, e.name).FontSize(bodyFont).Bold().SingleLine().Shrink(1).MinWidth(0)
-	})
-	s.actList.Label = func(i int) string { return acts[i].label }
-	s.actList.Header = func(i int) bool { return acts[i].separator }
-	s.actList.Selected = &s.actSel
-	list := ui.List(c.Key("branch-actions"), &s.actList, len(acts)).FillWidth().Height(listHeight).AutoFocus().
-		Label("Branch Actions")
-	list.Rows(func(row ui.ListRow) {
-		rc := row.Context
-		a := acts[row.Index]
-		if a.separator {
-			ui.Divider(rc).Margin(3, 0)
-			return
+	}
+	query := strings.ToLower(strings.TrimSpace(s.actions.Query))
+	var shown []branchAction
+	items := make([]quickinput.Item, 0, len(acts))
+	for _, a := range acts {
+		if query != "" && !strings.Contains(strings.ToLower(a.label), query) {
+			continue
 		}
-		el := ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).AlignItems(ui.Center).Children(func() {
-			text := ui.Text(rc, a.label).FontSize(bodyFont).SingleLine()
-			switch {
-			case a.disabled:
-				text.TextColor(rc.Theme().TextMuted)
-			case a.danger:
-				text.TextColor(rc.Theme().Danger)
-			}
-		})
-		if el.RowClicked() && !a.disabled {
-			s.open = false
-			a.run()
-		}
-	})
-	if list.Submitted() && s.actSel >= 0 && s.actSel < len(acts) && !acts[s.actSel].disabled && !acts[s.actSel].separator {
+		shown = append(shown, a)
+		items = append(items, quickinput.Item{Label: a.label})
+	}
+	res := quickinput.View(c, e.name, &s.actions, items, quickinput.Options{Placeholder: "Choose an action for " + e.name})
+	switch {
+	case res.Closed:
+		s.page = nil
+	case res.Accepted >= 0:
 		s.open = false
-		acts[s.actSel].run()
+		shown[res.Accepted].run()
 	}
 }

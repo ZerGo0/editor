@@ -3,7 +3,13 @@ package gitui
 import (
 	"context"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -58,7 +64,7 @@ func (g *Git) submodulesDialog(c *ui.Context) {
 	if s.open && !g.ready() {
 		s.open = false
 	}
-	modal(c, &s.open, "Submodules", dialogWidth, func() {
+	modal(c, &s.open, "Submodules", token.DialogWidth, func() {
 		switch {
 		case s.err != nil:
 			errorState(c, "Cannot list the submodules", s.err, g.loadSubmodules)
@@ -71,27 +77,27 @@ func (g *Git) submodulesDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].Path }
 			s.list.Label = func(i int) string { return items[i].Path }
 			s.list.Selected = &s.selected
-			ui.List(c.Key("submodules"), &s.list, len(items)).FillWidth().Height(listHeight).Label("Submodules").Rows(func(row ui.ListRow) {
-				m := items[row.Index]
-				rc := row.Context
-				ui.Row(rc).Height(rowHeight).FillWidth().Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Text(rc, m.Path).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-					muted(rc, shortHash(m.OID)).SingleLine().Shrink(0)
-					color := rc.Theme().TextMuted
+			boxedList(c, "Submodules", &s.list, len(items), func(i int) list.Item {
+				m := items[i]
+				it := list.Item{Label: m.Path, Icon: icons.Folder, Description: shortHash(m.OID)}
+				status := submoduleStatus(m.Status)
+				it.Trailing = func(c *ui.Context) {
 					if m.Status != ' ' && m.Status != 0 {
-						color = rc.Theme().Warning
+						badge.Tag(c, status, badge.TagOptions{Tone: token.ToneWarning})
+						return
 					}
-					ui.Text(rc, submoduleStatus(m.Status)).FontSize(smallFont).TextColor(color).SingleLine().Shrink(0)
-				})
+					secondary(c, status).SingleLine()
+				}
+				return it
 			})
 		}
 		busy := g.busy != ""
-		ui.Row(c).FillWidth().Gap(6).Children(func() {
-			if ui.Button(c, "Update").Disabled(len(s.items) == 0 || busy).Clicked() {
+		dialog.Actions(c, func() {
+			if button(c, "Update", len(s.items) == 0 || busy) {
 				g.updateSubmodules()
 			}
-			ui.Box(c).Grow(1)
-			if ui.Button(c, "Close").Clicked() {
+			design.Spacer(c)
+			if button(c, "Close", false) {
 				s.open = false
 			}
 		})

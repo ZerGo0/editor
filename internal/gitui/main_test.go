@@ -297,6 +297,10 @@ func (r *fakeRepo) Blame(context.Context, string, string, []byte) ([]git.BlameLi
 
 func (r *fakeRepo) OutgoingCommits(context.Context) ([]git.Commit, error) { return r.commits, nil }
 
+func (r *fakeRepo) IncomingCommits(context.Context) ([]git.Commit, error) {
+	return nil, git.ErrNoUpstream
+}
+
 func (r *fakeRepo) Push(_ context.Context, o git.PushOptions) error {
 	r.mu.Lock()
 	r.pushed = o

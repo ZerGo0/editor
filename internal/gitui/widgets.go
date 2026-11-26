@@ -1,123 +1,102 @@
 package gitui
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	iconButtonSize = 22
-	iconSize       = 14
-	buttonRadius   = 5
-	smallFont      = 12
-	bodyFont       = 13
-	sectionFont    = 11
-	rowHeight      = 22
-	rowPadding     = 8
-	toolbarHeight  = 30
-	stateGap       = 8
-	statePadding   = 16
-	badgeRadius    = 4
-	badgePaddingX  = 4
-	badgeFont      = 11
-	dialogGap      = 10
-	dialogWidth    = 520
-	wideDialog     = 720
-	listHeight     = 260
-	spinnerSize    = 16
-	tintAlpha      = 0.14
-	strongAlpha    = 0.28
-)
+const cancelLabel = "Cancel"
 
-func iconButton(c *ui.Context, label string, svg *ui.SVG, disabled bool) ui.Element {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(label)).Size(iconButtonSize, iconButtonSize).Radius(buttonRadius).Center().
-		TextColor(t.TextMuted).Label(label).Tooltip(label).Disabled(disabled)
-	if b.Hovered() && !disabled {
-		b.Background(t.SurfaceHover).TextColor(t.Text)
-	}
-	b.Children(func() { ui.Icon(c, svg).Size(iconSize, iconSize) })
-	return b
+func secondary(c *ui.Context, s string) ui.Element {
+	return token.TextLabel.Apply(ui.Text(c, s)).TextColor(token.Of(c).Text.Secondary)
 }
 
-func textButton(c *ui.Context, label string, disabled bool) ui.Element {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(label)).Height(iconButtonSize).Padding(0, 6).Radius(buttonRadius).Center().
-		Label(label).Disabled(disabled)
-	if b.Hovered() && !disabled {
-		b.Background(t.SurfaceHover)
-	}
-	b.Children(func() {
-		text := ui.Text(c, label).FontSize(smallFont).SingleLine()
-		if disabled {
-			text.TextColor(t.TextMuted)
-		}
-	})
-	return b
+func paragraph(c *ui.Context, s string) ui.Element {
+	return token.TextParagraph.Apply(ui.Text(c, s)).TextColor(token.Of(c).Text.Secondary).Wrap()
 }
 
-func muted(c *ui.Context, s string) ui.Element {
-	return ui.Text(c, s).FontSize(smallFont).TextColor(c.Theme().TextMuted)
+func errorText(c *ui.Context, s string) ui.Element {
+	return token.TextLabel.Apply(ui.Text(c, s)).TextColor(token.Of(c).Severity.Error).Wrap().Role(ui.RoleAlert)
 }
 
 func emptyState(c *ui.Context, title, detail string) {
-	t := c.Theme()
-	ui.Column(c).FillWidth().Grow(1).Center().Gap(stateGap).Padding(statePadding).Children(func() {
-		ui.Text(c, title).FontSize(bodyFont).TextColor(t.TextMuted).TextAlign(ui.Center)
-		if detail != "" {
-			ui.Text(c, detail).FontSize(smallFont).TextColor(t.TextMuted).TextAlign(ui.Center)
-		}
-	})
+	feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: detail})
 }
 
 func loadingState(c *ui.Context, label string) {
-	ui.Row(c).FillWidth().Grow(1).Center().Gap(stateGap).Padding(statePadding).Children(func() {
-		ui.Spinner(c).Size(spinnerSize, spinnerSize).Label(label)
-		muted(c, label)
-	})
+	feedback.Loading(c, label)
 }
 
 func errorState(c *ui.Context, title string, err error, retry func()) {
-	t := c.Theme()
-	ui.Column(c).FillWidth().Grow(1).Center().Gap(stateGap).Padding(statePadding).Children(func() {
-		ui.Text(c, title).FontSize(bodyFont).Bold().TextAlign(ui.Center)
-		if err != nil {
-			ui.Text(c, err.Error()).FontSize(smallFont).TextColor(t.Danger).TextAlign(ui.Center)
-		}
-		if retry != nil && ui.Button(c, "Retry").Clicked() {
-			retry()
-		}
-	})
+	feedback.Error(c, title, err, retry)
 }
 
-func sectionTitle(c *ui.Context, s string) ui.Element {
-	return ui.Text(c, s).FontSize(sectionFont).Bold().TextColor(c.Theme().TextMuted).SingleLine()
+func button(c *ui.Context, label string, disabled bool) bool {
+	return action.Button(c, label, action.ButtonOptions{Disabled: disabled}).Clicked() && !disabled
 }
 
-func badge(c *ui.Context, s string, color ui.Color) {
-	t := c.Theme()
-	ui.Text(c, s).FontSize(badgeFont).SingleLine().Padding(0, badgePaddingX).Radius(badgeRadius).
-		TextColor(color).Background(color.Alpha(tintAlpha)).BorderWidth(1).BorderColor(t.Border).Shrink(0)
+func primaryButton(c *ui.Context, label string, disabled bool) bool {
+	return action.Button(c, label, action.ButtonOptions{Variant: action.Primary, Disabled: disabled}).Clicked() && !disabled
 }
 
-func dialogButtons(c *ui.Context, cancel func(), action string, disabled bool, ok func()) {
-	ui.Row(c).Gap(stateGap).Justify(ui.End).FillWidth().Children(func() {
-		if ui.Button(c, "Cancel").Clicked() {
+func smallButton(c *ui.Context, label string, disabled bool) bool {
+	return action.Button(c, label, action.ButtonOptions{Small: true, Disabled: disabled}).Clicked() && !disabled
+}
+
+func iconButton(c *ui.Context, label string, svg *ui.SVG, disabled bool) bool {
+	return action.IconButton(c, svg, label, action.IconOptions{Disabled: disabled}).Clicked() && !disabled
+}
+
+func dialogButtons(c *ui.Context, cancel func(), label string, disabled bool, ok func()) {
+	dialog.Actions(c, func() {
+		if button(c, cancelLabel, false) {
 			cancel()
 		}
-		if ui.PrimaryButton(c, action).Disabled(disabled).Clicked() && !disabled {
+		if primaryButton(c, label, disabled) {
 			ok()
 		}
 	})
 }
 
-func modal(c *ui.Context, open *bool, title string, width float32, body func()) {
+func modal(c *ui.Context, open *bool, title string, width token.Size, body func()) {
 	if !*open {
 		return
 	}
-	ui.Modal(c, open, func() {
-		ui.Column(c).Gap(dialogGap).Width(width).Role(ui.RoleDialog).Label(title).Children(func() {
-			ui.Text(c, title).Bold()
-			body()
-		})
+	dialog.Modal(c, open, title, dialog.Options{Width: width}, body)
+}
+
+func boxedList(c *ui.Context, label string, s *ui.ListState, n int, item func(i int) list.Item) ui.Element {
+	p := token.Of(c)
+	var l ui.Element
+	ui.Column(c).FillWidth().Height(token.ListHeightMax.Px()).Radius(token.RadiusControl.Px()).Clip().
+		Border(token.BorderWidth.Px(), p.Border.Input).Children(func() {
+		l = list.View(c, s, n, list.ViewOptions{Label: label}, item)
 	})
+	return l
+}
+
+func changedFileItem(rel string, code byte, open func(preview, focus bool)) list.Item {
+	name, dir := splitPath(rel)
+	return list.Item{
+		Label:         name,
+		Description:   dir,
+		Git:           gitStatus(code),
+		Strike:        code == codeDeleted,
+		Tooltip:       rel + " \u2022 " + statusName(code),
+		Leading:       func(c *ui.Context) { icons.FileIcon(c, name, false, false, token.IconSize.Px()) },
+		OnClick:       func() { open(true, false) },
+		OnDoubleClick: func() { open(false, true) },
+	}
+}
+
+func toolbarRow(c *ui.Context, label string, children func()) ui.Element {
+	p := token.Of(c)
+	return ui.Row(c).FillWidth().Height(token.ToolbarHeight.Px()).Shrink(0).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).
+		AlignItems(ui.Center).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).Role(ui.RoleToolbar).Label(label).
+		Children(children)
 }

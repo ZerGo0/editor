@@ -41,6 +41,7 @@ type Git struct {
 
 	commit     commitState
 	changes    changesState
+	graph      graphState
 	log        *logState
 	branches   branchesState
 	push       pushState
@@ -100,7 +101,9 @@ func newGit(h host.Host, d deps) *Git {
 
 func (g *Git) initViews() {
 	g.log = newLogState(g, "")
-	g.changes.selected = -1
+	g.changes.cursor = -1
+	g.graph.cursor = -1
+	g.changes.stack.Weights = map[string]float32{paneChanges: changesPaneWeight, paneGraph: graphPaneWeight}
 }
 
 func (g *Git) open() {

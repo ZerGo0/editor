@@ -99,20 +99,3 @@ func matchOrder(query string, n int, text func(int) string) []int {
 	}
 	return idx
 }
-
-func nextEntry(entries []branchEntry, from, step int) int {
-	if len(entries) == 0 {
-		return -1
-	}
-	i := from
-	for range entries {
-		i += step
-		if i < 0 || i >= len(entries) {
-			return from
-		}
-		if !entries[i].header {
-			return i
-		}
-	}
-	return from
-}

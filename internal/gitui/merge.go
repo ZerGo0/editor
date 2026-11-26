@@ -7,17 +7,16 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const (
-	arrowColumn   = 26
-	arrowSize     = 20
-	paneHeader    = 24
-	mergeFileMode = 0o644
-)
+const mergeFileMode = 0o644
 
 type mergeTool struct {
 	g        *Git
@@ -141,31 +140,30 @@ func (t *mergeTool) toolbar(c *ui.Context) {
 	m := t.model
 	changes := m.changes()
 	busy := t.g.busy != ""
-	ui.Row(c).FillWidth().Height(toolbarHeight).Shrink(0).Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).
-		BorderWidth(0, 0, 1, 0).BorderColor(c.Theme().Border).Children(func() {
+	toolbarRow(c, "Merge Toolbar", func() {
 		left := m.unresolved()
 		status := "All conflicts are resolved"
 		if left > 0 {
 			status = fmt.Sprintf("%d conflicts left", left)
 		}
-		ui.Text(c, status).FontSize(smallFont).SingleLine().Shrink(0)
-		if textButton(c, "Previous Change", len(changes) == 0).Clicked() {
+		token.TextLabel.Apply(ui.Text(c, status)).TextColor(token.Of(c).Text.Primary).SingleLine().Shrink(0).Role(ui.RoleStatus)
+		if iconButton(c, "Previous Change", icons.ChevronUp, len(changes) == 0) {
 			t.move(changes, -1)
 		}
-		if textButton(c, "Next Change", len(changes) == 0).Clicked() {
+		if iconButton(c, "Next Change", icons.ChevronDown, len(changes) == 0) {
 			t.move(changes, 1)
 		}
-		ui.Box(c).Grow(1)
-		if textButton(c, "Apply Non-Conflicting Changes", false).Clicked() {
+		design.Spacer(c)
+		if smallButton(c, "Apply Non-Conflicting Changes", false) {
 			t.act(func() { m.applyNonConflicting(true, true) })
 		}
-		if textButton(c, "Accept Left", false).Clicked() {
+		if smallButton(c, "Accept Left", false) {
 			t.act(func() { m.acceptAll(true) })
 		}
-		if textButton(c, "Accept Right", false).Clicked() {
+		if smallButton(c, "Accept Right", false) {
 			t.act(func() { m.acceptAll(false) })
 		}
-		if ui.PrimaryButton(c, "Apply").Disabled(busy).Clicked() {
+		if action.Button(c, "Apply", action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: busy}).Clicked() && !busy {
 			t.apply()
 		}
 	})
@@ -188,15 +186,15 @@ func (t *mergeTool) move(changes []int, step int) {
 }
 
 func (t *mergeTool) chunkColor(c *ui.Context, i int) ui.Color {
-	th := c.Theme()
+	p := token.Of(c)
 	ch := t.model.chunks[i]
 	switch {
 	case ch.Kind == git.ChunkConflict && t.model.choices[i] == choiceNone:
-		return th.Danger.Alpha(tintAlpha)
+		return p.Severity.ErrorBackground
 	case t.model.choices[i] != choiceNone:
-		return th.Success.Alpha(tintAlpha)
+		return p.Diff.InsertedLine
 	}
-	return th.Accent.Alpha(tintAlpha)
+	return p.Severity.InfoBackground
 }
 
 func (t *mergeTool) backgrounds(c *ui.Context, side mergeSide) []editor.LineBackground {
@@ -220,26 +218,27 @@ func (t *mergeTool) panes(c *ui.Context) {
 	}
 	ui.Row(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
 		t.pane(c, left, t.ours)
-		t.arrows(c, t.ours, sideOurs, "\u00bb", choiceOurs)
+		t.arrows(c, t.ours, sideOurs, icons.ChevronRight, choiceOurs)
 		t.pane(c, "Result", t.result)
-		t.arrows(c, t.theirs, sideTheirs, "\u00ab", choiceTheirs)
+		t.arrows(c, t.theirs, sideTheirs, icons.ChevronLeft, choiceTheirs)
 		t.pane(c, right, t.theirs)
 	})
 }
 
 func (t *mergeTool) pane(c *ui.Context, title string, st *editor.State) {
 	ui.Column(c.Key(title)).Grow(1).Basis(0).FillHeight().MinWidth(0).Children(func() {
-		ui.Row(c).Height(paneHeader).FillWidth().Padding(0, rowPadding).AlignItems(ui.Center).Children(func() {
-			sectionTitle(c, title)
+		ui.Row(c).Height(token.HeaderHeight.Px()).FillWidth().Padding(token.Space0.Px(), token.PadRow.Px()).AlignItems(ui.Center).Children(func() {
+			token.TextCaption.Apply(ui.Text(c, title)).FontWeight(token.WeightSemibold).TextColor(token.Of(c).Text.Secondary).SingleLine()
 		})
 		editor.View(c.Key("editor"), st).Grow(1).FillWidth().MinHeight(0).Label(title)
 	})
 }
 
-func (t *mergeTool) arrows(c *ui.Context, st *editor.State, side mergeSide, glyph string, choice mergeChoice) {
+func (t *mergeTool) arrows(c *ui.Context, st *editor.State, side mergeSide, icon *ui.SVG, choice mergeChoice) {
 	ranges := t.model.ranges(side)
-	ui.Column(c.Key(side)).Width(arrowColumn).FillHeight().Shrink(0).Children(func() {
-		ui.Box(c).Height(paneHeader).Shrink(0)
+	inset := (token.ControlHeight.Px() - token.IconButtonSize.Px()) / half
+	ui.Column(c.Key(side)).Width(token.ControlHeight.Px()).FillHeight().Shrink(0).Children(func() {
+		ui.Box(c).Height(token.HeaderHeight.Px()).Shrink(0)
 		ui.Box(c).Grow(1).FillWidth().Clip().Children(func() {
 			for _, i := range t.model.changes() {
 				r := ranges[i]
@@ -251,12 +250,7 @@ func (t *mergeTool) arrows(c *ui.Context, st *editor.State, side mergeSide, glyp
 					continue
 				}
 				label := fmt.Sprintf("Accept change %d from %s", i+1, sideLabel(side))
-				b := ui.ButtonBase(c.Key(i)).Absolute().Top(y).Left((arrowColumn-arrowSize)/2).Size(arrowSize, arrowSize).
-					Radius(buttonRadius).Center().Label(label).Tooltip(label)
-				if b.Hovered() {
-					b.Background(c.Theme().SurfaceHover)
-				}
-				b.Children(func() { ui.Text(c, glyph).FontSize(bodyFont).Bold() })
+				b := action.IconButton(c, icon, label, action.IconOptions{}).Absolute().Top(y).Left(inset)
 				if b.Clicked() {
 					idx := i
 					t.current = idx

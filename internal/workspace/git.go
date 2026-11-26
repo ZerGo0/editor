@@ -28,7 +28,7 @@ var pullModes = map[string]gitui.PullMode{
 }
 
 func (w *Workspace) initGit() {
-	w.addSideView(toolView{id: SourceControlView, title: "Source Control", command: "workbench.view.scm", icon: icons.GitBranch, view: w.gitSideView, badge: w.gitChangeCount})
+	w.addSideView(toolView{id: SourceControlView, title: "Source Control", command: "workbench.view.scm", icon: icons.GitBranch, view: w.gitSideView, badge: w.gitChangeCount, actions: w.gitTitleActions})
 	w.addPanel(toolView{id: GitPanel, title: "Git", command: "git.showLog", icon: icons.Commit, view: w.gitLogPanel})
 	w.statusLeft = append(w.statusLeft, w.gitStatusItems)
 }
@@ -57,6 +57,18 @@ func (w *Workspace) gitSideView(c *ui.Context) {
 		return
 	}
 	w.git.SideView(c)
+}
+
+func (w *Workspace) gitTitleActions(c *ui.Context) {
+	if w.git != nil {
+		w.git.TitleActions(c)
+	}
+}
+
+func (w *Workspace) OpenViewWith(id, title string, view func(c *ui.Context), preview, focus bool) {
+	p := virtualPrefix + id
+	w.virtual[p] = &virtualTab{title: title, view: view}
+	w.OpenFile(p, preview, focus)
 }
 
 func (w *Workspace) gitLogPanel(c *ui.Context) {
@@ -154,6 +166,7 @@ func (w *Workspace) gitEditorItems(m *ui.Menu) {
 }
 
 func (w *Workspace) headChanged() {
+	w.scheduleIgnored()
 	if w.prs != nil {
 		w.prs.BranchChanged()
 	}

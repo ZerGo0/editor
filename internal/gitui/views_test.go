@@ -2,6 +2,7 @@ package gitui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -69,10 +70,13 @@ func TestCommitWindow(t *testing.T) {
 	r := &fakeRepo{status: st, branches: []git.Branch{{Name: "main", Current: true}}}
 	g, h := newFakeGit(t, r)
 	tt := newTester(g, g.SideView)
-	for _, want := range []string{"main", "staged.go", "work.go", "new.go", "Unversioned Files", "Staged"} {
+	for _, want := range []string{"staged.go", "work.go", "new.go", "Changes", "Staged Changes", "Graph"} {
 		if !tt.HasText(want) {
 			t.Fatalf("missing %q in %v", want, tt.Texts())
 		}
+	}
+	if _, ok := tt.Access("Commit Message"); !ok {
+		t.Fatal("no commit message field")
 	}
 	if g.ChangeCount() != 4 {
 		t.Fatalf("ChangeCount = %d", g.ChangeCount())
@@ -95,10 +99,81 @@ func TestStageButton(t *testing.T) {
 	r := &fakeRepo{status: st}
 	g, h := newFakeGit(t, r)
 	tt := newTester(g, g.SideView)
-	if err := tt.Click("Stage All Unversioned Files"); err != nil {
+	hover(t, tt, "Changes")
+	if err := tt.Click("Stage All Changes"); err != nil {
 		t.Fatal(err)
 	}
-	h.drain(t, func() bool { return r.called("stage new.go") })
+	h.drain(t, func() bool { return r.called("stage both.go,new.go,work.go") })
+}
+
+func hover(t *testing.T, tt *ui.Tester, label string) {
+	t.Helper()
+	var b ui.Rect
+	for _, info := range tt.AccessAll() {
+		if info.Name == label {
+			b = info.Bounds
+		}
+	}
+	if b.W == 0 {
+		var roles []string
+		for _, info := range tt.AccessAll() {
+			roles = append(roles, fmt.Sprintf("%v:%s", info.Role, info.Name))
+		}
+		t.Fatalf("no row %q in %v", label, roles)
+	}
+	tt.Move(b.X+b.W/2, b.Y+b.H/2)
+	tt.Frame()
+}
+
+func TestChangesTreeAndPreview(t *testing.T) {
+	st := &git.Status{Branch: "main", OID: "a", Files: []git.FileStatus{
+		{Path: "src/app/main.go", Index: '.', WorkTree: 'M'},
+		{Path: "src/app/util.go", Index: '.', WorkTree: 'D'},
+	}}
+	r := &fakeRepo{status: st}
+	g, h := newFakeGit(t, r)
+	tt := newTester(g, g.SideView)
+	if !tt.HasText("src/app") || !tt.HasText("main.go") {
+		t.Fatalf("tree = %v", tt.Texts())
+	}
+	if err := tt.Click("main.go"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle()
+	if _, ok := h.views[diffSource{kind: diffWorkTree, path: "src/app/main.go"}.id()]; !ok {
+		t.Fatalf("diff not opened: %v", h.views)
+	}
+	if err := tt.Click("src/app"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if tt.HasText("main.go") {
+		t.Fatal("folder did not collapse")
+	}
+	g.changes.setListMode(true)
+	tt.Frame()
+	if !tt.HasText("util.go") || !tt.HasText("src/app") {
+		t.Fatalf("list mode = %v", tt.Texts())
+	}
+	hover(t, tt, "util.go")
+	if err := tt.Click("Stage Changes"); err != nil {
+		t.Fatal(err)
+	}
+	h.drain(t, func() bool { return r.called("stage src/app/util.go") })
+}
+
+func TestPrimaryActionSync(t *testing.T) {
+	r := &fakeRepo{status: &git.Status{Branch: "main", OID: "a", Upstream: "origin/main", Ahead: 2, Behind: 1}}
+	g, _ := newFakeGit(t, r)
+	tt := newTester(g, g.SideView)
+	if !tt.HasText("Sync Changes \u21912 \u21931") {
+		t.Fatalf("texts = %v", tt.Texts())
+	}
+	g.commit.message = "Fix"
+	tt.Frame()
+	if !tt.HasText(commitLabel) {
+		t.Fatalf("texts = %v", tt.Texts())
+	}
 }
 
 func TestBranchesPopup(t *testing.T) {

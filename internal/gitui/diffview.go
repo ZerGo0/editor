@@ -5,6 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/pane"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -36,12 +41,28 @@ func (g *Git) openDiff(kind diffKind, rel string) {
 }
 
 func (g *Git) openDiffSource(src diffSource) {
+	g.openDiffWith(src, false, true)
+}
+
+func (g *Git) openDiffWith(src diffSource, preview, focus bool) {
 	if !g.ready() {
 		return
 	}
 	t := g.diffTabFor(src)
 	t.load()
-	g.h.OpenView(src.id(), src.title(), t.view)
+	g.openView(src.id(), src.title(), t.view, preview, focus)
+}
+
+type viewOpener interface {
+	OpenViewWith(id, title string, view func(c *ui.Context), preview, focus bool)
+}
+
+func (g *Git) openView(id, title string, view func(c *ui.Context), preview, focus bool) {
+	if o, ok := g.h.(viewOpener); ok {
+		o.OpenViewWith(id, title, view, preview, focus)
+		return
+	}
+	g.h.OpenView(id, title, view)
 }
 
 func (g *Git) diffTabFor(src diffSource) *diffTab {
@@ -152,39 +173,38 @@ func (t *diffTab) body(c *ui.Context) {
 }
 
 func (t *diffTab) toolbar(c *ui.Context) {
-	tc := c.Theme()
-	ui.Row(c).FillWidth().Height(toolbarHeight).Shrink(0).Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).
-		BorderWidth(0, 0, 1, 0).BorderColor(tc.Border).Children(func() {
-		ui.Text(c, t.src.path).FontSize(smallFont).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+	toolbarRow(c, "Diff Toolbar", func() {
+		secondary(c, t.src.path).SingleLine().Shrink(1).MinWidth(0).TruncateStart().Tooltip(t.src.path)
 		if t.loading {
-			ui.Spinner(c).Size(iconSize, iconSize).Label("Loading diff")
+			feedback.Spinner(c, "Loading diff")
 		}
-		ui.Box(c).Grow(1)
+		design.Spacer(c)
 		if d := t.state; d != nil {
 			added, deleted := d.Stats()
-			muted(c, fmt.Sprintf("+%d \u2212%d", added, deleted)).SingleLine()
+			secondary(c, fmt.Sprintf("+%d \u2212%d", added, deleted)).SingleLine().Shrink(0)
 			hunks := d.Hunks()
 			i, _ := d.CurrentHunk()
 			label := fmt.Sprintf("%d changes", len(hunks))
 			if i >= 0 && len(hunks) > 0 {
 				label = fmt.Sprintf("%d of %d", i+1, len(hunks))
 			}
-			muted(c, label).SingleLine()
-			if textButton(c, "Previous", i <= 0).Clicked() {
+			secondary(c, label).SingleLine().Shrink(0)
+			if iconButton(c, "Previous Change", icons.ChevronUp, i <= 0) {
 				d.GoToHunk(i - 1)
 			}
-			if textButton(c, "Next", i >= len(hunks)-1).Clicked() {
+			if iconButton(c, "Next Change", icons.ChevronDown, i >= len(hunks)-1) {
 				d.GoToHunk(i + 1)
 			}
 		}
-		ui.Segmented(c, &t.layout, layoutNames...).Label("Diff Layout")
-		diffmode.Controls(c, t.engine)
+		pane.Separator(c, true)
+		action.Segmented(c, "Diff Layout", &t.layout, layoutNames, action.SegmentedOptions{})
+		diffModeControls(c, t.engine)
 		if t.engine != nil && t.engine.Filtered() && (t.live || t.hasHunkActions()) {
-			muted(c, readOnlyNote).SingleLine().Shrink(0)
+			secondary(c, readOnlyNote).SingleLine().Shrink(0)
 		}
 		t.g.diffOptionsButton(c)
 		t.fileActions(c)
-		if iconButton(c, "Reload Diff", icons.Refresh, t.loading).Clicked() {
+		if iconButton(c, "Reload Diff", icons.Refresh, t.loading) {
 			t.load()
 		}
 	})
@@ -195,11 +215,11 @@ func (t *diffTab) fileActions(c *ui.Context) {
 	busy := g.busy != ""
 	switch t.src.kind {
 	case diffWorkTree, diffUntracked:
-		if textButton(c, "Stage File", busy).Clicked() {
+		if iconButton(c, "Stage File", icons.Plus, busy) {
 			g.doSimple("Stage", func(ctx context.Context, r repo) error { return r.StageFiles(ctx, rel) }, t.load)
 		}
 	case diffStaged:
-		if textButton(c, "Unstage File", busy).Clicked() {
+		if iconButton(c, "Unstage File", icons.Minus, busy) {
 			g.doSimple("Unstage", func(ctx context.Context, r repo) error { return r.UnstageFiles(ctx, rel) }, t.load)
 		}
 	}
@@ -207,21 +227,21 @@ func (t *diffTab) fileActions(c *ui.Context) {
 
 func (t *diffTab) hunkActions(c *ui.Context, bar ui.Element, a *editor.DiffHunkActions) {
 	busy := t.g.busy != ""
-	bar.Gap(4).Children(func() {
+	bar.Gap(token.GapInline.Px()).Children(func() {
 		switch t.src.kind {
 		case diffWorkTree:
-			if ui.Button(c, "Revert").Disabled(busy).Clicked() {
+			if smallButton(c, "Revert", busy) {
 				t.revertHunk(a)
 			}
-			if ui.PrimaryButton(c, "Stage").Disabled(busy).Clicked() {
+			if action.Button(c, "Stage", action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: busy}).Clicked() && !busy {
 				t.applyHunk(a.Hunk, false, true, false)
 			}
 		case diffStaged:
-			if ui.Button(c, "Unstage").Disabled(busy).Clicked() {
+			if smallButton(c, "Unstage", busy) {
 				t.applyHunk(a.Hunk, true, true, true)
 			}
 		case diffHead:
-			if ui.Button(c, "Revert").Disabled(busy).Clicked() {
+			if smallButton(c, "Revert", busy) {
 				t.revertHunk(a)
 			}
 		}

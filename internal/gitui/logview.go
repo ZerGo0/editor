@@ -5,6 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -14,11 +20,6 @@ const (
 	logNearEnd      = 60
 	defaultLogSplit = 64
 	filterDelay     = 300 * time.Millisecond
-	filterWidth     = 150
-	branchWidth     = 150
-	authorWidth     = 120
-	dateWidth       = 110
-	hashWidth       = 64
 	maxBadges       = 3
 	focusPageLimit  = 20
 	allBranches     = "All Branches"
@@ -267,43 +268,48 @@ func (s *logState) view(c *ui.Context) {
 }
 
 func (s *logState) filterBar(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c).FillWidth().Height(toolbarHeight+4).Shrink(0).Padding(0, rowPadding).Gap(6).AlignItems(ui.Center).
-		BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-		changed := ui.TextInput(c.Key("text"), &s.filter.text).Placeholder("Text or hash").Label("Filter by Text").
-			Width(filterWidth).Changed()
-		if ui.Select(c.Key("branch"), &s.filter.branch, s.g.branchOptions()).Label("Filter by Branch").Width(branchWidth).Changed() {
+	toolbarRow(c, "Log Filters", func() {
+		changed := false
+		filterField := func(label, placeholder, id string, value *string) {
+			ui.Row(c).Width(token.FieldWidthSmall.Px()).Shrink(0).Children(func() {
+				if field.TextInput(c, label, value, field.InputOptions{Placeholder: placeholder, ID: id}).Changed() {
+					changed = true
+				}
+			})
+		}
+		filterField("Filter by Text", "Text or hash", "text", &s.filter.text)
+		branch := s.filter.branch
+		ui.Row(c).Width(token.FieldWidthSmall.Px()).Shrink(0).Children(func() {
+			action.Select(c, "Filter by Branch", &s.filter.branch, s.g.branchOptions(), action.SelectOptions{ID: "branch"})
+		})
+		if s.filter.branch != branch {
 			s.applyFilter()
 		}
-		changed = ui.TextInput(c.Key("author"), &s.filter.author).Placeholder("User").Label("Filter by User").
-			Width(filterWidth).Changed() || changed
+		filterField("Filter by User", "User", "author", &s.filter.author)
 		if s.fixedPath == "" {
-			changed = ui.TextInput(c.Key("path"), &s.filter.path).Placeholder("Path").Label("Filter by Path").
-				Width(filterWidth).Changed() || changed
+			filterField("Filter by Path", "Path", "path", &s.filter.path)
 		}
 		if changed {
 			s.scheduleApply()
 		}
-		if s.filter != (logFilter{branch: s.defaultBranch()}) && iconButton(c, "Reset Filters", icons.Close, false).Clicked() {
+		if s.filter != (logFilter{branch: s.defaultBranch()}) && iconButton(c, "Reset Filters", icons.Close, false) {
 			s.resetFilters()
 		}
-		ui.Box(c).Grow(1)
+		design.Spacer(c)
 		if s.loading {
-			ui.Spinner(c).Size(iconSize, iconSize).Label("Loading commits")
+			feedback.Spinner(c, "Loading commits")
 		}
-		muted(c, commitCount(len(s.commits), s.done)).SingleLine()
-		if iconButton(c, "Refresh Log", icons.Refresh, false).Clicked() {
+		secondary(c, commitCount(len(s.commits), s.done)).SingleLine().Shrink(0)
+		if iconButton(c, "Refresh Log", icons.Refresh, false) {
 			s.reload()
 		}
 	})
 }
 
-func (g *Git) branchOptions() []string {
-	opts := []string{allBranches, currentBranch}
-	for _, b := range g.snap.branches {
-		if !strings.HasSuffix(b.Name, "/HEAD") {
-			opts = append(opts, b.Name)
-		}
+func (g *Git) branchOptions() []action.Option[string] {
+	opts := []action.Option[string]{{Value: allBranches, Label: allBranches}, {Value: currentBranch, Label: currentBranch}}
+	for _, b := range g.branchNames() {
+		opts = append(opts, action.Option[string]{Value: b, Label: b})
 	}
 	return opts
 }
@@ -335,26 +341,30 @@ func (s *logState) listView(c *ui.Context) {
 	s.list.Key = func(i int) any { return commits[i].OID }
 	s.list.Label = func(i int) string { return commits[i].Subject }
 	s.list.Selected = &s.selected
-	s.list.RowHeight = rowHeight
+	s.list.RowHeight = token.RowHeight.Px()
 	s.list.NearEnd = logNearEnd
 	s.list.EndReached = func(int) { s.loadPage() }
 	var gw float32
 	if s.graph != nil {
 		gw = graphWidth(s.graph)
 	}
-	now, remotes := c.Now(), s.g.remoteSet()
+	remotes := s.g.remoteSet()
 	ui.Column(c).Fill().Children(func() {
-		list := ui.List(c.Key("log"), &s.list, len(commits)).Grow(1).FillWidth().MinHeight(0).Label("Commits")
-		list.Rows(func(row ui.ListRow) { s.row(row, commits[row.Index], gw, now, remotes) })
-		if list.Submitted() {
+		l := ui.List(c.Key("log"), &s.list, len(commits)).Grow(1).FillWidth().MinHeight(0).Label("Commits").Background(ui.Transparent)
+		l.Rows(func(row ui.ListRow) {
+			rc := row.Context
+			st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered()}
+			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], gw, remotes))
+		})
+		if l.Submitted() {
 			if cm, ok := s.selectedCommit(); ok {
 				s.open(cm)
 			}
 		}
 		if s.err != nil {
-			ui.Row(c).FillWidth().Padding(4, rowPadding).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, s.err.Error()).FontSize(smallFont).TextColor(c.Theme().Danger).Grow(1).Shrink(1).MinWidth(0)
-				if ui.Button(c, "Retry").Clicked() {
+			ui.Row(c).FillWidth().Padding(token.GapStack.Px(), token.PadView.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).Children(func() {
+				errorText(c, s.err.Error()).Grow(1).Shrink(1).MinWidth(0)
+				if smallButton(c, "Retry", false) {
 					s.err = nil
 					s.loadPage()
 				}
@@ -366,48 +376,27 @@ func (s *logState) listView(c *ui.Context) {
 	}
 }
 
-func refColor(t *ui.Theme, k refKind) ui.Color {
-	switch k {
-	case refHead:
-		return t.Warning
-	case refLocal:
-		return t.Success
-	case refRemote:
-		return t.Accent
-	}
-	return t.TextMuted
-}
-
-func (s *logState) row(row ui.ListRow, cm git.Commit, gw float32, now time.Time, remotes map[string]bool) {
-	c := row.Context
-	t := c.Theme()
-	i := row.Index
+func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes map[string]bool) list.Item {
 	merge := len(cm.Parents) > 1
-	el := ui.Row(c).Height(rowHeight).FillWidth().Gap(6).PaddingEnd(rowPadding).AlignItems(ui.Center)
-	el.Children(func() {
-		if gw > 0 && i < len(s.graph) {
-			gr := s.graph[i]
-			ui.Box(c).Width(gw).Height(rowHeight).Shrink(0).Draw(func(p *ui.Painter, r ui.Rect) {
-				drawGraphRow(p, r, t, gr, merge)
-			})
-		} else {
-			ui.Box(c).Width(rowPadding).Shrink(0)
-		}
-		badges := refBadges(cm.Refs, remotes)
-		for j, b := range badges {
-			if j == maxBadges {
-				badge(c, fmt.Sprintf("+%d", len(badges)-maxBadges), t.TextMuted)
-				break
+	p := token.Of(c)
+	return list.Item{
+		Label: cm.Subject,
+		Muted: merge,
+		Leading: func(c *ui.Context) {
+			if gw == 0 || i >= len(s.graph) {
+				return
 			}
-			badge(c, b.name, refColor(t, b.kind))
-		}
-		subject := ui.Text(c, cm.Subject).FontSize(bodyFont).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-		if merge {
-			subject.TextColor(t.TextMuted)
-		}
-		muted(c, cm.Author).SingleLine().Width(authorWidth).Shrink(0)
-		muted(c, formatTime(cm.AuthorTime, now)).SingleLine().Width(dateWidth).Shrink(0)
-		muted(c, shortHash(cm.OID)).SingleLine().Width(hashWidth).Shrink(0)
-	})
-	el.ContextMenu(func(m *ui.Menu) { s.commitMenu(c, m, cm) })
+			gr := s.graph[i]
+			ui.Box(c).Width(gw).Height(token.RowHeight.Px()).Shrink(0).AccessHidden(true).Draw(func(pt *ui.Painter, r ui.Rect) {
+				drawGraphRow(pt, r, p, p.Layer.Panel, gr, merge)
+			})
+		},
+		Trailing: func(c *ui.Context) {
+			refTags(c, cm.Refs, remotes, maxBadges)
+			secondary(c, cm.Author).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
+			secondary(c, formatTime(cm.AuthorTime, c.Now())).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
+			secondary(c, shortHash(cm.OID)).SingleLine().Width(token.ColumnSmall.Px()).Shrink(0)
+		},
+		Menu: func(m *ui.Menu) { s.commitMenu(c, m, cm) },
+	}
 }
