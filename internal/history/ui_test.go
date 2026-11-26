@@ -26,6 +26,7 @@ type fakeHost struct {
 	active  string
 	mu      sync.Mutex
 	queue   []func()
+	queued  int
 	views   map[string]func(*ui.Context)
 	buffers map[string]*editor.Buffer
 	notices []string
@@ -52,6 +53,13 @@ func (f *fakeHost) Update(fn func()) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.queue = append(f.queue, fn)
+	f.queued++
+}
+
+func (f *fakeHost) updates() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.queued
 }
 
 func (f *fakeHost) OpenView(id, _ string, view func(*ui.Context)) { f.views[id] = view }
@@ -137,6 +145,19 @@ func (e *env) waitFor(what string, cond func() bool) {
 	}
 }
 
+func (e *env) waitLabel(label string) {
+	e.t.Helper()
+	e.waitFor("version labelled "+label, func() bool {
+		vs, _ := e.store.Versions(e.root, e.path)
+		for _, v := range vs {
+			if v.Label == label {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func (e *env) waitReady() {
 	e.t.Helper()
 	e.waitFor("revert enabled", func() bool {
@@ -210,15 +231,8 @@ func TestRevertWritesFileAtomically(t *testing.T) {
 		b, _ := os.ReadFile(e.path)
 		return string(b) == oldText
 	})
-	e.waitFor("current text kept", func() bool {
-		vs, _ := e.store.Versions(e.root, e.path)
-		for _, v := range vs {
-			if v.Label == beforeRevertLabel {
-				return true
-			}
-		}
-		return false
-	})
+	e.waitLabel(beforeRevertLabel)
+	e.waitLabel(revertedLabel)
 }
 
 func TestRevertWritesOpenBufferSoUndoWorks(t *testing.T) {
@@ -235,6 +249,7 @@ func TestRevertWritesOpenBufferSoUndoWorks(t *testing.T) {
 	if !buf.Undo() || buf.String() != currentText {
 		t.Errorf("undo gave %q", buf.String())
 	}
+	e.waitLabel(beforeRevertLabel)
 }
 
 func TestRevertCancelledChangesNothing(t *testing.T) {
@@ -326,8 +341,7 @@ func TestRecordReportsLowDiskOnce(t *testing.T) {
 	e.store.free = func(string) (uint64, error) { return 0, nil }
 	e.ui.Record(e.path, []byte("a"), "")
 	e.ui.Record(e.path, []byte("b"), "")
-	e.waitFor("notices", func() bool { return len(e.host.notices) > 0 })
-	time.Sleep(50 * time.Millisecond)
+	e.waitFor("both records reported", func() bool { return e.host.updates() == 2 })
 	e.host.drain()
 	if len(e.host.notices) != 1 {
 		t.Errorf("notices %q", e.host.notices)
