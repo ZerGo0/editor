@@ -42,10 +42,13 @@ func (i *Icon) ViewSize(c *ui.Context, size float64) ui.Element {
 }
 
 func (i *Icon) variant(dark bool) (*lazySVG, string) {
-	if !dark && i.lightPath != "" {
+	if dark {
+		return &i.dark, i.darkPath
+	}
+	if i.lightPath != "" {
 		return &i.light, i.lightPath
 	}
-	return &i.dark, i.darkPath
+	return &i.light, i.darkPath
 }
 
 func (i *Icon) svg(dark bool) *ui.SVG {
@@ -58,7 +61,7 @@ func (i *Icon) svg(dark bool) *ui.SVG {
 		if err != nil {
 			return
 		}
-		slot.svg, _ = ui.ParseSVG(data)
+		slot.svg, _ = ui.ParseSVG(adapt(data, dark))
 	})
 	return slot.svg
 }

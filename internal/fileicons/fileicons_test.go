@@ -205,6 +205,43 @@ func TestLightVariantFollowsTheme(t *testing.T) {
 	}
 }
 
+func TestEveryIconReachesContrastOnItsSurfaces(t *testing.T) {
+	for _, d := range iconDefs {
+		for _, dark := range []bool{true, false} {
+			path := d.dark
+			if !dark && d.light != "" {
+				path = d.light
+			}
+			data, err := svgFiles.ReadFile(svgDir + path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, required := adaptWithColors(data, dark)
+			for _, c := range required {
+				if got := worstContrast(c, dark); got < iconContrastFloor {
+					t.Errorf("icon %q dark=%v colour %s reaches %.2f:1 on its worst surface, needs %.1f:1", d.name, dark, c.hex(), got, iconContrastFloor)
+				}
+			}
+		}
+	}
+}
+
+func TestLightVariantDarkensOnlyWhatFails(t *testing.T) {
+	for name, want := range map[string]string{"main.go": "#00acc1", "data.json": "#f9a825", "notes.md": "#42a5f5"} {
+		icon := For(name)
+		data, err := svgFiles.ReadFile(svgDir + icon.darkPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(adapt(data, true)); !strings.Contains(got, want) {
+			t.Errorf("%s keeps its dark colours %s: %s", name, want, got)
+		}
+		if got := string(adapt(data, false)); strings.Contains(got, want) {
+			t.Errorf("%s light variant still uses %s", name, want)
+		}
+	}
+}
+
 func TestLicenseIsEmbedded(t *testing.T) {
 	text := License()
 	for _, want := range []string{"Material Extensions", "MIT License", themeCommit} {
