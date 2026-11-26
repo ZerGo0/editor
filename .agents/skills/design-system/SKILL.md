@@ -35,4 +35,6 @@ Pass meaning, not looks: a variant, a `token.Tone`, a `token.GitStatus`, a comma
 3. The view shows loading, empty and error states, and disabled states where actions do not apply.
 4. Copy uses VS Code wording, title case for commands and buttons, sentence case for messages, no final period on labels.
 5. Look at it in both themes. For components: `DESIGN_SHOTS=<dir> go test ./internal/design -run 'Gallery|QuickInput'`. For the app, only when the user allows running it: the e2e harness `App.Screenshot` writes PNGs when `EDITOR_E2E_ARTIFACTS` is set (see `e2e/harness_test.go`); capture dark and light.
-6. `gofmt`, `go vet` and `go tool mygo vet .` are clean.
+6. Run the redline gates in dark and light (see "Redlines and optical alignment" in `docs/design.md`): `go test ./internal/design -run TestGalleryRedlines` for components. For views, run `go test -tags e2e -run TestViewRedlines ./e2e/` when the user allows the e2e suite. Fix findings in `internal/design` with tokens. Add an allowlist entry with the owner package and the px values only for problems outside your scope. The allowlists only shrink.
+7. Use the text report, not the screenshots. Read at most one cropped image for each view, at the end, after all text checks pass.
+8. `gofmt`, `go vet` and `go tool mygo vet .` are clean.

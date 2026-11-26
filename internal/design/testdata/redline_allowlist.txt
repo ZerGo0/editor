@@ -1,0 +1,1 @@
+gallery-dark crisp tab "All" -- The gallery stacks text with fractional line heights (12.96 and 15.31 px) above the scope chips, so the chip row lands on y 1270.73 and MyGo does not snap fills to device pixels; whole-px line heights in token.TextStyle would remove it

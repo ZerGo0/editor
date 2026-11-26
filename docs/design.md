@@ -264,6 +264,55 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 - `Text(c, s, style)`, `Stack(c, gap, body)`, `Inline(c, gap, body)`, `Spacer(c)`, `ViewBody(c, body)`, `Page(c, title, body)`, `Form(c, label, body)`, `Setting(c, title, description, control)`.
 - `Gallery(c)`: every component in dark and light. `DESIGN_SHOTS=<dir> go test ./internal/design -run 'Gallery|QuickInput'` writes PNGs.
 
+## Redlines and optical alignment
+
+`internal/design/redline` reviews a screenshot the way a designer does with red lines. `redline.Analyze` takes the PNG, the accessibility boxes and the scale. It returns findings, an annotated PNG and a text report.
+
+The annotated PNG shows:
+
+- Red outlines on every box, and red gap dimensions between neighbours.
+- Pink padding dimensions inside containers.
+- Cyan guides on edges that 3 or more boxes share.
+- Purple boxes on measured ink (icons and text cap bands), and yellow `#n` markers on findings.
+
+| Rule | Flags | Threshold |
+| --- | --- | --- |
+| `align` | Edges or centres of related boxes that almost line up | 1 device px to 3 px |
+| `gap` | A gap in a row or column of same-role boxes that differs from the others | 1 device px to 4 px off the median |
+| `padding` | Container padding off the 4 px grid (a 1 px border is allowed) | Any |
+| `optical` | Icon ink centre off the box centre, or a row icon off the row centre | More than 0.5 px, and more than 1 device px |
+| `text-band` | Cap band (cap top to baseline) off the centre of a box with its own background | More than 0.5 px, and more than 1 device px |
+| `crisp` | A fill or border edge on a part pixel that blurs | Edge off the device grid with a blended pixel |
+| `icon-set` | Monochrome icons in one group with a different optical size or stroke weight | Size ×/÷ 1.5, stroke ±0.5 px |
+| `contrast` | Real-pixel contrast of text and icons against their background, also hovered, pressed and selected | 4.5:1 text, 3:1 icons |
+
+Each finding in the report names the element (role, label, bounds), the area of the view it is in, the rule, the measured value, the expected value, a fix with a token, the likely component, an allow key and a crop PNG.
+
+### Optical centering rules
+
+- Text: `token.TextStyle.Apply` moves text up by `token.TextNudgeY` (-0.5 px) with `token.NudgeText`. Use `TextStyle.Boxed` for text that draws its own background or border, and put a nudged text inside a `ui.Row` instead.
+- Text inside a fill (badges, keycaps, chips): build the fill as a `ui.Row` with `AlignItems(ui.Center)` and `Justify(ui.Center)`, with the text as a child. Never set `Height` on a `ui.Text` to centre it. MyGo draws the text at the top of the box.
+- Fills next to text (chips, keycaps): `token.TextStyle.WholeText` gives the text a whole-px width so that the next fill starts on a whole pixel.
+- Bars: children of a bar with a top border use `FillHeight`, not the bar height token, so that they do not sit on a half pixel.
+
+### Gates
+
+Fix findings in `internal/design` with tokens. Do not use raw numbers. Check every UI change in dark and light:
+
+- Components: `go test ./internal/design -run TestGalleryRedlines` renders the gallery headless at scale 2 in dark, light, dark high contrast and light high contrast. It also checks hover, pressed and keyboard focus for each control. Set `DESIGN_SHOTS=<dir>` to write `<view>.redline.png`, `<view>.redline.txt` and the crops. Set `DESIGN_REDLINE_DETAIL=1` to add every measurement to the report.
+- Views: `EDITOR_E2E_ARTIFACTS=<dir> go test -tags e2e -run TestViewRedlines ./e2e/` opens each view of the demo project in dark and light. It also checks hover states. Each view writes `<view>-<state>-<theme>.png` and the redline files. The app captures at scale 1, so the optical threshold there is 1 px.
+
+Both gates fail on any finding that is not in the allowlist. An allowlist entry is `<view prefix|*> <allow key prefix> -- <reason>`:
+
+- Components: `internal/design/testdata/redline_allowlist.txt`
+- Views: `e2e/testdata/redline_allowlist.txt`
+
+Give each entry a reason that names the owner package and the px values. The allowlists only shrink. A stale entry fails the gate. `DESIGN_REDLINE_UPDATE=1` or `EDITOR_REDLINE_UPDATE=1` removes stale entries.
+
+### Screenshot rule
+
+Do not read screenshots to find problems. The text report has the numbers. Read at most one cropped image for each view, and only at the end, after all text checks pass. Read the per-finding crops only when a number is not enough to decide.
+
 ## Do and do not
 
 | Do | Do not |
