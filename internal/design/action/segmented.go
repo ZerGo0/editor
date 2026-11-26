@@ -27,7 +27,7 @@ func Segmented(c *ui.Context, label string, selected *int, labels []string, o Se
 				s.Background(p.Control.Hover)
 			}
 			s.Children(func() {
-				token.TextBody.Apply(ui.Text(c, text)).TextColor(color).SingleLine()
+				token.TextBody.WholeText(c, text).TextColor(color).SingleLine()
 			})
 		}
 	})

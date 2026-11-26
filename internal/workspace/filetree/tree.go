@@ -84,6 +84,9 @@ func (t *Tree) rows(p string) []string {
 
 func (t *Tree) visibleRows(p string) []string {
 	rows := t.rows(p)
+	if rows == nil {
+		return nil
+	}
 	out := make([]string, len(rows))
 	for i, r := range rows {
 		out[i] = t.compact(r)

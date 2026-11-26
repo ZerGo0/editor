@@ -100,8 +100,8 @@ func (a *analysis) iconBox(i int) {
 		need = contrastText
 	}
 	if a.centred(i, s.bg) && !a.hugs(m) {
-		a.flagCentre(m, "ink centre x", m.DX, "move the glyph by "+signed(-m.DX)+" px: use an optical nudge token from internal/design/token/optical.go")
-		a.flagCentre(m, "ink centre y", m.DY, "move the glyph by "+signed(-m.DY)+" px: use an optical nudge token from internal/design/token/optical.go")
+		a.flagCentre(m, "ink centre x", m.DX, "move the glyph by "+signed(-m.DX)+" px in whole px: change the box size or padding so the difference is even")
+		a.flagCentre(m, "ink centre y", m.DY, "move the glyph by "+signed(-m.DY)+" px in whole px: change the box size or padding so the difference is even")
 	}
 	a.flagContrast(m, need)
 }
@@ -151,7 +151,7 @@ func (a *analysis) textBox(i int) {
 	if lead := parts[0]; text != 0 && !textRoles[a.boxes[i].Role] && float64(lead.to-lead.from) <= iconPx {
 		if m, ok := a.measureIcon(i, s, lead, MeasureRowIcon); ok && m.Ink.H <= iconLikeMax && math.Max(m.Ink.W, m.Ink.H) >= iconInkMin {
 			a.measures = append(a.measures, m)
-			a.flagCentre(m, "row icon centre y", m.DY, "move the icon by "+signed(-m.DY)+" px: use an optical nudge token from internal/design/token/optical.go")
+			a.flagCentre(m, "row icon centre y", m.DY, "move the icon by "+signed(-m.DY)+" px in whole px: change the box size or padding so the difference is even")
 			a.flagContrast(m, contrastIcon)
 		}
 	}
@@ -164,7 +164,7 @@ func (a *analysis) textBox(i int) {
 	}
 	a.measures = append(a.measures, m)
 	if a.centred(i, s.bg) && !a.hugs(m) {
-		a.flagCentre(m, "cap band centre y", m.DY, "move the text by "+signed(-m.DY)+" px: use the text nudge token from internal/design/token/optical.go")
+		a.flagCentre(m, "cap band centre y", m.DY, "move the text by "+signed(-m.DY)+" px in whole px: use token.TextStyle.ApplyLine or an even box size")
 	}
 	a.flagContrast(m, contrastText)
 }

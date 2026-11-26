@@ -46,7 +46,7 @@ type TabStripOptions struct {
 func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.Element {
 	p := token.Of(c)
 	strip := ui.Row(c.Key("tab-strip:"+o.Label)).FillWidth().Height(token.TabHeight.Px()).Shrink(0).Background(p.Layer.TabBar).
-		Padding(0, 0, 0, token.GapInline.Px()).AlignItems(ui.Center)
+		Padding(token.TabStripInset.Px(), 0, 0, token.GapInline.Px()).AlignItems(ui.Center)
 	shown := ui.Local(strip, "shown", func() int { return noTab })
 	strip.Children(func() {
 		ui.ScrollHorizontal(c).Shrink(1).MinWidth(0).FillHeight().Children(func() {
@@ -105,7 +105,7 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 		Padding(0, token.PadInputEnd.Px(), 0, token.PadControlX.Px()).Radius(token.RadiusCard.Px()).
 		Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).Label(t.Label).FocusRingOffset(-token.FocusRingWidth.Px())
 	if t.Tooltip != "" {
-		tab.Tooltip(t.Tooltip)
+		action.Tooltip(c, tab, t.Tooltip)
 	}
 	if t.Dirty {
 		tab.Description(dirtyLabel)

@@ -155,8 +155,8 @@ func (v *KeysView) item(r keyRow, i int) list.Item {
 			}
 			row.Label(label).Description(strings.Join(slices.DeleteFunc([]string{r.cmd.ID, keys, when, source}, func(s string) bool { return s == "" }), ", "))
 			row.Children(func() {
-				ui.RichText(c, ui.Span{Text: label + "  ", Color: p.Text.Primary}, ui.Span{Text: r.cmd.ID, Color: p.Text.Secondary}).
-					FontSize(token.TextBody.Px()).SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
+				token.TextBody.Apply(ui.RichText(c, ui.Span{Text: label + "  ", Color: p.Text.Primary}, ui.Span{Text: r.cmd.ID, Color: p.Text.Secondary})).
+					SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
 				v.columns(c, func() {
 					if keys != "" {
 						badge.Keys(c, keys)

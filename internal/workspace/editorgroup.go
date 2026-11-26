@@ -35,7 +35,7 @@ func (w *Workspace) group(c *ui.Context, g *layout.Group) {
 			w.tabBar(c, g)
 			w.breadcrumbs(c, g, tab)
 		}
-		area := ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0)
+		area := ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Clip()
 		area.Children(func() {
 			if tab == nil {
 				w.watermark(c)

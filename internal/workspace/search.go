@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/history"
@@ -52,7 +53,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 		Root:     w.Root,
 		Files:    w.search.files,
 		Symbols:  syms,
-		Actions:  w.commandItems,
+		Actions:  w.commandList,
 		Recent:   func() []string { return slices.Clone(w.search.recent) },
 		Modified: w.modifiedTexts,
 		Repo:     w.openRepo,
@@ -78,7 +79,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 		}
 	}
 	w.search.engine = engine
-	w.addSideView(toolView{id: SearchView, title: "Search", command: "workbench.view.search", icon: icons.Search, view: w.search.view.View, badge: w.search.view.Count})
+	w.addSideView(toolView{id: SearchView, title: "Search", command: "workbench.view.search", icon: icons.Search, view: w.search.view.View, badge: w.search.view.Count, actions: w.search.view.TitleActions})
 	w.initQuickOpen()
 }
 
@@ -154,25 +155,29 @@ func (w *Workspace) openPaths() []string {
 	return out
 }
 
-func (w *Workspace) commandItems() []palette.Item {
+func (w *Workspace) commandList() []palette.Item {
+	recent, other := w.commandItems()
+	return append(recent, other...)
+}
+
+func (w *Workspace) commandItems() (recent, other []palette.Item) {
 	reg := w.env.Commands
-	items := make([]palette.Item, 0, len(reg.All()))
 	seen := map[string]bool{}
-	add := func(id string) {
-		cmd := reg.Get(id)
-		if cmd == nil || seen[id] {
-			return
-		}
-		seen[id] = true
-		items = append(items, palette.Item{ID: id, Label: cmd.Label(), Keys: w.keyLabel(id)})
+	item := func(cmd *command.Command) palette.Item {
+		seen[cmd.ID] = true
+		return palette.Item{ID: cmd.ID, Label: cmd.Label(), Keys: w.keyLabel(cmd.ID)}
 	}
 	for _, id := range reg.Recent() {
-		add(id)
+		if cmd := reg.Get(id); cmd != nil && !seen[id] {
+			recent = append(recent, item(cmd))
+		}
 	}
 	for _, cmd := range reg.All() {
-		add(cmd.ID)
+		if !seen[cmd.ID] {
+			other = append(other, item(cmd))
+		}
 	}
-	return items
+	return recent, other
 }
 
 func (w *Workspace) ShowCommands() {

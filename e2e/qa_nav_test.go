@@ -164,7 +164,7 @@ func demoViewSteps() []viewStep {
 			return q.Command("Show GitHub", viewMenu, "GitHub")
 		}},
 		{"settings", func(q *QAApp, d DemoProject) error {
-			if err := q.Command("Open Settings", editorMenu, "Settings..."); err != nil {
+			if err := q.Command("Open Settings (UI)", editorMenu, "Settings"); err != nil {
 				return err
 			}
 			_, err := q.TryWait(hasRoleLabel("textField", "Search settings"), navTimeout)

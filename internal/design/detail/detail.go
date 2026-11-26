@@ -126,10 +126,10 @@ func Comment(c *ui.Context, o CommentOptions, body func()) ui.Element {
 	card.Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Wrap().Gap(token.GapRowIcon.Px()).Children(func() {
 			badge.Avatar(c, o.Author, token.AvatarSize)
-			token.TextStrong.Apply(ui.Text(c, o.Author)).TextColor(p.Text.Primary).SingleLine()
-			token.TextLabel.Apply(ui.Text(c, o.Verb)).TextColor(p.Text.Secondary).SingleLine()
+			token.TextStrong.WholeText(c, o.Author).TextColor(p.Text.Primary).SingleLine()
+			token.TextLabel.WholeText(c, o.Verb).TextColor(p.Text.Secondary).SingleLine()
 			if o.Time != "" {
-				token.TextLabel.Apply(ui.Text(c, o.Time)).TextColor(p.Text.Secondary).SingleLine()
+				token.TextLabel.WholeText(c, o.Time).TextColor(p.Text.Secondary).SingleLine()
 			}
 			ui.Box(c).Grow(1)
 			if o.Actions != nil {

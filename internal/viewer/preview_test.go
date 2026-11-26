@@ -17,7 +17,7 @@ type previewFixture struct {
 func newPreviewFixture(t *testing.T, path, text string) *previewFixture {
 	t.Helper()
 	fx := &previewFixture{h: newFakeHost(), text: text}
-	fx.pv = NewPreview(fx.h, path, func() string { return fx.text })
+	fx.pv = NewPreview(fx.h, path, func() string { return fx.text }, Options{})
 	if fx.pv == nil {
 		t.Fatalf("NewPreview(%q) = nil", path)
 	}
@@ -29,11 +29,11 @@ func newPreviewFixture(t *testing.T, path, text string) *previewFixture {
 func TestNewPreviewOnlyForPreviewableFiles(t *testing.T) {
 	h := newFakeHost()
 	for _, path := range []string{"main.go", "a.png", "a.bin", "a.pdf"} {
-		if NewPreview(h, path, func() string { return "" }) != nil {
+		if NewPreview(h, path, func() string { return "" }, Options{}) != nil {
 			t.Errorf("NewPreview(%q) returned a preview", path)
 		}
 	}
-	if NewPreview(h, "a.md", nil) != nil {
+	if NewPreview(h, "a.md", nil, Options{}) != nil {
 		t.Error("NewPreview without a text source returned a preview")
 	}
 }

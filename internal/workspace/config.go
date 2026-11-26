@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"math"
 	"time"
 
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -12,7 +13,7 @@ import (
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const zoomStep = 0.1
+const zoomFactor = 1.2
 
 var (
 	lineNumberModes = map[string]editor.LineNumbers{
@@ -28,12 +29,12 @@ var (
 )
 
 func (w *Workspace) zoom() float32 {
-	return 1 + float32(w.settings.Int(settings.ZoomLevel))*zoomStep
+	return float32(math.Pow(zoomFactor, float64(w.settings.Int(settings.ZoomLevel))))
 }
 
 func (w *Workspace) configure(st *editor.State) {
 	s := w.settings
-	st.Font = ui.Font{Family: cmpOr(s.String(settings.FontFamily), token.FontEditor), Size: float32(s.Int(settings.FontSize))}
+	st.Font = w.editorFont()
 	st.HoverDelay = token.EditorHover
 	st.LineHeight = float32(s.Number(settings.LineHeight))
 	st.TabSize, st.Indent = 0, editor.IndentAuto

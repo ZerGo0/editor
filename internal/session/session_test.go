@@ -46,6 +46,25 @@ func TestLoadNullProjects(t *testing.T) {
 	}
 }
 
+func TestCommandHistoryRoundTrip(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.json")
+	s, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.State.Commands = []string{"workbench.action.files.save", "editor.action.formatDocument"}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.State.Commands, s.State.Commands) {
+		t.Fatalf("commands %v", got.State.Commands)
+	}
+}
+
 func TestSaveLoadRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "s.json")
 	s, err := Load(p)

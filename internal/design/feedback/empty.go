@@ -26,15 +26,14 @@ func Empty(c *ui.Context, o EmptyOptions) ui.Element {
 					ui.Icon(c, o.Icon).Size(token.IconSizeLarge.Px(), token.IconSizeLarge.Px()).TextColor(p.Text.Secondary).AccessHidden(true)
 				}
 				if o.Title != "" {
-					ui.Text(c, o.Title).FontSize(token.TextBody.Px()).FontWeight(token.WeightSemibold).TextColor(p.Text.Primary).
+					token.TextStrong.Apply(ui.Text(c, o.Title)).TextColor(p.Text.Primary).
 						TextAlign(ui.Center).Wrap().Role(ui.RoleHeading).Level(2)
 				}
 				if o.Message != "" {
-					ui.Text(c, o.Message).FontSize(token.TextLabel.Px()).TextColor(p.Text.Secondary).TextAlign(ui.Center).
-						Wrap().LineHeight(token.LineHeight)
+					token.TextParagraph.Apply(ui.Text(c, o.Message)).TextColor(p.Text.Secondary).TextAlign(ui.Center).Wrap()
 				}
 				if o.Code != "" {
-					token.TextMono.Boxed(ui.Text(c, o.Code)).TextColor(p.Text.Primary).Selectable().Wrap().Background(p.Layer.Input).
+					token.TextMono.Apply(ui.Text(c, o.Code)).TextColor(p.Text.Primary).Selectable().Wrap().Background(p.Layer.Input).
 						Radius(token.RadiusControl.Px()).Padding(token.PadInputY.Px(), token.PadInputX.Px())
 				}
 				if o.Action != "" && o.OnAction != nil {

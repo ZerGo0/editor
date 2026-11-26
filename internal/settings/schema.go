@@ -36,13 +36,16 @@ const (
 	CategoryGit       = "Git"
 	CategoryDiff      = "Diff Editor"
 	CategoryGitHub    = "GitHub Issues"
+	CategoryMarkdown  = "Markdown"
 )
 
-var Categories = []string{CategoryEditor, CategoryFiles, CategorySearch, CategoryWorkbench, CategoryWindow, CategoryGit, CategoryDiff, CategoryGitHub}
+var Categories = []string{CategoryEditor, CategoryFiles, CategorySearch, CategoryWorkbench, CategoryWindow, CategoryGit, CategoryDiff, CategoryGitHub, CategoryMarkdown}
 
 const (
 	FontFamily           = "editor.fontFamily"
 	FontSize             = "editor.fontSize"
+	ScmInputFontSize     = "scm.inputFontSize"
+	MarkdownFontSize     = "markdown.preview.fontSize"
 	LineHeight           = "editor.lineHeight"
 	TabSize              = "editor.tabSize"
 	InsertSpaces         = "editor.insertSpaces"
@@ -122,7 +125,7 @@ const (
 )
 
 const (
-	defaultFontSize      = 13
+	defaultFontSize      = 16
 	minFontSize          = 6
 	maxFontSize          = 72
 	defaultLineHeight    = 1.5
@@ -141,7 +144,7 @@ const (
 )
 
 var Defs = []Def{
-	{Key: FontFamily, Title: "Font Family", Description: "The font of the text editor. Empty uses the bundled JetBrains Mono.", Category: CategoryEditor, Kind: String, Default: ""},
+	{Key: FontFamily, Title: "Font Family", Description: "Font families of the text editor, separated by commas, for example 'Hack', Menlo. The first installed family is used. Empty, or no installed family, uses the bundled Hack.", Category: CategoryEditor, Kind: String, Default: ""},
 	{Key: FontSize, Title: "Font Size", Description: "The font size of the text editor, in points.", Category: CategoryEditor, Kind: Int, Default: defaultFontSize, Min: minFontSize, Max: maxFontSize},
 	{Key: LineHeight, Title: "Line Height", Description: "The height of a line as a multiple of the font size.", Category: CategoryEditor, Kind: Number, Default: defaultLineHeight, Min: minLineHeight, Max: maxLineHeight},
 	{Key: DetectIndentation, Title: "Detect Indentation", Description: "Use the indentation of the language and the file. When off, Tab Size and Insert Spaces apply.", Category: CategoryEditor, Kind: Bool, Default: true},
@@ -170,10 +173,11 @@ var Defs = []Def{
 	{Key: ColorTheme, Title: "Color Theme", Description: "The appearance of the windows. System follows the macOS appearance.", Category: CategoryWorkbench, Kind: Enum, Default: ThemeSystem, Options: []string{ThemeSystem, ThemeLight, ThemeDark}, AppWide: true},
 	{Key: EnablePreview, Title: "Enable Preview", Description: "A single click opens a file in a preview tab, which the next file replaces until you edit or pin it.", Category: CategoryWorkbench, Kind: Bool, Default: true},
 	{Key: RestoreWindows, Title: "Restore Windows", Description: "Open the projects of the last session when the app starts.", Category: CategoryWindow, Kind: Bool, Default: true, AppWide: true},
-	{Key: ZoomLevel, Title: "Zoom Level", Description: "The zoom of all windows. 0 is 100%, each step is 10% more or less.", Category: CategoryWindow, Kind: Int, Default: 0, Min: -maxZoomLevel, Max: maxZoomLevel, AppWide: true},
+	{Key: ZoomLevel, Title: "Zoom Level", Description: "The zoom of all windows. 0 is 100%, each step up or down zooms 20% larger or smaller.", Category: CategoryWindow, Kind: Int, Default: 0, Min: -maxZoomLevel, Max: maxZoomLevel, AppWide: true},
 	{Key: GitAutoFetch, Title: "Autofetch", Description: "Minutes between automatic fetches of all remotes. 0 turns autofetch off.", Category: CategoryGit, Kind: Int, Default: 0, Min: 0, Max: maxAutoFetchMinutes},
 	{Key: GitPullMode, Title: "Pull Mode", Description: "How Pull and Update Project join the remote changes: merge, rebase, or fast-forward only.", Category: CategoryGit, Kind: Enum, Default: PullMerge, Options: []string{PullMerge, PullRebase, PullFFOnly}},
 	{Key: GitLogPageSize, Title: "Log Page Size", Description: "The number of commits the Git log loads at a time.", Category: CategoryGit, Kind: Int, Default: defaultLogPageSize, Min: minLogPageSize, Max: maxLogPageSize},
+	{Key: ScmInputFontSize, Title: "Input Font Size", Description: "The font size of the commit message input, in points.", Category: CategoryGit, Kind: Int, Default: defaultFontSize, Min: minFontSize, Max: maxFontSize},
 	{Key: DiffIgnoreWhitespace, Title: "Ignore Whitespace", Description: "Which whitespace changes diffs hide: none, at line ends (trim), all (ignore), or all plus blank lines.", Category: CategoryDiff, Kind: Enum, Default: DiffWhitespaceNone, Options: []string{DiffWhitespaceNone, DiffWhitespaceTrim, DiffWhitespaceIgnore, DiffWhitespaceIgnoreBlank}, AppWide: true},
 	{Key: DiffShowMoves, Title: "Show Moved Code", Description: "Mark blocks of code that moved to another place in a diff.", Category: CategoryDiff, Kind: Bool, Default: true, AppWide: true},
 	{Key: IssueBranchTitle, Title: "Issue Branch Title", Description: "The branch name for Start Working on Issue. Variables: ${user}, ${issueNumber}, ${issueTitle}, ${sanitizedIssueTitle}, ${owner}, ${repository}. Empty uses ${user}/issue${issueNumber}.", Category: CategoryGitHub, Kind: String, Default: ""},
@@ -181,6 +185,7 @@ var Defs = []Def{
 	{Key: IssueCommitFormat, Title: "Working Issue Commit Message", Description: "The commit message template while you work on an issue. Variables: ${issueTitle}, ${issueNumber}. Empty uses the issue title and a Fixes line.", Category: CategoryGitHub, Kind: String, Default: ""},
 	{Key: IssueQueries, Title: "Queries", Description: "The issue queries of the GitHub view: a list of objects with label, query and an optional groupBy. Empty uses My Issues, Created Issues and Recent Issues.", Category: CategoryGitHub, Kind: JSON, Default: json.RawMessage(nil)},
 	{Key: IssueLinkBranch, Title: "Link Branch on GitHub", Description: "Create the issue branch on GitHub so that the issue links to it.", Category: CategoryGitHub, Kind: Bool, Default: false},
+	{Key: MarkdownFontSize, Title: "Preview Font Size", Description: "The font size of the Markdown preview, in points.", Category: CategoryMarkdown, Kind: Int, Default: defaultFontSize, Min: minFontSize, Max: maxFontSize},
 }
 
 func DefFor(key string) *Def {

@@ -47,7 +47,7 @@ func StatusParts(c *ui.Context, label string, parts []StatusPart, o StatusOption
 		Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Label(label).Disabled(disabled).
 		FocusRingOffset(-token.FocusRingWidth.Px())
 	if tip != "" {
-		b.Tooltip(action.Hint(tip, keys))
+		action.Tooltip(c, b, action.Hint(tip, keys))
 	}
 	if b.Hovered() || b.Pressed() {
 		b.Background(p.Bar.StatusHover)
@@ -62,7 +62,7 @@ func StatusParts(c *ui.Context, label string, parts []StatusPart, o StatusOption
 				ui.Icon(c, part.Icon).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(color).AccessHidden(true)
 			}
 			if part.Text != "" {
-				token.TextLabel.Apply(ui.Text(c, part.Text)).TextColor(p.Bar.StatusText).SingleLine().AccessHidden(true)
+				token.TextLabel.ApplyLine(ui.Text(c, part.Text)).TextColor(p.Bar.StatusText).SingleLine().AccessHidden(true)
 			}
 		}
 	})

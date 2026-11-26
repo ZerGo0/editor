@@ -125,7 +125,7 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 | ViewTitleHeight | 35 | IconSizeGlyph | 12 |
 | TabHeight | 35 | IconSizeLarge | 32 |
 | TitleBarHeight | 35 | IconButtonSize | 22 |
-| StatusBarHeight | 22 | ToggleSize | 20 |
+| StatusBarHeight | 22 | ToggleSize | 22 (the hit target minimum) |
 | ToolbarHeight | 28 | CheckboxSize | 16 |
 | ControlHeight | 26 | SwitchWidth / Height / Knob | 28 / 16 / 12 |
 | ControlHeightSmall | 22 | SplitArrowWidth | 24 |
@@ -141,6 +141,7 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 | QuickInputWidth | 600 | CommandCenterWidth / MinWidth | 600 / 160 |
 | EmptyStateWidth | 280 | NoticeMaxWidth | 480 |
 | TooltipMaxWidth | 300 | QuickInputRows (count) | 20 |
+| TagMaxWidth | 160 | | |
 
 ### Radii, strokes, opacity
 
@@ -160,17 +161,19 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 
 ### Type (`token.TextStyle`)
 
-| Style | Size | Weight | Notes |
-| --- | --- | --- | --- |
-| TextBody | 13 | 400 | Default UI text |
-| TextStrong | 13 | 600 | Setting titles, emphasis |
-| TextLabel | 12 | 400 | Descriptions, status bar, inputs' errors |
-| TextParagraph | 12 | 400 | Muted, line height 1.4 |
-| TextCaption | 11 | 400 | Muted captions |
-| TextTitle | 11 | 700 | Uppercase view and section titles |
-| TextHeading | 15 | 600 | Page and dialog headings |
-| TextBadge | 11 | 600 | Count badges |
-| TextMono | 12 | 400 | Menlo, code and hashes |
+| Style | Size | Line | Weight | Notes |
+| --- | --- | --- | --- | --- |
+| TextBody | 13 | 16 | 400 | Default UI text |
+| TextStrong | 13 | 16 | 600 | Setting titles, emphasis |
+| TextLabel | 12 | 16 | 400 | Descriptions, status bar, inputs' errors. Rises 1 px in single lines |
+| TextParagraph | 12 | 18 | 400 | Muted |
+| TextCaption | 11 | 14 | 400 | Muted captions |
+| TextTitle | 11 | 14 | 700 | Uppercase view and section titles |
+| TextHeading | 15 | 20 | 600 | Page and dialog headings |
+| TextBadge | 11 | 14 | 600 | Count badges |
+| TextMono | 12 | 16 | 400 | Menlo, code and hashes |
+
+Line heights are whole px (`FixedLineHeight`), so text boxes stack on whole pixels at scale 1.
 
 Use `design.Text(c, s, token.TextCaption)` in feature code. It applies the size, weight, case, family and the right text color.
 
@@ -220,15 +223,16 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 ### field
 
-- `TextInput(c, label, &value, InputOptions{Placeholder, Error, Icon, Toggles, Disabled, ReadOnly, AutoFocus, ID})`.
+- `TextInput(c, label, &value, InputOptions{Placeholder, Error, Icon, Toggles, Actions, Disabled, ReadOnly, AutoFocus, ID})`.
 - `TextArea(c, label, &value, AreaOptions{..., MinLines, MaxLines})`: grows with its text.
 - `SearchInput(c, label, &query, SearchOptions{..., Toggles, NoIcon})`: clear button, Escape clears.
-- `Toggle{Icon, Label, Keys, On}`: inline toggles such as Match Case. The error shows below the box and is announced.
+- `Toggle{Icon, Label, Keys, On}`: inline toggles such as Match Case. `Action{Icon, Label, Keys, Disabled, Run}`: a trailing icon button after the toggles. In a multi-line box, toggles and actions centre on the first line. The error shows below the box and is announced.
 
 ### list
 
 - `View(c, &state, n, ViewOptions{Label, Empty}, func(i) Item)` and `Tree(c, &outline, roots, children, ViewOptions{}, func(k) Item)`.
 - `Item{Label, Matches, Description, Icon, Leading, Git, Count, Strike, Muted, Tooltip, Actions, Menu, OnClick, OnDoubleClick, Drop}`.
+- `ViewOptions{Label, Empty, Tree, Height}`: `View` and `Tree` grow to fill the column; set `Height` for a fixed height (MyGo grows an element with `Grow` past a `Height` set on it).
 - Selection, focus outline, hover, indent guides (on hover and focus), twistie, highlight ranges, git decoration, count and drop target come for free. Actions show on hover and on the focused row.
 - `Spans(label, matches, color, highlight)` for match highlighting elsewhere.
 
@@ -247,7 +251,7 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 ### badge
 
-- `Count(c, n, CountOptions{Accent, Small, Label})` (caps at 999+), `Decoration(c, gitStatus)`, `Tag(c, text, TagOptions{Tone, Icon, Tooltip})`, `Avatar(c, name, token.AvatarSize)`, `Keys(c, "⌘K ⌘S")`.
+- `Count(c, n, CountOptions{Accent, Small, Label})` (caps at 999+), `Decoration(c, gitStatus)`, `Tag(c, text, TagOptions{Tone, Icon, Tooltip})` (cut with an ellipsis at `TagMaxWidth`; a cut tag shows its full text as a tooltip), `Avatar(c, name, token.AvatarSize)`, `Keys(c, "⌘K ⌘S")`.
 
 ### feedback
 
@@ -291,7 +295,7 @@ Each finding in the report names the element (role, label, bounds), the area of 
 
 ### Optical centering rules
 
-- Text: `token.TextStyle.Apply` moves text up by `token.TextNudgeY` (-0.5 px) with `token.NudgeText`. Use `TextStyle.Boxed` for text that draws its own background or border, and put a nudged text inside a `ui.Row` instead.
+- Text: never move text by a fraction of a pixel. The owner's displays are scale 1, where a half-pixel offset blurs every glyph. Correct optical centring with whole px only: `token.TextStyle.ApplyLine` lifts single-line `TextLabel` text by `token.TextRise` (1 px) inside the same box height, or change the box size so the difference to the line height is even.
 - Text inside a fill (badges, keycaps, chips): build the fill as a `ui.Row` with `AlignItems(ui.Center)` and `Justify(ui.Center)`, with the text as a child. Never set `Height` on a `ui.Text` to centre it. MyGo draws the text at the top of the box.
 - Fills next to text (chips, keycaps): `token.TextStyle.WholeText` gives the text a whole-px width so that the next fill starts on a whole pixel.
 - Bars: children of a bar with a top border use `FillHeight`, not the bar height token, so that they do not sit on a half pixel.
@@ -300,7 +304,7 @@ Each finding in the report names the element (role, label, bounds), the area of 
 
 Fix findings in `internal/design` with tokens. Do not use raw numbers. Check every UI change in dark and light:
 
-- Components: `go test ./internal/design -run TestGalleryRedlines` renders the gallery headless at scale 2 in dark, light, dark high contrast and light high contrast. It also checks hover, pressed and keyboard focus for each control. Set `DESIGN_SHOTS=<dir>` to write `<view>.redline.png`, `<view>.redline.txt` and the crops. Set `DESIGN_REDLINE_DETAIL=1` to add every measurement to the report.
+- Components: `go test ./internal/design -run TestGalleryRedlines` renders the gallery headless at scale 1 and scale 2 in dark, light, dark high contrast and light high contrast. It also checks hover, pressed and keyboard focus for each control. Set `DESIGN_SHOTS=<dir>` to write `<view>.redline.png`, `<view>.redline.txt` and the crops. Set `DESIGN_REDLINE_DETAIL=1` to add every measurement to the report.
 - Views: `EDITOR_E2E_ARTIFACTS=<dir> go test -tags e2e -run TestViewRedlines ./e2e/` opens each view of the demo project in dark and light. It also checks hover states. Each view writes `<view>-<state>-<theme>.png` and the redline files. The app captures at scale 1, so the optical threshold there is 1 px.
 
 Both gates fail on any finding that is not in the allowlist. An allowlist entry is `<view prefix|*> <allow key prefix> -- <reason>`:
@@ -380,7 +384,7 @@ Files with violations today (count in parentheses):
 | Accent | The macOS system accent color. |
 | Surfaces | Opaque theme colors for the title bar, sidebar, panel and status bar. No vibrancy. |
 | Density | VS Code default: 22 px rows, 35 px tabs, 22 px status bar, 13 px UI text. |
-| Editor font | JetBrains Mono 13 px, bundled with its OFL license. |
+| Editor font | Hack 16 px (`editor.fontFamily`, `editor.fontSize`), bundled from source-foundry/Hack v3.003 with its MIT license. The commit input (`scm.inputFontSize`) and the Markdown preview (`markdown.preview.fontSize`) also use 16 px. UI text stays 13 px. |
 | Tabs | Xcode-like: rounded, borderless tabs with a soft fill for the active tab. |
 | Status bar | Neutral. Color only for warnings and conflicts. |
 | Title bar | 36 px. The command center shows the project name. The window title is "file - project". |

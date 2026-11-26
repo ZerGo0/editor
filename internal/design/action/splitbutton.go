@@ -44,18 +44,19 @@ func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
 		button = ui.ButtonBase(c.Key("action")).Grow(1).Padding(0, token.PadButtonX.Px()).Gap(token.GapInline.Px()).Center().
 			Radius(token.RadiusControl.Px(), 0, 0, token.RadiusControl.Px()).Label(label).FocusRingOffset(-token.BorderWidth.Px())
 		if tip := tooltipText(label, o.Tooltip, o.Keys); tip != label {
-			button.Tooltip(tip)
+			Tooltip(c, button, tip)
 		}
 		segment(p, o.Variant, button)
 		button.Children(func() {
 			if o.Icon != nil {
 				ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
 			}
-			token.TextBody.Apply(ui.Text(c, label)).TextColor(fg).SingleLine()
+			token.TextBody.WholeText(c, label).TextColor(fg).SingleLine()
 		})
 		ui.Box(c).Width(token.BorderWidth.Px()).Height(token.IconSize.Px()).AlignSelf(ui.Center).Background(separator).Shrink(0)
 		arrow := ui.ButtonBase(c.Key("menu")).Width(token.SplitArrowWidth.Px()).Center().Shrink(0).
-			Radius(0, token.RadiusControl.Px(), token.RadiusControl.Px(), 0).Label(menuLabel).Tooltip(menuLabel).FocusRingOffset(-token.BorderWidth.Px())
+			Radius(0, token.RadiusControl.Px(), token.RadiusControl.Px(), 0).Label(menuLabel).FocusRingOffset(-token.BorderWidth.Px())
+		Tooltip(c, arrow, menuLabel)
 		segment(p, o.Variant, arrow)
 		arrow.Children(func() {
 			ui.Icon(c, icons.ChevronDown).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg)

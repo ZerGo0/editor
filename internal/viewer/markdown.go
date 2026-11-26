@@ -39,7 +39,7 @@ func newMarkdownPane(s *State) *markdownPane {
 func newMarkdownSurface(s *State) *markdownPane {
 	p := &markdownPane{s: s}
 	p.opts = markdown.Options{
-		Theme:     &markdown.Theme{FontSize: token.TextBody.Px(), CodeFont: s.opts.FontFamily},
+		Theme:     &markdown.Theme{FontSize: s.opts.PreviewSize, CodeFont: s.opts.FontFamily},
 		OnLink:    p.link,
 		LoadImage: markdown.FileImages(filepath.Dir(s.path)),
 	}

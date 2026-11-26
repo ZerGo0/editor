@@ -3,6 +3,7 @@ package badge
 import (
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -40,15 +41,24 @@ func Tag(c *ui.Context, text string, o TagOptions) ui.Element {
 		tint = c
 	}
 	el := ui.Row(c).Height(token.TagHeight.Px()).Padding(0, token.PadChipX.Px()).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).
-		Radius(token.RadiusPill.Px()).Background(tint.Alpha(token.OpacityTintFill.Value())).Border(token.BorderWidth.Px(), tint.Alpha(token.OpacityTintBorder.Value())).Label(text)
-	if o.Tooltip != "" {
-		el.Tooltip(o.Tooltip)
-	}
+		MaxWidth(token.TagMaxWidth.Px()).Radius(token.RadiusPill.Px()).Background(tint.Alpha(token.OpacityTintFill.Value())).
+		Border(token.BorderWidth.Px(), tint.Alpha(token.OpacityTintBorder.Value())).Label(text)
+	room := token.TagMaxWidth.Px() - 2*(token.PadChipX.Px()+token.BorderWidth.Px())
+	cut := false
 	el.Children(func() {
 		if o.Icon != nil {
 			ui.Icon(c, o.Icon).Size(token.IconSizeGlyph.Px(), token.IconSizeGlyph.Px()).TextColor(p.Text.Primary).AccessHidden(true)
+			room -= token.IconSizeGlyph.Px() + token.GapInline.Px()
 		}
-		token.TextCaption.Apply(ui.Text(c, text)).TextColor(p.Text.Primary).SingleLine().AccessHidden(true)
+		var label ui.Element
+		label, cut = token.TextCaption.WholeTextMax(c, text, room)
+		label.TextColor(p.Text.Primary).AccessHidden(true)
 	})
+	switch {
+	case o.Tooltip != "":
+		action.Tooltip(c, el, o.Tooltip)
+	case cut:
+		action.Tooltip(c, el, text)
+	}
 	return el
 }

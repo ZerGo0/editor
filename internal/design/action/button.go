@@ -34,13 +34,13 @@ func Button(c *ui.Context, label string, o ButtonOptions) ui.Element {
 	bg, fg, border := variantColors(p, o.Variant, b.Hovered(), b.Pressed())
 	b.Background(bg).Border(token.BorderWidth.Px(), border)
 	if tip := tooltipText(label, o.Tooltip, o.Keys); tip != label {
-		b.Tooltip(tip)
+		Tooltip(c, b, tip)
 	}
 	b.Children(func() {
 		if o.Icon != nil {
 			ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
 		}
-		token.TextBody.Apply(ui.Text(c, label)).TextColor(fg).SingleLine()
+		token.TextBody.WholeText(c, label).TextColor(fg).SingleLine()
 	})
 	return b
 }

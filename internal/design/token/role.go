@@ -33,19 +33,25 @@ var (
 	IndentStep      = Space8
 	OffsetPopover   = Space2
 	OffsetQuickOpen = Space4
+	OffsetTooltip   = Space6
+	PadTooltipX     = Space8
+	PadTooltipY     = Space4
 )
 
 var (
 	RowHeight          = Size{22}
 	HeaderHeight       = Size{22}
 	ViewTitleHeight    = Size{35}
+	ActivityBarHeight  = Size{34}
 	TabHeight          = Size{35}
+	TabStripInset      = Size{1}
 	TitleBarHeight     = Size{36}
 	StatusBarHeight    = Size{22}
 	ToolbarHeight      = Size{28}
 	ControlHeight      = Size{26}
 	ControlHeightSmall = Size{22}
 	HitTargetMin       = Size{22}
+	TooltipHeight      = Size{24}
 )
 
 var (
@@ -57,7 +63,7 @@ var (
 
 var (
 	IconButtonSize  = Size{22}
-	ToggleSize      = Size{20}
+	ToggleSize      = Size{22}
 	CheckboxSize    = Size{16}
 	SwitchWidth     = Size{28}
 	SwitchHeight    = Size{16}
@@ -91,6 +97,7 @@ var (
 	EmptyStateWidth       = Size{280}
 	NoticeMaxWidth        = Size{480}
 	TooltipMaxWidth       = Size{300}
+	TagMaxWidth           = Size{160}
 )
 
 const QuickInputRows = 20

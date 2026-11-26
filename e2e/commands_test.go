@@ -29,6 +29,50 @@ func TestCommandPaletteRunsCommand(t *testing.T) {
 	app.Eventually("two editors", func() bool { return countRole(app.Tree(win), "textField") == 2 })
 }
 
+func TestCommandPaletteListsRecentlyUsedFirst(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
+	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
+	app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	app.Menu(win, "View", "Command Palette...")
+	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
+	app.Type(win, "split right")
+	app.WaitNode(win, "split command", func(n Node) bool { return strings.HasPrefix(n.Label, "View: Split Editor Right") })
+	app.Key(win, "Enter")
+	app.Eventually("two editors", func() bool { return countRole(app.Tree(win), "textField") == 2 })
+	app.Menu(win, "View", "Command Palette...")
+	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
+	group := app.WaitNode(win, "recently used label", Label("recently used"))
+	split := app.WaitNode(win, "split command", func(n Node) bool { return strings.HasPrefix(n.Label, "View: Split Editor Right") })
+	if split.Bounds.Y > group.Bounds.Y || group.Bounds.Y >= split.Bounds.Y+split.Bounds.Height {
+		t.Fatalf("recently used label %+v is not on the first row %+v", group.Bounds, split.Bounds)
+	}
+	app.WaitNode(win, "other commands label", Label("other commands"))
+	if input, ok := app.Find(win, RoleLabel("textField", "Command Palette")); ok && input.Value != ">" {
+		t.Fatalf("palette kept the last query %q", input.Value)
+	}
+}
+
+func TestQuickOpenRecentlyOpenedOpensToSide(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n", "b.txt": "beta\n"})
+	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
+	app.WaitNode(win, "a.txt tab", RoleLabel("tab", "a.txt"))
+	app.Click(win, app.WaitNode(win, "b.txt row", RoleLabel("treeItem", "b.txt")), 2)
+	app.WaitNode(win, "b.txt tab", RoleLabel("tab", "b.txt"))
+	app.Menu(win, "Go", "Go to File...")
+	dialog := app.WaitNode(win, "quick open", RoleLabel("dialog", "Go to File"))
+	app.WaitNode(win, "recently opened label", Label("recently opened"))
+	app.WaitNode(win, "remove button", RoleLabel("button", "Remove from Recently Opened"))
+	for _, n := range app.Tree(win) {
+		if n.Label == "b.txt" && n.Role != "tab" && n.Role != "treeItem" && n.Bounds.Y > dialog.Bounds.Y {
+			t.Fatalf("the active file is listed in Quick Open: %+v", n)
+		}
+	}
+	app.Key(win, "Cmd+Enter")
+	app.Eventually("a.txt opened to the side", func() bool { return countRole(app.Tree(win), "textField") == 2 })
+}
+
 func TestChordOpensKeyboardShortcuts(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
@@ -73,7 +117,7 @@ func TestSettingsSwitchWritesFile(t *testing.T) {
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))
-	app.Menu(win, "Editor", "Settings...")
+	app.Menu(win, "Editor", "Settings")
 	search := app.WaitNode(win, "settings search", RoleLabel("textField", "Search settings"))
 	app.Act(win, search.ID, "focus", "")
 	app.Type(win, "folding")

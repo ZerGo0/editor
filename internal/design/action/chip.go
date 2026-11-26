@@ -19,7 +19,7 @@ func Chip(c *ui.Context, label string, o ChipOptions) ui.Element {
 		AlignItems(ui.Center).Shrink(0).Radius(token.RadiusPill.Px()).Role(ui.RoleTab).AccessSelected(o.Active).Label(label).
 		FocusRingOffset(token.FocusRingOffset.Px())
 	if tip := tooltipText(label, o.Tooltip, o.Keys); tip != label {
-		b.Tooltip(tip)
+		Tooltip(c, b, tip)
 	}
 	color := p.Text.Secondary
 	switch {

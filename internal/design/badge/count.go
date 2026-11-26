@@ -38,7 +38,7 @@ func Count(c *ui.Context, n int, o CountOptions) ui.Element {
 	el := ui.Row(c).Background(bg).Radius(token.RadiusPill.Px()).MinWidth(height).Height(height).Padding(0, token.PadBadgeX.Px()).
 		AlignItems(ui.Center).Justify(ui.Center).Shrink(0)
 	el.Children(func() {
-		text := token.TextBadge.Apply(ui.Text(c, CountText(n))).TextColor(fg).SingleLine()
+		text := token.TextBadge.WholeText(c, CountText(n)).TextColor(fg).SingleLine()
 		if o.Label != "" {
 			text.AccessHidden(true)
 		}
@@ -51,6 +51,6 @@ func Count(c *ui.Context, n int, o CountOptions) ui.Element {
 
 func Decoration(c *ui.Context, status token.GitStatus) ui.Element {
 	p := token.Of(c)
-	return ui.Text(c, status.Letter()).FontSize(token.TextLabel.Px()).FontWeight(token.WeightSemibold).TextColor(p.GitColor(status)).
+	return token.TextLabel.Apply(ui.Text(c, status.Letter())).FontWeight(token.WeightSemibold).TextColor(p.GitColor(status)).
 		Width(token.DecorationWidth.Px()).TextAlign(ui.Center).SingleLine().Shrink(0)
 }

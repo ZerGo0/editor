@@ -37,12 +37,11 @@ func (w *Workspace) sidebar(c *ui.Context) {
 	w.focus.side = side.FocusWithin()
 	v := findView(w.tools.sideViews, w.tools.side)
 	side.Children(func() {
-		w.activityBar(c)
+		w.activityBar(c, v, side.Hovered() || w.focus.side)
 		if v == nil {
 			return
 		}
-		pane.ViewTitle(c, v.title, pane.TitleOptions{Actions: v.actions})
-		ui.Column(c.Key("view-" + v.id)).Grow(1).FillWidth().MinHeight(0).Children(func() { v.view(c) })
+		ui.Column(c.Key("view-" + v.id)).Grow(1).FillWidth().MinHeight(0).Role(ui.RoleRegion).Label(v.title).Children(func() { v.view(c) })
 	})
 }
 

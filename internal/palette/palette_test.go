@@ -1,8 +1,10 @@
 package palette
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/design/quickinput"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -36,6 +38,27 @@ func TestPrefixPicksMode(t *testing.T) {
 	p.Open("")
 	if p.Label() != "Files" {
 		t.Fatalf("empty query mode = %q", p.Label())
+	}
+}
+
+func TestAcceptVariants(t *testing.T) {
+	var got []string
+	files := items("a.go", "b.go")
+	p := Palette{Modes: []Mode{{
+		Label:      "Files",
+		Search:     func(_ string, done func([]Item)) { done(files) },
+		Accept:     func(it Item) { got = append(got, "open "+it.ID) },
+		AcceptSide: func(it Item) { got = append(got, "side "+it.ID) },
+		Background: func(it Item) { got = append(got, "background "+it.ID) },
+	}}}
+	p.Open("")
+	p.acceptWith(p.items[0], quickinput.Result{Background: true})
+	if !p.IsOpen() {
+		t.Fatal("opening in the background closed the palette")
+	}
+	p.acceptWith(p.items[1], quickinput.Result{Side: true})
+	if p.IsOpen() || !slices.Equal(got, []string{"background a.go", "side b.go"}) {
+		t.Fatalf("open %v, got %v", p.IsOpen(), got)
 	}
 }
 

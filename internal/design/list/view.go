@@ -5,13 +5,21 @@ import (
 )
 
 type ViewOptions struct {
-	Label string
-	Empty func(c *ui.Context)
-	Tree  bool
+	Label  string
+	Empty  func(c *ui.Context)
+	Tree   bool
+	Height float32
+}
+
+func (o ViewOptions) size(el ui.Element) ui.Element {
+	if o.Height > 0 {
+		return el.Height(o.Height).Shrink(0)
+	}
+	return el.Grow(1).MinHeight(0)
 }
 
 func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int) Item) ui.Element {
-	l := ui.List(c, s, n).Grow(1).FillWidth().MinHeight(0).Label(o.Label).Background(ui.Transparent)
+	l := o.size(ui.List(c, s, n)).FillWidth().Label(o.Label).Background(ui.Transparent)
 	l.Rows(func(r ui.ListRow) {
 		it := item(r.Index)
 		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, flat: o.Tree}, it)
@@ -23,7 +31,7 @@ func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int)
 }
 
 func Tree[K comparable](c *ui.Context, s *ui.OutlineState[K], roots []K, children func(K) []K, o ViewOptions, item func(K) Item) ui.Element {
-	box := ui.Column(c).Grow(1).FillWidth().MinHeight(0)
+	box := o.size(ui.Column(c)).FillWidth()
 	guides := box.Hovered()
 	focused := s.List.FocusWithin(c)
 	selected := selection(s)

@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	redlineScale     = 2
 	redlineWidth     = 640
 	redlineHeight    = 1500
 	redlineAllowPath = "testdata/redline_allowlist.txt"
@@ -23,6 +22,8 @@ const (
 	redlineDetailEnv = "DESIGN_REDLINE_DETAIL"
 	stateMargin      = 4
 )
+
+var redlineScales = []float64{1, 2}
 
 var stateRoles = map[string]bool{
 	"button": true, "toggleButton": true, "menuButton": true, "tab": true, "checkBox": true, "switch": true,
@@ -104,14 +105,14 @@ func finishRedlineAllow(t *testing.T, allow *redline.Allowlist) {
 	}
 }
 
-func analyzeTester(t *testing.T, tt *ui.Tester, name string) redline.Result {
+func analyzeTester(t *testing.T, tt *ui.Tester, name string, scale float64) redline.Result {
 	t.Helper()
-	return analyze(t, name, tt.Image(), testerBoxes(tt), true)
+	return analyze(t, name, tt.Image(), testerBoxes(tt), true, scale)
 }
 
-func analyze(t *testing.T, name string, img image.Image, boxes []redline.Box, write bool) redline.Result {
+func analyze(t *testing.T, name string, img image.Image, boxes []redline.Box, write bool, scale float64) redline.Result {
 	t.Helper()
-	res, err := redline.Analyze(redline.Input{Name: name, Image: img, Boxes: boxes, Scale: redlineScale,
+	res, err := redline.Analyze(redline.Input{Name: name, Image: img, Boxes: boxes, Scale: scale,
 		Detail: os.Getenv(redlineDetailEnv) != ""})
 	if err != nil {
 		t.Fatal(err)
@@ -124,14 +125,14 @@ func analyze(t *testing.T, name string, img image.Image, boxes []redline.Box, wr
 	return res
 }
 
-func analyzeState(t *testing.T, tt *ui.Tester, target redline.Box, name string) redline.Result {
+func analyzeState(t *testing.T, tt *ui.Tester, target redline.Box, name string, scale float64) redline.Result {
 	t.Helper()
 	area := target.Rect
 	area = redline.Rect{X: area.X - stateMargin, Y: area.Y - stateMargin, W: area.W + 2*stateMargin, H: area.H + 2*stateMargin}
 	full := tt.Image()
-	crop := image.Rect(int(math.Floor(area.X*redlineScale)), int(math.Floor(area.Y*redlineScale)),
-		int(math.Ceil(area.Right()*redlineScale)), int(math.Ceil(area.Bottom()*redlineScale))).Intersect(full.Bounds())
-	ox, oy := float64(crop.Min.X)/redlineScale, float64(crop.Min.Y)/redlineScale
+	crop := image.Rect(int(math.Floor(area.X*scale)), int(math.Floor(area.Y*scale)),
+		int(math.Ceil(area.Right()*scale)), int(math.Ceil(area.Bottom()*scale))).Intersect(full.Bounds())
+	ox, oy := float64(crop.Min.X)/scale, float64(crop.Min.Y)/scale
 	var boxes []redline.Box
 	for _, b := range testerBoxes(tt) {
 		r := b.Rect
@@ -140,7 +141,7 @@ func analyzeState(t *testing.T, tt *ui.Tester, target redline.Box, name string) 
 			boxes = append(boxes, b)
 		}
 	}
-	return analyze(t, name, full.SubImage(crop), boxes, false)
+	return analyze(t, name, full.SubImage(crop), boxes, false, scale)
 }
 
 func slug(label string) string {
@@ -152,7 +153,7 @@ func slug(label string) string {
 	}, label)
 }
 
-func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist) {
+func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64) {
 	t.Helper()
 	for _, b := range testerBoxes(tt) {
 		if !stateRoles[b.Role] || b.Disabled {
@@ -160,9 +161,9 @@ func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowl
 		}
 		x, y := float32(b.Rect.CenterX()), float32(b.Rect.CenterY())
 		tt.Move(x, y)
-		checkRedlines(t, analyzeState(t, tt, b, view+"-hover-"+slug(b.Label)), allow)
+		checkRedlines(t, analyzeState(t, tt, b, view+"-hover-"+slug(b.Label), scale), allow)
 		tt.Press(x, y)
-		checkRedlines(t, analyzeState(t, tt, b, view+"-pressed-"+slug(b.Label)), allow)
+		checkRedlines(t, analyzeState(t, tt, b, view+"-pressed-"+slug(b.Label), scale), allow)
 		tt.CancelPress()
 	}
 	tt.Move(0, 0)
@@ -181,22 +182,28 @@ func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowl
 			break
 		}
 		seen[focused.Rect] = true
-		checkRedlines(t, analyzeState(t, tt, *focused, view+"-focus-"+slug(focused.Label)), allow)
+		checkRedlines(t, analyzeState(t, tt, *focused, view+"-focus-"+slug(focused.Label), scale), allow)
 	}
 }
 
 func TestGalleryRedlines(t *testing.T) {
 	useFakeCommands(t)
 	allow := loadRedlineAllow(t)
-	for _, th := range redlineThemes {
-		p, g := th.palette(), newGallery()
-		tt := ui.NewTester(func(c *ui.Context) {
-			ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { galleryColumn(c, g) })
-		}, redlineWidth, redlineHeight)
-		tt.SetScale(redlineScale)
-		tt.Frame()
-		checkRedlines(t, analyzeTester(t, tt, "gallery-"+th.name), allow)
-		sweepStates(t, tt, "gallery-"+th.name, allow)
+	t.Cleanup(func() { finishRedlineAllow(t, allow) })
+	for _, scale := range redlineScales {
+		for _, th := range redlineThemes {
+			t.Run(fmt.Sprintf("%s@%gx", th.name, scale), func(t *testing.T) {
+				t.Parallel()
+				p, g := th.palette(), newGallery()
+				tt := ui.NewTester(func(c *ui.Context) {
+					ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { galleryColumn(c, g) })
+				}, redlineWidth, redlineHeight)
+				tt.SetScale(float32(scale))
+				tt.Frame()
+				view := fmt.Sprintf("gallery-%s@%gx", th.name, scale)
+				checkRedlines(t, analyzeTester(t, tt, view, scale), allow)
+				sweepStates(t, tt, view, allow, scale)
+			})
+		}
 	}
-	finishRedlineAllow(t, allow)
 }

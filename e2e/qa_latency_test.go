@@ -38,6 +38,12 @@ const (
 	rulePendingFrame  = "no-frame-after-input"
 	ruleFrameStorm    = "frames-never-settle"
 	fewTabs           = 3
+	tabSwitchesNarrow = 12
+	tabSwitchesWide   = 3
+	maxTabSwitchFrame = 4
+	nextEditorMenu    = "Next Editor"
+	tabShownSlack     = 1.0
+	editorTabsLabel   = "Editor Tabs"
 )
 
 type Burst struct {
@@ -156,7 +162,7 @@ func latencyActions() []latencyAction {
 				o.Tabs = d.TabFiles
 				return o
 			},
-			Do: func(q *QAApp, d DemoProject, i int) { menuOrFail(q, viewMenu, "Next Tab") },
+			Do: func(q *QAApp, d DemoProject, i int) { menuNow(q, viewMenu, nextEditorMenu) },
 		},
 		{
 			Name: "toggle sidebar", Owner: qa.OwnerWorkspace, Budget: budgetToggleSidebar, Samples: latencySamples, Quiet: burstQuietShort,
@@ -211,6 +217,52 @@ func latencyActions() []latencyAction {
 			},
 			Do: func(q *QAApp, d DemoProject, i int) { menuOrFail(q, gitMenu, "Show Log") },
 		},
+	}
+}
+
+func menuNow(q *QAApp, path ...string) {
+	q.t.Helper()
+	if _, err := q.Call("menu", map[string]any{"window": q.Win, "path": path}); err != nil {
+		q.t.Fatalf("menu %v: %v", path, err)
+	}
+}
+
+func activeTabShown(tree *qa.Tree) (qa.Node, bool) {
+	tab, ok := tree.Find(func(n qa.Node) bool {
+		list, found := tree.ByID(n.Parent)
+		return n.Role == "tab" && n.Has("checked") && found && list.Label == editorTabsLabel
+	})
+	if !ok {
+		return tab, false
+	}
+	clip, ok := tree.ByID(tab.Parent)
+	for ok && clip.Role != "scroll" {
+		clip, ok = tree.ByID(clip.Parent)
+	}
+	return tab, ok && clip.Bounds.Contains(tab.Bounds, tabShownSlack)
+}
+
+func TestTabSwitchSettles(t *testing.T) {
+	t.Parallel()
+	demo := NewDemoProject(t)
+	for _, c := range []struct{ width, switches int }{{smallestWindowW, tabSwitchesNarrow}, {normalWindowW, tabSwitchesWide}} {
+		t.Run(fmt.Sprint(c.width), func(t *testing.T) {
+			o := defaultLatencyOptions(demo)
+			o.Width, o.Tabs = c.width, demo.TabFiles
+			q := LaunchQA(t, demo.Root, o)
+			for i := range c.switches {
+				offset := q.outputLen()
+				menuNow(q, viewMenu, nextEditorMenu)
+				tab, shown := activeTabShown(q.Snapshot())
+				time.Sleep(idleWatchWindow)
+				if frames := qa.CountFrames(q.outputFrom(offset)); frames > maxTabSwitchFrame {
+					t.Errorf("switch %d: %d frames in %s, want at most %d", i, frames, idleWatchWindow, maxTabSwitchFrame)
+				}
+				if !shown {
+					t.Errorf("switch %d: active tab %q at %+v is not scrolled into the tab strip", i, tab.Label, tab.Bounds)
+				}
+			}
+		})
 	}
 }
 

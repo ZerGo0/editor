@@ -35,13 +35,13 @@ func SettingRow(c *ui.Context, title, description string, o SettingOptions, cont
 		if o.Modified {
 			bar.Background(p.Accent.Base)
 		}
-		ui.Column(c).Grow(1).MinWidth(0).Padding(token.GapStack.Px(), token.PadRow.Px()).Gap(token.GapInline.Px()).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Padding(token.GapStack.Px(), token.PadRow.Px(), token.GapStack.Px(), token.PadPanel.Px()-token.ModifiedBarWidth.Px()).Gap(token.GapInline.Px()).Children(func() {
 			ui.Row(c).FillWidth().Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Children(func() {
 				spans := []ui.Span{{Text: title, Color: p.Text.Primary, Weight: token.TextStrong.Weight()}}
 				if o.Category != "" {
 					spans = append([]ui.Span{{Text: o.Category + ": ", Color: p.Text.Secondary, Weight: token.TextStrong.Weight()}}, spans...)
 				}
-				ui.RichText(c, spans...).FontSize(token.TextStrong.Px()).SingleLine().Shrink(1).MinWidth(0)
+				token.TextStrong.Apply(ui.RichText(c, spans...)).SingleLine().Shrink(1).MinWidth(0)
 				if o.Note != "" {
 					Text(c, o.Note, token.TextCaption).SingleLine().Shrink(1).MinWidth(0)
 				}

@@ -68,3 +68,4 @@ copy Copy01Icon
 arrow-up ArrowUp02Icon
 arrow-down ArrowDown02Icon
 selection TextSelectionIcon
+bell Notification01Icon

@@ -24,12 +24,12 @@ type previewPane interface {
 	setText(text string)
 }
 
-func NewPreview(h host.Host, path string, text func() string) *Preview {
+func NewPreview(h host.Host, path string, text func() string, opts Options) *Preview {
 	kind := Detect(path, nil)
 	if !kind.Previewable() || text == nil {
 		return nil
 	}
-	s := newState(h, path, kind, Options{})
+	s := newState(h, path, kind, opts)
 	var pane previewPane
 	if kind == SVG {
 		pane = newImageSurface(s, SVG, svgPreviewLabel)

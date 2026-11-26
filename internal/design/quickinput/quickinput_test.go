@@ -34,6 +34,46 @@ func TestKeyboard(t *testing.T) {
 	}
 }
 
+func TestOpenToSideAndInBackground(t *testing.T) {
+	items := []Item{{Label: "a.go"}, {Label: "b.go"}}
+	s := &State{}
+	var last Result
+	tt := ui.NewTester(func(c *ui.Context) {
+		if r := View(c, "Go to File", s, items, Options{Side: true, Background: true}); r.Accepted >= 0 {
+			last = r
+		}
+	}, testWidth, testHeight)
+	tt.Key(ui.Cmd, ui.KeyEnter)
+	if last.Accepted != 0 || !last.Side || last.Background {
+		t.Fatalf("Cmd+Enter result %+v", last)
+	}
+	last = Result{Accepted: none}
+	tt.Type("ab")
+	tt.Key(0, ui.KeyLeft)
+	tt.Key(0, ui.KeyRight)
+	if last.Accepted != none {
+		t.Fatalf("Right inside the query accepted %+v", last)
+	}
+	tt.Key(0, ui.KeyRight)
+	if last.Accepted != 0 || !last.Background || last.Side {
+		t.Fatalf("Right at the end result %+v", last)
+	}
+}
+
+func TestRemoveButtonRemovesRow(t *testing.T) {
+	items := []Item{{Label: "a.go", Remove: "Remove from Recently Opened"}}
+	var last Result
+	tt := ui.NewTester(func(c *ui.Context) {
+		if r := View(c, "Go to File", &State{}, items, Options{}); r.Removed >= 0 || r.Accepted >= 0 {
+			last = r
+		}
+	}, testWidth, testHeight)
+	tt.Click("Remove from Recently Opened")
+	if last.Removed != 0 || last.Accepted != none {
+		t.Fatalf("remove click result %+v", last)
+	}
+}
+
 func TestRowReadsKeys(t *testing.T) {
 	items := []Item{{Label: "Go to File...", Keys: "⌘P"}}
 	tt := ui.NewTester(func(c *ui.Context) { View(c, "Command Palette", &State{}, items, Options{}) }, testWidth, testHeight)

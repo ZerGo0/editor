@@ -8,7 +8,6 @@ import (
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/layout"
-	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/viewer"
 	"github.com/egoist/mygo/ui"
 )
@@ -69,13 +68,10 @@ func loadFile(path string, asText bool) (*document.Document, viewer.Kind, fileSt
 func (w *Workspace) viewerContent(c *ui.Context, g *layout.Group, tab *layout.Tab, e *docEntry) {
 	v := w.viewers.open[tab]
 	if v == nil {
-		s := w.settings
 		path := tab.Path
-		opened, err := viewer.Open(w, path, e.kind, viewer.Options{
-			OpenAsText: func() { w.openAsText(path) },
-			FontFamily: s.String(settings.FontFamily),
-			FontSize:   float32(s.Int(settings.FontSize)),
-		})
+		opts := w.viewerOptions()
+		opts.OpenAsText = func() { w.openAsText(path) }
+		opened, err := viewer.Open(w, path, e.kind, opts)
 		if err != nil {
 			placeholder(c, "Cannot open this file", err.Error())
 			return
@@ -186,7 +182,7 @@ func (w *Workspace) openPreview(g *layout.Group) {
 	}
 	p := virtualPrefix + previewPrefix + path
 	if _, ok := w.virtual[p]; !ok {
-		pv := viewer.NewPreview(w, path, d.Buffer.String)
+		pv := viewer.NewPreview(w, path, d.Buffer.String, w.viewerOptions())
 		if pv == nil {
 			w.setNotice(noPreviewNotice)
 			return

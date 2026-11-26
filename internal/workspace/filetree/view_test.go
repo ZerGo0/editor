@@ -169,3 +169,17 @@ func TestTreeGitDecorations(t *testing.T) {
 		t.Fatalf("untracked status = %v", s)
 	}
 }
+
+func TestTreeTwistieOnlyForFolders(t *testing.T) {
+	_, tt, _, _ := newTestTree(t, "a.txt", "src/main.go", "docs/guide/intro.md")
+	tt.Frame()
+	for name, branch := range map[string]bool{"a.txt": false, "src": true, "docs/guide": true} {
+		row, ok := tt.AccessByRole(ui.RoleTreeItem, name)
+		if !ok {
+			t.Fatalf("row %q is not shown", name)
+		}
+		if row.Expandable != branch {
+			t.Errorf("row %q expandable = %v, want %v", name, row.Expandable, branch)
+		}
+	}
+}

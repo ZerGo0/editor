@@ -38,6 +38,7 @@ type Workspace struct {
 	tree          *filetree.Tree
 	sidebarWidth  float32
 	sidebarHidden bool
+	font          fontChoice
 	nextID        int
 	focusTab      *layout.Tab
 	lastFocused   *layout.Tab

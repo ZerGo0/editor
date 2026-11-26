@@ -24,6 +24,21 @@ func rowView(state *ui.ListState) func(c *ui.Context) {
 	}
 }
 
+func TestViewKeepsFixedHeight(t *testing.T) {
+	const fixed = 60
+	names := []string{"a.go", "b.go", "c.go", "d.go", "e.go"}
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Column(c).Height(testHeight).Children(func() {
+			View(c, &ui.ListState{}, len(names), ViewOptions{Label: "Fixed", Height: fixed}, func(i int) Item { return Item{Label: names[i]} })
+			ui.Column(c).Grow(1).Label("Rest")
+		})
+	}, testWidth, testHeight)
+	l, ok := tt.AccessByRole(ui.RoleList, "Fixed")
+	if !ok || l.Bounds.H != fixed {
+		t.Fatalf("list bounds %v; want a height of %d px", l.Bounds, fixed)
+	}
+}
+
 func TestRowActionsShowOnKeyboardFocus(t *testing.T) {
 	selected := -1
 	state := &ui.ListState{Selected: &selected}

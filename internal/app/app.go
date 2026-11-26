@@ -106,6 +106,7 @@ func (a *App) loadSession() {
 }
 
 func (a *App) saveSession() {
+	a.store.State.Commands = a.commands.Recent()
 	if err := a.store.Save(); err != nil {
 		log.Printf("save session: %v", err)
 	}
@@ -154,16 +155,17 @@ func (a *App) openProject(root string) *projectWindow {
 	}
 	ws := workspace.New(root, a.store.State.Projects[root], a.env)
 	win := mygo.NewWindow(mygo.WindowOptions{
-		Title:          ws.Name,
-		Width:          projectWidth,
-		Height:         projectHeight,
-		MinWidth:       projectMinWidth,
-		MinHeight:      projectMinHeight,
-		StateKey:       "project:" + root,
-		TitleBarStyle:  mygo.TitleBarHiddenInset,
-		TitleBarHeight: workspace.TitleBarHeight,
-		Hidden:         a.options.Hidden,
-		Content:        ui.View(a.projectView(ws)),
+		Title:                ws.Name,
+		Width:                projectWidth,
+		Height:               projectHeight,
+		MinWidth:             projectMinWidth,
+		MinHeight:            projectMinHeight,
+		StateKey:             "project:" + root,
+		TitleBarStyle:        mygo.TitleBarHiddenInset,
+		TitleBarHeight:       workspace.TitleBarHeight,
+		TrafficLightPosition: workspace.TrafficLightPosition(),
+		Hidden:               a.options.Hidden,
+		Content:              ui.View(a.projectView(ws)),
 	})
 	ws.Attach(win)
 	pw := &projectWindow{win: win, ws: ws}

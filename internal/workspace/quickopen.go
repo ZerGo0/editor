@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,17 +17,22 @@ import (
 )
 
 const (
-	quickOpenLimit   = 50
-	commandsPrefix   = ">"
-	editorSymPrefix  = "@"
-	projectSymPrefix = "#"
-	linePrefix       = ":"
-	textPrefix       = "%"
-	helpPrefix       = "?"
-	lineColSeparator = ":"
-	commandsTitle    = "Command Palette"
-	goToFileTitle    = "Go to File"
-	textSearchFormat = "Search for \"%s\" in files"
+	quickOpenLimit      = 50
+	commandsPrefix      = ">"
+	editorSymPrefix     = "@"
+	projectSymPrefix    = "#"
+	linePrefix          = ":"
+	textPrefix          = "%"
+	helpPrefix          = "?"
+	lineColSeparator    = ":"
+	commandsTitle       = "Command Palette"
+	goToFileTitle       = "Go to File"
+	textSearchFormat    = "Search for \"%s\" in files"
+	recentlyUsedGroup   = "recently used"
+	otherCommandsGroup  = "other commands"
+	recentlyOpenedGroup = "recently opened"
+	fileResultsGroup    = "file results"
+	removeRecentLabel   = "Remove from Recently Opened"
 )
 
 type quickLocation struct {
@@ -38,9 +44,10 @@ type quickLocation struct {
 func (w *Workspace) initQuickOpen() {
 	w.palette.Modes = []palette.Mode{
 		{Label: goToFileTitle, Placeholder: "Search files by name (type ? for help)", Search: w.searchFiles, Accept: w.acceptLocation,
+			AcceptSide: w.acceptLocationSide, Background: w.acceptLocationBackground, RemoveLabel: removeRecentLabel, Remove: w.forgetRecent,
 			Empty: "No matching files"},
 		{Prefix: commandsPrefix, Label: commandsTitle, Placeholder: "Type the name of a command to run", Search: w.searchCommands,
-			Accept: func(it palette.Item) { w.run(it.ID) }, Empty: "No matching commands"},
+			Accept: w.runFromPalette, Empty: "No matching commands"},
 		{Prefix: editorSymPrefix, Label: "Go to Symbol in Editor", Placeholder: "Type the name of a symbol in this file",
 			Search: w.searchEditorSymbols, Accept: w.acceptLocation, Empty: "No matching symbols in this file"},
 		{Prefix: projectSymPrefix, Label: "Go to Symbol in Workspace", Placeholder: "Type the name of a symbol",
@@ -66,20 +73,54 @@ func (w *Workspace) QuickOpen(prefix string) {
 }
 
 func (w *Workspace) acceptLocation(it palette.Item) {
+	w.openItem(it, searchview.OpenOptions{Focus: true})
+}
+
+func (w *Workspace) acceptLocationSide(it palette.Item) {
+	w.openItem(it, searchview.OpenOptions{Focus: true, Side: true})
+}
+
+func (w *Workspace) acceptLocationBackground(it palette.Item) {
+	w.openItem(it, searchview.OpenOptions{})
+}
+
+func (w *Workspace) openItem(it palette.Item, o searchview.OpenOptions) {
 	loc, ok := it.Value.(quickLocation)
 	if !ok {
 		return
 	}
 	pos := editor.Pos{Line: loc.line, Col: loc.col}
-	w.openLocation(searchview.Location{Path: loc.path, Start: pos, End: pos, HasRange: loc.hasPos}, searchview.OpenOptions{Focus: true})
+	w.openLocation(searchview.Location{Path: loc.path, Start: pos, End: pos, HasRange: loc.hasPos}, o)
+}
+
+func (w *Workspace) forgetRecent(it palette.Item) {
+	if loc, ok := it.Value.(quickLocation); ok {
+		w.search.recent = slices.DeleteFunc(w.search.recent, func(p string) bool { return p == loc.path })
+	}
 }
 
 func (w *Workspace) searchFiles(q string, done func([]palette.Item)) {
 	s := w.search.engine.Session()
 	s.MarkOpen(w.openPaths())
+	current := ""
+	if t := w.active.ActiveTab(); t != nil && q == "" {
+		current = t.Path
+	}
 	run := func() []palette.Item {
-		rs, _ := s.Files(q, quickOpenLimit)
-		return w.resultItems(rs)
+		rs, _ := s.Files(q, quickOpenLimit+1)
+		rs = slices.DeleteFunc(rs, func(r everywhere.Result) bool { return r.Path == current })
+		recent := slices.DeleteFunc(slices.Clone(rs), func(r everywhere.Result) bool { return !r.Recent })
+		other := slices.DeleteFunc(rs, func(r everywhere.Result) bool { return r.Recent })
+		items := w.resultItems(recent)
+		for i := range items {
+			items[i].Group, items[i].Removable = recentlyOpenedGroup, true
+		}
+		others := w.resultItems(other)
+		if len(items) > 0 {
+			groupItems(others, fileResultsGroup)
+		}
+		items = append(items, others...)
+		return items[:min(len(items), quickOpenLimit)]
 	}
 	if q == "" || w.win == nil {
 		done(run())
@@ -120,7 +161,24 @@ func (w *Workspace) resultItems(rs []everywhere.Result) []palette.Item {
 }
 
 func (w *Workspace) searchCommands(q string, done func([]palette.Item)) {
-	done(palette.Filter(w.commandItems(), q))
+	recent, other := w.commandItems()
+	recent, other = palette.Filter(recent, q), palette.Filter(other, q)
+	if len(recent) > 0 {
+		groupItems(recent, recentlyUsedGroup)
+		groupItems(other, otherCommandsGroup)
+	}
+	done(append(recent, other...))
+}
+
+func (w *Workspace) runFromPalette(it palette.Item) {
+	w.env.Commands.MarkUsed(it.ID)
+	w.run(it.ID)
+}
+
+func groupItems(items []palette.Item, group string) {
+	for i := range items {
+		items[i].Group = group
+	}
 }
 
 func (w *Workspace) searchEditorSymbols(q string, done func([]palette.Item)) {

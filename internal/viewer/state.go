@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo/ui"
 )
@@ -22,9 +23,10 @@ const (
 )
 
 type Options struct {
-	OpenAsText func()
-	FontFamily string
-	FontSize   float32
+	OpenAsText  func()
+	FontFamily  string
+	FontSize    float32
+	PreviewSize float32
 }
 
 type commandRunner func(name string, args ...string) error
@@ -84,6 +86,9 @@ func newState(h host.Host, path string, kind Kind, opts Options) *State {
 	}
 	if opts.FontSize <= 0 {
 		opts.FontSize = defaultMonoPt
+	}
+	if opts.PreviewSize <= 0 {
+		opts.PreviewSize = token.TextBody.Px()
 	}
 	return &State{h: h, path: path, kind: kind, opts: opts, run: runCommand}
 }

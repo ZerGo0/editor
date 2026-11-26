@@ -4,11 +4,14 @@ package e2e
 
 import (
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ZerGo0/editor/e2e/qa"
 	"github.com/ZerGo0/editor/internal/design/redline"
@@ -22,6 +25,8 @@ const (
 	stateDisabled    = "disabled"
 	stateOffscreen   = "offscreen"
 	pointerMoveEvent = "pointerMove"
+	tooltipShowWait  = 700 * time.Millisecond
+	captureTries     = 5
 )
 
 func treeBoxes(tree *qa.Tree) []redline.Box {
@@ -38,11 +43,10 @@ func treeBoxes(tree *qa.Tree) []redline.Box {
 
 func (q *QAApp) Redlines(name string) (redline.Result, error) {
 	q.t.Helper()
-	img, err := q.Capture()
+	img, tree, err := q.stableCapture()
 	if err != nil {
 		return redline.Result{}, fmt.Errorf("capture %s: %w", name, err)
 	}
-	tree := q.Snapshot()
 	scale, err := redline.ScaleOf(img, tree.Window.Width)
 	if err != nil {
 		return redline.Result{}, fmt.Errorf("scale of %s: %w", name, err)
@@ -62,8 +66,28 @@ func (q *QAApp) Redlines(name string) (redline.Result, error) {
 	return res, nil
 }
 
+func (q *QAApp) stableCapture() (image.Image, *qa.Tree, error) {
+	q.t.Helper()
+	before := q.Snapshot()
+	for range captureTries {
+		img, err := q.Capture()
+		if err != nil {
+			return nil, nil, err
+		}
+		after := q.Snapshot()
+		if reflect.DeepEqual(before.Nodes, after.Nodes) {
+			return img, after, nil
+		}
+		q.Settle()
+		before = after
+	}
+	return nil, nil, fmt.Errorf("the accessibility tree changed during each of %d captures", captureTries)
+}
+
 func (q *QAApp) hover(n qa.Node) {
 	q.Send(map[string]any{"type": pointerMoveEvent, "x": n.Bounds.CenterX(), "y": n.Bounds.CenterY()})
+	q.Settle()
+	time.Sleep(tooltipShowWait)
 	q.Settle()
 }
 

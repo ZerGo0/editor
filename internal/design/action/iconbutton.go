@@ -18,7 +18,8 @@ type IconOptions struct {
 func IconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions) ui.Element {
 	p := token.Of(c)
 	b := ui.ButtonBase(c.Key(keyOf(o.ID, label))).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Radius(token.RadiusControl.Px()).
-		Center().Shrink(0).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled)
+		Center().Shrink(0).Label(label).Disabled(o.Disabled)
+	Tooltip(c, b, tooltipText(label, o.Tooltip, o.Keys))
 	keepFocus(b, o)
 	bg := p.Fill(b.Hovered(), b.Pressed())
 	if o.Active && bg == ui.Transparent {
@@ -41,7 +42,8 @@ func MenuIconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions, me
 func ToggleIconButton(c *ui.Context, icon *ui.SVG, label string, on *bool, o IconOptions) ui.Element {
 	p := token.Of(c)
 	b := ui.ToggleBase(c.Key(keyOf(o.ID, label)), on).Size(token.ToggleSize.Px(), token.ToggleSize.Px()).Radius(token.RadiusInline.Px()).
-		Center().Shrink(0).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled)
+		Center().Shrink(0).Label(label).Disabled(o.Disabled)
+	Tooltip(c, b, tooltipText(label, o.Tooltip, o.Keys))
 	keepFocus(b, o)
 	color := p.Icon
 	switch {

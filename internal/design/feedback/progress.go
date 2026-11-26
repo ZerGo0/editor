@@ -27,6 +27,6 @@ func Loading(c *ui.Context, text string) ui.Element {
 	return ui.Row(c).FillWidth().Padding(token.PadLoading.Px(), token.PadView.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).
 		Role(ui.RoleStatus).Busy(true).Label(text).Children(func() {
 		Spinner(c, text)
-		ui.Text(c, text).FontSize(token.TextLabel.Px()).TextColor(p.Text.Secondary).AccessHidden(true)
+		token.TextLabel.Apply(ui.Text(c, text)).TextColor(p.Text.Secondary).AccessHidden(true)
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -33,6 +34,7 @@ func (a *Allow) matches(view string) bool {
 type Allowlist struct {
 	Path    string
 	Entries []*Allow
+	mu      sync.Mutex
 }
 
 func LoadAllowlist(path string) (*Allowlist, error) {
@@ -65,6 +67,8 @@ func LoadAllowlist(path string) (*Allowlist, error) {
 }
 
 func (l *Allowlist) Check(res Result) []int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var keys []string
 	for _, a := range l.Entries {
 		if !a.matches(res.Name) {
@@ -81,6 +85,8 @@ func (l *Allowlist) Check(res Result) []int {
 }
 
 func (l *Allowlist) Stale() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var out []string
 	for _, a := range l.Entries {
 		if !a.used {
@@ -91,6 +97,8 @@ func (l *Allowlist) Stale() []string {
 }
 
 func (l *Allowlist) Prune() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var kept []string
 	for _, a := range l.Entries {
 		if a.used {

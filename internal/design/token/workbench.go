@@ -1,6 +1,6 @@
 package token
 
-const FontEditor = "JetBrains Mono"
+const FontEditor = "Hack"
 
 var (
 	TabMaxWidth        = Size{240}

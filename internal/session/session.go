@@ -69,6 +69,7 @@ type State struct {
 	Recent   []string           `json:"recent"`
 	Open     []string           `json:"open"`
 	Projects map[string]Project `json:"projects"`
+	Commands []string           `json:"commands,omitempty"`
 }
 
 type Store struct {

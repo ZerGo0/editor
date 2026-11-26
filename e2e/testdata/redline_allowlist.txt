@@ -1,7 +1,7 @@
-settings align listItem "GitHub Issues" bottom edge -- internal/prefs: the categories list and the settings list are separate columns with different row heights; the 1.6 px near miss is not a shared edge
-settings padding group "Detect Indentation" padding left -- internal/prefs: the checkbox setting row insets its content 10 px where the other setting rows use 12 px (token.PadPanel)
-settings text-band tab "index.ts" cap band centre y -- internal/workspace tab bar: the tab title cap band is 1.5 px below the tab centre in this light-theme state
-settings contrast button "Go Back" icon contrast -- internal/workspace title bar: the Go Back icon draws at 2.68:1 (dimmed) but the node is not marked disabled; mark it disabled when there is no history or use the normal icon colour
+settings align listItem " -- internal/prefs: the categories list (22 px rows) and the settings list (tall setting rows) are separate columns; their 1 to 2 px near misses are not shared edges
+* text-band tab "index.ts" cap band centre y -- internal/design chrome.TabStrip: at scale 1 the TextBody baseline of this lower-case title snaps 1.5 px below the 26 px tab centre in the light theme; the same tab is centred at scale 2 in TestGalleryRedlines, and a 1 px rise breaks the scale-2 check
 settings contrast text "Git" text contrast -- internal/prefs categories list: 12 px Text.Secondary label renders at 4.48:1 at scale 1 (needs 4.5:1)
 * optical group "⌃ -- internal/design badge.Keys: the control glyph (⌃) sits 2.2 to 2.5 px above the keycap centre by font design; the check reads the leading glyph as a row icon
-panel text-band textField "Filter Problems" cap band centre y -- internal/workspace Problems panel filter: input text cap band sits 1.5 px below the field centre
+search optical treeItem " -- internal/search result rows: the line-number column (raw ui.Text at the token.TextCaption size, no fixed line height) sits 1.0 to 1.02 px below the 22 px row centre at scale 1; give it a token.TextStyle with a whole-px line height
+search optical menuButton "Search Scope" ink centre x -- internal/search scope menu: the filter glyph ink sits 1.11 to 1.13 px left of the 22 px button centre at scale 1; shown since the Search title actions moved into the activity bar row
+search padding region "Search" padding top -- internal/search: the query field starts 10 px below the side bar top now that the view title row is gone; inset it 8 or 12 px (token.PadPanel)

@@ -17,11 +17,20 @@ type Toggle struct {
 	On    *bool
 }
 
+type Action struct {
+	Icon     *ui.SVG
+	Label    string
+	Keys     string
+	Disabled bool
+	Run      func()
+}
+
 type frame struct {
 	label    string
 	error    string
 	leading  *ui.SVG
 	toggles  []Toggle
+	actions  []Action
 	trailing func()
 	disabled bool
 }
@@ -42,13 +51,19 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 				ui.Icon(c, f.leading).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Text.Secondary).Shrink(0).
 					Margin(0, 0, 0, token.PadInputX.Px()).AccessHidden(true)
 			}
-			in = input().Grow(1).MinWidth(0).Padding(token.PadInputY.Px(), token.PadInputX.Px()).FontSize(token.TextBody.Px()).
+			in = token.TextBody.Apply(input()).Grow(1).MinWidth(0).Padding(token.PadInputY.Px(), token.PadInputX.Px()).
 				TextColor(p.Text.Primary).PlaceholderColor(p.Text.Muted).CaretColor(p.Text.Primary).FocusRing(false).Label(f.label)
 			if f.trailing != nil {
 				f.trailing()
 			}
 			for _, t := range f.toggles {
-				action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys, KeepFocus: true})
+				onFirstLine(action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys, KeepFocus: true}), token.ToggleSize, multiline)
+			}
+			for _, a := range f.actions {
+				b := onFirstLine(action.IconButton(c, a.Icon, a.Label, action.IconOptions{Keys: a.Keys, Disabled: a.Disabled, KeepFocus: true}), token.IconButtonSize, multiline)
+				if b.Clicked() && a.Run != nil {
+					a.Run()
+				}
 			}
 		})
 		border := p.Border.Input
@@ -72,4 +87,11 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 		in.ErrorMessage(msg)
 	})
 	return in
+}
+
+func onFirstLine(el ui.Element, size token.Size, multiline bool) ui.Element {
+	if multiline {
+		el.Margin((token.ControlHeight.Px()-2*token.BorderWidth.Px()-size.Px())/2, 0, 0, 0)
+	}
+	return el
 }

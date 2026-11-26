@@ -12,8 +12,9 @@ func CommandCenter(c *ui.Context, text, command string) ui.Element {
 	info, _ := action.Lookup(command)
 	b := ui.ButtonBase(c.Key("command-center:"+command)).Height(token.ControlHeightSmall.Px()).Grow(1).
 		MinWidth(token.CommandCenterMinWidth.Px()).MaxWidth(token.CommandCenterWidth.Px()).Radius(token.RadiusPopover.Px()).
-		Padding(0, token.PadControlX.Px()).Gap(token.GapRowIcon.Px()).Center().Label(info.Title).Tooltip(action.Hint(info.Title, info.Keys)).
+		Padding(0, token.PadControlX.Px()).Gap(token.GapRowIcon.Px()).Center().Label(info.Title).
 		Border(token.BorderWidth.Px(), p.Bar.CommandCenterBorder)
+	action.Tooltip(c, b, action.Hint(info.Title, info.Keys))
 	bg := p.Bar.CommandCenter
 	if b.Hovered() || b.Pressed() {
 		bg = p.Bar.CommandCenterHover

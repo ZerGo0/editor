@@ -15,11 +15,6 @@ const (
 	WeightBold     = 700
 )
 
-const (
-	LineHeight      float32 = 1.4
-	LineHeightTight float32 = 1.2
-)
-
 type TextStyle struct {
 	size   float32
 	weight int
@@ -27,18 +22,19 @@ type TextStyle struct {
 	mono   bool
 	upper  bool
 	muted  bool
+	rise   Size
 }
 
 var (
-	TextBody      = TextStyle{size: 13, weight: WeightRegular}
-	TextStrong    = TextStyle{size: 13, weight: WeightSemibold}
-	TextLabel     = TextStyle{size: 12, weight: WeightRegular}
-	TextParagraph = TextStyle{size: 12, weight: WeightRegular, line: LineHeight, muted: true}
-	TextCaption   = TextStyle{size: 11, weight: WeightRegular, muted: true}
-	TextTitle     = TextStyle{size: 11, weight: WeightBold, upper: true}
-	TextHeading   = TextStyle{size: 15, weight: WeightSemibold}
-	TextBadge     = TextStyle{size: 11, weight: WeightSemibold}
-	TextMono      = TextStyle{size: 12, weight: WeightRegular, mono: true}
+	TextBody      = TextStyle{size: 13, weight: WeightRegular, line: 16}
+	TextStrong    = TextStyle{size: 13, weight: WeightSemibold, line: 16}
+	TextLabel     = TextStyle{size: 12, weight: WeightRegular, line: 16, rise: TextRise}
+	TextParagraph = TextStyle{size: 12, weight: WeightRegular, line: 18, muted: true}
+	TextCaption   = TextStyle{size: 11, weight: WeightRegular, line: 14, muted: true}
+	TextTitle     = TextStyle{size: 11, weight: WeightBold, line: 14, upper: true}
+	TextHeading   = TextStyle{size: 15, weight: WeightSemibold, line: 20}
+	TextBadge     = TextStyle{size: 11, weight: WeightSemibold, line: 14}
+	TextMono      = TextStyle{size: 12, weight: WeightRegular, line: 16, mono: true}
 )
 
 func (t TextStyle) Px() float32 { return t.size }
@@ -55,14 +51,7 @@ func (t TextStyle) Format(s string) string {
 }
 
 func (t TextStyle) Apply(el ui.Element) ui.Element {
-	return NudgeText(t.Boxed(el))
-}
-
-func (t TextStyle) Boxed(el ui.Element) ui.Element {
-	el.FontSize(t.size).FontWeight(t.weight)
-	if t.line > 0 {
-		el.LineHeight(t.line)
-	}
+	el.FontSize(t.size).FontWeight(t.weight).FixedLineHeight(t.line)
 	if t.mono {
 		el.Font(FontMono)
 	}

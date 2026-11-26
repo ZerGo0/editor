@@ -30,7 +30,7 @@ func Notice(c *ui.Context, o NoticeOptions) ui.Element {
 	return ui.Row(c).FillWidth().Padding(token.PadNoticeY.Px(), token.PadNoticeX.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).
 		Radius(token.RadiusControl.Px()).Background(bg).Border(token.BorderWidth.Px(), border).Role(role).Label(o.Text).Children(func() {
 		ui.Icon(c, ToneIcon(o.Tone)).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Tone(o.Tone)).Shrink(0).AccessHidden(true)
-		ui.Text(c, o.Text).FontSize(token.TextLabel.Px()).TextColor(p.Text.Primary).Wrap().Grow(1).MinWidth(0)
+		token.TextLabel.Apply(ui.Text(c, o.Text)).TextColor(p.Text.Primary).Wrap().Grow(1).MinWidth(0)
 		if o.Action != "" && o.OnAction != nil {
 			if action.Button(c, o.Action, action.ButtonOptions{Small: true}).Clicked() {
 				o.OnAction()

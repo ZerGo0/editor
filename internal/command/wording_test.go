@@ -263,7 +263,7 @@ func TestCommandAndMenuWording(t *testing.T) {
 	for title, ids := range byLabel {
 		if len(ids) > 1 {
 			slices.Sort(ids)
-			advisory = append(advisory, "duplicate title "+strconv.Quote(title)+" for "+strings.Join(ids, ", "))
+			strict = append(strict, "duplicate title "+strconv.Quote(title)+" for "+strings.Join(ids, ", "))
 		}
 	}
 	slices.Sort(advisory)

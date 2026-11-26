@@ -28,7 +28,7 @@ type Registry struct {
 	recent []string
 }
 
-const maxRecent = 20
+const maxRecent = 50
 
 func NewRegistry() *Registry {
 	return &Registry{byID: map[string]*Command{}, inMenu: map[string]bool{}}
@@ -58,16 +58,24 @@ func (r *Registry) Run(id string, win *mygo.Window) bool {
 	if c == nil {
 		return false
 	}
-	r.recent = slices.Insert(slices.DeleteFunc(r.recent, func(s string) bool { return s == id }), 0, id)
-	if len(r.recent) > maxRecent {
-		r.recent = r.recent[:maxRecent]
-	}
 	c.Run(win)
 	return true
 }
 
+func (r *Registry) MarkUsed(id string) {
+	if r.byID[id] == nil {
+		return
+	}
+	r.recent = slices.Insert(slices.DeleteFunc(r.recent, func(s string) bool { return s == id }), 0, id)
+	r.recent = r.recent[:min(len(r.recent), maxRecent)]
+}
+
 func (r *Registry) Recent() []string {
 	return r.recent
+}
+
+func (r *Registry) SetRecent(ids []string) {
+	r.recent = slices.Clone(ids[:min(len(ids), maxRecent)])
 }
 
 func (r *Registry) SetInMenu(id string) {

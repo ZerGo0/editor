@@ -1,9 +1,17 @@
 package badge
 
 import (
+	"math"
+	"strings"
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
+)
+
+const (
+	testWidth  = 600
+	testHeight = 200
 )
 
 func TestHexColor(t *testing.T) {
@@ -18,6 +26,26 @@ func TestHexColor(t *testing.T) {
 	}
 	if c, ok := hexColor("d73a4a"); !ok || c != ui.RGB(0xd7, 0x3a, 0x4a) {
 		t.Errorf("hexColor = %v %v", c, ok)
+	}
+}
+
+func TestLongTagEndsWithEllipsis(t *testing.T) {
+	long := strings.Repeat("feature/very-long-branch-name-", 4)
+	tt := ui.NewTester(func(c *ui.Context) { Tag(c, long, TagOptions{}) }, testWidth, testHeight)
+	var tag ui.AccessInfo
+	for _, a := range tt.AccessAll() {
+		if a.Name == long {
+			tag = a
+		}
+	}
+	if tag.Name == "" || tag.Bounds.W > token.TagMaxWidth.Px() {
+		t.Fatalf("tag bounds %v; want a width of at most %v px", tag.Bounds, token.TagMaxWidth.Px())
+	}
+	if tag.Bounds.W != float32(math.Round(float64(tag.Bounds.W))) {
+		t.Fatalf("tag width %v is not a whole px", tag.Bounds.W)
+	}
+	if tag.Description != long {
+		t.Fatalf("cut tag tooltip %q; want the full text", tag.Description)
 	}
 }
 

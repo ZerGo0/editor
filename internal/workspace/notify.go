@@ -72,7 +72,7 @@ func (w *Workspace) notificationsStatus(c *ui.Context) {
 	if n := w.notes.Unread(); n > 0 && !w.noteCenter {
 		text = badge.CountText(n)
 	}
-	anchor := chrome.StatusItem(c, text, chrome.StatusOptions{Icon: icons.Info, ID: "notifications", Command: showNotificationsID,
+	anchor := chrome.StatusItem(c, text, chrome.StatusOptions{Icon: icons.Bell, ID: "notifications", Command: showNotificationsID,
 		Tooltip: notificationsTitle})
 	ui.Popover(c, anchor, &w.noteCenter, func() { w.notificationCenter(c) })
 }

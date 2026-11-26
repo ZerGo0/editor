@@ -39,7 +39,7 @@ func (w *Workspace) View(c *ui.Context) {
 			}
 			w.clampSidebar(c)
 			ui.Split(c, &w.sidebarWidth, func() { w.sidebar(c) }, func() { w.main(c) }).
-				SplitReset(defaultSidebarWidth).Grow(1).FillHeight()
+				SplitReset(defaultSidebarWidth).Grow(1).FillHeight().MinWidth(0)
 		})
 		w.statusBar(c)
 	})

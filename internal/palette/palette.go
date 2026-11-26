@@ -19,6 +19,7 @@ type Item struct {
 	Leading   func(c *ui.Context)
 	Group     string
 	Query     string
+	Removable bool
 }
 
 type Mode struct {
@@ -28,6 +29,10 @@ type Mode struct {
 	Empty       string
 	Search      func(query string, done func([]Item))
 	Accept      func(Item)
+	AcceptSide  func(Item)
+	Background  func(Item)
+	RemoveLabel string
+	Remove      func(Item)
 }
 
 type Palette struct {
@@ -109,6 +114,21 @@ func (p *Palette) accept(it Item) {
 	}
 }
 
+func (p *Palette) acceptWith(it Item, res quickinput.Result) {
+	m := p.mode
+	switch {
+	case it.Query != "" || m == nil:
+		p.accept(it)
+	case res.Background && m.Background != nil:
+		m.Background(it)
+	case res.Side && m.AcceptSide != nil:
+		p.Close()
+		m.AcceptSide(it)
+	default:
+		p.accept(it)
+	}
+}
+
 func (p *Palette) current() *Mode {
 	if p.single != nil {
 		return p.single
@@ -150,19 +170,25 @@ func (p *Palette) View(c *ui.Context) {
 	m := p.mode
 	label, o := "", quickinput.Options{}
 	if m != nil {
-		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty}
+		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty, Side: m.AcceptSide != nil, Background: m.Background != nil}
 	}
 	items := make([]quickinput.Item, len(p.items))
 	for i, it := range p.items {
 		items[i] = quickinput.Item{Label: it.Label, Matches: it.Positions, Description: it.Detail, Icon: it.Icon, Leading: it.Leading, Keys: it.Keys, Group: it.Group}
+		if it.Removable && m.Remove != nil {
+			items[i].Remove = m.RemoveLabel
+		}
 	}
 	res := quickinput.View(c, label, &p.state, items, o)
 	if p.state.Query != p.searched {
 		c.Invalidate()
 	}
 	switch {
+	case res.Removed >= 0 && res.Removed < len(p.items):
+		m.Remove(p.items[res.Removed])
+		p.refresh()
 	case res.Accepted >= 0 && res.Accepted < len(p.items):
-		p.accept(p.items[res.Accepted])
+		p.acceptWith(p.items[res.Accepted], res)
 	case res.Closed:
 		p.Close()
 	}

@@ -1,6 +1,7 @@
 package list
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -73,7 +74,7 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 		row.Background(p.List.Hover)
 	}
 	if it.Tooltip != "" {
-		row.Tooltip(it.Tooltip)
+		action.Tooltip(c, row, it.Tooltip)
 	}
 	if s.tree && s.Guides && s.Depth > 0 {
 		guides(row, s.Depth, p.List.IndentGuide)
@@ -171,7 +172,7 @@ func label(c *ui.Context, p *token.Palette, it Item, active bool) {
 	case it.Git != token.GitNone:
 		color = p.GitColor(it.Git)
 	}
-	token.NudgeText(ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapRowIcon.Px()).AlignItems(ui.Baseline)).Children(func() {
+	ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapRowIcon.Px()).AlignItems(ui.Baseline).Children(func() {
 		spans := it.Spans
 		if it.Rich != nil {
 			spans = it.Rich(Style{Text: color, Secondary: secondary, Highlight: match})
@@ -179,7 +180,7 @@ func label(c *ui.Context, p *token.Palette, it Item, active bool) {
 		if spans == nil {
 			spans = Spans(it.Label, it.Matches, color, match)
 		}
-		name := ui.RichText(c, spans...).FontSize(token.TextBody.Px()).SingleLine().Shrink(1).MinWidth(0)
+		name := token.TextBody.Apply(ui.RichText(c, spans...)).SingleLine().Shrink(1).MinWidth(0)
 		if it.Strong {
 			name.FontWeight(token.WeightSemibold)
 		}
@@ -187,7 +188,7 @@ func label(c *ui.Context, p *token.Palette, it Item, active bool) {
 			name.Strikethrough()
 		}
 		if it.Description != "" {
-			ui.Text(c, it.Description).FontSize(token.TextLabel.Px()).TextColor(secondary).SingleLine().Shrink(1).MinWidth(0)
+			token.TextLabel.Apply(ui.Text(c, it.Description)).TextColor(secondary).SingleLine().Shrink(1).MinWidth(0)
 		}
 	})
 }

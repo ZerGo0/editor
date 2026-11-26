@@ -174,7 +174,7 @@ func (w *Workspace) panelView(c *ui.Context) {
 	}
 	w.focus.panel = col.FocusWithin()
 	col.Children(func() {
-		header := ui.Row(c).Height(token.ViewTitleHeight.Px()).Shrink(0).FillWidth().MinWidth(0).Clip().Padding(0, token.PadRow.Px()).
+		header := ui.Row(c).Height(token.ViewTitleHeight.Px()-token.BorderWidth.Px()).Shrink(0).FillWidth().MinWidth(0).Clip().Padding(0, token.PadRow.Px()).
 			Gap(token.GapInline.Px()).AlignItems(ui.Center)
 		header.Children(func() {
 			selected := slices.IndexFunc(w.tools.panels, func(t toolView) bool { return t.id == v.id })
@@ -203,7 +203,7 @@ func (w *Workspace) panelView(c *ui.Context) {
 			w.panelActions(c)
 		})
 		header.ContextMenu(w.panelMenu)
-		ui.Column(c.Key("panel-view-" + v.id)).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(func() { v.view(c) })
+		ui.Column(c.Key("panel-view-" + v.id)).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Clip().Children(func() { v.view(c) })
 	})
 }
 

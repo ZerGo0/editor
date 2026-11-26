@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/design/token"
 )
 
 const (
@@ -103,4 +105,38 @@ func TestGitHubViewShowsOneEmptyStateWithoutRepository(t *testing.T) {
 			t.Errorf("section %q drawn behind the view-level empty state", n.Label)
 		}
 	}
+}
+
+func TestTitleBarContentCentresOnTrafficLights(t *testing.T) {
+	t.Parallel()
+	const tolerance = 0.01
+	centre := float64(token.TitleBarHeight.Px()) / 2
+	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n"})
+	for _, what := range []string{"Layout Controls", "Go to File"} {
+		n := app.WaitNode(win, what, func(n Node) bool { return strings.HasPrefix(n.Label, what) })
+		if got := n.Bounds.Y + n.Bounds.Height/2; got < centre-tolerance || got > centre+tolerance {
+			t.Errorf("%s centre y = %v, want %v, the traffic lights' centre", what, got, centre)
+		}
+	}
+}
+
+func TestViewActionsShareTheActivityBarRow(t *testing.T) {
+	t.Parallel()
+	root := gitProject(t, map[string]string{"main.go": "package main\n"})
+	app := Launch(t, root)
+	win := app.WaitWindow(filepath.Base(root))
+	app.Idle(win)
+	app.Menu(win, "View", "Source Control")
+	bar := app.WaitNode(win, "activity bar", RoleLabel("tabList", "Activity Bar"))
+	actions := app.WaitNode(win, "view actions", RoleLabel("toolbar", "Source Control Actions"))
+	if top, bottom := bar.Bounds.Y, bar.Bounds.Y+bar.Bounds.Height; actions.Bounds.Y < top || actions.Bounds.Y+actions.Bounds.Height > bottom {
+		t.Errorf("view actions at y %v..%v, want them in the activity bar row at y %v..%v", actions.Bounds.Y, actions.Bounds.Y+actions.Bounds.Height, top, bottom)
+	}
+	if bar.Bounds.X > actions.Bounds.X {
+		t.Errorf("view actions at x %v, want them after the activity icons at x %v", actions.Bounds.X, bar.Bounds.X)
+	}
+	if n, ok := app.Find(win, RoleLabel("heading", "Source Control")); ok {
+		t.Errorf("the side bar still shows a view title row: %+v", n)
+	}
+	app.WaitNode(win, "view region", RoleLabel("region", "Source Control"))
 }

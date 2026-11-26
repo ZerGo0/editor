@@ -11,15 +11,16 @@ import (
 )
 
 const (
-	activityLabel = "Activity Bar"
-	manageLabel   = "Manage"
+	activityLabel     = "Activity Bar"
+	manageLabel       = "Manage"
+	viewActionsSuffix = " Actions"
 )
 
 func (w *Workspace) visibleViews() []toolView {
 	return slices.DeleteFunc(slices.Clone(w.tools.sideViews), func(v toolView) bool { return w.tools.hiddenViews[v.id] })
 }
 
-func (w *Workspace) activityBar(c *ui.Context) {
+func (w *Workspace) activityBar(c *ui.Context, v *toolView, showActions bool) {
 	views := w.visibleViews()
 	items := make([]chrome.Activity, len(views))
 	for i, v := range views {
@@ -32,10 +33,18 @@ func (w *Workspace) activityBar(c *ui.Context) {
 	row := ui.Row(c).FillWidth().Shrink(0).AlignItems(ui.Center).Padding(0, token.PadRow.Px(), 0, 0).
 		BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(token.Of(c).Border.Section)
 	row.Children(func() {
-		bar := chrome.ActivityBar(c, activityLabel, &selected, items).Grow(1).MinWidth(0)
+		bar := chrome.ActivityBar(c, activityLabel, &selected, items).Shrink(1).MinWidth(0)
 		w.takeFocus(partSide, bar)
 		if bar.Changed() && selected >= 0 && selected < len(views) {
 			w.ShowSideView(views[selected].id)
+		}
+		ui.Box(c).Grow(1)
+		if v != nil && v.actions != nil {
+			actions := ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(v.title + viewActionsSuffix)
+			if !showActions {
+				actions.Opacity(token.OpacityHidden.Value())
+			}
+			actions.Children(func() { v.actions(c) })
 		}
 		action.MenuIconButton(c, icons.Settings, manageLabel, action.IconOptions{}, w.manageMenu)
 	})

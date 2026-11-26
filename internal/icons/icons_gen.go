@@ -7,6 +7,7 @@ var (
 	ArrowLeft     = load("arrow-left")
 	ArrowRight    = load("arrow-right")
 	ArrowUp       = load("arrow-up")
+	Bell          = load("bell")
 	CaseSensitive = load("case-sensitive")
 	Check         = load("check")
 	ChevronDown   = load("chevron-down")

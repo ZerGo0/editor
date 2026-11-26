@@ -1,6 +1,7 @@
 package feedback
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -70,13 +71,14 @@ func toastAction(c *ui.Context, p *token.Palette, parts ui.ToastParts, label str
 		bg = p.Control.SecondaryHover
 	}
 	b.Background(bg).Border(token.BorderWidth.Px(), p.Control.ButtonBorder).Children(func() {
-		token.TextBody.Apply(ui.Text(c, label)).TextColor(p.Control.SecondaryText).SingleLine()
+		token.TextBody.WholeText(c, label).TextColor(p.Control.SecondaryText).SingleLine()
 	})
 }
 
 func closeToast(c *ui.Context, p *token.Palette, parts ui.ToastParts) {
 	b := parts.CloseButton().Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Radius(token.RadiusControl.Px()).Center().Shrink(0).
-		Label(closeToastLabel).Tooltip(closeToastLabel)
+		Label(closeToastLabel)
+	action.Tooltip(c, b, closeToastLabel)
 	b.Background(p.Fill(b.Hovered(), b.Pressed())).Children(func() {
 		ui.Icon(c, icons.Close).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon)
 	})

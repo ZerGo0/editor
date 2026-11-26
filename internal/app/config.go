@@ -37,6 +37,7 @@ func (a *App) loadConfig() {
 	a.settings = settings.Load(filepath.Join(dir, settingsFile))
 	a.keys = keymap.Load(filepath.Join(dir, keybindingsFile))
 	a.commands = command.NewRegistry()
+	a.commands.SetRecent(a.store.State.Commands)
 	a.env = &workspace.Env{Settings: a.settings, Keys: a.keys, Commands: a.commands, UserData: dir}
 	if !a.options.NoBackups {
 		a.env.BackupDir = filepath.Join(dir, dataDir, backupsDir)

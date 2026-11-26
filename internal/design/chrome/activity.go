@@ -18,12 +18,13 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 	p := token.Of(c)
 	parts := ui.TabsBase(c, selected, len(items))
 	forward := parts.List.Focused()
-	parts.List.Height(token.ViewTitleHeight.Px()).FillWidth().Padding(0, token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).
+	parts.List.Height(token.ActivityBarHeight.Px()).Padding(0, token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).
 		Label(label).Children(func() {
 		for i, it := range items {
 			active := i == *selected
-			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ViewTitleHeight.Px()).Center().Shrink(0).Label(it.Label).
-				Tooltip(action.Hint(it.Label, it.Keys)).FocusRingOffset(-token.FocusRingWidth.Px())
+			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ActivityBarHeight.Px()).Center().Shrink(0).Label(it.Label).
+				FocusRingOffset(-token.FocusRingWidth.Px())
+			action.Tooltip(c, tab, action.Hint(it.Label, it.Keys))
 			if active && forward {
 				tab.Focus()
 			}
