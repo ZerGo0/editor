@@ -55,10 +55,13 @@ var modifierAliases = map[string]ui.Modifiers{
 	"alt":    ui.Alt,
 	"option": ui.Alt,
 	"shift":  ui.Shift,
+	"win":    ui.Super,
 }
 
 var keyNameAliases = map[string]string{
-	"esc": "escape",
+	"esc":     "escape",
+	"back":    "browserback",
+	"forward": "browserforward",
 }
 
 var (
@@ -106,6 +109,8 @@ func buildKeyInfos() map[ui.Key]keyInfo {
 		ui.KeyBracketRight: {"]", "]", "]"},
 		ui.KeyBackslash:    {"\\", "\\", "\\"},
 		ui.KeyBackquote:    {"`", "`", "`"},
+		ui.KeyBack:         {"browserback", "Back", ""},
+		ui.KeyForward:      {"browserforward", "Forward", ""},
 	}
 	for i, key := range letters {
 		name := string(rune('a' + i))
@@ -177,8 +182,14 @@ func parseStroke(s string) (Stroke, error) {
 }
 
 func StrokeFor(ev ui.InputEvent) Stroke {
+	return DispatchCode.Stroke(ev)
+}
+
+func (d Dispatch) Stroke(ev ui.InputEvent) Stroke {
 	key := ev.Key
-	if _, known := keyInfos[key]; !known && ev.Mods&shortcutMods != 0 && ev.PhysicalKey != ui.KeyUnknown {
+	_, known := keyInfos[key]
+	byPosition := ev.Mods&shortcutMods != 0 && ev.PhysicalKey != ui.KeyUnknown
+	if byPosition && (!known || d == DispatchKeyCode) {
 		key = ev.PhysicalKey
 	}
 	return Stroke{Mods: ev.Mods, Key: key}

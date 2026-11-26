@@ -3,33 +3,75 @@
 package e2e
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func dumpProbe(t *testing.T, app *App, win int, when string) {
-	for _, n := range app.Tree(win) {
-		if n.Role == "dialog" || n.Role == "textField" || n.Role == "toolbar" {
-			t.Logf("%s: %s %q %v", when, n.Role, n.Label, n.States)
-		}
-	}
+func openInEditor(t *testing.T, app *App, win int, name string) Node {
+	t.Helper()
+	app.Click(win, app.WaitNode(win, name+" row", RoleLabel("treeItem", name)), 2)
+	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	app.Act(win, field.ID, "focus", "")
+	return field
 }
 
-func TestProbeCtrlG(t *testing.T) {
+func TestCtrlGOpensGoToLine(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
-	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
-	dumpProbe(t, app, win, "start")
+	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Ctrl+G")
-	dumpProbe(t, app, win, "ctrl+g no explicit focus")
-	app.Key(win, "Escape")
-	dumpProbe(t, app, win, "after escape")
-	app.Act(win, field.ID, "focus", "")
-	app.Menu(win, "Go", "Go to Line/Column...")
-	dumpProbe(t, app, win, "after menu")
-	app.Key(win, "Escape")
-	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 1)
-	app.Key(win, "Ctrl+G")
-	dumpProbe(t, app, win, "ctrl+g with tree focus")
+	app.WaitNode(win, "go to line", RoleLabel("dialog", "Go to line"))
+}
+
+func TestCmdAltFShowsReplace(t *testing.T) {
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
+	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Alt+F")
-	dumpProbe(t, app, win, "cmd+alt+f")
+	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
+}
+
+func TestCmdShiftHOpensSearchView(t *testing.T) {
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
+	openInEditor(t, app, win, "a.txt")
+	app.Key(win, "Cmd+Shift+H")
+	waitScope(app, win, "Text")
+}
+
+func TestCmdSlashCommentsLine(t *testing.T) {
+	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n\nfunc main() {}\n"})
+	field := openInEditor(t, app, win, "main.go")
+	app.Key(win, "Cmd+/")
+	app.Eventually("line commented", func() bool {
+		n, ok := app.Find(win, func(n Node) bool { return n.ID == field.ID })
+		return ok && strings.HasPrefix(n.Value, "// package main")
+	})
+}
+
+func launchWindowsKeymap(t *testing.T, files map[string]string) (*App, int) {
+	t.Helper()
+	userData := t.TempDir()
+	writeFile(t, filepath.Join(userData, "settings.json"), "{\"keyboard.keymap\": \"vscode-windows\"}\n")
+	root := Project(t, files)
+	app := LaunchWith(t, userData, root)
+	win := app.WaitWindow(filepath.Base(root))
+	app.Idle(win)
+	return app, win
+}
+
+func TestWindowsKeymapBindsCtrlPToGoToFile(t *testing.T) {
+	app, win := launchWindowsKeymap(t, map[string]string{"a.txt": "alpha\n"})
+	openInEditor(t, app, win, "a.txt")
+	app.Menu(win, "View", "Command Palette...")
+	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
+	app.Type(win, "go to file")
+	app.WaitNode(win, "Go to File with Ctrl+P", RoleLabel("listItem", "Go: Go to File... ⌃P"))
+	app.Key(win, "Enter")
+	waitScope(app, win, "Files")
+}
+
+func TestWindowsKeymapCtrlHShowsReplace(t *testing.T) {
+	app, win := launchWindowsKeymap(t, map[string]string{"a.txt": "alpha\n"})
+	openInEditor(t, app, win, "a.txt")
+	app.Key(win, "Ctrl+H")
+	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
 }

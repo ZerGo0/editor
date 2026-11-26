@@ -9,7 +9,7 @@ import (
 
 const (
 	maxRecentMenuItems = 10
-	goToLineCommand    = "editor.goToLine"
+	goToLineCommand    = "workbench.action.gotoLine"
 )
 
 func (a *App) refreshMenu() {
@@ -49,6 +49,7 @@ func (a *App) appMenu() *mygo.MenuItem {
 		mygo.Separator(),
 		a.item("workbench.action.openSettings", "Settings..."),
 		a.item("workbench.action.openGlobalKeybindings", "Keyboard Shortcuts"),
+		a.item(importKeybindingsCommand, "Import VS Code Keybindings..."),
 		mygo.Separator(),
 		install,
 		uninstall,

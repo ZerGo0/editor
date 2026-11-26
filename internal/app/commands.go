@@ -118,6 +118,7 @@ func (a *App) registerCommands() {
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
 		add(keymap.EditorCommandID(cmd), categoryEditor, humanize(cmd.String()), ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))
 	}
+	a.registerKeymapCommands()
 }
 
 func (a *App) zoom(step int) {

@@ -19,6 +19,10 @@ func TestParseChord(t *testing.T) {
 		{"cmd+\\", Chord{{ui.Super, ui.KeyBackslash}}},
 		{"F12", Chord{{0, ui.KeyF12}}},
 		{"cmd+1", Chord{{ui.Super, ui.Key1}}},
+		{"win+p", Chord{{ui.Super, ui.KeyP}}},
+		{"back", Chord{{0, ui.KeyBack}}},
+		{"forward", Chord{{0, ui.KeyForward}}},
+		{"BrowserBack", Chord{{0, ui.KeyBack}}},
 	}
 	for _, tt := range tests {
 		got, err := ParseChord(tt.in)
@@ -48,7 +52,7 @@ func TestChordRoundTrip(t *testing.T) {
 		"cmd+k cmd+s", "ctrl+shift+alt+cmd+p", "escape", "f1", "ctrl+pageup",
 		"cmd+[", "cmd+]", "-", "=", ",", ".", "/", ";", "'", "`", "\\",
 		"enter", "tab", "space", "backspace", "delete", "insert", "home", "end",
-		"left", "right", "up", "down", "0", "9", "z",
+		"left", "right", "up", "down", "0", "9", "z", "browserback", "browserforward",
 	} {
 		chord, err := ParseChord(in)
 		if err != nil {
@@ -188,9 +192,35 @@ func TestStrokeForFallsBackToPhysicalKey(t *testing.T) {
 			t.Errorf("%s: StrokeFor = %v, want %v", tt.name, got, tt.want)
 		}
 	}
-	km := New(Defaults(), nil)
+	km := New(Defaults(PresetVSCode), nil)
 	b, ok := km.Lookup(Chord{StrokeFor(ui.InputEvent{Key: ui.KeyUnknown, PhysicalKey: ui.KeyS, Mods: ui.Super})})
 	if !ok || b.Command != "workbench.action.files.save" {
 		t.Fatalf("Cmd+ы = %v %v, want Save", b, ok)
+	}
+}
+
+func TestKeyCodeDispatchUsesThePhysicalKey(t *testing.T) {
+	azerty := ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyW, Mods: ui.Super}
+	if got, want := DispatchKeyCode.Stroke(azerty), (Stroke{ui.Super, ui.KeyW}); got != want {
+		t.Errorf("keyCode: Stroke = %v, want %v", got, want)
+	}
+	if got, want := DispatchCode.Stroke(azerty), (Stroke{ui.Super, ui.KeyZ}); got != want {
+		t.Errorf("code: Stroke = %v, want %v", got, want)
+	}
+	plain := ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyW}
+	if got, want := DispatchKeyCode.Stroke(plain), (Stroke{0, ui.KeyZ}); got != want {
+		t.Errorf("keyCode without modifiers: Stroke = %v, want %v", got, want)
+	}
+}
+
+func TestBrowserKeysHaveNoAccelerator(t *testing.T) {
+	for _, key := range []string{"browserback", "browserforward"} {
+		chord, err := ParseChord(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := chord[0].Accelerator(); got != "" {
+			t.Errorf("%s accelerator = %q, want none", key, got)
+		}
 	}
 }
