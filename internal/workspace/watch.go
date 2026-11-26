@@ -47,4 +47,6 @@ func (w *Workspace) diskChanged(dirs []string) {
 	w.search.view.Changed(dirs)
 	w.scheduleReindex()
 	w.scheduleIgnored()
+	w.folderSettingsChanged(dirs)
+	w.editorConfigChanged(dirs)
 }

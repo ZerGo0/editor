@@ -26,6 +26,7 @@ const (
 type Options struct {
 	Hidden         bool
 	DiscardOnClose bool
+	NoBackups      bool
 }
 
 type projectWindow struct {
@@ -174,7 +175,10 @@ func (a *App) openProject(root string) *projectWindow {
 }
 
 func (a *App) confirmClose(pw *projectWindow, e *mygo.CloseEvent) {
-	if pw.closing || a.options.DiscardOnClose || !pw.ws.HasUnsaved() {
+	if pw.closing {
+		return
+	}
+	if prompt := pw.ws.PrepareClose(); a.options.DiscardOnClose || !prompt {
 		return
 	}
 	e.PreventDefault()

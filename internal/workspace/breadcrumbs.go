@@ -30,7 +30,7 @@ type symbolEntry struct {
 }
 
 func (w *Workspace) breadcrumbs(c *ui.Context, g *layout.Group, tab *layout.Tab) {
-	if isVirtual(tab.Path) {
+	if !onDisk(tab.Path) {
 		return
 	}
 	t := c.Theme()

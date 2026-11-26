@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/egoist/mygo"
 )
@@ -36,22 +35,23 @@ func askSave(win *mygo.Window, names []string) saveChoice {
 }
 
 func (w *Workspace) ConfirmClose(done func(ok bool)) {
-	dirty := w.modified()
+	dirty := w.unbacked()
 	if len(dirty) == 0 || w.win == nil {
 		done(true)
 		return
 	}
 	names := make([]string, len(dirty))
 	for i, d := range dirty {
-		names[i] = filepath.Base(d.Path)
+		names[i] = w.tabTitle(d.Path)
 	}
 	go func() {
 		choice := askSave(w.win, names)
 		w.update(func() {
 			switch choice {
 			case choiceSave:
-				done(w.save(dirty))
+				w.saveThen(dirty, func() { done(true) })
 			case choiceDiscard:
+				w.discardBackups(dirty)
 				done(true)
 			default:
 				done(false)

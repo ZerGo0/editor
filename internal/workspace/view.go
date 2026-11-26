@@ -32,6 +32,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.endViewerFrame()
 	w.gitFrame()
 	w.autoSave(w.focusedTab)
+	w.syncBackups()
 	w.overlays(c)
 	paletteOpen := w.palette.IsOpen()
 	w.palette.View(c, w.paletteTop(), w.acceptPalette)

@@ -71,7 +71,7 @@ func loadFile(path string, asText bool) (*document.Document, viewer.Kind, fileSt
 func (w *Workspace) viewerContent(c *ui.Context, g *layout.Group, tab *layout.Tab, e *docEntry) {
 	v := w.viewers.open[tab]
 	if v == nil {
-		s := w.env.Settings
+		s := w.settings
 		path := tab.Path
 		opened, err := viewer.Open(w, path, e.kind, viewer.Options{
 			OpenAsText: func() { w.openAsText(path) },

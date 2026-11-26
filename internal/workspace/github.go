@@ -50,7 +50,7 @@ func (w *Workspace) applyIssueSettings() {
 	if w.issues == nil {
 		return
 	}
-	st := w.env.Settings
+	st := w.settings
 	s := issueui.DefaultSettings()
 	if v := st.String(settings.IssueBranchTitle); v != "" {
 		s.IssueBranchTitle = v

@@ -63,6 +63,8 @@ func (a *App) appMenu() *mygo.MenuItem {
 
 func (a *App) fileMenu() *mygo.MenuItem {
 	return &mygo.MenuItem{Label: "File", Submenu: []*mygo.MenuItem{
+		a.item("workbench.action.files.newUntitledFile", ""),
+		a.item("scratch.newFile", ""),
 		a.item("explorer.newFile", ""),
 		a.item("explorer.newFolder", ""),
 		a.item("workbench.action.newWindow", ""),

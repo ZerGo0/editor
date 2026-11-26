@@ -62,7 +62,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 		Host:        w,
 		Providers:   engine,
 		Files:       w.search.files,
-		Settings:    w.env.Settings,
+		Settings:    w.settings,
 		OpenFiles:   w.openPaths,
 		Open:        w.openLocation,
 		Reveal:      func(p string) { w.revealPath(p, false) },
@@ -105,7 +105,7 @@ func (w *Workspace) reindex() {
 	}
 	ctx, cancel := context.WithCancel(w.ctx)
 	w.search.cancel = cancel
-	patterns := slices.Clone(w.env.Settings.Strings(settings.Exclude))
+	patterns := slices.Clone(w.settings.Strings(settings.Exclude))
 	excluded := func(rel string) bool { return glob.MatchAny(patterns, rel) }
 	go func() {
 		if err := w.search.files.Refresh(ctx, excluded); err != nil {
@@ -126,7 +126,7 @@ func (w *Workspace) scheduleReindex() {
 }
 
 func (w *Workspace) touchRecent(p string) {
-	if isVirtual(p) {
+	if !onDisk(p) {
 		return
 	}
 	r := append([]string{p}, slices.DeleteFunc(w.search.recent, func(q string) bool { return q == p })...)
@@ -136,6 +136,9 @@ func (w *Workspace) touchRecent(p string) {
 func (w *Workspace) modifiedTexts() map[string]string {
 	out := map[string]string{}
 	for _, d := range w.modified() {
+		if !onDisk(d.Path) {
+			continue
+		}
 		out[d.Path] = d.Buffer.String()
 	}
 	return out
@@ -144,7 +147,7 @@ func (w *Workspace) modifiedTexts() map[string]string {
 func (w *Workspace) openPaths() []string {
 	var out []string
 	for _, t := range w.tabs() {
-		if !isVirtual(t.Path) && !slices.Contains(out, t.Path) {
+		if onDisk(t.Path) && !slices.Contains(out, t.Path) {
 			out = append(out, t.Path)
 		}
 	}
@@ -236,6 +239,8 @@ func (w *Workspace) acceptPalette(item palette.Item) {
 	switch v := item.Value.(type) {
 	case languagePick:
 		w.setLanguage(v)
+	case scratchPick:
+		w.createScratch(v)
 	case switcherPick:
 		w.openPick(v)
 	default:

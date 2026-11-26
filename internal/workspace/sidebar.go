@@ -68,9 +68,10 @@ func (w *Workspace) explorerView(c *ui.Context) {
 	})
 	if collapsed {
 		ui.Box(c).Grow(1)
-		return
+	} else {
+		w.tree.View(c, c.Vibrancy(), filetreeHandlers(w))
 	}
-	w.tree.View(c, c.Vibrancy(), filetreeHandlers(w))
+	w.scratchesSection(c)
 }
 
 func (w *Workspace) RefreshExplorer() {

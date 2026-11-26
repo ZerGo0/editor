@@ -64,15 +64,16 @@ type Rect struct {
 }
 
 type Node struct {
-	ID      string   `json:"id"`
-	Parent  string   `json:"parent"`
-	Role    string   `json:"role"`
-	Key     any      `json:"key"`
-	Label   string   `json:"label"`
-	Value   string   `json:"value"`
-	States  []string `json:"states"`
-	Actions []string `json:"actions"`
-	Bounds  Rect     `json:"bounds"`
+	ID          string   `json:"id"`
+	Parent      string   `json:"parent"`
+	Role        string   `json:"role"`
+	Key         any      `json:"key"`
+	Label       string   `json:"label"`
+	Value       string   `json:"value"`
+	Description string   `json:"description"`
+	States      []string `json:"states"`
+	Actions     []string `json:"actions"`
+	Bounds      Rect     `json:"bounds"`
 }
 
 func (n Node) Has(state string) bool {

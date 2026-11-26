@@ -26,11 +26,11 @@ var (
 )
 
 func (w *Workspace) zoom() float32 {
-	return 1 + float32(w.env.Settings.Int(settings.ZoomLevel))*zoomStep
+	return 1 + float32(w.settings.Int(settings.ZoomLevel))*zoomStep
 }
 
 func (w *Workspace) configure(st *editor.State) {
-	s := w.env.Settings
+	s := w.settings
 	st.Font = ui.Font{Family: s.String(settings.FontFamily), Size: float32(s.Int(settings.FontSize))}
 	st.LineHeight = float32(s.Number(settings.LineHeight))
 	st.TabSize, st.Indent = 0, editor.IndentAuto
@@ -66,14 +66,17 @@ func (w *Workspace) editorMenu(m *ui.Menu) {
 }
 
 func (w *Workspace) prepareSave(d *document.Document) {
-	s := w.env.Settings
-	if s.Bool(settings.TrimTrailing) {
+	trim, finalNewline, lineEnding := w.saveRules(d)
+	if trim {
 		if st := w.editorFor(d.Path); st != nil {
 			st.Run(editor.TrimTrailingWhitespace)
 		}
 	}
-	if s.Bool(settings.FinalNewline) {
+	if finalNewline {
 		d.EnsureFinalNewline()
+	}
+	if lineEnding != "" && d.Buffer.LineEnding() != lineEnding {
+		d.Buffer.SetLineEnding(lineEnding)
 	}
 }
 
@@ -90,7 +93,7 @@ func (w *Workspace) editorFor(path string) *editor.State {
 }
 
 func (w *Workspace) autoSave(focused *layout.Tab) {
-	mode := w.env.Settings.String(settings.AutoSave)
+	mode := w.settings.String(settings.AutoSave)
 	if mode == settings.AutoSaveFocusChange && focused != w.lastFocused {
 		if t := w.lastFocused; t != nil {
 			if d := w.doc(t.Path); d != nil && d.Modified() {
@@ -102,7 +105,7 @@ func (w *Workspace) autoSave(focused *layout.Tab) {
 	if mode != settings.AutoSaveAfterDelay {
 		return
 	}
-	delay := time.Duration(w.env.Settings.Int(settings.AutoSaveDelay)) * time.Millisecond
+	delay := time.Duration(w.settings.Int(settings.AutoSaveDelay)) * time.Millisecond
 	for _, e := range w.docs {
 		d := e.doc
 		if d == nil || !d.Modified() {

@@ -317,6 +317,7 @@ func (w *Workspace) moved(from, to string) {
 	for path, e := range w.docs {
 		if np, ok := remap(path); ok {
 			delete(w.docs, path)
+			w.deleteBackup(path)
 			w.docs[np] = e
 			if e.doc != nil {
 				e.doc.Rename(np)

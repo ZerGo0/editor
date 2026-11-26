@@ -41,10 +41,16 @@ func (w *Workspace) tabTitle(p string) string {
 	if v, ok := w.virtual[p]; ok {
 		return v.title
 	}
+	if isUntitled(p) {
+		return strings.TrimPrefix(p, untitledPrefix)
+	}
 	return filepath.Base(p)
 }
 
 func (w *Workspace) restorable(p string) bool {
+	if isUntitled(p) {
+		return w.hasBackup(p)
+	}
 	v, ok := w.virtual[p]
 	return !isVirtual(p) || ok && v.persistent
 }

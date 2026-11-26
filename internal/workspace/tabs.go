@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"path/filepath"
 	"slices"
 
 	"github.com/ZerGo0/editor/internal/document"
@@ -14,7 +13,7 @@ func (w *Workspace) OpenFile(path string, preview, focus bool) {
 }
 
 func (w *Workspace) openIn(g *layout.Group, path string, preview, focus bool) *layout.Tab {
-	preview = preview && w.env.Settings.Bool(settings.EnablePreview)
+	preview = preview && w.settings.Bool(settings.EnablePreview)
 	t := g.Open(path, preview, w.newID())
 	w.active = g
 	w.touchRecent(path)
@@ -48,15 +47,17 @@ func (w *Workspace) requestClose(g *layout.Group, tabs []*layout.Tab) {
 	}
 	names := make([]string, len(dirty))
 	for i, d := range dirty {
-		names[i] = filepath.Base(d.Path)
+		names[i] = w.tabTitle(d.Path)
 	}
 	go func() {
 		choice := askSave(w.win, names)
 		w.update(func() {
-			if choice == choiceCancel || choice == choiceSave && !w.save(dirty) {
-				return
+			switch choice {
+			case choiceSave:
+				w.saveThen(dirty, func() { w.removeTabs(g, tabs) })
+			case choiceDiscard:
+				w.removeTabs(g, tabs)
 			}
-			w.removeTabs(g, tabs)
 		})
 	}()
 }

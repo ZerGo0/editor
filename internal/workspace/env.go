@@ -8,9 +8,9 @@ import (
 )
 
 type Env struct {
-	Settings *settings.Store
-	Keys     *keymap.Store
-	Commands *command.Registry
+	Settings  *settings.Store
+	Keys      *keymap.Store
+	Commands  *command.Registry
 	UserData  string
 	BackupDir string
 	History   *history.Store

@@ -66,6 +66,12 @@ type Workspace struct {
 	issues        *issueui.Issues
 	issueSettings issueui.Settings
 	viewers       viewerState
+	settings      *settings.Store
+	folderStamp   fileStamp
+	hot           hotExitState
+	ec            editorConfigState
+	brackets      bracketState
+	scratches     scratchState
 }
 
 func New(root string, saved session.Project, env *Env) *Workspace {
@@ -81,6 +87,8 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 		sidebarWidth:  defaultSidebarWidth,
 		sidebarHidden: saved.SidebarHidden,
 	}
+	w.settings = settings.LoadFolder(w.folderSettingsPath(), env.Settings)
+	w.folderStamp, _ = statFile(w.folderSettingsPath())
 	if saved.SidebarWidth > 0 {
 		w.sidebarWidth = saved.SidebarWidth
 	}
@@ -90,9 +98,11 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	}
 	w.tree = filetree.New(root, expanded)
 	w.tree.Hidden = w.excluded
-	w.settingsView = &prefs.SettingsView{Store: env.Settings, OpenJSON: w.OpenSettingsJSON}
+	w.settingsView = &prefs.SettingsView{Store: env.Settings, Folder: w.settings, OpenJSON: w.OpenSettingsJSON, OpenFolderJSON: w.OpenFolderSettingsJSON}
 	w.keysView = &prefs.KeysView{Keys: env.Keys, Commands: env.Commands, OpenJSON: w.OpenKeybindingsJSON}
 	w.initVirtual()
+	w.initEditorConfig()
+	w.initBrackets()
 	w.ctx, w.cancel = context.WithCancel(context.Background())
 	w.initTools(saved)
 	w.initInsights()
@@ -102,20 +112,24 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	w.layout = w.restoreNode(saved.Layout)
 	groups := w.layout.Groups()
 	w.active = groups[min(max(saved.ActiveGroup, 0), len(groups)-1)]
+	w.initHotExit()
 	return w
 }
 
 func (w *Workspace) Attach(win *mygo.Window) {
 	w.win = win
+	w.loadBackups()
 	go w.watch(w.ctx)
 	w.reindex()
 	w.refreshIgnored()
+	w.attachScratches()
 	w.attachGit()
 	w.attachGitHub()
 }
 
 func (w *Workspace) Close() {
 	w.cancel()
+	w.stopBackupTimers()
 	if w.search.timer != nil {
 		w.search.timer.Stop()
 	}
@@ -143,7 +157,7 @@ func (w *Workspace) update(fn func()) {
 }
 
 func (w *Workspace) excluded(p string) bool {
-	return glob.MatchAny(w.env.Settings.Strings(settings.Exclude), filepath.ToSlash(w.rel(p)))
+	return glob.MatchAny(w.settings.Strings(settings.Exclude), filepath.ToSlash(w.rel(p)))
 }
 
 func (w *Workspace) SettingsChanged() {
@@ -151,10 +165,11 @@ func (w *Workspace) SettingsChanged() {
 	w.scheduleReindex()
 	w.applyGitSettings()
 	w.applyIssueSettings()
+	w.hotExitSettingsChanged()
 }
 
 func (w *Workspace) abs(p string) string {
-	if filepath.IsAbs(p) || isVirtual(p) {
+	if filepath.IsAbs(p) || !onDisk(p) {
 		return p
 	}
 	return filepath.Join(w.Root, p)
@@ -162,7 +177,7 @@ func (w *Workspace) abs(p string) string {
 
 func (w *Workspace) rel(p string) string {
 	r, err := filepath.Rel(w.Root, p)
-	if err != nil || !filepath.IsLocal(r) || isVirtual(p) {
+	if err != nil || !filepath.IsLocal(r) || !onDisk(p) {
 		return p
 	}
 	return r

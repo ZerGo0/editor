@@ -43,7 +43,7 @@ func (w *Workspace) applyGitSettings() {
 	if w.git == nil {
 		return
 	}
-	s := w.env.Settings
+	s := w.settings
 	w.git.SetSettings(gitui.Settings{
 		AutoFetch:   time.Duration(s.Int(settings.GitAutoFetch)) * time.Minute,
 		PullMode:    pullModes[s.String(settings.GitPullMode)],

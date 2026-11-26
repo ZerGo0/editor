@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/backup"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/largefile"
@@ -33,16 +34,46 @@ func (w *Workspace) entry(path string) *docEntry {
 	e := &docEntry{loading: true}
 	w.docs[path] = e
 	asText := w.viewers.asText[path]
+	meta, restore := w.takeBackup(path)
+	store := w.hot.store
+	w.refreshEditorConfig([]string{path})
+	load := func() loaded {
+		var l loaded
+		if isUntitled(path) {
+			l.doc = document.Empty(path)
+		} else {
+			l.doc, l.kind, l.stamp, l.err = loadFile(path, asText)
+		}
+		if restore {
+			l.backup, _, l.backupErr = store.Read(path)
+		}
+		return l
+	}
 	if w.win == nil {
-		e.doc, e.kind, e.stamp, e.err = loadFile(path, asText)
-		e.loading = false
+		w.finishLoad(e, path, load(), meta, restore)
 		return e
 	}
 	go func() {
-		d, kind, stamp, err := loadFile(path, asText)
-		w.update(func() { e.doc, e.kind, e.stamp, e.err, e.loading = d, kind, stamp, err, false })
+		l := load()
+		w.update(func() { w.finishLoad(e, path, l, meta, restore) })
 	}()
 	return e
+}
+
+type loaded struct {
+	doc       *document.Document
+	kind      viewer.Kind
+	stamp     fileStamp
+	err       error
+	backup    string
+	backupErr error
+}
+
+func (w *Workspace) finishLoad(e *docEntry, path string, l loaded, meta backup.Meta, restore bool) {
+	e.doc, e.kind, e.stamp, e.err, e.loading = l.doc, l.kind, l.stamp, l.err, false
+	if restore {
+		w.restoreBackup(e, path, l.backup, meta, l.backupErr)
+	}
 }
 
 func (w *Workspace) ensureEditor(t *layout.Tab) *docEntry {
@@ -102,8 +133,12 @@ func (w *Workspace) dropUnused() {
 				e.doc.Close()
 			}
 			delete(w.docs, path)
+			w.deleteBackup(path)
 		}
 	}
+	w.dropPendingBackups(open)
+	w.dropUnusedBrackets(open)
+	w.dropUnusedEditorConfig(open)
 	w.dropUnusedViews(open)
 	w.dropUnusedViewers(open)
 	for path := range w.symbols {
@@ -130,6 +165,9 @@ func (w *Workspace) HasUnsaved() bool {
 
 func (w *Workspace) save(docs []*document.Document) bool {
 	for _, d := range docs {
+		if isUntitled(d.Path) {
+			continue
+		}
 		if d.Large != nil {
 			w.saveLarge(d)
 			continue
@@ -148,13 +186,13 @@ func (w *Workspace) Save() {
 	if t := w.active.ActiveTab(); t != nil {
 		if d := w.doc(t.Path); d != nil && (d.Editable() || d.Large != nil) {
 			t.Preview = false
-			w.save([]*document.Document{d})
+			w.saveThen([]*document.Document{d}, nil)
 		}
 	}
 }
 
 func (w *Workspace) SaveAll() {
-	w.save(w.modified())
+	w.saveThen(w.modified(), nil)
 }
 
 func (w *Workspace) reloadChanged(dir string) {

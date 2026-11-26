@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -24,6 +25,7 @@ const (
 	middleButton    = 2
 	hiddenOpacity   = 0
 	pinnedLabel     = "pinned"
+	modifiedLabel   = "modified"
 )
 
 type tabDrag struct {
@@ -48,7 +50,7 @@ func (w *Workspace) tabBar(c *ui.Context, g *layout.Group) {
 		rest := ui.Box(c).Grow(1).FillHeight().BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 		if rest.DoubleClicked() {
 			w.active = g
-			w.NewFile()
+			w.NewUntitled()
 		}
 		rest.ContextMenu(func(m *ui.Menu) { w.groupMenu(m, g) })
 		w.dropTarget(rest, g, len(g.Tabs))
@@ -77,8 +79,12 @@ func (w *Workspace) tab(c *ui.Context, g *layout.Group, el ui.Element, i int, ta
 	active := g.ActiveTab() == tab
 	hovered := el.Hovered()
 	el.Gap(tabGap).Padding(0, tabPaddingEnd, 0, tabPaddingStart).AlignItems(ui.Center).Label(name).Drag(tabDrag{g, tab})
-	if tab.Pinned {
-		el.Description(pinnedLabel)
+	modified := false
+	if d := w.doc(tab.Path); d != nil {
+		modified = d.Modified()
+	}
+	if desc := tabDescription(tab.Pinned, modified); desc != "" {
+		el.Description(desc)
 	}
 	switch {
 	case active:
@@ -89,10 +95,6 @@ func (w *Workspace) tab(c *ui.Context, g *layout.Group, el ui.Element, i int, ta
 		el.BorderWidth(0, 1, 1, 0)
 	}
 	el.BorderColor(t.Border)
-	modified := false
-	if d := w.doc(tab.Path); d != nil {
-		modified = d.Modified()
-	}
 	el.Children(func() {
 		if active && g == w.active {
 			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(tabAccentHeight).Background(activeAccent(c))
@@ -118,6 +120,17 @@ func (w *Workspace) tab(c *ui.Context, g *layout.Group, el ui.Element, i int, ta
 	}
 	el.ContextMenu(func(m *ui.Menu) { w.tabMenu(m, g, tab) })
 	w.dropTarget(el, g, i)
+}
+
+func tabDescription(pinned, modified bool) string {
+	var parts []string
+	if pinned {
+		parts = append(parts, pinnedLabel)
+	}
+	if modified {
+		parts = append(parts, modifiedLabel)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (w *Workspace) tabIcon(c *ui.Context, p string) {
@@ -177,7 +190,7 @@ func (w *Workspace) tabMenu(m *ui.Menu, g *layout.Group, tab *layout.Tab) {
 	if m.Item("Close All").Chosen() {
 		w.closeAll(g)
 	}
-	if !isVirtual(tab.Path) {
+	if onDisk(tab.Path) {
 		m.Separator()
 		w.pathItems(m, tab.Path)
 		m.Separator()
@@ -212,7 +225,7 @@ func (w *Workspace) tabMenu(m *ui.Menu, g *layout.Group, tab *layout.Tab) {
 }
 
 func (w *Workspace) groupMenu(m *ui.Menu, g *layout.Group) {
-	w.commandItem(m, "New File...", "explorer.newFile")
+	w.commandItem(m, "New Text File", "workbench.action.files.newUntitledFile")
 	m.Separator()
 	w.commandItem(m, "Reopen Closed Editor", "workbench.action.reopenClosedEditor")
 	m.Separator()

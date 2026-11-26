@@ -90,6 +90,7 @@ func (w *Workspace) configProblems() []insights.Group {
 		out = append(out, g)
 	}
 	add(w.env.Settings.Path, w.env.Settings.Errors)
+	add(w.settings.Path, w.settings.Errors)
 	add(w.env.Keys.Path, w.env.Keys.Current.Errors)
 	return out
 }

@@ -18,12 +18,13 @@ const (
 )
 
 func e2eOptions() app.Options {
-	if dir := os.Getenv(userDataEnv); dir != "" {
+	dir := os.Getenv(userDataEnv)
+	if dir != "" {
 		mygo.App.SetPath(mygo.PathUserData, dir)
 	}
 	if n, err := strconv.ParseInt(os.Getenv(editLimitEnv), 10, 64); err == nil && n > 0 {
 		document.EditLimit = n
 	}
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
-	return app.Options{Hidden: true, DiscardOnClose: true}
+	return app.Options{Hidden: true, DiscardOnClose: true, NoBackups: dir == ""}
 }
