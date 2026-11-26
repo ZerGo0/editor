@@ -62,7 +62,7 @@ action.SetCommands(commandSource)
 5. Support dark, light, high contrast and the system accent. Never branch on the appearance in feature code.
 6. Show a loading, empty and error state for every view that loads data (`feedback.Loading`, `feedback.Empty`, `feedback.Error`). Never block the UI thread.
 7. Keep text at WCAG AA: 4.5:1 for text, 3:1 for icons, focus rings and large text. The palette tests enforce it for every role.
-8. Respect reduced motion. Use `token.Quick`, `token.Expand` and `token.Popup(c)` with MyGo's `Animate`/`AnimateTo`, which skip motion when the user asks.
+8. Do not animate. Every change shows on the next frame: no fades, slides, eases or element transitions. `design.Apply` turns off MyGo's built-in motion in every frame, and `TestNoMotion` fails on `Animate`, `AnimateTo`, `AnimateColor`, `Keyframes`, `Spring` and `Transition`. Only progress indicators and the caret blink move.
 9. Keep `go test ./internal/design` green. `TestDesignRules` fails on raw colors, raw numbers in visual setters, raw MyGo widgets and direct theme reads in feature packages.
 
 ### SHOULD
@@ -84,7 +84,7 @@ When a literal is truly needed (for example, a value that a file format dictates
 - **Meaning in, look out.** Callers pass a variant, a tone (`token.ToneError`), a git status or a command ID. Components choose colors, sizes and states.
 - **Correct by construction.** Tokens are typed (`token.Space`, `token.Size`, `token.Radius`, `token.Stroke`, `token.Opacity`, `token.TextStyle`, `token.Layer`, `token.Elevation`). They have no exported constructors, so a raw number does not compile where a token is expected. Components that need a label take it as a parameter.
 - **Theme from context.** `token.Of(c)` returns the palette of the theme in use, so no component takes a theme argument.
-- **VS Code first, macOS polish.** Metrics and colors follow VS Code. Native touches: system accent, high contrast, reduced motion, popover menus, inset title bar.
+- **VS Code first, macOS polish.** Metrics and colors follow VS Code. Native touches: system accent, high contrast, popover menus, inset title bar. No motion.
 
 ## Tokens
 
@@ -174,14 +174,11 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 
 Use `design.Text(c, s, token.TextCaption)` in feature code. It applies the size, weight, case, family and the right text color.
 
-### Motion, depth and layers
+### Delays, depth and layers
 
 | Token | Value |
 | --- | --- |
-| DurationFast / DurationNormal / DurationSlow | 100 / 150 / 250 ms |
-| TooltipDelay / LongPress | 500 / 400 ms |
-| Quick / Expand | ui.Animation, ease out, fast / normal |
-| Popup(c) | Enter and exit transition for popovers; none under reduced motion |
+| TooltipDelay / EditorHover / SpinnerDelay / LongPress | 400 / 300 / 150 / 400 ms (delays, not animations) |
 | ElevationPopover / ElevationDrag / ElevationDialog | y 2 blur 8 / y 2 blur 8 / y 4 blur 16, palette shadow color |
 | LayerBase / Sticky / DropTarget / Popover / QuickInput / Toast / Tooltip | 0 / 10 / 20 / 100 / 200 / 300 / 400 |
 
@@ -337,7 +334,7 @@ Files with violations today (count in parentheses):
 | Tabs | Xcode-like: rounded, borderless tabs with a soft fill for the active tab. |
 | Status bar | Neutral. Color only for warnings and conflicts. |
 | Title bar | 36 px. The command center shows the project name. The window title is "file - project". |
-| Motion | Subtle, 100 to 150 ms fades and small moves. Off with Reduce Motion. |
+| Motion | None. Everything is instant (owner, 2026-11-26: "everything should just be snappy"). |
 | Panel | Bottom by default. A command moves it to the right and remembers it. |
 | Icons | Hugeicons 1.5 px stroke at 16 px. The selected view icon uses the filled variant. |
 | Problems and TODO | Bottom panel tabs, with counts in the status bar. |

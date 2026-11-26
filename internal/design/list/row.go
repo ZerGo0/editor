@@ -103,9 +103,8 @@ func twistie(c *ui.Context, p *token.Palette, s State) {
 	if s.Open {
 		target = token.TwistieOpenAngle
 	}
-	angle := arrow.AnimateTo("twistie", target, token.Expand)
 	arrow.Children(func() {
-		ui.Icon(c, icons.ChevronRight).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Rotate(angle)
+		ui.Icon(c, icons.ChevronRight).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Rotate(target)
 	})
 }
 

@@ -58,9 +58,8 @@ func Switch(c *ui.Context, label string, on *bool, o ChoiceOptions) ui.Element {
 		} else {
 			track.Background(p.Control.Secondary).Border(token.BorderWidth.Px(), p.Border.Input)
 		}
-		x := track.AnimateTo("knob", target, token.Quick)
 		track.Children(func() {
-			ui.Box(c).Absolute().Top(switchInset).Left(switchInset+x).Size(token.SwitchKnob.Px(), token.SwitchKnob.Px()).
+			ui.Box(c).Absolute().Top(switchInset).Left(switchInset+target).Size(token.SwitchKnob.Px(), token.SwitchKnob.Px()).
 				Radius(token.RadiusPill.Px()).Background(p.Accent.Text)
 		})
 		choiceLabel(c, p, label)

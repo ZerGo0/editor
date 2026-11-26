@@ -33,5 +33,6 @@ func Apply(c *ui.Context, s Settings) *token.Palette {
 	}
 	p := token.For(dark, accent, prefs.HighContrast)
 	c.SetTheme(p.Theme())
+	c.DisableAnimations()
 	return p
 }

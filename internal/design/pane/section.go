@@ -33,9 +33,8 @@ func Header(c *ui.Context, title string, open *bool, o SectionOptions) ui.Elemen
 		if *open {
 			target = token.TwistieOpenAngle
 		}
-		angle := toggle.AnimateTo("twistie", target, token.Expand)
 		toggle.Children(func() {
-			ui.Icon(c, icons.ChevronRight).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Rotate(angle).
+			ui.Icon(c, icons.ChevronRight).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Rotate(target).
 				Margin(0, 0, 0, token.GapTight.Px()).Shrink(0)
 			ui.Text(c, strings.ToUpper(title)).FontSize(token.TextCaption.Px()).FontWeight(token.WeightBold).
 				TextColor(p.Text.Primary).SingleLine().MinWidth(0).Shrink(1)
