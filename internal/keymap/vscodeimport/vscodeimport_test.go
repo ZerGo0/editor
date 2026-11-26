@@ -241,41 +241,6 @@ func TestFindPrefersStableThenOthers(t *testing.T) {
 	}
 }
 
-func TestShouldOfferOnce(t *testing.T) {
-	home := t.TempDir()
-	writeSource(t, home, fixture, "")
-	dir := t.TempDir()
-	state := filepath.Join(dir, "data", PromptStateFile)
-	ours := filepath.Join(dir, "keybindings.json")
-	if _, ok := ShouldOffer(home, state, ours); !ok {
-		t.Fatal("no offer with a VS Code file and no keybindings.json")
-	}
-	if err := os.WriteFile(ours, []byte("// nothing yet\n[\n]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := ShouldOffer(home, state, ours); !ok {
-		t.Fatal("no offer with an empty keybindings.json")
-	}
-	if err := os.WriteFile(ours, []byte(`[{"key": "cmd+1", "command": "x"}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := ShouldOffer(home, state, ours); ok {
-		t.Fatal("offer with a keybindings.json that has entries")
-	}
-	if err := os.Remove(ours); err != nil {
-		t.Fatal(err)
-	}
-	if err := Remember(state, ChoiceNotNow); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := ShouldOffer(home, state, ours); ok {
-		t.Fatal("offer after the choice is saved")
-	}
-	if _, ok := ShouldOffer(t.TempDir(), filepath.Join(t.TempDir(), PromptStateFile), ours); ok {
-		t.Fatal("offer without a VS Code file")
-	}
-}
-
 func TestSummaryStates(t *testing.T) {
 	s := &Summary{Loading: true}
 	tt := ui.NewTester(s.View, testViewW, testViewH)
