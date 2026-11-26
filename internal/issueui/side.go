@@ -6,22 +6,27 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	sectionSearchID   = "search"
-	sectionIDPrefix   = "query-"
-	searchLabel       = "Search Results"
-	searchPlaceholder = "Search issues (GitHub syntax)"
-	repoQualifier     = "repo:"
-	repoQueryPrefix   = "repo:${owner}/${repository} "
-	noMilestoneTitle  = "No Milestone"
-	toolbarPad        = 8
-	groupIndent       = 10
-	maxSideLabels     = 2
+	sectionSearchID    = "search"
+	sectionIDPrefix    = "query-"
+	searchLabel        = "Search Results"
+	searchPlaceholder  = "Search issues (GitHub syntax)"
+	repoQualifier      = "repo:"
+	repoQueryPrefix    = "repo:${owner}/${repository} "
+	noMilestoneTitle   = "No Milestone"
+	issueMetaSeparator = " · "
+	maxSideLabels      = 1
 )
 
 type section struct {
@@ -267,33 +272,48 @@ func (i *Issues) SideView(c *ui.Context) {
 	i.ensureLoaded()
 	s := i.side
 	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-		i.sideToolbar(c)
+		i.sideSearch(c)
 		rows := i.sideRows()
 		s.rows = rows
 		s.list.Key = func(n int) any { return rows[n].key() }
 		s.list.Label = func(n int) string { return rows[n].label() }
-		ui.List(c, &s.list, len(rows), func(n int) { i.sideRowView(c, rows[n]) }).Grow(1).FillWidth().MinHeight(0).Label("Issues")
+		list.View(c, &s.list, len(rows), list.ViewOptions{Label: "Issues", Tree: true}, func(n int) list.Item { return i.sideItem(c, rows[n]) })
 		if s.list.Shortcut(c, 0, ui.KeyEnter) && s.row >= 0 && s.row < len(rows) {
 			i.activate(rows[s.row])
+		}
+		if s.row >= 0 && s.row < len(rows) && rows[s.row].kind == rowHeader && s.list.Handle.Focused(c) {
+			sec := rows[s.row].sec
+			switch {
+			case !sec.open && c.Shortcut(0, ui.KeyRight):
+				sec.open = true
+			case sec.open && c.Shortcut(0, ui.KeyLeft):
+				sec.open = false
+			}
 		}
 	})
 }
 
-func (i *Issues) sideToolbar(c *ui.Context) {
+func (i *Issues) SideActions(c *ui.Context) {
+	if !i.ready() {
+		return
+	}
+	if action.IconButton(c, icons.Plus, "Create Issue", action.IconOptions{ID: "create"}).Clicked() {
+		i.openCreate(createDraft{})
+	}
+	if action.IconButton(c, icons.Refresh, "Refresh Issues", action.IconOptions{ID: "refresh"}).Clicked() {
+		i.refresh()
+	}
+}
+
+func (i *Issues) sideSearch(c *ui.Context) {
 	s := i.side
-	ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Padding(0, toolbarPad, toolbarPad, toolbarPad).Shrink(0).FillWidth().Children(func() {
-		field := ui.SearchField(c.Key("search"), &s.field).Placeholder(searchPlaceholder).Label("Search issues").Grow(1).MinWidth(0)
+	ui.Column(c).FillWidth().Padding(token.GapInline.Px(), token.PadRow.Px(), token.GapControl.Px(), token.PadRow.Px()).Shrink(0).Children(func() {
+		field := field.SearchInput(c, "Search issues", &s.field, field.SearchOptions{Placeholder: searchPlaceholder, ID: "search"})
 		switch {
 		case field.Submitted():
 			i.runSearch(s.field)
 		case field.Changed() && s.field == "" && s.search != nil:
 			i.runSearch("")
-		}
-		if iconButton(c, "create", "Create Issue", icons.Plus).Clicked() {
-			i.openCreate(createDraft{})
-		}
-		if iconButton(c, "refresh", "Refresh Issues", icons.Refresh).Clicked() {
-			i.refresh()
 		}
 	})
 }
@@ -311,89 +331,68 @@ func (i *Issues) activate(r sideRow) {
 	}
 }
 
-func (i *Issues) sideRowView(c *ui.Context, r sideRow) {
-	t := c.Theme()
+func (i *Issues) sideItem(c *ui.Context, r sideRow) list.Item {
 	switch r.kind {
 	case rowHeader:
-		row := ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Padding(rowPadY, rowPadX).FillWidth()
-		row.Children(func() {
-			svg := icons.ChevronRight
-			if r.sec.open {
-				svg = icons.ChevronDown
-			}
-			ui.Icon(c, svg).Size(iconSmall, iconSmall).TextColor(t.TextMuted).Shrink(0)
-			ui.Text(c, r.sec.query.Label).FontSize(fontBody).Bold().SingleLine().MinWidth(0)
-			if n := len(r.sec.items); n > 0 {
-				label := strconv.Itoa(n)
-				if r.sec.more {
-					label += "+"
-				}
-				mutedPill(c, label)
-			}
-		})
-		if row.RowClicked() {
-			r.sec.open = !r.sec.open
-		}
+		it := list.Item{Label: r.sec.query.Label, Strong: true, Branch: true, Open: r.sec.open, Count: len(r.sec.items), OnClick: func() { r.sec.open = !r.sec.open }}
+		return it
 	case rowGroup:
-		mutedText(c, r.text).Bold().SingleLine().Padding(rowPadY, rowPadX, 0, rowPadX+groupIndent)
+		return list.Item{Depth: 1, Label: r.text, Strong: true, Muted: true}
 	case rowIssue:
-		row := i.issueRow(c, *r.issue)
-		if row.RowClicked() {
-			i.openIssue(r.issue.Number, r.issue)
-		}
+		return i.issueItem(c, r)
 	case rowMore:
-		row := ui.Row(c).Padding(rowPadY, rowPadX, rowPadY, rowPadX+iconMedium).FillWidth()
-		row.Children(func() {
-			ui.Button(c, "Load more").OnClick(func() { i.loadSection(r.sec, true) })
-		})
-		if row.RowClicked() {
-			i.loadSection(r.sec, true)
-		}
+		return list.Item{Depth: 1, Label: r.label(), OnClick: func() { i.loadSection(r.sec, true) }}
 	case rowLoading:
-		loadingRow(c, r.text)
+		return list.Item{Depth: 1, Muted: true, Label: r.text, Leading: func(c *ui.Context) { feedback.Spinner(c, r.text) }}
 	case rowNote:
-		mutedText(c, r.text).Padding(rowPadY, rowPadX, rowPadY, rowPadX+iconMedium)
+		return list.Item{Depth: 1, Muted: true, Label: r.text, Tooltip: r.text}
 	case rowError:
-		errorBlock(c, r.err, func() { i.retrySection(r.sec) })
+		return list.Item{Depth: 1, Tone: token.ToneError, Label: errorText(r.err), Tooltip: errorText(r.err), Trailing: func(c *ui.Context) {
+			ghostButton(c, retryLabel, "retry").OnClick(func() { i.retrySection(r.sec) })
+		}}
 	}
+	return list.Item{}
 }
 
-func (i *Issues) issueRow(c *ui.Context, issue github.Issue) ui.Element {
-	t := c.Theme()
-	now := i.env.Now()
-	row := ui.Row(c).Gap(spacingMedium).AlignItems(ui.Start).Padding(rowPadY, rowPadX).FillWidth()
-	row.ContextMenu(func(m *ui.Menu) { i.issueMenu(c, m, issue) })
-	row.Children(func() {
-		svg := icons.Dot
-		if !isOpen(issue) {
-			svg = icons.Check
-		}
-		ui.Icon(c, svg).Size(iconMedium, iconMedium).TextColor(stateColor(t, issue)).Shrink(0).Margin(rowIconGap, 0, 0, 0).Label(stateLabel(issue))
-		ui.Column(c).Grow(1).MinWidth(0).Gap(rowIconGap).Children(func() {
-			ui.Text(c, issue.Title).FontSize(fontBody).SingleLine()
-			ui.Row(c).Gap(spacingSmall + rowIconGap).AlignItems(ui.Center).Children(func() {
-				mutedText(c, "#"+strconv.Itoa(issue.Number)).SingleLine().Shrink(0)
-				if issue.Author != "" {
-					mutedText(c, issue.Author).SingleLine().Shrink(1).MinWidth(0)
+func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
+	pal := token.Of(c)
+	issue := *r.issue
+	depth := 1
+	if r.sec.query.groupsByMilestone() {
+		depth++
+	}
+	description := "#" + strconv.Itoa(issue.Number)
+	if when := relativeTime(i.env.Now(), issue.Updated); when != "" {
+		description += issueMetaSeparator + when
+	}
+	svg := icons.Dot
+	if !isOpen(issue) {
+		svg = icons.Check
+	}
+	return list.Item{
+		Depth:       depth,
+		Label:       issue.Title,
+		Description: description,
+		Tooltip:     fmt.Sprintf("%s\n#%d by %s", issue.Title, issue.Number, issue.Author),
+		Count:       issue.Comments,
+		Leading: func(c *ui.Context) {
+			ui.Icon(c, svg).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(issue))).Shrink(0).Label(stateLabel(issue))
+		},
+		Trailing: func(c *ui.Context) {
+			for n, l := range issue.Labels {
+				if n == maxSideLabels {
+					mutedTag(c, "+"+strconv.Itoa(len(issue.Labels)-maxSideLabels))
+					break
 				}
-				if when := relativeTime(now, issue.Updated); when != "" {
-					mutedText(c, when).SingleLine().Shrink(0)
-				}
-				for n, l := range issue.Labels {
-					if n == maxSideLabels {
-						mutedPill(c, "+"+strconv.Itoa(len(issue.Labels)-maxSideLabels))
-						break
-					}
-					labelPill(c, l)
-				}
-				if issue.Comments > 0 {
-					ui.Icon(c, icons.Comment).Size(iconSmall, iconSmall).TextColor(t.TextMuted).Shrink(0).Label(fmt.Sprintf("%d comments", issue.Comments))
-					mutedText(c, strconv.Itoa(issue.Comments)).Shrink(0)
-				}
-			})
-		})
-	})
-	return row
+				labelTag(c, l)
+			}
+			if issue.Author != "" {
+				badge.Avatar(c, issue.Author, token.AvatarSize)
+			}
+		},
+		OnClick: func() { i.openIssue(issue.Number, r.issue) },
+		Menu:    func(m *ui.Menu) { i.issueMenu(c, m, issue) },
+	}
 }
 
 func (i *Issues) issueMenu(c *ui.Context, m *ui.Menu, issue github.Issue) {

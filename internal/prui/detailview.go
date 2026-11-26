@@ -8,6 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/detail"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -15,12 +23,8 @@ import (
 )
 
 const (
-	fileListRowHeight = 28
-	fileListMaxRows   = 12
-	commentBoxHeight  = 80
-	statLetterWidth   = 16
-	moreActionsLabel  = "More"
-	statusLabelWidth  = 84
+	moreActionsLabel = "More"
+	commentLines     = 6
 )
 
 var reactionNames = []struct{ content, label string }{
@@ -54,140 +58,125 @@ func (p *PRs) detailView(c *ui.Context, d *prData) {
 		return
 	}
 	p.detailTick(c, d)
-	t := c.Theme()
-	ui.Column(c).Fill().Background(t.Background).Children(func() {
+	detail.Page(c, func() {
 		switch {
 		case d.err != nil && !d.loaded:
-			ui.Column(c).Grow(1).FillWidth().Center().Gap(spacingMedium).Padding(messagePad).Children(func() {
-				ui.Text(c, "Cannot load #"+strconv.Itoa(d.number)).Bold()
-				ui.Text(c, errorText(d.err)).FontSize(fontSmall).TextColor(t.Danger)
-				ui.Button(c, "Retry").OnClick(func() { p.loadDetail(d) })
+			detail.Centered(c, func() {
+				feedback.Error(c, "Cannot load #"+strconv.Itoa(d.number), d.err, func() { p.loadDetail(d) })
 			})
 		case !d.loaded && d.pr.Title == "":
-			ui.Column(c).Grow(1).FillWidth().Center().Children(func() { loadingRow(c, "Loading #"+strconv.Itoa(d.number)+"...") })
+			detail.Centered(c, func() { feedback.Loading(c, "Loading #"+strconv.Itoa(d.number)+"...") })
 		default:
 			p.detailHeader(c, d)
-			ui.Scroll(c).Grow(1).FillWidth().Children(func() {
-				ui.Column(c).Gap(spacingLarge).Padding(messagePad).MaxWidth(contentMax).FillWidth().Children(func() { p.detailBody(c, d) })
-			})
+			detail.Body(c, "Pull request", token.PageMaxWidth, func() { p.detailBody(c, d) })
 		}
 	})
 }
 
 func (p *PRs) detailHeader(c *ui.Context, d *prData) {
-	t := c.Theme()
 	pr := d.pr
-	ui.Column(c).Gap(spacingMedium).Padding(spacingLarge, messagePad).Shrink(0).FillWidth().Background(t.Surface).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).FillWidth().Children(func() {
-			if d.editingTitle {
-				field := ui.TextInput(c.Key("title"), &d.titleDraft).AutoFocus().Grow(1).Label("Pull request title")
-				if field.Submitted() {
-					p.saveTitle(d, d.titleDraft)
-				}
-				ui.PrimaryButton(c, "Save Title").OnClick(func() { p.saveTitle(d, d.titleDraft) })
-				ui.Button(c, "Cancel").OnClick(func() { d.editingTitle = false })
-			} else {
-				ui.Text(c, pr.Title).FontSize(fontTitle).Bold().Grow(1).MinWidth(0)
-				ui.Text(c, "#"+strconv.Itoa(pr.Number)).FontSize(fontTitle).TextColor(t.TextMuted).Shrink(0)
-				if !d.hasOv || d.ov.CanUpdate {
-					ui.Button(c, "Edit Title").Disabled(d.busy != "").OnClick(func() { d.editingTitle, d.titleDraft = true, pr.Title })
-				}
+	o := detail.HeaderOptions{Title: pr.Title, Number: pr.Number, Busy: d.busy != "" || d.loading}
+	if d.editingTitle {
+		o.Number = 0
+		o.Editor = func(c *ui.Context) {
+			title := field.TextInput(c, "Pull request title", &d.titleDraft, field.InputOptions{AutoFocus: true, ID: "title"})
+			if title.Submitted() {
+				p.saveTitle(d, d.titleDraft)
 			}
-			if d.loading {
-				ui.Spinner(c).Label("Refreshing")
-			}
-			if iconButton(c, "refresh", "Refresh", icons.Refresh).Clicked() {
-				p.loadDetail(d)
-			}
-		})
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-			pill(c, prStateLabel(pr), stateColor(t, pr))
-			author := pr.Author
-			if author == "" {
-				author = "unknown"
-			}
-			mutedText(c, author+" wants to merge").Shrink(0)
-			branchChip(c, pr.HeadRef)
-			mutedText(c, "into").Shrink(0)
-			branchChip(c, pr.BaseRef)
-			if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
-				mutedText(c, "Updated "+when)
-			}
-		})
-		if summary := mergeSummary(d); summary != "" && summary != prStateMerged && summary != prStateClosed {
-			ui.Text(c, summary).FontSize(fontSmall).TextColor(mergeSummaryColor(t, d))
+			action.Button(c, "Save Title", action.ButtonOptions{Variant: action.Primary, Small: true}).OnClick(func() { p.saveTitle(d, d.titleDraft) })
+			action.Button(c, "Cancel", action.ButtonOptions{Variant: action.Ghost, Small: true}).OnClick(func() { d.editingTitle = false })
 		}
-		p.detailActions(c, d)
-	})
+	}
+	o.Actions = func(c *ui.Context) {
+		if !d.editingTitle && (!d.hasOv || d.ov.CanUpdate) {
+			if action.IconButton(c, icons.Edit, "Edit Title", action.IconOptions{Disabled: d.busy != ""}).Clicked() {
+				d.editingTitle, d.titleDraft = true, pr.Title
+			}
+		}
+		if d.loading {
+			feedback.Spinner(c, "Refreshing")
+		}
+		if action.IconButton(c, icons.Refresh, "Refresh", action.IconOptions{ID: "refresh"}).Clicked() {
+			p.loadDetail(d)
+		}
+	}
+	o.Meta = func(c *ui.Context) {
+		stateTag(c, pr)
+		author := pr.Author
+		if author == "" {
+			author = "unknown"
+		}
+		badge.Avatar(c, author, token.AvatarSize)
+		mutedText(c, author+" wants to merge").Shrink(0)
+		branchChip(c, pr.HeadRef)
+		mutedText(c, "into").Shrink(0)
+		branchChip(c, pr.BaseRef)
+		if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
+			mutedText(c, "Updated "+when)
+		}
+		if summary := mergeSummary(d); summary != "" && summary != prStateMerged && summary != prStateClosed {
+			badge.Tag(c, summary, badge.TagOptions{Tone: mergeSummaryTone(d)})
+		}
+	}
+	o.Toolbar = func(c *ui.Context) { p.detailActions(c, d) }
+	detail.Header(c, o)
 }
 
-func mergeSummaryColor(t *ui.Theme, d *prData) ui.Color {
+func mergeSummaryTone(d *prData) token.Tone {
 	switch d.ov.MergeState {
 	case mergeStateClean:
-		return t.Success
+		return token.ToneSuccess
 	case mergeStateDirty:
-		return t.Danger
+		return token.ToneError
 	case mergeStateBehind, mergeStateBlocked, mergeStateUnstable:
-		return t.Warning
+		return token.ToneWarning
 	}
-	return t.TextMuted
-}
-
-func branchChip(c *ui.Context, name string) {
-	t := c.Theme()
-	ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Background(t.SurfacePressed).Radius(cardRadius).Padding(1, spacingMedium).Shrink(0).Children(func() {
-		ui.Icon(c, icons.GitBranch).Size(iconSmall, iconSmall).TextColor(t.TextMuted)
-		ui.Text(c, name).FontSize(fontSmall).SingleLine()
-	})
+	return token.ToneNeutral
 }
 
 func (p *PRs) detailActions(c *ui.Context, d *prData) {
 	pr := d.pr
 	idle := d.busy == ""
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-		checkedOut := p.current.pr != nil && p.current.pr.Number == d.number
-		label := "Checkout"
-		if checkedOut {
-			label = "Checked Out"
+	checkedOut := p.current.pr != nil && p.current.pr.Number == d.number
+	label := "Checkout"
+	if checkedOut {
+		label = "Checked Out"
+	}
+	smallButton(c, label, !idle || checkedOut || !d.isOpen()).OnClick(func() { p.checkoutPR(d.number, &d.busy) })
+	smallButton(c, "Open on GitHub", pr.URL == "").OnClick(func() { openExternal(c, pr.URL) })
+	smallButton(c, "Copy Link", pr.URL == "").OnClick(func() { c.WriteClipboard(pr.URL) })
+	if pr.Draft && d.isOpen() {
+		smallButton(c, "Mark Ready for Review", !idle).OnClick(func() { p.markReady(d) })
+	}
+	if d.isOpen() {
+		p.mergeButton(c, d, idle)
+		if d.pendingReview != "" {
+			action.Button(c, "Submit Review", action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: !idle}).OnClick(func() { p.openReviewDialog(d, 0) })
+			smallButton(c, "Discard Review", !idle).OnClick(func() { p.discardReview(d) })
 		}
-		ui.Button(c, label).Disabled(!idle || checkedOut || !d.isOpen()).OnClick(func() { p.checkoutPR(d.number, &d.busy) })
-		ui.Button(c, "Open on GitHub").Disabled(pr.URL == "").OnClick(func() { openExternal(c, pr.URL) })
-		ui.Button(c, "Copy Link").Disabled(pr.URL == "").OnClick(func() { c.WriteClipboard(pr.URL) })
-		if pr.Draft && d.isOpen() {
-			ui.Button(c, "Mark Ready for Review").Disabled(!idle).OnClick(func() { p.markReady(d) })
-		}
-		if d.isOpen() {
-			p.mergeButton(c, d, idle)
-			if d.pendingReview != "" {
-				ui.PrimaryButton(c, "Submit Review").Disabled(!idle).OnClick(func() { p.openReviewDialog(d, 0) })
-				ui.Button(c, "Discard Review").Disabled(!idle).OnClick(func() { p.discardReview(d) })
-			}
-			ui.Button(c, "Approve").Disabled(!idle).OnClick(func() { p.openReviewDialog(d, 1) })
-			ui.Button(c, "Request Changes").Disabled(!idle).OnClick(func() { p.openReviewDialog(d, 2) })
-			ui.Button(c, "Comment").Disabled(!idle).OnClick(func() { p.openReviewDialog(d, 0) })
-		}
-		ui.MenuButton(c, moreActionsLabel, func(m *ui.Menu) { p.moreMenu(c, m, d) }).Label("More actions").Disabled(!idle)
-		if !idle {
-			ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Children(func() {
-				ui.Spinner(c).Label(d.busy)
-				mutedText(c, d.busy+"...")
-			})
-		}
-	})
+		smallButton(c, "Approve", !idle).OnClick(func() { p.openReviewDialog(d, 1) })
+		smallButton(c, "Request Changes", !idle).OnClick(func() { p.openReviewDialog(d, 2) })
+		smallButton(c, "Comment", !idle).OnClick(func() { p.openReviewDialog(d, 0) })
+	}
+	action.MenuButton(c, moreActionsLabel, action.ButtonOptions{Small: true, Disabled: !idle, ID: "more"}, func(m *ui.Menu) { p.moreMenu(c, m, d) }).Label("More actions")
+	if !idle {
+		feedback.Spinner(c, d.busy)
+		mutedText(c, d.busy+"...")
+	}
 }
 
 func (p *PRs) mergeButton(c *ui.Context, d *prData, idle bool) {
 	blocked := d.mergeBlocked()
 	switch {
 	case d.hasOv && d.ov.Queue.InQueue:
-		ui.Button(c, "Remove from Merge Queue").Disabled(!idle).OnClick(func() { p.dequeue(d) })
+		smallButton(c, "Remove from Merge Queue", !idle).OnClick(func() { p.dequeue(d) })
 	case d.hasOv && d.ov.Queue.Enabled:
-		b := ui.Button(c, "Add to Merge Queue").Disabled(blocked != "" || !idle).OnClick(func() { p.enqueue(d) })
+		b := smallButton(c, "Add to Merge Queue", blocked != "" || !idle).OnClick(func() { p.enqueue(d) })
 		if blocked != "" {
 			b.Tooltip(blocked)
 		}
 	default:
-		b := ui.Button(c, "Merge").Disabled(blocked != "" || !idle).OnClick(func() { p.openMergeDialog(d) })
+		b := smallButton(c, "Merge", blocked != "" || !idle).OnClick(func() { p.openMergeDialog(d) })
 		if blocked != "" {
 			b.Tooltip(blocked)
 		}
@@ -256,15 +245,8 @@ func (p *PRs) moreMenu(c *ui.Context, m *ui.Menu, d *prData) {
 }
 
 func (p *PRs) detailBody(c *ui.Context, d *prData) {
-	t := c.Theme()
 	if len(d.partErrs) > 0 {
-		ui.Column(c).Gap(spacingSmall).FillWidth().Children(func() {
-			ui.Text(c, "Some details could not be loaded:").FontSize(fontSmall).TextColor(t.Warning)
-			for _, msg := range d.partErrs {
-				ui.Text(c, msg).FontSize(fontSmall).TextColor(t.TextMuted)
-			}
-			ui.Button(c, "Retry").OnClick(func() { p.loadDetail(d) })
-		})
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "Some details could not be loaded: " + strings.Join(d.partErrs, "; "), Action: retryLabel, OnAction: func() { p.loadDetail(d) }})
 	}
 	p.descriptionCard(c, d)
 	p.peopleCard(c, d)
@@ -279,17 +261,18 @@ func (p *PRs) detailBody(c *ui.Context, d *prData) {
 }
 
 func (p *PRs) descriptionCard(c *ui.Context, d *prData) {
-	card(c, "Description", 0, func() {
+	var actions func(c *ui.Context)
+	if !d.hasOv || d.ov.CanUpdate {
+		actions = func(c *ui.Context) {
+			smallButton(c, "Edit Description", d.busy != "").OnClick(func() { p.openBodyEditor(d) })
+		}
+	}
+	detail.Card(c, "Description", detail.CardOptions{Actions: actions}, func() {
 		if strings.TrimSpace(d.pr.Body) == "" {
-			mutedText(c, "No description provided.").Italic()
-		} else {
-			markdown.View(c.Key("description"), d.pr.Body, &d.md)
+			mutedText(c, "No description provided.")
+			return
 		}
-		if !d.hasOv || d.ov.CanUpdate {
-			ui.Row(c).FillWidth().Children(func() {
-				ui.Button(c, "Edit Description").Disabled(d.busy != "").OnClick(func() { p.openBodyEditor(d) })
-			})
-		}
+		markdown.View(c.Key("description"), d.pr.Body, &d.md)
 	})
 }
 
@@ -303,120 +286,117 @@ func (p *PRs) peopleCard(c *ui.Context, d *prData) {
 	}
 	slices.Sort(reviewers)
 	canEdit := !d.hasOv || d.ov.CanUpdate
-	card(c, "Reviewers and Labels", 0, func() {
-		t := c.Theme()
-		line := func(title string, edit string, action func(), items func()) {
-			ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-				mutedText(c, title).Width(statusLabelWidth).Shrink(0)
-				items()
-				if action != nil && canEdit && d.isOpen() {
-					ui.Button(c, edit).Disabled(d.busy != "").OnClick(action)
-				}
-			})
+	edit := func(label string, onClick func()) func(c *ui.Context) {
+		if !canEdit || !d.isOpen() {
+			return nil
 		}
-		line("Reviewers", "Request Review", func() { p.openReviewerPicker(d) }, func() {
+		return func(c *ui.Context) { smallButton(c, label, d.busy != "").OnClick(onClick) }
+	}
+	none := func(c *ui.Context, text string) { mutedText(c, text) }
+	detail.Card(c, "Reviewers and Labels", detail.CardOptions{}, func() {
+		detail.Property(c, "Reviewers", func(c *ui.Context) {
 			if len(reviewers) == 0 {
-				mutedText(c, "None requested")
+				none(c, "None requested")
 			}
 			for _, name := range reviewers {
 				text := name + " requested"
 				if state, ok := states[name]; ok {
 					text = name + " " + reviewStateLabel(state)
 				}
-				mutedPill(c, text)
+				mutedTag(c, text)
 			}
-		})
-		line("Assignees", "Edit Assignees", func() { p.openAssigneePicker(d) }, func() {
+		}, edit("Request Review", func() { p.openReviewerPicker(d) }))
+		detail.Property(c, "Assignees", func(c *ui.Context) {
 			if len(d.ov.Assignees) == 0 {
-				mutedText(c, "None")
+				none(c, "None")
 			}
 			for _, a := range d.ov.Assignees {
-				mutedPill(c, a)
+				mutedTag(c, a)
 			}
-		})
-		line("Labels", "Edit Labels", func() { p.openLabelPicker(d) }, func() {
+		}, edit("Edit Assignees", func() { p.openAssigneePicker(d) }))
+		detail.Property(c, "Labels", func(c *ui.Context) {
 			if len(d.pr.Labels) == 0 {
-				ui.Text(c, "None").FontSize(fontSmall).TextColor(t.TextMuted)
+				none(c, "None")
 			}
 			for _, name := range d.pr.Labels {
-				mutedPill(c, name)
+				mutedTag(c, name)
 			}
-		})
-		line("Milestone", "Set Milestone", func() { p.openMilestonePicker(d) }, func() {
+		}, edit("Edit Labels", func() { p.openLabelPicker(d) }))
+		detail.Property(c, "Milestone", func(c *ui.Context) {
 			if d.ov.Milestone == nil {
-				mutedText(c, "None")
+				none(c, "None")
 				return
 			}
-			mutedPill(c, d.ov.Milestone.Title)
-		})
+			mutedTag(c, d.ov.Milestone.Title)
+		}, edit("Set Milestone", func() { p.openMilestonePicker(d) }))
 		if len(d.ov.Linked) > 0 {
-			line("Closes", "", nil, func() {
+			detail.Property(c, "Closes", func(c *ui.Context) {
 				for _, issue := range d.ov.Linked {
-					ui.Button(c, fmt.Sprintf("#%d %s", issue.Number, issue.Title)).Label(fmt.Sprintf("Open issue #%d", issue.Number)).OnClick(func() { openExternal(c, issue.URL) })
+					ghostButton(c, fmt.Sprintf("#%d %s", issue.Number, issue.Title), "linked").Label(fmt.Sprintf("Open issue #%d", issue.Number)).OnClick(func() { openExternal(c, issue.URL) })
 				}
-			})
+			}, nil)
 		}
 	})
 }
 
 func (p *PRs) checksCard(c *ui.Context, d *prData) {
-	t := c.Theme()
 	plain := make([]github.Check, len(d.checks))
 	for i, chk := range d.checks {
 		plain[i] = chk.Check
 	}
-	card(c, "Checks", len(d.checks), func() {
+	detail.Card(c, "Checks", detail.CardOptions{Count: len(d.checks)}, func() {
 		if len(d.checks) == 0 {
 			mutedText(c, "No checks reported for this commit.")
 			return
 		}
 		mutedText(c, fmt.Sprintf("%d of %d checks passed", countChecks(plain), len(d.checks)))
 		for i, chk := range d.checks {
-			ui.Row(c.Key(i)).Gap(checkRowGap).AlignItems(ui.Center).FillWidth().Children(func() {
+			ui.Row(c.Key(i)).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 				checkIcon(c, checkOutcome(chk.Check))
-				ui.Text(c, chk.Name).FontSize(fontBody).SingleLine().Grow(1).MinWidth(0)
+				design.Text(c, chk.Name, token.TextBody).SingleLine().Grow(1).MinWidth(0)
 				if chk.Required {
-					mutedPill(c, "Required")
+					mutedTag(c, "Required")
 				}
 				if chk.Conclusion != "" {
 					mutedText(c, chk.Conclusion).Shrink(0)
 				} else {
 					mutedText(c, chk.Status).Shrink(0)
 				}
-				p.checkButtons(c, d, chk, t)
+				p.checkButtons(c, d, chk)
 			})
 		}
 	})
 }
 
-func (p *PRs) checkButtons(c *ui.Context, d *prData, chk checkRow, t *ui.Theme) {
+func (p *PRs) checkButtons(c *ui.Context, d *prData, chk checkRow) {
 	if chk.URL != "" {
-		ui.Button(c, "Details").Label("Details for " + chk.Name).TextColor(t.Accent).OnClick(func() { openExternal(c, chk.URL) })
+		ghostButton(c, "Details", "details-"+chk.Name).Label("Details for " + chk.Name).OnClick(func() { openExternal(c, chk.URL) })
 	}
 	if chk.JobID > 0 && chk.Status != "queued" {
-		ui.Button(c, "View Logs").Label("View logs of " + chk.Name).OnClick(func() { p.openLogs(d, chk) })
+		ghostButton(c, "View Logs", "logs-"+chk.Name).Label("View logs of " + chk.Name).OnClick(func() { p.openLogs(d, chk) })
 	}
 	if chk.RunID <= 0 {
 		return
 	}
 	switch outcome := checkOutcome(chk.Check); {
 	case outcome == checkFailure && chk.Conclusion == "action_required":
-		ui.Button(c, "Approve Run").Label("Approve run of " + chk.Name).OnClick(func() { p.runAction(d, chk, actionApprove) })
+		ghostButton(c, "Approve Run", "approve-"+chk.Name).Label("Approve run of " + chk.Name).OnClick(func() { p.runAction(d, chk, actionApprove) })
 	case outcome == checkFailure:
-		ui.Button(c, "Re-run").Label("Re-run " + chk.Name).OnClick(func() { p.runAction(d, chk, actionRerunFailed) })
+		ghostButton(c, "Re-run", "rerun-"+chk.Name).Label("Re-run " + chk.Name).OnClick(func() { p.runAction(d, chk, actionRerunFailed) })
 	case outcome == checkPending:
-		ui.Button(c, "Cancel").Label("Cancel " + chk.Name).OnClick(func() { p.runAction(d, chk, actionCancel) })
+		ghostButton(c, "Cancel", "cancel-"+chk.Name).Label("Cancel " + chk.Name).OnClick(func() { p.runAction(d, chk, actionCancel) })
 	}
 }
 
 func (p *PRs) filesCard(c *ui.Context, d *prData) {
 	files := d.visibleFiles()
-	card2 := func() {
-		if d.viewedCount() > 0 || d.hideViewed {
-			ui.Toggle(c.Key("hide-viewed"), &d.hideViewed, "Hide viewed")
+	var actions func(c *ui.Context)
+	if d.viewedCount() > 0 || d.hideViewed {
+		actions = func(c *ui.Context) {
+			action.Checkbox(c, "Hide viewed", &d.hideViewed, action.ChoiceOptions{ID: "hide-viewed"})
 		}
 	}
-	cardWith(c, "Changed files", len(d.files), card2, func() {
+	detail.Card(c, "Changed files", detail.CardOptions{Count: len(d.files), Actions: actions}, func() {
 		if len(d.files) == 0 {
 			mutedText(c, "No changed files.")
 			return
@@ -427,75 +407,61 @@ func (p *PRs) filesCard(c *ui.Context, d *prData) {
 }
 
 func (p *PRs) sinceCard(c *ui.Context, d *prData) {
-	cardWith(c, "Changes since your last review", len(d.since), nil, func() {
+	detail.Card(c, "Changes since your last review", detail.CardOptions{Count: len(d.since)}, func() {
 		mutedText(c, "Compared with commit "+shortSHA(d.sinceSHA)+", the one you last reviewed.")
 		p.fileList(c, d, &d.sinceList, &d.sinceRow, d.since, modeSince, "Changes since last review")
 	})
 }
 
-func (p *PRs) fileList(c *ui.Context, d *prData, list *ui.ListState, row *int, files []github.PRFile, mode, label string) {
-	t := c.Theme()
+func (p *PRs) fileList(c *ui.Context, d *prData, state *ui.ListState, row *int, files []github.PRFile, mode, label string) {
 	if len(files) == 0 {
 		mutedText(c, "Every file is marked as viewed.")
 		return
 	}
-	list.Key = func(i int) any { return files[i].Path }
-	list.Label = func(i int) string { return files[i].Path }
-	rows := min(len(files), fileListMaxRows)
+	state.Key = func(i int) any { return files[i].Path }
+	state.Label = func(i int) string { return files[i].Path }
+	state.Selected = row
+	rows := min(len(files), token.ListRowsMax)
 	spec := diffSpec{mode: mode, oldRef: d.sinceSHA}
-	filesEl := ui.List(c, list, len(files), func(i int) {
-		f := files[i]
-		line := ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(0, spacingMedium).Height(fileListRowHeight).FillWidth()
-		line.Children(func() {
-			if mode == modePR && d.pr.NodeID != "" {
-				viewed := d.viewed[f.Path]
-				if ui.Checkbox(c.Key("viewed"), &viewed, "").Label("Viewed " + f.Path).Changed() {
-					p.setViewed(d, f.Path, viewed)
-				}
+	var el ui.Element
+	ui.Column(c).FillWidth().Height(float32(rows) * token.RowHeight.Px()).Shrink(0).Children(func() {
+		el = list.View(c, state, len(files), list.ViewOptions{Label: label}, func(i int) list.Item {
+			f := files[i]
+			it := list.Item{
+				Label:       f.Path,
+				Git:         fileGitStatus(f.Status),
+				OnClick:     func() { p.openDiff(d, f, spec) },
+				Description: fmt.Sprintf("+%d -%d", f.Additions, f.Deletions),
 			}
-			ui.Text(c, fileStatusLetter(f.Status)).FontSize(fontSmall).Bold().Width(statLetterWidth).TextColor(fileStatusColor(t, f.Status)).Shrink(0)
-			ui.Text(c, f.Path).FontSize(fontBody).SingleLine().Grow(1).MinWidth(0)
 			if n := d.commentCount(f.Path); n > 0 && mode == modePR {
-				ui.Icon(c, icons.Comment).Size(iconSmall, iconSmall).TextColor(t.TextMuted).Shrink(0).Label(fmt.Sprintf("%d comments", n))
-				mutedText(c, strconv.Itoa(n)).Shrink(0)
+				it.Count = n
 			}
-			ui.Text(c, "+"+strconv.Itoa(f.Additions)).FontSize(fontSmall).TextColor(t.Success).Shrink(0)
-			ui.Text(c, "-"+strconv.Itoa(f.Deletions)).FontSize(fontSmall).TextColor(t.Danger).Shrink(0)
+			if mode == modePR && d.pr.NodeID != "" {
+				it.Leading = func(c *ui.Context) { p.viewedBox(c, d, f.Path) }
+			}
+			return it
 		})
-		if line.RowClicked() {
-			p.openDiff(d, f, spec)
-		}
-	}).FillWidth().Height(float32(rows * fileListRowHeight)).Label(label)
-	if filesEl.Submitted() && *row >= 0 && *row < len(files) {
+	})
+	if el.Submitted() && *row >= 0 && *row < len(files) {
 		p.openDiff(d, files[*row], spec)
 	}
 }
 
-func fileStatusColor(t *ui.Theme, status string) ui.Color {
-	switch status {
-	case statusAdded:
-		return t.Success
-	case statusRemoved:
-		return t.Danger
-	}
-	return t.Warning
-}
-
 func (p *PRs) commitsCard(c *ui.Context, d *prData) {
-	card(c, "Commits", len(d.commits), func() {
+	detail.Card(c, "Commits", detail.CardOptions{Count: len(d.commits)}, func() {
 		if len(d.commits) == 0 {
 			mutedText(c, "No commits.")
 			return
 		}
 		now := p.env.Now()
 		for i, cm := range d.commits {
-			ui.Row(c.Key(i)).Gap(spacingMedium).AlignItems(ui.Center).FillWidth().Children(func() {
-				mutedText(c, shortSHA(cm.SHA)).Font("monospace").Shrink(0)
-				ui.Text(c, firstLine(cm.Message)).FontSize(fontBody).SingleLine().Grow(1).MinWidth(0)
+			ui.Row(c.Key(i)).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
+				token.TextMono.Apply(ui.Text(c, shortSHA(cm.SHA))).TextColor(token.Of(c).Text.Secondary).Shrink(0)
+				design.Text(c, firstLine(cm.Message), token.TextBody).SingleLine().Grow(1).MinWidth(0)
 				mutedText(c, cm.Author).SingleLine().Shrink(0)
 				mutedText(c, relativeTime(now, cm.Date)).Shrink(0)
 				if cm.URL != "" {
-					ui.Button(c, "Open").Label("Open commit " + shortSHA(cm.SHA)).OnClick(func() { openExternal(c, cm.URL) })
+					ghostButton(c, "Open", "commit-"+cm.SHA).Label("Open commit " + shortSHA(cm.SHA)).OnClick(func() { openExternal(c, cm.URL) })
 				}
 			})
 		}
@@ -546,7 +512,7 @@ func eventSentence(e TimelineEvent) string {
 }
 
 func (p *PRs) timelineCard(c *ui.Context, d *prData) {
-	card(c, "Conversation", len(d.timeline), func() {
+	detail.Card(c, "Conversation", detail.CardOptions{Count: len(d.timeline)}, func() {
 		if len(d.timeline) == 0 {
 			mutedText(c, "No activity yet.")
 			return
@@ -554,11 +520,7 @@ func (p *PRs) timelineCard(c *ui.Context, d *prData) {
 		now := p.env.Now()
 		for i, e := range d.timeline {
 			if !e.isComment() && !e.isReview() {
-				ui.Row(c.Key(i)).Gap(spacingSmall).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-					ui.Text(c, e.Actor).FontSize(fontSmall).Bold()
-					mutedText(c, eventSentence(e))
-					mutedText(c, relativeTime(now, e.Time))
-				})
+				detail.Activity(c, e.Actor, eventSentence(e), relativeTime(now, e.Time))
 				continue
 			}
 			p.commentView(c, d, i, e, now)
@@ -567,27 +529,23 @@ func (p *PRs) timelineCard(c *ui.Context, d *prData) {
 }
 
 func (p *PRs) commentView(c *ui.Context, d *prData, i int, e TimelineEvent, now time.Time) {
-	t := c.Theme()
-	ui.Column(c.Key(i)).Gap(spacingSmall).Padding(spacingMedium).FillWidth().Radius(cardRadius).Border(1, t.Border).Children(func() {
-		ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-			ui.Text(c, e.Actor).FontSize(fontBody).Bold()
-			verb := "commented"
-			if e.isReview() {
-				verb = reviewStateLabel(e.State)
-			}
-			mutedText(c, verb)
-			mutedText(c, relativeTime(now, e.Time))
-			ui.Box(c).Grow(1)
-			if e.URL != "" {
-				ui.Button(c, "Copy Link").Label("Copy link to comment by " + e.Actor).OnClick(func() { c.WriteClipboard(e.URL) })
-			}
-			if e.isComment() && e.CanEdit {
-				ui.Button(c, "Edit").Label("Edit comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.editComment(d, e) })
-			}
-			if e.isComment() && e.CanDelete {
-				ui.Button(c, "Delete").Label("Delete comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.deleteComment(d, e) })
-			}
-		})
+	verb := "commented"
+	if e.isReview() {
+		verb = reviewStateLabel(e.State)
+	}
+	o := detail.CommentOptions{Author: e.Actor, Verb: verb, Time: relativeTime(now, e.Time)}
+	o.Actions = func(c *ui.Context) {
+		if e.URL != "" {
+			ghostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + e.Actor).OnClick(func() { c.WriteClipboard(e.URL) })
+		}
+		if e.isComment() && e.CanEdit {
+			ghostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.editComment(d, e) })
+		}
+		if e.isComment() && e.CanDelete {
+			ghostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.deleteComment(d, e) })
+		}
+	}
+	detail.Comment(c.Key(i), o, func() {
 		if strings.TrimSpace(e.Body) != "" {
 			markdown.View(c.Key("body"), e.Body, &d.md)
 		}
@@ -598,33 +556,35 @@ func (p *PRs) commentView(c *ui.Context, d *prData, i int, e TimelineEvent, now 
 }
 
 func (p *PRs) reactionBar(c *ui.Context, d *prData, e TimelineEvent) {
-	t := c.Theme()
-	ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Wrap().Gap(token.GapInline.Px()).Children(func() {
 		for _, r := range e.Reactions {
 			if r.Count == 0 {
 				continue
 			}
-			b := ui.Button(c, fmt.Sprintf("%s %d", reactionLabel(r.Content), r.Count)).Label(reactionLabel(r.Content) + " reaction").Disabled(d.busy != "").OnClick(func() { p.react(d, e, r.Content) })
+			variant := action.Secondary
 			if r.Viewer {
-				b.Background(t.Selection)
+				variant = action.Primary
 			}
+			label := reactionLabel(r.Content)
+			action.Button(c, fmt.Sprintf("%s %d", label, r.Count), action.ButtonOptions{Variant: variant, Small: true, Disabled: d.busy != "", ID: "reaction-" + r.Content}).
+				Label(label + " reaction").OnClick(func() { p.react(d, e, r.Content) })
 		}
-		ui.MenuButton(c, "React", func(m *ui.Menu) {
+		action.MenuButton(c, "React", action.ButtonOptions{Variant: action.Ghost, Small: true, Disabled: d.busy != "", ID: "react"}, func(m *ui.Menu) {
 			for _, r := range reactionNames {
-				if m.Item(r.label).Chosen() {
+				if action.Item(m, r.label, action.ItemOptions{}).Chosen() {
 					p.react(d, e, r.content)
 				}
 			}
-		}).Label("Add reaction").Disabled(d.busy != "")
+		}).Label("Add reaction")
 	})
 }
 
 func (p *PRs) commentBox(c *ui.Context, d *prData) {
-	card(c, "Add a comment", 0, func() {
-		ui.TextArea(c.Key("comment"), &d.draft).Placeholder("Leave a comment (Markdown is supported)").MinHeight(commentBoxHeight).FillWidth().Label("Comment")
+	detail.Card(c, "Add a comment", detail.CardOptions{}, func() {
+		field.TextArea(c, "Comment", &d.draft, field.AreaOptions{Placeholder: "Leave a comment (Markdown is supported)", MinLines: commentLines, ID: "comment"})
 		blank := trimmed(d.draft) == ""
 		ui.Row(c).Justify(ui.End).FillWidth().Children(func() {
-			ui.PrimaryButton(c, "Add Comment").Disabled(blank || d.busy != "").OnClick(func() { p.postComment(d) })
+			action.Button(c, "Add Comment", action.ButtonOptions{Variant: action.Primary, Disabled: blank || d.busy != ""}).OnClick(func() { p.postComment(d) })
 		})
 	})
 }

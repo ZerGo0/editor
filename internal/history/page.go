@@ -7,24 +7,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/pane"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
 const (
-	listWidth      = 260
-	rowHeight      = 40
-	rowPadding     = 10
-	rowRadius      = 5
-	rowGap         = 2
-	headerHeight   = 34
-	headerPadding  = 10
-	bodyFontSize   = 13
-	detailFontSize = 12
-	emptyPadding   = 16
-	statusGap      = 8
-	headerIconSize = 16
+	listWidth     = 260
+	revertLabel   = "Revert to This Version"
+	emptyMessage  = "Versions are recorded each time the file is saved."
+	selectMessage = "Select a version to compare it with the current text."
 )
 
 type page struct {
@@ -166,73 +165,68 @@ func (u *UI) pageView(c *ui.Context, p *page) {
 	if p.stale {
 		u.reload(p)
 	}
-	ui.Column(c).Fill().Background(c.Theme().Background).Children(func() {
+	pal := token.Of(c)
+	ui.Column(c).Fill().Background(pal.Layer.Editor).Children(func() {
 		switch {
 		case p.err != nil:
 			u.failure(c, "Cannot load history", p.err, func() { u.reload(p) })
 		case p.loading && len(p.versions) == 0:
 			u.busy(c, "Loading history...")
 		case len(p.versions) == 0:
-			ui.Text(c, "No history yet. Versions are recorded each time the file is saved.").
-				TextColor(c.Theme().TextMuted).Padding(emptyPadding)
+			u.centered(c, func() {
+				feedback.Empty(c, feedback.EmptyOptions{Icon: icons.History, Title: "No history yet", Message: emptyMessage})
+			})
 		default:
 			ui.Split(c, &p.split, func() { u.versionList(c, p) }, func() { u.detail(c, p) }).SplitReset(listWidth).Fill()
 		}
 	})
 }
 
+func (u *UI) centered(c *ui.Context, body func()) {
+	ui.Column(c).Grow(1).FillWidth().Center().Children(body)
+}
+
 func (u *UI) busy(c *ui.Context, text string) {
-	ui.Row(c).Gap(statusGap).Padding(emptyPadding).AlignItems(ui.Center).Children(func() {
-		ui.Spinner(c).Label(text)
-		ui.Text(c, text).TextColor(c.Theme().TextMuted)
-	})
+	u.centered(c, func() { feedback.Loading(c, text) })
 }
 
 func (u *UI) failure(c *ui.Context, title string, err error, retry func()) {
-	ui.Column(c).Gap(statusGap).Padding(emptyPadding).Children(func() {
-		ui.Text(c, title).Bold()
-		ui.Text(c, err.Error()).TextColor(c.Theme().Danger)
-		if ui.Button(c, "Retry").Clicked() {
-			retry()
-		}
-	})
+	u.centered(c, func() { feedback.Error(c, title, err, retry) })
 }
 
 func (u *UI) versionList(c *ui.Context, p *page) {
-	t := c.Theme()
+	pal := token.Of(c)
 	now := u.now()
-	ui.List(c, &p.list, len(p.versions)).Grow(1).FillWidth().Padding(rowGap).Gap(rowGap).Label("Versions").
-		Rows(func(row ui.ListRow) {
-			v := p.versions[row.Index]
-			muted := t.TextMuted
-			if row.Selected() && row.ListFocused() {
-				muted = t.Text
+	ui.Column(c).Fill().Background(pal.Layer.SideBar).Children(func() {
+		pane.ViewTitle(c, "Versions", pane.TitleOptions{})
+		list.View(c, &p.list, len(p.versions), list.ViewOptions{Label: "Versions"}, func(i int) list.Item {
+			v := p.versions[i]
+			it := list.Item{
+				Label:       absoluteTime(now, v.Time),
+				Description: relativeTime(now, v.Time) + "  " + formatSize(v.Size),
+				Icon:        icons.History,
 			}
-			rc := row.Context
-			ui.Column(rc).Height(rowHeight).Padding(rowGap, rowPadding).Radius(rowRadius).Justify(ui.Center).FillWidth().Children(func() {
-				ui.Row(rc).Gap(statusGap).AlignItems(ui.Center).Children(func() {
-					ui.Text(rc, absoluteTime(now, v.Time)).FontSize(bodyFontSize).SingleLine().Shrink(0)
-					if v.Label != "" {
-						ui.Text(rc, v.Label).FontSize(bodyFontSize).Bold().TextColor(t.Accent).SingleLine().Shrink(1).MinWidth(0)
-					}
-				})
-				ui.Text(rc, relativeTime(now, v.Time)+"  "+formatSize(v.Size)).FontSize(detailFontSize).TextColor(muted).SingleLine()
-			})
+			if v.Label != "" {
+				it.Trailing = func(c *ui.Context) { badge.Tag(c, v.Label, badge.TagOptions{Tone: token.ToneInfo}) }
+			}
+			return it
 		})
+	})
 }
 
 func (u *UI) detail(c *ui.Context, p *page) {
 	u.syncSelection(p)
 	ui.Column(c).Fill().Children(func() {
 		u.toolbar(c, p)
-		ui.Divider(c)
 		switch {
 		case p.diffErr != nil:
 			u.failure(c, "Cannot read this version", p.diffErr, func() { p.wantHash = "" })
 		case p.diff != nil:
 			editor.DiffView(c, p.diff).Grow(1).FillWidth()
 		case p.selected < 0:
-			ui.Text(c, "Select a version to compare it with the current text.").TextColor(c.Theme().TextMuted).Padding(emptyPadding)
+			u.centered(c, func() {
+				feedback.Empty(c, feedback.EmptyOptions{Title: "Select a version", Message: selectMessage})
+			})
 		default:
 			u.busy(c, "Loading version...")
 		}
@@ -240,27 +234,28 @@ func (u *UI) detail(c *ui.Context, p *page) {
 }
 
 func (u *UI) toolbar(c *ui.Context, p *page) {
-	t := c.Theme()
+	pal := token.Of(c)
 	v, ok := p.selectedVersion()
 	ready := ok && p.loaded
-	ui.Row(c).Height(headerHeight).Shrink(0).FillWidth().Padding(0, headerPadding).Gap(statusGap).AlignItems(ui.Center).Children(func() {
-		ui.Icon(c, icons.History).Size(headerIconSize, headerIconSize).TextColor(t.TextMuted)
+	ui.Row(c).Height(token.ViewTitleHeight.Px()).Shrink(0).FillWidth().Padding(0, token.PadRow.Px(), 0, token.PadView.Px()).Gap(token.GapControl.Px()).
+		AlignItems(ui.Center).Background(pal.Layer.Panel).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(pal.Border.Default).
+		Role(ui.RoleToolbar).Label("Version actions").Children(func() {
 		title := "No version selected"
 		if ok {
 			title = filepath.Base(p.path) + " at " + absoluteTime(u.now(), v.Time)
 		}
-		ui.Text(c, title).FontSize(bodyFontSize).Bold().SingleLine().Grow(1).MinWidth(0)
+		design.Text(c, title, token.TextStrong).SingleLine().Grow(1).MinWidth(0)
 		if p.deleted {
-			ui.Text(c, "File deleted").FontSize(detailFontSize).TextColor(t.Warning).SingleLine().Shrink(0)
+			badge.Tag(c, "File deleted", badge.TagOptions{Tone: token.ToneWarning})
 		}
-		if ui.Button(c, "Revert to this version").Disabled(!ready).Clicked() {
+		if action.Button(c, revertLabel, action.ButtonOptions{Small: true, Disabled: !ready}).Clicked() {
 			u.revert(p)
 		}
-		if ui.Button(c, "Copy").Disabled(!ready).Clicked() {
+		if action.Button(c, "Copy", action.ButtonOptions{Variant: action.Ghost, Small: true, Disabled: !ready}).Clicked() {
 			u.copyText(p.oldText)
 			u.h.Notify("Copied version text")
 		}
-		if ui.Button(c, "Put Label...").Tooltip("Label the current text").Clicked() {
+		if action.Button(c, "Put Label...", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Label the Current Text"}).Clicked() {
 			u.PutLabel(p.path)
 		}
 	})

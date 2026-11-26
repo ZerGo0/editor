@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -12,7 +15,6 @@ import (
 
 const (
 	pdfLabel          = "PDF document"
-	pdfSpinnerInset   = 8
 	pdfSpinnerLabel   = "Loading PDF"
 	pdfUnavailableMsg = "The PDF could not be shown inside the editor. Open it in Preview instead."
 )
@@ -116,7 +118,7 @@ func (p *pdfPane) close() {
 func (p *pdfPane) info() string { return joinInfo(formatSize(p.size), "PDF") }
 
 func (p *pdfPane) controls(c *ui.Context) {
-	if ui.Button(c.Key("open-preview"), "Open in Preview").FontSize(smallFontSize).Clicked() {
+	if action.Button(c, "Open in Preview", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "open-preview"}).Clicked() {
 		p.s.openInPreview()
 	}
 }
@@ -124,14 +126,14 @@ func (p *pdfPane) controls(c *ui.Context) {
 func (p *pdfPane) body(c *ui.Context) {
 	switch {
 	case p.unavailable != nil:
-		message(c, "PDF preview is not available", p.unavailable.Error()+". "+pdfUnavailableMsg, nil)
+		message(c, "PDF preview is not available", p.unavailable.Error()+". "+pdfUnavailableMsg, "", nil)
 	case p.err != nil:
 		errorView(c, "Cannot show this PDF", p.err, p.start)
 	default:
 		view := p.web.show(c).Grow(1).FillWidth().Label(pdfLabel).Bind(&p.s.focus)
 		if p.loading {
 			view.Children(func() {
-				ui.Spinner(c).Label(pdfSpinnerLabel).Absolute().Top(pdfSpinnerInset).Right(pdfSpinnerInset)
+				feedback.Spinner(c, pdfSpinnerLabel).Absolute().Top(token.GapControl.Px()).Right(token.GapControl.Px())
 			})
 		}
 	}

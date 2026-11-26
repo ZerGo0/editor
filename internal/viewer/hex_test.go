@@ -38,7 +38,7 @@ func TestHexBannerAndOpenAsText(t *testing.T) {
 	if !tt.HasText("Binary file, 1,234 bytes.") {
 		t.Fatalf("texts: %q", tt.Texts())
 	}
-	if err := tt.Click("Open as text anyway"); err != nil {
+	if err := tt.Click("Open as Text Anyway"); err != nil {
 		t.Fatal(err)
 	}
 	if opened != 1 {
@@ -51,7 +51,7 @@ func TestHexBannerAndOpenAsText(t *testing.T) {
 
 func TestHexHidesOpenAsTextWithoutCallback(t *testing.T) {
 	_, _, _, tt := openHex(t, binaryData(10), Options{})
-	if tt.HasText("Open as text anyway") {
+	if tt.HasText("Open as Text Anyway") {
 		t.Error("the button shows without a callback")
 	}
 }

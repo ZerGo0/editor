@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -20,10 +22,6 @@ const (
 	defaultViewW     = 800
 	defaultViewH     = 600
 	shapeCacheMax    = 512
-	statusFontSize   = 12
-	statusGap        = 16
-	statusPadY       = 4
-	statusPadX       = 12
 	percent          = 100
 	unknownLine      = "?"
 	cutMarker        = " ..."
@@ -94,9 +92,9 @@ func View(c *ui.Context, s *State) ui.Element {
 	if s.Doc == nil {
 		return ui.Box(c).Grow(1)
 	}
-	t := c.Theme()
+	pal := token.Of(c)
 	s.services = c.Services()
-	s.barStyle = ui.ScrollbarStyle{}.Resolve(t)
+	s.barStyle = token.ScrollbarStyle(pal)
 	s.init()
 	s.applyFound()
 	col := ui.Column(c).Grow(1)
@@ -104,7 +102,7 @@ func View(c *ui.Context, s *State) ui.Element {
 		if s.find.open {
 			s.findBar(c)
 		}
-		s.textArea(c, t)
+		s.textArea(c, pal)
 		s.statusLine(c)
 	})
 	return col
@@ -218,7 +216,7 @@ func (s *State) selection() (int64, int64) {
 	return min(s.Caret, s.Anchor), max(s.Caret, s.Anchor)
 }
 
-func (s *State) textArea(c *ui.Context, t *ui.Theme) {
+func (s *State) textArea(c *ui.Context, t *token.Palette) {
 	s.layout()
 	e := ui.Box(c).Grow(1).FillWidth().Focusable().FocusRing(false).Clip().Cursor(ui.CursorText).
 		Role(ui.RoleTextField).Label(editorLabel).Bind(&s.focus)
@@ -226,26 +224,26 @@ func (s *State) textArea(c *ui.Context, t *ui.Theme) {
 	e.HandleInput(s.input).TextCaret(s.caretRect()).Draw(func(p *ui.Painter, r ui.Rect) { s.paint(p, r, t) })
 }
 
-func (s *State) paint(p *ui.Painter, r ui.Rect, t *ui.Theme) {
+func (s *State) paint(p *ui.Painter, r ui.Rect, t *token.Palette) {
 	if r.W != s.viewW || r.H != s.viewH {
 		s.viewW, s.viewH = r.W, r.H
 		s.services.Invalidate()
 	}
 	fr := &s.frame
-	p.Fill(r, t.Background, 0)
+	p.Fill(r, t.Layer.Editor, 0)
 	x0 := r.X + s.textX()
 	a, b := s.selection()
 	p.Clip(ui.Rect{X: r.X + fr.gutterW, Y: r.Y, W: max(0, r.W-fr.gutterW), H: r.H}, 0, func() {
 		for i, ln := range fr.lines {
 			y := r.Y + float32(i)*s.lineH
 			if a < b {
-				s.paintSelection(p, ln, x0, y, a, b, t.Selection)
+				s.paintSelection(p, ln, x0, y, a, b, t.Text.Selection)
 			}
 			ty := y + (s.lineH-ln.shape.h)/2
-			p.TextLayout(ln.shape.layout, x0, ty, t.Text)
+			p.TextLayout(ln.shape.layout, x0, ty, t.Text.Primary)
 			if ln.cut {
 				m := s.shape(cutMarker)
-				p.TextLayout(m.layout, x0+ln.shape.w, ty, t.TextMuted)
+				p.TextLayout(m.layout, x0+ln.shape.w, ty, t.Text.Muted)
 			}
 		}
 		if row, x, ok := s.caretRow(); ok && s.focused {
@@ -253,20 +251,20 @@ func (s *State) paint(p *ui.Painter, r ui.Rect, t *ui.Theme) {
 			if s.compose != "" {
 				s.paintCompose(p, x0+x, y, t)
 			} else {
-				p.Fill(ui.Rect{X: x0 + x, Y: y, W: caretWidth, H: s.lineH}, t.Accent, 0)
+				p.Fill(ui.Rect{X: x0 + x, Y: y, W: caretWidth, H: s.lineH}, t.Accent.Base, 0)
 			}
 		}
 	})
-	p.Fill(ui.Rect{X: r.X, Y: r.Y, W: fr.gutterW, H: r.H}, t.Surface, 0)
+	p.Fill(ui.Rect{X: r.X, Y: r.Y, W: fr.gutterW, H: r.H}, t.Layer.Editor, 0)
 	caretRow, _, caretShown := s.caretRow()
 	for i := range fr.lines {
 		label := unknownLine
 		if fr.numbered {
 			label = strconv.FormatInt(fr.topLine+int64(i)+1, 10)
 		}
-		color := t.TextMuted
+		color := t.Text.Muted
 		if caretShown && i == caretRow {
-			color = t.Text
+			color = t.Text.Primary
 		}
 		sh := s.shape(label)
 		y := r.Y + float32(i)*s.lineH + (s.lineH-sh.h)/2
@@ -297,11 +295,11 @@ func (s *State) paintSelection(p *ui.Painter, ln viewLine, x0, y float32, a, b i
 	}
 }
 
-func (s *State) paintCompose(p *ui.Painter, x, y float32, t *ui.Theme) {
+func (s *State) paintCompose(p *ui.Painter, x, y float32, t *token.Palette) {
 	sh := s.shape(s.compose)
-	p.Fill(ui.Rect{X: x, Y: y, W: sh.w, H: s.lineH}, t.Surface, 0)
-	p.TextLayout(sh.layout, x, y+(s.lineH-sh.h)/2, t.Text)
-	p.Line(x, y+s.lineH-1, x+sh.w, y+s.lineH-1, 1, t.Accent)
+	p.Fill(ui.Rect{X: x, Y: y, W: sh.w, H: s.lineH}, t.Layer.Input, 0)
+	p.TextLayout(sh.layout, x, y+(s.lineH-sh.h)/2, t.Text.Primary)
+	p.Line(x, y+s.lineH-1, x+sh.w, y+s.lineH-1, token.BorderWidth.Px(), t.Accent.Base)
 }
 
 func (s *State) scrollbar() (ui.Scrollbar, bool) {
@@ -336,10 +334,11 @@ func (s *State) statusLine(c *ui.Context) {
 	if len(parts) == 0 {
 		return
 	}
-	t := c.Theme()
-	ui.Row(c).Gap(statusGap).Padding(statusPadY, statusPadX).Shrink(0).FillWidth().BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Children(func() {
+	p := token.Of(c)
+	ui.Row(c).Gap(token.GapSection.Px()).Height(token.StatusBarHeight.Px()).Padding(0, token.PadBarText.Px()).AlignItems(ui.Center).Shrink(0).FillWidth().
+		Background(p.Layer.Panel).BorderWidth(token.BorderWidth.Px(), 0, 0, 0).BorderColor(p.Border.Default).Role(ui.RoleStatus).Children(func() {
 		for _, part := range parts {
-			ui.Text(c, part).FontSize(statusFontSize).TextColor(t.TextMuted).SingleLine()
+			design.Text(c, part, token.TextLabel).SingleLine()
 		}
 	})
 }

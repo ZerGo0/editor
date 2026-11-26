@@ -1,6 +1,8 @@
 package prui
 
 import (
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -8,6 +10,8 @@ const (
 	ghInstallURL    = "https://cli.github.com"
 	ghLoginCommand  = "gh auth login"
 	gitRemoteSample = "git remote add origin https://github.com/OWNER/REPO.git"
+	copyCommand     = "Copy Command"
+	installLink     = "Get the GitHub CLI"
 )
 
 type stateMessage struct {
@@ -33,7 +37,7 @@ func (p *PRs) stateMessage() stateMessage {
 		if host != "" && host != dotComHost {
 			command += " --hostname " + host
 		}
-		return stateMessage{title: "Sign in to GitHub with " + ghLoginCommand, detail: "Run this command in a terminal, then check again:", command: command, retry: "Check Again"}
+		return stateMessage{title: "Sign in to GitHub", detail: "Run this command in a terminal, then check again:", command: command, retry: "Check Again"}
 	case phaseError:
 		detail := "Something went wrong."
 		if p.phaseErr != nil {
@@ -44,28 +48,34 @@ func (p *PRs) stateMessage() stateMessage {
 	return stateMessage{title: "Connecting to GitHub...", spin: true}
 }
 
+func (p *PRs) Ready() bool {
+	return !p.closed && p.phase == phaseReady
+}
+
+func (p *PRs) StateView(c *ui.Context) bool {
+	if p.Ready() {
+		return false
+	}
+	if !p.closed {
+		p.stateView(c)
+	}
+	return true
+}
+
 func (p *PRs) stateView(c *ui.Context) {
 	m := p.stateMessage()
-	t := c.Theme()
-	ui.Column(c).Grow(1).FillWidth().Gap(spacingMedium).Padding(messagePad).Children(func() {
+	ui.Column(c).Grow(1).FillWidth().Children(func() {
 		if m.spin {
-			ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Children(func() {
-				ui.Spinner(c).Label(m.title)
-				ui.Text(c, m.title).FontSize(fontBody)
-			})
+			feedback.Loading(c, m.title)
 			return
 		}
-		ui.Text(c, m.title).Bold().FontSize(fontBody)
-		ui.Text(c, m.detail).FontSize(fontSmall).TextColor(t.TextMuted)
-		if m.command != "" {
-			ui.Text(c, m.command).FontSize(fontSmall).Font("monospace").Selectable().Background(t.Surface).Radius(cardRadius).Padding(spacingSmall, spacingMedium)
-			ui.Button(c, "Copy Command").OnClick(func() { c.WriteClipboard(m.command) })
+		o := feedback.EmptyOptions{Icon: icons.Github, Title: m.title, Message: m.detail, Code: m.command, Action: m.retry, OnAction: p.connect}
+		switch {
+		case m.link != "":
+			o.Link, o.OnLink = installLink, func() { openExternal(c, m.link) }
+		case m.command != "":
+			o.Link, o.OnLink = copyCommand, func() { c.WriteClipboard(m.command) }
 		}
-		if m.link != "" {
-			ui.Link(c, "Get the GitHub CLI", m.link)
-		}
-		if m.retry != "" {
-			ui.Button(c, m.retry).OnClick(p.connect)
-		}
+		feedback.Empty(c, o)
 	})
 }

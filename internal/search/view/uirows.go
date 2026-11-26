@@ -1,11 +1,18 @@
 package searchview
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
+	"github.com/ZerGo0/editor/internal/search/symbols"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -15,25 +22,20 @@ func (v *View) resultList(c *ui.Context) {
 		v.field.Focus()
 	}
 	v.upDown = up
-	list := ui.List(c.Key("results"), &v.list, len(v.rows)).Grow(1).FillWidth().MinHeight(0).Label(labelResults).Role(ui.RoleTree)
-	list.Rows(func(lr ui.ListRow) { v.rowView(lr) })
-	list.Children(func() {
-		if len(v.rows) == 0 {
-			v.emptyState(c)
-		}
-	})
+	opts := list.ViewOptions{Label: labelResults, Tree: v.hasBranches(), Empty: v.emptyState}
+	el := list.View(c.Key("results"), &v.list, len(v.rows), opts, func(i int) list.Item { return v.item(c, i) }).Role(ui.RoleTree)
 	if v.scrollTo {
 		v.scrollTo = false
 		v.list.ScrollIntoView(v.selected)
 	}
-	if list.Changed() {
+	if el.Changed() {
 		v.userMoved = true
 		v.captureSelection()
 		if r, ok := v.rowAt(v.selected); ok && r.kind != rowFile && r.kind != rowGroup && r.kind != rowFolder {
 			v.previewRow(v.selected)
 		}
 	}
-	if list.Submitted() {
+	if el.Submitted() {
 		v.activateRow(v.selected, OpenOptions{Focus: true})
 	}
 	v.listKeys(c)
@@ -63,197 +65,180 @@ func (v *View) listKeys(c *ui.Context) {
 }
 
 func (v *View) emptyState(c *ui.Context) {
-	t := c.Theme()
 	switch {
 	case v.busy() || v.text.searching:
-		ui.Row(c).FillWidth().Center().Gap(stateGap).Padding(statePadding).Children(func() {
-			ui.Spinner(c).Size(spinnerSize, spinnerSize).Label("Searching")
-			ui.Text(c, "Searching…").FontSize(smallFont).TextColor(t.TextMuted)
-		})
+		feedback.Loading(c, "Searching…")
 	case v.scope == ScopeText && v.text.err != "":
-		ui.Column(c).FillWidth().Center().Gap(stateGap).Padding(statePadding).Children(func() {
-			ui.Text(c, "The pattern is not valid").FontSize(smallFont).TextColor(t.Danger).TextAlign(ui.Center)
-			if ui.Button(c, "Retry").Clicked() {
-				v.searchSoon(0)
-			}
-		})
+		feedback.Error(c, "The pattern is not valid", errors.New(v.text.err), func() { v.searchSoon(0) })
 	case v.scope == ScopeText && strings.TrimSpace(v.st.Query) == "":
-		stateText(c, "Type to search the text of your files", "Use .* for a regular expression. Shift+Enter adds a line.")
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "Type to search the text of your files", Message: "Use .* for a regular expression. Shift+Enter adds a line."})
 	case v.scope == ScopeText:
-		stateText(c, "No results for "+strconv.Quote(firstLine(strings.TrimSpace(v.st.Query))), "Check the files to include and exclude, or the match options.")
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No results for " + strconv.Quote(firstLine(strings.TrimSpace(v.st.Query))), Message: "Check the files to include and exclude, or the match options."})
 	case v.scope == ScopeAll:
-		stateText(c, "Search files, symbols, text and actions", "Start with # for symbols, @ for this file, > for actions, / for text or : for a line.")
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "Search files, symbols, text and actions", Message: "Start with # for symbols, @ for this file, > for actions, / for text or : for a line."})
 	default:
-		stateText(c, "Type to search", "")
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "Type to search"})
 	}
 }
 
-func (v *View) rowView(lr ui.ListRow) {
-	r, ok := v.rowAt(lr.Index)
+func (v *View) item(c *ui.Context, i int) list.Item {
+	r, ok := v.rowAt(i)
 	if !ok {
-		return
+		return list.Item{}
 	}
+	it := list.Item{Depth: r.depth, Menu: func(m *ui.Menu) { v.rowMenu(c, m, r) }}
 	switch r.kind {
 	case rowHeader:
-		v.headerView(lr, r)
-	case rowFolder, rowFile, rowGroup:
-		v.branchView(lr, r)
-	case rowMatch:
-		v.matchView(lr, r)
-	case rowResult:
-		v.resultView(lr, r)
-	case rowRecentQuery:
-		v.recentView(lr, r)
-	case rowGoto:
-		v.gotoView(lr, r)
-	case rowMessage:
-		mutedText(lr.Context, r.title, false).Padding(6, sidePad)
-	}
-}
-
-func (v *View) box(lr ui.ListRow, r row) ui.Element {
-	return ui.Row(lr.Context).Height(rowHeight).FillWidth().Padding(0, sidePad, 0, sidePad+float32(r.depth)*indentStep).Gap(5).AlignItems(ui.Center)
-}
-
-func (v *View) headerView(lr ui.ListRow, r row) {
-	c := lr.Context
-	t := c.Theme()
-	bg := t.Background
-	if c.Vibrancy() {
-		bg = bg.Alpha(headerAlpha)
-	}
-	el := ui.Row(c).Height(rowHeight).FillWidth().Padding(0, sidePad).Gap(6).AlignItems(ui.Center).Background(bg)
-	el.Children(func() {
-		ui.Text(c, strings.ToUpper(r.title)).FontSize(tinyFont).Bold().TextColor(t.TextMuted).SingleLine()
-		if r.count > 0 {
-			countBadge(c, r.count, false)
+		return v.headerItem(r)
+	case rowFolder:
+		it.Leading, it.Label, it.Branch, it.Open, it.Count = folderLeading(r.title, r.open), r.title, true, r.open, r.count
+		it.OnClick = func() { v.toggle(r.key) }
+		it.Actions = v.rowActions(r)
+	case rowFile, rowGroup:
+		it.Leading, it.Label, it.Strong, it.Branch, it.Open, it.Count = fileLeading(r.title), r.title, true, true, r.open, r.count
+		if r.detail != "" && (r.kind == rowGroup || v.st.ListView) {
+			it.Description = r.detail
 		}
-		ui.Box(c).Grow(1)
-		if r.total > allSectionLimit && v.scope == ScopeAll {
-			if textButton(c, "all-"+r.title, "Show all "+formatCount(r.total), false).Clicked() {
+		it.OnClick = func() { v.toggle(r.key) }
+		if r.kind == rowFile {
+			it.OnDoubleClick = func() { v.activateRow(i, OpenOptions{Focus: true}) }
+		}
+		it.Actions = v.rowActions(r)
+	case rowMatch:
+		v.matchItem(c, &it, r, i)
+	case rowResult:
+		v.resultItem(&it, r, i)
+	case rowRecentQuery:
+		it.Icon, it.Label = icons.History, firstLine(r.query)
+		it.OnClick = func() { v.useQuery(r.query) }
+		it.Menu = nil
+	case rowGoto:
+		it.Label = r.label
+		if path := v.relPath(v.h.ActivePath()); path != "" {
+			it.Description = "in " + path
+		}
+		it.Menu = nil
+	case rowMessage:
+		it.Label, it.Muted, it.Menu = r.title, true, nil
+	}
+	return it
+}
+
+func (v *View) headerItem(r row) list.Item {
+	it := list.Item{Label: r.title, Strong: true, Count: r.count}
+	if r.total > allSectionLimit && v.scope == ScopeAll {
+		it.Trailing = func(c *ui.Context) {
+			if action.Button(c, "Show all "+formatCount(r.total), action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "all-" + r.title}).Clicked() {
 				v.switchScope(r.scope)
 			}
 		}
-	})
-	if el.RowClicked() && r.scope != v.scope && v.scope == ScopeAll {
-		v.switchScope(r.scope)
 	}
-}
-
-func (v *View) branchView(lr ui.ListRow, r row) {
-	c := lr.Context
-	sel := lr.Selected()
-	el := v.box(lr, r).Role(ui.RoleTreeItem).Level(r.depth + 1).Expanded(r.open)
-	el.Children(func() {
-		chevron(c, r.open, sel)
-		switch r.kind {
-		case rowFolder:
-			folderIcon(c, r.title, r.open)
-			ui.Text(c, r.title).FontSize(bodyFont).SingleLine().Shrink(1).MinWidth(0)
-		default:
-			fileIcon(c, r.title)
-			ui.Text(c, r.title).FontSize(bodyFont).SingleLine().Bold().Shrink(0)
-			if r.detail != "" && (r.kind == rowGroup || v.st.ListView) {
-				mutedText(c, r.detail, sel).SingleLine().TruncateStart().Shrink(1).MinWidth(0)
+	if v.scope == ScopeAll {
+		it.OnClick = func() {
+			if r.scope != v.scope {
+				v.switchScope(r.scope)
 			}
 		}
-		ui.Box(c).Grow(1)
-		if lr.Hovered() || sel {
-			v.rowActions(c, r, sel)
-		}
-		if r.count > 0 {
-			countBadge(c, r.count, sel)
-		}
-	})
-	if el.RowClicked() {
-		v.toggle(r.key)
 	}
-	if r.kind == rowFile && el.RowDoubleClicked() {
-		v.activateRow(lr.Index, OpenOptions{Focus: true})
-	}
-	el.ContextMenu(func(m *ui.Menu) { v.rowMenu(c, m, r) })
+	return it
 }
 
-func (v *View) matchView(lr ui.ListRow, r row) {
-	c := lr.Context
-	t := c.Theme()
-	sel := lr.Selected()
+func (v *View) matchItem(c *ui.Context, it *list.Item, r row, i int) {
 	if r.match >= len(r.file.matches) {
 		return
 	}
+	pal := token.Of(c)
 	m := r.file.matches[r.match]
 	replacing := v.scope == ScopeText && v.st.ShowReplace && v.text.matcher != nil
 	replacement := ""
 	if replacing {
 		replacement = v.replacement().Expand(m.Matched, m.Groups)
 	}
-	el := v.box(lr, r).Role(ui.RoleTreeItem).Level(r.depth + 1)
-	el.Children(func() {
-		ui.Text(c, strconv.Itoa(m.Start.Line+1)).FontSize(tinyFont).SingleLine().TextColor(mutedColor(t, sel)).Width(lineNumWidth).TextAlign(ui.End).Shrink(0)
-		ui.RichText(c, matchSpans(t, m, replacement, replacing, sel)...).FontSize(smallFont).SingleLine().Grow(1).MinWidth(0)
-		if r.detail != "" {
-			mutedText(c, r.detail, sel).SingleLine().TruncateStart().Shrink(1).MinWidth(0)
-		}
-		if lr.Hovered() || sel {
-			v.rowActions(c, r, sel)
-		}
-	})
-	el.ContextMenu(func(m *ui.Menu) { v.rowMenu(c, m, r) })
-	if el.RowDoubleClicked() {
-		v.activateRow(lr.Index, OpenOptions{Focus: true})
+	it.Leading = func(c *ui.Context) {
+		ui.Text(c, strconv.Itoa(m.Start.Line+1)).FontSize(token.TextCaption.Px()).SingleLine().TextColor(pal.Text.Secondary).
+			Width(token.LineNumberWidth.Px()).TextAlign(ui.End)
 	}
+	it.Rich = func(s list.Style) []ui.Span { return matchSpans(pal, s, m, replacement, replacing) }
+	it.Description = r.detail
+	it.OnDoubleClick = func() { v.activateRow(i, OpenOptions{Focus: true}) }
+	it.Actions = v.rowActions(r)
 }
 
-func (v *View) rowActions(c *ui.Context, r row, sel bool) {
+func (v *View) rowActions(r row) func(c *ui.Context) {
 	if v.scope != ScopeText {
-		return
+		return nil
 	}
-	key := r.key
-	if v.st.ShowReplace && (r.kind == rowMatch || r.kind == rowFile) {
-		if iconButtonOn(c, "replace-"+key, "Replace", icons.Replace, !v.canReplace(), sel).Clicked() {
-			if r.kind == rowMatch {
-				v.replaceMatch(r.file, r.match)
-			} else {
-				v.replaceFile(r.file)
+	replace := v.st.ShowReplace && (r.kind == rowMatch || r.kind == rowFile)
+	dismiss := r.canDismiss()
+	if !replace && !dismiss {
+		return nil
+	}
+	return func(c *ui.Context) {
+		if replace {
+			if action.IconButton(c, icons.Replace, "Replace", action.IconOptions{Disabled: !v.canReplace(), ID: "replace-" + r.key}).Clicked() {
+				if r.kind == rowMatch {
+					v.replaceMatch(r.file, r.match)
+				} else {
+					v.replaceFile(r.file)
+				}
+			}
+		}
+		if dismiss {
+			if action.IconButton(c, icons.Close, "Dismiss", action.IconOptions{ID: "dismiss-" + r.key}).Clicked() {
+				v.dismiss(r)
 			}
 		}
 	}
-	if r.canDismiss() {
-		if iconButtonOn(c, "dismiss-"+key, "Dismiss", icons.Close, false, sel).Clicked() {
-			v.dismiss(r)
+}
+
+func (v *View) resultItem(it *list.Item, r row, i int) {
+	res := r.res
+	it.Label, it.Matches = res.Label, res.Positions
+	switch res.Kind {
+	case everywhere.KindFile:
+		it.Leading = fileLeading(res.Label)
+		it.Description = res.Detail
+	case everywhere.KindSymbol:
+		it.Leading = symbolLeading(res)
+		it.Description = symbolDetail(res)
+	case everywhere.KindGitRef:
+		it.Icon, it.Description = icons.GitBranch, res.Detail
+	case everywhere.KindGitCommit:
+		it.Icon, it.Description = icons.Commit, res.Detail
+	}
+	it.Trailing = func(c *ui.Context) {
+		if res.Kind == everywhere.KindAction && res.Keys != "" {
+			badge.Keys(c, res.Keys)
 		}
+		if res.Open {
+			ui.Icon(c, icons.Dot).Size(token.DirtyDotSize.Px(), token.DirtyDotSize.Px()).TextColor(token.Of(c).Text.Secondary).Tooltip("Open in an editor").Shrink(0)
+		}
+	}
+	it.OnDoubleClick = func() { v.activateRow(i, OpenOptions{Focus: true}) }
+}
+
+func symbolDetail(res everywhere.Result) string {
+	text := res.Detail + ":" + itoa(res.Line+1)
+	if res.Container != "" {
+		text = res.Container + "  " + text
+	}
+	return text
+}
+
+func symbolLeading(res everywhere.Result) func(c *ui.Context) {
+	return func(c *ui.Context) {
+		badge.Tag(c, kindLetters[res.Symbol], badge.TagOptions{Tone: kindTone(res.Symbol), Tooltip: res.Symbol.String()})
 	}
 }
 
-func (v *View) resultView(lr ui.ListRow, r row) {
-	c := lr.Context
-	t := c.Theme()
-	sel := lr.Selected()
-	res := r.res
-	el := v.box(lr, r)
-	el.Children(func() {
-		switch res.Kind {
-		case everywhere.KindFile:
-			fileIcon(c, res.Label)
-		case everywhere.KindSymbol:
-			kindBadge(c, res, sel)
-		case everywhere.KindGitRef:
-			ui.Icon(c, icons.GitBranch).Size(iconSize, iconSize).TextColor(mutedColor(t, sel)).Shrink(0)
-		case everywhere.KindGitCommit:
-			ui.Icon(c, icons.Commit).Size(iconSize, iconSize).TextColor(mutedColor(t, sel)).Shrink(0)
-		}
-		ui.RichText(c, highlightSpans(t, res.Label, res.Positions, sel)...).FontSize(bodyFont).SingleLine().Shrink(0)
-		v.resultDetail(c, res, sel)
-		ui.Box(c).Grow(1)
-		if res.Kind == everywhere.KindAction && res.Keys != "" {
-			mutedText(c, res.Keys, sel).SingleLine().Shrink(0)
-		}
-		if res.Open {
-			ui.Icon(c, icons.Dot).Size(8, 8).TextColor(mutedColor(t, sel)).Tooltip("Open in an editor").Shrink(0)
-		}
-	})
-	el.ContextMenu(func(m *ui.Menu) { v.rowMenu(c, m, r) })
-	if el.RowDoubleClicked() {
-		v.activateRow(lr.Index, OpenOptions{Focus: true})
+func kindTone(k symbols.Kind) token.Tone {
+	switch k {
+	case symbols.Function, symbols.Method:
+		return token.ToneInfo
+	case symbols.Class, symbols.Struct, symbols.Interface, symbols.Enum, symbols.Type:
+		return token.ToneWarning
+	case symbols.Const, symbols.Var, symbols.Field:
+		return token.ToneSuccess
 	}
+	return token.ToneNeutral
 }

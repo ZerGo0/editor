@@ -11,7 +11,10 @@ import (
 
 func notificationsTester(p *PRs) *ui.Tester {
 	return ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).Fill().Children(func() { p.NotificationsView(c) })
+		ui.Column(c).Fill().Children(func() {
+			ui.Row(c).Children(func() { p.NotificationsActions(c) })
+			p.NotificationsView(c)
+		})
 		p.Overlay(c)
 	}, sideWidth, sideHeight)
 }
@@ -120,7 +123,7 @@ func TestNotificationsEmptyAndError(t *testing.T) {
 	hs.ready(t)
 	hs.h.pump(t, func() bool { return hs.p.notifs.loaded })
 	tt := notificationsTester(hs.p)
-	mustHaveText(t, tt, "You are all caught up. New pull request activity shows here.")
+	mustHaveText(t, tt, "You are all caught up")
 
 	failing := newHarness(t)
 	failing.be.errs["Notifications"] = &github.APIError{Status: 403, Message: "no scope"}

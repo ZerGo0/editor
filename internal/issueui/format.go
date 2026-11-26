@@ -10,26 +10,15 @@ import (
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
-	"github.com/egoist/mygo/ui"
 )
 
 const (
-	justNowLimit   = 45 * time.Second
-	hoursPerDay    = 24
-	daysPerWeek    = 7
-	daysPerYear    = 365
-	dotComHost     = "github.com"
-	issuesSegment  = "issues"
-	hexColorLength = 6
-	hexBase        = 16
-	colorChannels  = 3
-	luminanceRed   = 299
-	luminanceGreen = 587
-	luminanceBlue  = 114
-	luminanceScale = 1000
-	luminanceHalf  = 128
-	maxColorByte   = 255
-	opaqueAlpha    = 255
+	justNowLimit  = 45 * time.Second
+	hoursPerDay   = 24
+	daysPerWeek   = 7
+	daysPerYear   = 365
+	dotComHost    = "github.com"
+	issuesSegment = "issues"
 )
 
 var errBadIssueNumber = errors.New("Enter an issue number, such as 42 or #42.")
@@ -154,26 +143,6 @@ func detailTitle(number int, title string) string {
 	return fmt.Sprintf("#%d %s", number, title)
 }
 
-func labelColors(hex string, fallbackBG, fallbackFG ui.Color) (ui.Color, ui.Color) {
-	if len(hex) != hexColorLength {
-		return fallbackBG, fallbackFG
-	}
-	var rgb [colorChannels]int
-	for i := range rgb {
-		v, err := strconv.ParseUint(hex[i*2:i*2+2], hexBase, 8)
-		if err != nil {
-			return fallbackBG, fallbackFG
-		}
-		rgb[i] = int(v)
-	}
-	luminance := (rgb[0]*luminanceRed + rgb[1]*luminanceGreen + rgb[2]*luminanceBlue) / luminanceScale
-	fg := ui.RGBA(maxColorByte, maxColorByte, maxColorByte, opaqueAlpha)
-	if luminance > luminanceHalf {
-		fg = ui.RGBA(0, 0, 0, opaqueAlpha)
-	}
-	return ui.RGBA(uint8(rgb[0]), uint8(rgb[1]), uint8(rgb[2]), opaqueAlpha), fg
-}
-
 func isOpen(issue github.Issue) bool {
 	return issue.State == github.StateOpen
 }
@@ -183,13 +152,6 @@ func stateLabel(issue github.Issue) string {
 		return "Open"
 	}
 	return "Closed"
-}
-
-func stateColor(t *ui.Theme, issue github.Issue) ui.Color {
-	if isOpen(issue) {
-		return t.Success
-	}
-	return t.Accent
 }
 
 func milestoneTitle(issue github.Issue) string {

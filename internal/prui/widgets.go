@@ -1,121 +1,82 @@
 package prui
 
 import (
-	"strconv"
-
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	fontBody      = 12
-	fontSmall     = 11
-	fontTitle     = 16
-	fontBadge     = 10
-	iconSmall     = 12
-	iconMedium    = 14
-	buttonSize    = 24
-	rowPadX       = 10
-	rowPadY       = 6
-	cardPad       = 10
-	cardRadius    = 6
-	pillRadius    = 8
-	pillPadX      = 6
-	spacingSmall  = 4
-	spacingMedium = 8
-	spacingLarge  = 12
-	messagePad    = 16
-	messageGap    = 6
-	contentMax    = 960
-	checkRowGap   = 8
-)
+const retryLabel = "Retry"
 
-func iconButton(c *ui.Context, key, label string, svg *ui.SVG) ui.Element {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(key)).Size(buttonSize, buttonSize).Radius(cardRadius).Center().
-		TextColor(t.TextMuted).Label(label).Tooltip(label)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
-	}
-	b.Children(func() { ui.Icon(c, svg).Size(iconMedium, iconMedium) })
-	return b
-}
-
-func pill(c *ui.Context, text string, bg ui.Color) ui.Element {
-	return ui.Text(c, text).FontSize(fontBadge).Bold().SingleLine().TextColor(c.Theme().AccentText).Background(bg).Radius(pillRadius).Padding(1, pillPadX).Shrink(0)
-}
-
-func mutedPill(c *ui.Context, text string) ui.Element {
-	t := c.Theme()
-	return ui.Text(c, text).FontSize(fontBadge).SingleLine().TextColor(t.TextMuted).Background(t.SurfacePressed).Radius(pillRadius).Padding(1, pillPadX).Shrink(0)
-}
-
-func stateColor(t *ui.Theme, pr github.PullRequest) ui.Color {
+func stateTone(pr github.PullRequest) token.Tone {
 	switch prStateLabel(pr) {
 	case prStateMerged:
-		return t.Accent
+		return token.ToneInfo
 	case prStateClosed:
-		return t.Danger
+		return token.ToneError
 	case prStateDraft:
-		return t.TextMuted
+		return token.ToneNeutral
 	}
-	return t.Success
+	return token.ToneSuccess
+}
+
+func stateTag(c *ui.Context, pr github.PullRequest) ui.Element {
+	return badge.Tag(c, prStateLabel(pr), badge.TagOptions{Tone: stateTone(pr)})
+}
+
+func mutedTag(c *ui.Context, text string) ui.Element {
+	return badge.Tag(c, text, badge.TagOptions{})
+}
+
+func branchChip(c *ui.Context, name string) ui.Element {
+	return badge.Tag(c, name, badge.TagOptions{Icon: icons.GitBranch, Tooltip: "Branch"})
+}
+
+func checkAppearance(state checkState) (*ui.SVG, token.Tone, bool) {
+	switch state {
+	case checkSuccess:
+		return icons.Check, token.ToneSuccess, true
+	case checkFailure:
+		return icons.Error, token.ToneError, true
+	case checkPending:
+		return icons.Dot, token.ToneWarning, true
+	}
+	return nil, token.ToneNeutral, false
 }
 
 func checkIcon(c *ui.Context, state checkState) {
-	t := c.Theme()
-	var svg *ui.SVG
-	var color ui.Color
-	switch state {
-	case checkSuccess:
-		svg, color = icons.Check, t.Success
-	case checkFailure:
-		svg, color = icons.Error, t.Danger
-	case checkPending:
-		svg, color = icons.Dot, t.Warning
-	default:
+	svg, tone, ok := checkAppearance(state)
+	if !ok {
 		return
 	}
-	ui.Icon(c, svg).Size(iconSmall, iconSmall).TextColor(color).Shrink(0).Label(checkStateLabel(state))
+	ui.Icon(c, svg).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(token.Of(c).Tone(tone)).Shrink(0).Label(checkStateLabel(state))
 }
 
 func mutedText(c *ui.Context, text string) ui.Element {
-	return ui.Text(c, text).FontSize(fontSmall).TextColor(c.Theme().TextMuted)
+	return design.Text(c, text, token.TextCaption)
 }
 
-func loadingRow(c *ui.Context, text string) {
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(rowPadY, rowPadX).Children(func() {
-		ui.Spinner(c).Label(text)
-		mutedText(c, text)
-	})
+func errorNotice(c *ui.Context, err error, retry func()) {
+	feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: errorText(err), Action: retryLabel, OnAction: retry})
 }
 
-func errorBlock(c *ui.Context, err error, retry func()) {
-	t := c.Theme()
-	ui.Column(c).Gap(messageGap).Padding(rowPadY, rowPadX).FillWidth().Children(func() {
-		ui.Text(c, errorText(err)).FontSize(fontBody).TextColor(t.Danger)
-		ui.Button(c, "Retry").OnClick(retry)
-	})
+func smallButton(c *ui.Context, label string, disabled bool) ui.Element {
+	return action.Button(c, label, action.ButtonOptions{Small: true, Disabled: disabled})
 }
 
-func card(c *ui.Context, title string, count int, body func()) {
-	cardWith(c, title, count, nil, body)
+func ghostButton(c *ui.Context, label, id string) ui.Element {
+	return action.Button(c, label, action.ButtonOptions{Variant: action.Ghost, Small: true, ID: id})
 }
 
-func cardWith(c *ui.Context, title string, count int, extra, body func()) {
-	t := c.Theme()
-	ui.Column(c).FillWidth().Radius(cardRadius).Border(1, t.Border).Children(func() {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(spacingMedium, cardPad).FillWidth().Background(t.Surface).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-			ui.Text(c, title).Bold().FontSize(fontBody)
-			if count > 0 {
-				mutedPill(c, strconv.Itoa(count))
-			}
-			ui.Box(c).Grow(1)
-			if extra != nil {
-				extra()
-			}
-		})
-		ui.Column(c).Gap(spacingMedium).Padding(cardPad).FillWidth().Children(body)
-	})
+func options(values []string) []action.Option[string] {
+	out := make([]action.Option[string], len(values))
+	for i, v := range values {
+		out[i] = action.Option[string]{Value: v, Label: v}
+	}
+	return out
 }

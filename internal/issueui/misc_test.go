@@ -10,7 +10,6 @@ import (
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
-	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -123,23 +122,6 @@ func TestRelativeTime(t *testing.T) {
 	}
 	if relativeTime(testNow, time.Time{}) != "" {
 		t.Error("a zero time must give no text")
-	}
-}
-
-func TestLabelColors(t *testing.T) {
-	fallbackBG, fallbackFG := ui.RGBA(1, 2, 3, 255), ui.RGBA(4, 5, 6, 255)
-	bg, fg := labelColors("zzzzzz", fallbackBG, fallbackFG)
-	if bg != fallbackBG || fg != fallbackFG {
-		t.Error("invalid hex must use the fallback")
-	}
-	if bg, fg := labelColors("", fallbackBG, fallbackFG); bg != fallbackBG || fg != fallbackFG {
-		t.Error("empty hex must use the fallback")
-	}
-	if _, fg := labelColors("ffffff", fallbackBG, fallbackFG); fg != ui.RGBA(0, 0, 0, 255) {
-		t.Errorf("light label text %v", fg)
-	}
-	if bg, fg := labelColors("000000", fallbackBG, fallbackFG); fg != ui.RGBA(255, 255, 255, 255) || bg != ui.RGBA(0, 0, 0, 255) {
-		t.Errorf("dark label %v %v", bg, fg)
 	}
 }
 

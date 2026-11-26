@@ -1,6 +1,8 @@
 package issueui
 
 import (
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -8,6 +10,8 @@ const (
 	ghInstallURL    = "https://cli.github.com"
 	ghLoginCommand  = "gh auth login"
 	gitRemoteSample = "git remote add origin https://github.com/OWNER/REPO.git"
+	copyCommand     = "Copy Command"
+	installLink     = "Get the GitHub CLI"
 )
 
 type stateMessage struct {
@@ -45,26 +49,18 @@ func (i *Issues) stateMessage() stateMessage {
 
 func (i *Issues) stateView(c *ui.Context) {
 	m := i.stateMessage()
-	t := c.Theme()
-	ui.Column(c).FillWidth().Gap(spacingMedium).Padding(messagePad).Children(func() {
+	ui.Column(c).FillWidth().Children(func() {
 		if m.spin {
-			ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Children(func() {
-				ui.Spinner(c).Label(m.title)
-				ui.Text(c, m.title).FontSize(fontBody)
-			})
+			feedback.Loading(c, m.title)
 			return
 		}
-		ui.Text(c, m.title).Bold().FontSize(fontBody)
-		ui.Text(c, m.detail).FontSize(fontSmall).TextColor(t.TextMuted)
-		if m.command != "" {
-			ui.Text(c, m.command).FontSize(fontSmall).Font("monospace").Selectable().Background(t.Surface).Radius(cardRadius).Padding(spacingSmall, spacingMedium)
-			ui.Button(c, "Copy Command").OnClick(func() { c.WriteClipboard(m.command) })
+		o := feedback.EmptyOptions{Icon: icons.Github, Title: m.title, Message: m.detail, Code: m.command, Action: m.retry, OnAction: i.connect}
+		switch {
+		case m.link != "":
+			o.Link, o.OnLink = installLink, func() { openExternal(c, m.link) }
+		case m.command != "":
+			o.Link, o.OnLink = copyCommand, func() { c.WriteClipboard(m.command) }
 		}
-		if m.link != "" {
-			ui.Link(c, "Get the GitHub CLI", m.link)
-		}
-		if m.retry != "" {
-			ui.Button(c, m.retry).OnClick(i.connect)
-		}
+		feedback.Empty(c, o)
 	})
 }

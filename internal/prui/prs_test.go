@@ -19,7 +19,10 @@ const (
 
 func sideTester(p *PRs) *ui.Tester {
 	return ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).Fill().Children(func() { p.SideView(c) })
+		ui.Column(c).Fill().Children(func() {
+			ui.Row(c).Children(func() { p.SideActions(c) })
+			p.SideView(c)
+		})
 		p.Overlay(c)
 	}, sideWidth, sideHeight)
 }
@@ -49,7 +52,7 @@ func TestStateMessages(t *testing.T) {
 		{"no repo", func(hs *harness) { hs.open = fmt.Errorf("%w: /x", git.ErrNotRepo) }, []string{"No Git repository", "Open a folder that is a Git repository"}},
 		{"no remote", func(hs *harness) { hs.local.remotes = nil }, []string{"No GitHub remote", "git remote add origin"}},
 		{"no gh", func(hs *harness) { hs.token = github.ErrNoGH }, []string{"GitHub CLI not found", "Install the GitHub CLI and run gh auth login"}},
-		{"not logged in", func(hs *harness) { hs.token = github.ErrNotLoggedIn }, []string{"Sign in to GitHub with gh auth login", "Copy Command"}},
+		{"not logged in", func(hs *harness) { hs.token = github.ErrNotLoggedIn }, []string{"Sign in to GitHub", ghLoginCommand, "Copy Command"}},
 		{"git error", func(hs *harness) { hs.open = errors.New("boom") }, []string{"Cannot load pull requests", "boom", "Retry"}},
 	}
 	for _, tc := range cases {
@@ -93,7 +96,7 @@ func TestUnauthorizedResponseShowsSignIn(t *testing.T) {
 	tt := sideTester(hs.p)
 	hs.h.pump(t, func() bool { return hs.p.phase == phaseNotLoggedIn })
 	tt.Frame()
-	mustHaveText(t, tt, "Sign in to GitHub with gh auth login")
+	mustHaveText(t, tt, "Sign in to GitHub")
 }
 
 func TestSideViewSections(t *testing.T) {
@@ -143,8 +146,8 @@ func TestPRRowShowsDraftAndChecks(t *testing.T) {
 	hs.h.pump(t, func() bool { return hs.p.side.review.loaded })
 	tt.Frame()
 	mustHaveText(t, tt, "Draft", "Draft work")
-	if a, ok := tt.Access("Checks failed"); !ok || a.Name != "Checks failed" {
-		t.Errorf("check icon not named: %+v %v", a, ok)
+	if _, ok := tt.Access("Draft work, #31 by alice, Checks failed"); !ok {
+		t.Error("the check state is not part of the row name")
 	}
 }
 
@@ -196,7 +199,7 @@ func TestEmptySectionSaysWhatToDo(t *testing.T) {
 	tt := sideTester(hs.p)
 	hs.h.pump(t, func() bool { return hs.p.side.review.loaded })
 	tt.Frame()
-	mustHaveText(t, tt, "No pull requests. Press refresh to check again.")
+	mustHaveText(t, tt, "No pull requests")
 }
 
 func TestCreateRowWhenBranchHasNoPR(t *testing.T) {
@@ -408,5 +411,50 @@ func TestHeaderDoubleClickTogglesOnceAndEnterToggles(t *testing.T) {
 	tt.Key(0, ui.KeyEnter)
 	if hs.p.side.assigned.open {
 		t.Error("Enter did not toggle the selected header")
+	}
+}
+
+func TestStateViewGatesTheWholeGitHubView(t *testing.T) {
+	hs := newHarness(t)
+	hs.token = github.ErrNotLoggedIn
+	hs.start(t)
+	tt := ui.NewTester(func(c *ui.Context) {
+		if hs.p.StateView(c) {
+			return
+		}
+		ui.Text(c, "sections")
+	}, sideWidth, sideHeight)
+	mustHaveText(t, tt, "Sign in to GitHub", "Copy Command")
+	if tt.HasText("sections") {
+		t.Error("sections drawn behind the view-level state")
+	}
+	ready := newHarness(t)
+	ready.ready(t)
+	rt := ui.NewTester(func(c *ui.Context) {
+		if ready.p.StateView(c) {
+			return
+		}
+		ui.Text(c, "sections")
+	}, sideWidth, sideHeight)
+	mustHaveText(t, rt, "sections")
+}
+
+func TestHeaderRowsOpenAndCloseWithArrowKeys(t *testing.T) {
+	hs := newHarness(t)
+	hs.ready(t)
+	tt := sideTester(hs.p)
+	hs.h.pump(t, func() bool { return hs.p.side.review.loaded })
+	tt.Frame()
+	mustClick(t, tt, "Assigned to Me")
+	if !hs.p.side.assigned.open {
+		t.Fatal("click did not open the section")
+	}
+	tt.Key(0, ui.KeyLeft)
+	if hs.p.side.assigned.open {
+		t.Error("Left did not close the section")
+	}
+	tt.Key(0, ui.KeyRight)
+	if !hs.p.side.assigned.open {
+		t.Error("Right did not open the section")
 	}
 }

@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	annotationCharsPerLine = 72
-	annotationLineHeight   = 17
-	annotationCommentHead  = 24
-	annotationCommentPad   = 10
-	annotationChrome       = 48
-	annotationCollapsed    = 34
+	annotationCharsPerLine = 66
+	annotationLineHeight   = 18
+	annotationCommentHead  = 28
+	annotationCommentPad   = 4
+	annotationChrome       = 52
+	annotationTagRow       = 26
+	annotationCollapsed    = 40
 )
 
 var ErrBinaryFile = errors.New("prui: binary file, no text diff to show")
@@ -58,6 +59,9 @@ func threadHeight(t github.Thread, expanded bool) float32 {
 		return annotationCollapsed
 	}
 	h := float32(annotationChrome)
+	if t.Resolved || t.Outdated {
+		h += annotationTagRow
+	}
 	for _, c := range t.Comments {
 		h += annotationCommentHead + annotationCommentPad + float32(wrappedLines(c.Body)*annotationLineHeight)
 	}

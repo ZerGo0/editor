@@ -1,89 +1,60 @@
 package issueui
 
 import (
-	"strconv"
-
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	fontBody      = 12
-	fontSmall     = 11
-	fontTitle     = 16
-	fontBadge     = 10
-	iconSmall     = 12
-	iconMedium    = 14
-	buttonSize    = 24
-	rowPadX       = 10
-	rowPadY       = 6
-	cardPad       = 10
-	cardRadius    = 6
-	pillRadius    = 8
-	pillPadX      = 6
-	spacingSmall  = 4
-	spacingMedium = 8
-	spacingLarge  = 12
-	messagePad    = 16
-	messageGap    = 6
-	contentMax    = 960
-	rowIconGap    = 2
-)
+const retryLabel = "Retry"
 
-func iconButton(c *ui.Context, key, label string, svg *ui.SVG) ui.Element {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(key)).Size(buttonSize, buttonSize).Radius(cardRadius).Center().
-		TextColor(t.TextMuted).Label(label).Tooltip(label)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
+func stateTone(issue github.Issue) token.Tone {
+	if isOpen(issue) {
+		return token.ToneSuccess
 	}
-	b.Children(func() { ui.Icon(c, svg).Size(iconMedium, iconMedium) })
-	return b
+	return token.ToneInfo
 }
 
-func pill(c *ui.Context, text string, bg ui.Color) ui.Element {
-	return ui.Text(c, text).FontSize(fontBadge).Bold().SingleLine().TextColor(c.Theme().AccentText).Background(bg).Radius(pillRadius).Padding(1, pillPadX).Shrink(0)
+func stateTag(c *ui.Context, issue github.Issue) ui.Element {
+	return badge.Tag(c, stateLabel(issue), badge.TagOptions{Tone: stateTone(issue)})
 }
 
-func mutedPill(c *ui.Context, text string) ui.Element {
-	t := c.Theme()
-	return ui.Text(c, text).FontSize(fontBadge).SingleLine().TextColor(t.TextMuted).Background(t.SurfacePressed).Radius(pillRadius).Padding(1, pillPadX).Shrink(0)
+func mutedTag(c *ui.Context, text string) ui.Element {
+	return badge.Tag(c, text, badge.TagOptions{})
 }
 
-func labelPill(c *ui.Context, label github.Label) ui.Element {
-	t := c.Theme()
-	bg, fg := labelColors(label.Color, t.SurfacePressed, t.TextMuted)
-	return ui.Text(c, label.Name).FontSize(fontBadge).SingleLine().TextColor(fg).Background(bg).Radius(pillRadius).Padding(1, pillPadX).Shrink(0)
+func labelTag(c *ui.Context, label github.Label) ui.Element {
+	return badge.Tag(c, label.Name, badge.TagOptions{Hex: label.Color})
 }
 
 func mutedText(c *ui.Context, text string) ui.Element {
-	return ui.Text(c, text).FontSize(fontSmall).TextColor(c.Theme().TextMuted)
+	return design.Text(c, text, token.TextCaption)
 }
 
-func loadingRow(c *ui.Context, text string) {
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(rowPadY, rowPadX).Children(func() {
-		ui.Spinner(c).Label(text)
-		mutedText(c, text)
-	})
+func errorNotice(c *ui.Context, err error, retry func()) {
+	feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: errorText(err), Action: retryLabel, OnAction: retry})
 }
 
-func errorBlock(c *ui.Context, err error, retry func()) {
-	t := c.Theme()
-	ui.Column(c).Gap(messageGap).Padding(rowPadY, rowPadX).FillWidth().Children(func() {
-		ui.Text(c, errorText(err)).FontSize(fontBody).TextColor(t.Danger)
-		ui.Button(c, "Retry").OnClick(retry)
-	})
+func smallButton(c *ui.Context, label string, disabled bool) ui.Element {
+	return action.Button(c, label, action.ButtonOptions{Small: true, Disabled: disabled})
 }
 
-func card(c *ui.Context, title string, count int, body func()) {
-	t := c.Theme()
-	ui.Column(c).FillWidth().Radius(cardRadius).Border(1, t.Border).Children(func() {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(spacingMedium, cardPad).FillWidth().Background(t.Surface).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-			ui.Text(c, title).Bold().FontSize(fontBody)
-			if count > 0 {
-				mutedPill(c, strconv.Itoa(count))
-			}
-		})
-		ui.Column(c).Gap(spacingMedium).Padding(cardPad).FillWidth().Children(body)
-	})
+func ghostButton(c *ui.Context, label, id string) ui.Element {
+	return action.Button(c, label, action.ButtonOptions{Variant: action.Ghost, Small: true, ID: id})
+}
+
+func primaryButton(c *ui.Context, label string, disabled bool) ui.Element {
+	return action.Button(c, label, action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: disabled})
+}
+
+func options(values []string) []action.Option[string] {
+	out := make([]action.Option[string], len(values))
+	for i, v := range values {
+		out[i] = action.Option[string]{Value: v, Label: v}
+	}
+	return out
 }

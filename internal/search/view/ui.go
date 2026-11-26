@@ -3,11 +3,17 @@ package searchview
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
+	flagCount         = 3
 	labelFilesInclude = "files to include"
 	labelFilesExclude = "files to exclude"
 	labelSearch       = "Search"
@@ -82,26 +88,15 @@ func (v *View) captureSelection() {
 }
 
 func (v *View) chips(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c).FillWidth().Padding(0, sidePad, 6, sidePad).Gap(4).Wrap().Role(ui.RoleTabList).Label("Search scope").Children(func() {
+	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapControl.Px(), token.PadRow.Px()).Gap(token.GapTight.Px()).Wrap().
+		Role(ui.RoleTabList).Label("Search scope").Children(func() {
 		for s := ScopeAll; s < scopeCount; s++ {
-			active := s == v.scope
-			b := ui.ButtonBase(c.Key("scope-"+s.String())).Height(buttonSize-2).Padding(0, 8).Radius(chipRadius).Gap(4).AlignItems(ui.Center).
-				Role(ui.RoleTab).AccessSelected(active).Label(s.String()).Tooltip(s.String() + " (" + scopeShortcut(s) + ")")
-			switch {
-			case active:
-				b.Background(t.Accent.Alpha(tintAlpha)).BorderWidth(1).BorderColor(t.Accent)
-			case b.Hovered():
-				b.Background(t.SurfaceHover)
+			count := ""
+			if n := v.scopeCount(s); n > 0 {
+				count = formatCount(n)
 			}
-			n := v.scopeCount(s)
-			b.Children(func() {
-				ui.Text(c, s.String()).FontSize(smallFont).SingleLine().TextColor(ifColor(active, t.Text, t.TextMuted))
-				if n > 0 {
-					ui.Text(c, formatCount(n)).FontSize(tinyFont).SingleLine().TextColor(t.TextMuted)
-				}
-			})
-			if b.Clicked() {
+			chip := action.Chip(c, s.String(), action.ChipOptions{Active: s == v.scope, Count: count, Keys: scopeShortcut(s), ID: "scope-" + s.String()})
+			if chip.Clicked() {
 				v.switchScope(s)
 				v.field.Focus()
 			}
@@ -132,31 +127,35 @@ func (v *View) scopeCount(s Scope) int {
 func (v *View) placeholder() string {
 	switch v.scope {
 	case ScopeFiles:
-		return "Go to file (add :line to jump)"
+		return "Go to file"
 	case ScopeSymbols:
 		if v.editorOnly {
 			return "Go to symbol in editor"
 		}
-		return "Go to symbol in workspace"
+		return "Go to symbol"
 	case ScopeText:
-		return "Search (Shift+Enter for a new line)"
+		return "Search"
 	case ScopeActions:
 		return "Run an action"
 	case ScopeGit:
 		return "Branches, tags and commits"
 	}
-	return "Search files, symbols, text and actions"
+	return "Search everywhere"
+}
+
+func (v *View) fieldInset() float32 {
+	return token.PadRow.Px() + token.IconButtonSize.Px() + token.GapTight.Px()
 }
 
 func (v *View) fieldBlock(c *ui.Context) {
 	text := v.scope == ScopeText
-	ui.Row(c).FillWidth().Padding(0, sidePad, 4, sidePad).Gap(2).AlignItems(ui.Start).Children(func() {
+	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), token.PadRow.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Start).Children(func() {
 		if text {
-			chev := icons.ChevronRight
+			chevron := icons.ChevronRight
 			if v.st.ShowReplace {
-				chev = icons.ChevronDown
+				chevron = icons.ChevronDown
 			}
-			if iconButton(c, "toggle-replace", "Toggle Replace", chev, false).Width(chevronWidth).Clicked() {
+			if action.IconButton(c, chevron, "Toggle Replace", action.IconOptions{ID: "toggle-replace"}).Margin(token.GapTight.Px(), 0, 0, 0).Clicked() {
 				v.st.ShowReplace = !v.st.ShowReplace
 			}
 		}
@@ -168,30 +167,22 @@ func (v *View) fieldBlock(c *ui.Context) {
 	if text && v.st.ShowFilters {
 		v.filterFields(c)
 	}
-	if text && v.text.err != "" {
-		ui.Text(c, v.text.err).FontSize(tinyFont).TextColor(c.Theme().Danger).Padding(0, sidePad, 4, sidePad+chevronWidth+2).Role(ui.RoleAlert)
-	}
-}
-
-func (v *View) boxBorder(c *ui.Context, handle *ui.Handle, invalid bool) ui.Color {
-	t := c.Theme()
-	switch {
-	case invalid:
-		return t.Danger
-	case handle.Focused(c):
-		return t.Accent
-	}
-	return t.Border
 }
 
 func (v *View) searchBox(c *ui.Context) {
-	t := c.Theme()
 	text := v.scope == ScopeText
-	box := ui.Row(c.Key("search-box")).Grow(1).MinWidth(0).Background(t.Surface).Radius(fieldRadius).BorderWidth(1).
-		BorderColor(v.boxBorder(c, &v.field, text && v.text.err != "")).Padding(1, 2, 1, 6).AlignItems(ui.Start).Role(ui.RoleSearch)
-	box.Children(func() {
-		in := ui.TextAreaBase(c, &v.st.Query).Bind(&v.field).Label(labelSearch).Placeholder(v.placeholder()).Lines(1, maxFieldLines).
-			FontSize(bodyFont).Grow(1).MinWidth(0).Padding(3, 2, 3, 0).OnTextKey(v.fieldKey)
+	o := field.AreaOptions{Placeholder: v.placeholder(), MaxLines: maxFieldLines}
+	flags := [flagCount]bool{v.st.MatchCase, v.st.WholeWord, v.st.Regex}
+	if text {
+		o.Error = v.text.err
+		o.Toggles = []field.Toggle{
+			{Icon: icons.CaseSensitive, Label: "Match Case", Keys: "⌥⌘C", On: &v.st.MatchCase},
+			{Icon: icons.WholeWord, Label: "Match Whole Word", Keys: "⌥⌘W", On: &v.st.WholeWord},
+			{Icon: icons.Regex, Label: "Use Regular Expression", Keys: "⌥⌘R", On: &v.st.Regex},
+		}
+	}
+	ui.Column(c.Key("search-field")).Grow(1).MinWidth(0).Children(func() {
+		in := field.TextArea(c, labelSearch, &v.st.Query, o).Bind(&v.field).OnTextKey(v.fieldKey)
 		if v.pendingNewline {
 			v.pendingNewline = false
 			from, to := in.TextSelection()
@@ -200,54 +191,42 @@ func (v *View) searchBox(c *ui.Context) {
 		if in.Changed() {
 			v.queryEdited()
 		}
-		if !text {
-			return
-		}
-		ui.Row(c).Gap(1).Shrink(0).Padding(1, 0).Children(func() {
-			changed := flagToggle(c, &v.st.MatchCase, icons.CaseSensitive, "Match Case", "Match Case (⌥⌘C)")
-			changed = flagToggle(c, &v.st.WholeWord, icons.WholeWord, "Match Whole Word", "Match Whole Word (⌥⌘W)") || changed
-			changed = flagToggle(c, &v.st.Regex, icons.Regex, "Use Regular Expression", "Use Regular Expression (⌥⌘R)") || changed
-			if changed {
-				v.searchSoon(0)
-			}
-		})
 	})
+	if text && flags != [flagCount]bool{v.st.MatchCase, v.st.WholeWord, v.st.Regex} {
+		v.searchSoon(0)
+	}
 }
 
 func (v *View) replaceRow(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c).FillWidth().Padding(0, sidePad, 4, sidePad+chevronWidth+2).Gap(2).AlignItems(ui.Start).Children(func() {
-		box := ui.Row(c.Key("replace-box")).Grow(1).MinWidth(0).Background(t.Surface).Radius(fieldRadius).BorderWidth(1).
-			BorderColor(v.boxBorder(c, &v.replaceField, false)).Padding(1, 2, 1, 6).AlignItems(ui.Start)
-		box.Children(func() {
-			in := ui.TextAreaBase(c, &v.st.Replace).Bind(&v.replaceField).Label(labelReplace).Placeholder(labelReplace).Lines(1, maxFieldLines).
-				FontSize(bodyFont).Grow(1).MinWidth(0).Padding(3, 2, 3, 0).OnTextKey(v.replaceKey)
+	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), v.fieldInset()).Gap(token.GapTight.Px()).AlignItems(ui.Start).Children(func() {
+		ui.Column(c.Key("replace-field")).Grow(1).MinWidth(0).Children(func() {
+			o := field.AreaOptions{Placeholder: labelReplace, MaxLines: maxFieldLines, Toggles: []field.Toggle{
+				{Icon: icons.PreserveCase, Label: "Preserve Case", Keys: "⌥⌘P", On: &v.st.PreserveCase},
+			}}
+			in := field.TextArea(c, labelReplace, &v.st.Replace, o).Bind(&v.replaceField).OnTextKey(v.replaceKey)
 			if v.pendingReplaceNewline {
 				v.pendingReplaceNewline = false
 				from, to := in.TextSelection()
 				in.ReplaceText(from, to, "\n")
 			}
-			ui.Row(c).Shrink(0).Padding(1, 0).Children(func() {
-				flagToggle(c, &v.st.PreserveCase, icons.PreserveCase, "Preserve Case", "Preserve Case (⌥⌘P)")
-			})
 		})
-		if iconButton(c, "replace-all", "Replace All", icons.ReplaceAll, !v.canReplace()).Clicked() {
+		if action.IconButton(c, icons.ReplaceAll, "Replace All", action.IconOptions{Disabled: !v.canReplace()}).Margin(token.GapTight.Px(), 0, 0, 0).Clicked() {
 			v.ReplaceAll()
 		}
 	})
 }
 
 func (v *View) filterFields(c *ui.Context) {
-	t := c.Theme()
 	changed := false
-	ui.Column(c).FillWidth().Padding(0, sidePad, 6, sidePad+chevronWidth+2).Gap(4).Children(func() {
-		ui.Text(c, labelFilesInclude).FontSize(tinyFont).TextColor(t.TextMuted)
-		changed = ui.TextInput(c.Key("include"), &v.st.Include).Bind(&v.includeField).Label(labelFilesInclude).Placeholder("e.g. src/**/*.go, ./internal").FontSize(smallFont).FillWidth().Changed() || changed
-		changed = ui.Checkbox(c, &v.st.OnlyOpen, "Search only in open editors").Label("Search only in open editors").Changed() || changed
-		ui.Text(c, labelFilesExclude).FontSize(tinyFont).TextColor(t.TextMuted)
-		changed = ui.TextInput(c.Key("exclude"), &v.st.Exclude).Label(labelFilesExclude).Placeholder("e.g. **/*.test.go, dist").FontSize(smallFont).FillWidth().Changed() || changed
+	ui.Column(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapControl.Px(), v.fieldInset()).Gap(token.GapInline.Px()).Children(func() {
+		design.Text(c, labelFilesInclude, token.TextCaption)
+		include := field.TextInput(c, labelFilesInclude, &v.st.Include, field.InputOptions{Placeholder: "e.g. src/**/*.go, ./internal", ID: "include"}).Bind(&v.includeField)
+		changed = include.Changed() || changed
+		changed = action.Checkbox(c, "Search only in open editors", &v.st.OnlyOpen, action.ChoiceOptions{}).Changed() || changed
+		design.Text(c, labelFilesExclude, token.TextCaption)
+		changed = field.TextInput(c, labelFilesExclude, &v.st.Exclude, field.InputOptions{Placeholder: "e.g. **/*.test.go, dist", ID: "exclude"}).Changed() || changed
 		use := !v.st.NoExcludes
-		if ui.Checkbox(c, &use, "Use exclude settings and ignore files").Label("Use exclude settings and ignore files").Changed() {
+		if action.Checkbox(c, "Use exclude settings and ignore files", &use, action.ChoiceOptions{}).Changed() {
 			v.st.NoExcludes = !use
 			changed = true
 		}
@@ -258,30 +237,30 @@ func (v *View) filterFields(c *ui.Context) {
 }
 
 func (v *View) statusRow(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c).FillWidth().MinHeight(buttonSize+4).Padding(0, sidePad, 0, sidePad+2).Gap(4).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).FillWidth().MinHeight(token.ToolbarHeight.Px()).Padding(0, token.PadRow.Px(), 0, token.PadView.Px()).Gap(token.GapInline.Px()).AlignItems(ui.Center).Children(func() {
 		v.statusMessage(c)
-		ui.Box(c).Grow(1)
+		design.Spacer(c)
 		v.headerActions(c)
 	})
 	if v.scope == ScopeText && v.text.truncated && !v.text.searching {
-		ui.Text(c, truncatedNotice).FontSize(tinyFont).TextColor(t.Warning).Padding(0, sidePad, 4, sidePad+2)
+		ui.Column(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), token.PadRow.Px()).Children(func() {
+			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: truncatedNotice})
+		})
 	}
 }
 
 func (v *View) statusMessage(c *ui.Context) {
-	t := c.Theme()
 	switch {
 	case v.text.searching && v.scope != ScopeAll:
-		ui.Spinner(c).Size(spinnerSize, spinnerSize).Label("Searching").Shrink(0)
-		ui.Text(c, "Searching…").FontSize(smallFont).TextColor(t.TextMuted).SingleLine()
-		if textButton(c, "cancel-search", "Cancel", false).Clicked() {
+		feedback.Spinner(c, "Searching").Shrink(0)
+		design.Text(c, "Searching…", token.TextLabel).SingleLine()
+		if action.Button(c, "Cancel", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "cancel-search"}).Clicked() {
 			v.CancelSearch()
 		}
 	case v.busy():
-		ui.Spinner(c).Size(spinnerSize, spinnerSize).Label("Loading").Shrink(0)
+		feedback.Spinner(c, "Loading").Shrink(0)
 	case v.scope == ScopeText && v.text.err == "" && strings.TrimSpace(v.st.Query) != "" && v.text.matcher != nil:
-		ui.Text(c, v.statusSummary()).FontSize(smallFont).TextColor(t.TextMuted).SingleLine().Role(ui.RoleStatus)
+		design.Text(c, v.statusSummary(), token.TextLabel).SingleLine().Role(ui.RoleStatus)
 	}
 }
 
@@ -294,10 +273,10 @@ func (v *View) statusSummary() string {
 
 func (v *View) headerActions(c *ui.Context) {
 	hasQuery := strings.TrimSpace(v.st.Query) != ""
-	if iconButton(c, "refresh", "Refresh", icons.Refresh, !hasQuery).Clicked() {
+	if action.IconButton(c, icons.Refresh, "Refresh", action.IconOptions{Disabled: !hasQuery, ID: "refresh"}).Clicked() {
 		v.Refresh()
 	}
-	if iconButton(c, "clear", "Clear Search Results", icons.ClearAll, !hasQuery && v.text.total == 0).Clicked() {
+	if action.IconButton(c, icons.ClearAll, "Clear Search Results", action.IconOptions{Disabled: !hasQuery && v.text.total == 0, ID: "clear"}).Clicked() {
 		v.ClearResults()
 	}
 	if v.hasBranches() {
@@ -305,7 +284,7 @@ func (v *View) headerActions(c *ui.Context) {
 		if !v.anyExpanded() {
 			label, svg = "Expand All", icons.ExpandAll
 		}
-		if iconButton(c, "collapse-all", label, svg, false).Clicked() {
+		if action.IconButton(c, svg, label, action.IconOptions{ID: "collapse-all"}).Clicked() {
 			v.toggleAll()
 		}
 	}
@@ -315,11 +294,11 @@ func (v *View) headerActions(c *ui.Context) {
 		if v.st.ListView {
 			label, svg = "View as Tree", icons.TreeView
 		}
-		if iconButton(c, "view-mode", label, svg, false).Clicked() {
+		if action.IconButton(c, svg, label, action.IconOptions{ID: "view-mode"}).Clicked() {
 			v.st.ListView = !v.st.ListView
 			v.rowsDirty = true
 		}
-		if iconButton(c, "toggle-filters", "Toggle Search Details", icons.More, false).Clicked() {
+		if action.IconButton(c, icons.More, "Toggle Search Details", action.IconOptions{Active: v.st.ShowFilters, ID: "toggle-filters"}).Clicked() {
 			v.st.ShowFilters = !v.st.ShowFilters
 		}
 	case ScopeSymbols:
@@ -327,7 +306,7 @@ func (v *View) headerActions(c *ui.Context) {
 		if v.st.SymbolsTree {
 			label, svg = "View as List", icons.ListView
 		}
-		if iconButton(c, "view-mode", label, svg, false).Clicked() {
+		if action.IconButton(c, svg, label, action.IconOptions{ID: "view-mode"}).Clicked() {
 			v.st.SymbolsTree = !v.st.SymbolsTree
 			v.rowsDirty = true
 		}

@@ -3,6 +3,8 @@ package prui
 import (
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/design/chrome"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -12,7 +14,6 @@ func (p *PRs) StatusItems(c *ui.Context) {
 		return
 	}
 	pr := p.current.pr
-	t := c.Theme()
 	state := p.checks[pr.Number]
 	label := fmt.Sprintf("Pull request #%d", pr.Number)
 	tip := fmt.Sprintf("#%d %s", pr.Number, pr.Title)
@@ -20,15 +21,16 @@ func (p *PRs) StatusItems(c *ui.Context) {
 		label += ", " + text
 		tip += "\n" + text
 	}
-	b := ui.ButtonBase(c.Key("pr-status")).Gap(spacingSmall).Padding(0, spacingSmall).Radius(spacingSmall).AlignItems(ui.Center).
-		TextColor(t.TextMuted).Label(label).Tooltip(tip)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
+	_, tone, _ := checkAppearance(state)
+	item := chrome.StatusItem(c, fmt.Sprintf("#%d", pr.Number), chrome.StatusOptions{Icon: icons.PullRequest, Tooltip: tip, Tone: statusTone(tone)}).Label(label)
+	if item.Clicked() {
+		p.openPR(pr.Number, pr)
 	}
-	b.Children(func() {
-		ui.Icon(c, icons.PullRequest).Size(iconSmall, iconSmall)
-		ui.Text(c, fmt.Sprintf("#%d", pr.Number)).FontSize(fontBody).SingleLine()
-		checkIcon(c, state)
-	})
-	b.OnClick(func() { p.openPR(pr.Number, pr) })
+}
+
+func statusTone(t token.Tone) token.Tone {
+	if t == token.ToneSuccess {
+		return token.ToneNeutral
+	}
+	return t
 }

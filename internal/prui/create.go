@@ -8,14 +8,21 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/detail"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	createFormWidth  = 720
-	createBodyHeight = 160
+	createViewTitle  = "Create Pull Request"
+	createBodyLines  = 8
 	templateMaxBytes = 64 << 10
 	compareListRows  = 8
 )
@@ -73,11 +80,11 @@ func (p *PRs) openCreate() {
 	if f == nil || f.branch.Name != p.branch.Name {
 		p.createForm = p.newCreateForm()
 	}
-	p.h.OpenView(createViewID, "Create Pull Request", func(c *ui.Context) { p.createView(c) })
+	p.h.OpenView(createViewID, createViewTitle, func(c *ui.Context) { p.createView(c) })
 }
 
 func (p *PRs) newCreateForm() *createForm {
-	f := &createForm{title: p.branch.Subject, milestones: map[string]int{}}
+	f := &createForm{title: p.branch.Subject, milestones: map[string]int{}, autoMergeLabel: autoMergeChoices[0]}
 	p.loadCreateBases(f)
 	p.loadTemplate(f)
 	return f
@@ -266,10 +273,9 @@ func (p *PRs) createView(c *ui.Context) {
 		return
 	}
 	f := p.createForm
-	t := c.Theme()
-	ui.Scroll(c).Fill().Background(t.Background).Children(func() {
-		ui.Column(c).Gap(spacingLarge).Padding(messagePad).MaxWidth(createFormWidth).FillWidth().Children(func() {
-			ui.Text(c, "Create Pull Request").FontSize(fontTitle).Bold()
+	detail.Page(c, func() {
+		detail.Body(c, createViewTitle, token.FormMaxWidth, func() {
+			design.Text(c, createViewTitle, token.TextHeading)
 			if f == nil {
 				mutedText(c, "Check out a branch, then open this view again.")
 				return
@@ -280,34 +286,27 @@ func (p *PRs) createView(c *ui.Context) {
 }
 
 func (p *PRs) createFields(c *ui.Context, f *createForm) {
-	t := c.Theme()
 	head := f.branch.Name
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Wrap().Gap(token.GapControl.Px()).Children(func() {
 		mutedText(c, "Compare").Shrink(0)
 		branchChip(c, head)
 		mutedText(c, "into").Shrink(0)
 		if f.loading {
-			ui.Spinner(c).Label("Loading branches")
+			feedback.Spinner(c, "Loading branches")
 		} else if len(f.bases) > 0 {
-			ui.Select(c.Key("base"), &f.base, f.bases).Label("Base branch")
+			action.Select(c, "Base branch", &f.base, options(f.bases), action.SelectOptions{ID: "base"})
 		}
 	})
 	if f.err != nil {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, errorText(f.err)).FontSize(fontSmall).TextColor(t.Danger)
-			ui.Button(c, "Retry").OnClick(func() { p.loadCreateBases(f) })
-		})
+		errorNotice(c, f.err, func() { p.loadCreateBases(f) })
 	} else if !f.loading && len(f.bases) == 0 {
-		mutedText(c, "No remote branches found. Fetch the remote, then retry.")
-		ui.Button(c, "Retry").OnClick(func() { p.loadCreateBases(f) })
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "No remote branches found. Fetch the remote, then retry.", Action: retryLabel, OnAction: func() { p.loadCreateBases(f) }})
 	}
-	ui.Column(c).Gap(spacingSmall).FillWidth().Children(func() {
-		mutedText(c, "Title")
-		ui.TextInput(c.Key("title"), &f.title).Placeholder("Pull request title").FillWidth().Label("Title")
+	detail.Field(c, "Title", func() {
+		field.TextInput(c, "Title", &f.title, field.InputOptions{Placeholder: "Pull request title", ID: "title"})
 	})
-	ui.Column(c).Gap(spacingSmall).FillWidth().Children(func() {
-		mutedText(c, "Description")
-		if ui.TextArea(c.Key("body"), &f.body).Placeholder("Describe the changes (Markdown is supported)").MinHeight(createBodyHeight).FillWidth().Label("Description").Changed() {
+	detail.Field(c, "Description", func() {
+		if field.TextArea(c, "Description", &f.body, field.AreaOptions{Placeholder: "Describe the changes (Markdown is supported)", MinLines: createBodyLines, ID: "body"}).Changed() {
 			f.typedBody = true
 		}
 	})
@@ -317,30 +316,28 @@ func (p *PRs) createFields(c *ui.Context, f *createForm) {
 		mutedText(c, "This branch has no upstream. It will be pushed to "+p.targetRemote()+" first.")
 	}
 	blocked := f.blocked()
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Justify(ui.End).FillWidth().Children(func() {
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Justify(ui.End).Gap(token.GapControl.Px()).Children(func() {
 		if f.busy != "" {
-			ui.Spinner(c).Label(f.busy)
+			feedback.Spinner(c, f.busy)
 			mutedText(c, f.busy+"...")
 		}
 		if blocked != "" {
 			mutedText(c, blocked)
 		}
-		ui.PrimaryButton(c, "Create").Disabled(blocked != "" || f.busy != "").OnClick(func() { p.submitCreate(f) })
+		action.Button(c, "Create", action.ButtonOptions{Variant: action.Primary, Disabled: blocked != "" || f.busy != ""}).OnClick(func() { p.submitCreate(f) })
 	})
 }
 
 func (p *PRs) createMetadata(c *ui.Context, f *createForm) {
-	line := func(title, edit string, action func(), values []string) {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().FillWidth().Children(func() {
-			mutedText(c, title).Width(statusLabelWidth).Shrink(0)
+	line := func(title, edit string, onClick func(), values []string) {
+		detail.Property(c, title, func(c *ui.Context) {
 			if len(values) == 0 {
 				mutedText(c, "None")
 			}
 			for _, v := range values {
-				mutedPill(c, v)
+				mutedTag(c, v)
 			}
-			ui.Button(c, edit).OnClick(action)
-		})
+		}, func(c *ui.Context) { smallButton(c, edit, false).OnClick(onClick) })
 	}
 	line("Reviewers", "Choose Reviewers", func() { p.pickFormUsers(f, "Reviewers", &f.reviewers) }, f.reviewers)
 	line("Assignees", "Choose Assignees", func() { p.pickFormUsers(f, "Assignees", &f.assignees) }, f.assignees)
@@ -350,12 +347,13 @@ func (p *PRs) createMetadata(c *ui.Context, f *createForm) {
 		milestone = []string{f.milestone}
 	}
 	line("Milestone", "Choose Milestone", func() { p.pickFormMilestone(f) }, milestone)
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().Children(func() {
-		ui.Switch(c.Key("draft"), &f.draft).Label("Create as draft")
-		ui.Text(c, "Create as draft").FontSize(fontBody)
-		ui.Checkbox(c.Key("assign-me"), &f.assignMe, "Assign to me")
-		ui.Select(c.Key("auto-merge"), &f.autoMergeLabel, autoMergeChoices).Label("Auto-merge")
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Wrap().Gap(token.GapSection.Px()).Children(func() {
+		action.Switch(c, "Create as draft", &f.draft, action.ChoiceOptions{ID: "draft"})
+		action.Checkbox(c, "Assign to me", &f.assignMe, action.ChoiceOptions{ID: "assign-me"})
 	})
+	detail.Property(c, "Auto-merge", func(c *ui.Context) {
+		action.Select(c, "Auto-merge", &f.autoMergeLabel, options(autoMergeChoices), action.SelectOptions{ID: "auto-merge"})
+	}, nil)
 }
 
 func (p *PRs) pickFormUsers(f *createForm, title string, target *[]string) {
@@ -408,32 +406,31 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 	if f.base != "" && f.base != f.cmpFor && !f.cmpLoading && f.base != f.branch.HeadRef {
 		p.loadCompare(f)
 	}
-	t := c.Theme()
-	card(c, "Changes", len(f.cmpFiles), func() {
+	detail.Card(c, "Changes", detail.CardOptions{Count: len(f.cmpFiles)}, func() {
 		switch {
 		case f.base == "":
 			mutedText(c, "Choose a base branch to see the changes.")
 			return
 		case f.cmpLoading:
-			loadingRow(c, "Comparing...")
+			feedback.Loading(c, "Comparing...")
 			return
 		case f.cmpErr != nil:
-			ui.Text(c, errorText(f.cmpErr)).FontSize(fontSmall).TextColor(t.Danger)
+			errorNotice(c, f.cmpErr, func() { p.loadCompare(f) })
 			return
 		}
 		mutedText(c, fmt.Sprintf("%d commits ahead of %s", len(f.cmpCommits), f.base))
 		for i, s := range f.cmpCommits[:min(len(f.cmpCommits), compareListRows)] {
-			ui.Text(c.Key(i), s).FontSize(fontBody).SingleLine()
+			design.Text(c.Key(i), s, token.TextBody).SingleLine()
 		}
 		if f.pushNeed {
 			mutedText(c, "Push the branch to list the changed files.")
 			return
 		}
 		for i, file := range f.cmpFiles[:min(len(f.cmpFiles), compareListRows)] {
-			ui.Row(c.Key("f" + fmt.Sprint(i))).Gap(spacingMedium).AlignItems(ui.Center).FillWidth().Children(func() {
-				ui.Text(c, fileStatusLetter(file.Status)).FontSize(fontSmall).Bold().Width(statLetterWidth).TextColor(fileStatusColor(t, file.Status)).Shrink(0)
-				ui.Text(c, file.Path).FontSize(fontBody).SingleLine().Grow(1).MinWidth(0)
-				ui.Text(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).FontSize(fontSmall).TextColor(t.TextMuted).Shrink(0)
+			ui.Row(c.Key("f" + fmt.Sprint(i))).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
+				badge.Decoration(c, fileGitStatus(file.Status))
+				design.Text(c, file.Path, token.TextBody).SingleLine().Grow(1).MinWidth(0)
+				mutedText(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).Shrink(0)
 			})
 		}
 		if len(f.cmpFiles) > compareListRows {

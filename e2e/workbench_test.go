@@ -89,9 +89,15 @@ func TestImageOpensViewer(t *testing.T) {
 	app.WaitNode(win, "zoom control", Label("Zoom In"))
 }
 
-func TestGitHubViewShowsEmptyStateWithoutRepository(t *testing.T) {
+func TestGitHubViewShowsOneEmptyStateWithoutRepository(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n"})
 	app.Menu(win, "View", "GitHub")
-	app.WaitNode(win, "pull requests section", Label("Pull Requests"))
 	app.WaitNode(win, "empty state", Label("No Git repository"))
+	app.Idle(win)
+	for _, n := range app.Tree(win) {
+		switch n.Label {
+		case "Pull Requests", "Issues":
+			t.Errorf("section %q drawn behind the view-level empty state", n.Label)
+		}
+	}
 }

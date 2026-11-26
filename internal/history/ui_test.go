@@ -19,7 +19,6 @@ const (
 	waitStep    = 2 * time.Millisecond
 	oldText     = "old text\n"
 	currentText = "current text\n"
-	revertLabel = "Revert to this version"
 )
 
 type fakeHost struct {
@@ -159,7 +158,7 @@ func TestEmptyState(t *testing.T) {
 	e := newEnv(t)
 	e.write(currentText)
 	e.show()
-	e.waitFor("empty text", func() bool { return e.tt.HasText("No history yet. Versions are recorded each time the file is saved.") })
+	e.waitFor("empty text", func() bool { return e.tt.HasText("No history yet") && e.tt.HasText(emptyMessage) })
 }
 
 func TestLoadingShowsSpinner(t *testing.T) {
@@ -358,7 +357,7 @@ func TestErrorStateOffersRetry(t *testing.T) {
 	if err := e.tt.Click("Retry"); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor("empty after retry", func() bool { return e.tt.HasText("No history yet. Versions are recorded each time the file is saved.") })
+	e.waitFor("empty after retry", func() bool { return e.tt.HasText("No history yet") && e.tt.HasText(emptyMessage) })
 }
 
 func TestMissingFileShowsDeleted(t *testing.T) {

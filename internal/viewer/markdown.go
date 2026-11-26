@@ -6,13 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 )
 
 const (
-	markdownPadY   = 12
-	markdownPadX   = 20
 	markdownLabel  = "Markdown preview"
 	markdownScroll = "markdown-scroll"
 )
@@ -40,7 +39,7 @@ func newMarkdownPane(s *State) *markdownPane {
 func newMarkdownSurface(s *State) *markdownPane {
 	p := &markdownPane{s: s}
 	p.opts = markdown.Options{
-		Theme:     &markdown.Theme{FontSize: bodyFontSize, CodeFont: s.opts.FontFamily},
+		Theme:     &markdown.Theme{FontSize: token.TextBody.Px(), CodeFont: s.opts.FontFamily},
 		OnLink:    p.link,
 		LoadImage: markdown.FileImages(filepath.Dir(s.path)),
 	}
@@ -99,9 +98,9 @@ func (p *markdownPane) body(c *ui.Context) {
 	case p.loading && p.source == "":
 		loadingView(c, "Loading Markdown")
 	case strings.TrimSpace(p.source) == "":
-		message(c, "Nothing to preview", "Write some Markdown to see it here.", nil)
+		message(c, "Nothing to preview", "Write some Markdown to see it here.", "", nil)
 	default:
-		ui.Scroll(c.Key(markdownScroll)).Grow(1).FillWidth().Padding(markdownPadY, markdownPadX).Role(ui.RoleArticle).Label(markdownLabel).Children(func() {
+		ui.Scroll(c.Key(markdownScroll)).Grow(1).FillWidth().Padding(token.PadBarText.Px(), token.PadBarText.Px()).Role(ui.RoleArticle).Label(markdownLabel).Children(func() {
 			markdown.View(c, p.source, &p.opts)
 		})
 	}

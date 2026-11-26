@@ -65,7 +65,7 @@ func TestDetailShowsIssue(t *testing.T) {
 	d, tt := hs.openDetail(t)
 	_ = d
 	mustHaveText(t, tt, "Crash on start", "#5", "Open", "alice opened this 2d ago", "Milestone", "v1", "Assignees", "bob", "Labels", "bug",
-		"Description", "Body of Crash on start", "Linked pull requests", "#9 Fix the crash", "Conversation", "carol", "commented 2h ago", "I can reproduce this",
+		"Description", "Body of Crash on start", "Linked pull requests", "#9 Fix the crash", "Conversation", "carol", "commented", "2h ago", "I can reproduce this",
 		"Add a comment", "Edit", "Close Issue", "Open on GitHub", "Start Working")
 	if tt.HasText("Some details could not be loaded:") {
 		t.Error("unexpected partial error banner")

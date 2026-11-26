@@ -6,6 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/video"
@@ -15,12 +19,6 @@ const (
 	audioTick           = 250 * time.Millisecond
 	audioEndSlack       = 150 * time.Millisecond
 	hiddenCheckInterval = time.Second
-	volumeWidth         = 90
-	timeWidth           = 92
-	transportGap        = 10
-	transportPadY       = 6
-	transportPadX       = 12
-	stageGap            = 6
 	spinnerOverlayLabel = "Loading media"
 	mediaLabel          = "Media player"
 	volumeMax           = 1
@@ -237,28 +235,28 @@ func (p *mediaPane) advance(c *ui.Context) {
 }
 
 func (p *mediaPane) stage(c *ui.Context, loaded bool) {
-	t := c.Theme()
-	ui.Column(c.Key("stage")).Grow(1).FillWidth().Center().Gap(stageGap).Background(t.Background).Children(func() {
+	pal := token.Of(c)
+	ui.Column(c.Key("stage")).Grow(1).FillWidth().Center().Gap(token.GapRowIcon.Px()).Background(pal.Layer.Editor).Children(func() {
 		surface := p.player.show(c)
 		if p.audio {
 			surface.Size(0, 0).AccessHidden(true).IgnoreInput(true)
-			ui.Text(c, p.s.name()).Bold().FontSize(bodyFontSize)
-			ui.Text(c, p.s.kind.String()).FontSize(smallFontSize).TextColor(t.TextMuted)
+			design.Text(c, p.s.name(), token.TextStrong)
+			design.Text(c, p.s.kind.String(), token.TextLabel)
 		} else {
 			surface.Grow(1).FillWidth().Fit(ui.Contain)
 		}
 		if !loaded {
-			ui.Spinner(c).Label(spinnerOverlayLabel).Absolute().Top(stageGap).Right(stageGap)
+			feedback.Spinner(c, spinnerOverlayLabel).Absolute().Top(token.GapControl.Px()).Right(token.GapControl.Px())
 		}
 	})
 }
 
 func (p *mediaPane) transport(c *ui.Context, loaded bool) {
-	t := c.Theme()
+	pal := token.Of(c)
 	pl := p.player
 	dur := pl.Duration()
-	ui.Row(c.Key("transport")).Gap(transportGap).AlignItems(ui.Center).Padding(transportPadY, transportPadX).Shrink(0).FillWidth().
-		Background(t.Surface).BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Children(func() {
+	ui.Row(c.Key("transport")).Gap(token.GapControl.Px()).AlignItems(ui.Center).Height(token.ToolbarHeight.Px()).Padding(0, token.PadRow.Px()).Shrink(0).FillWidth().
+		Background(pal.Layer.Panel).BorderWidth(token.BorderWidth.Px(), 0, 0, 0).BorderColor(pal.Border.Default).Role(ui.RoleToolbar).Label("Media controls").Children(func() {
 		label, icon := "Play", icons.Play
 		if pl.Playing() {
 			label, icon = "Pause", icons.Pause
@@ -266,19 +264,18 @@ func (p *mediaPane) transport(c *ui.Context, loaded bool) {
 		if iconButton(c, "play", icon, label, !loaded) {
 			p.toggle()
 		}
-		ui.Text(c.Key("time"), formatClock(pl.Position())+" / "+formatClock(dur)).FontSize(smallFontSize).
-			TextColor(t.TextMuted).Width(timeWidth).SingleLine()
+		design.Text(c.Key("time"), formatClock(pl.Position())+" / "+formatClock(dur), token.TextLabel).Width(token.ClockWidth.Px()).SingleLine()
 		p.pos = pl.Position().Seconds()
 		seek := ui.Slider(c.Key("seek"), &p.pos, 0, max(dur.Seconds(), minSeekSeconds)).Label("Seek").Grow(1).Disabled(!loaded || dur <= 0)
 		if seek.Changed() {
 			pl.Seek(time.Duration(p.pos * float64(time.Second)))
 		}
-		ui.Icon(c, icons.Volume).Size(iconSize, iconSize).TextColor(t.TextMuted).Shrink(0)
-		volume := ui.Slider(c.Key("volume"), &p.volume, 0, volumeMax).Label("Volume").Width(volumeWidth)
+		ui.Icon(c, icons.Volume).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Icon).Shrink(0).AccessHidden(true)
+		volume := ui.Slider(c.Key("volume"), &p.volume, 0, volumeMax).Label("Volume").Width(token.SliderWidth.Px())
 		if volume.Changed() {
 			pl.SetVolume(p.volume)
 		}
-		if ui.Toggle(c.Key("loop"), &p.loop, "Loop").Changed() {
+		if action.Checkbox(c, "Loop", &p.loop, action.ChoiceOptions{ID: "loop"}).Changed() {
 			pl.SetLoop(p.loop && !p.audio)
 		}
 	})

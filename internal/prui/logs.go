@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/detail"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -64,17 +66,14 @@ func (p *PRs) logView(c *ui.Context, t *logTab) {
 	if p.closed {
 		return
 	}
-	th := c.Theme()
-	ui.Column(c).Fill().Background(th.Background).Children(func() {
+	detail.Page(c, func() {
 		switch {
 		case t.err != nil:
-			ui.Column(c).Grow(1).FillWidth().Center().Gap(spacingMedium).Padding(messagePad).Children(func() {
-				ui.Text(c, "Cannot load the logs of "+t.name).Bold()
-				ui.Text(c, errorText(t.err)).FontSize(fontSmall).TextColor(th.TextMuted).TextAlign(ui.Center)
-				ui.Button(c, "Retry").OnClick(func() { p.loadLogs(t) })
+			detail.Centered(c, func() {
+				feedback.Error(c, "Cannot load the logs of "+t.name, t.err, func() { p.loadLogs(t) })
 			})
 		case t.state == nil:
-			ui.Column(c).Grow(1).FillWidth().Center().Children(func() { loadingRow(c, "Loading logs...") })
+			detail.Centered(c, func() { feedback.Loading(c, "Loading logs...") })
 		default:
 			editor.View(c, t.state).Grow(1).FillWidth().Label("Logs of " + t.name)
 		}

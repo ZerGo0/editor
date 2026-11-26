@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -16,7 +18,6 @@ const (
 	maxCompletions      = 50
 	completionDocLength = 300
 	recentIssuesQuery   = "repo:${owner}/${repository} sort:updated-desc"
-	statusGap           = 4
 )
 
 type workingRuntime struct {
@@ -219,27 +220,20 @@ func (i *Issues) StatusItems(c *ui.Context) {
 	if i.closed || !i.ready() || active == nil {
 		return
 	}
-	t := c.Theme()
 	number := active.Number
 	label := fmt.Sprintf("Working on issue #%d", number)
-	b := ui.ButtonBase(c.Key("issue-status")).Gap(statusGap).Padding(0, spacingSmall).Radius(spacingSmall).AlignItems(ui.Center).
-		TextColor(t.TextMuted).Label(label).Tooltip(label + ": " + active.Title)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
-	}
-	b.Children(func() {
-		ui.Icon(c, icons.GitBranch).Size(iconSmall, iconSmall)
-		ui.Text(c, "#"+strconv.Itoa(number)).FontSize(fontBody).SingleLine()
-	})
+	b := chrome.StatusItem(c, "#"+strconv.Itoa(number), chrome.StatusOptions{Icon: icons.GitBranch, Tooltip: label + ": " + active.Title}).Label(label)
 	b.ContextMenu(func(m *ui.Menu) {
-		if m.Item("Open Issue").Chosen() {
+		if action.Item(m, "Open Issue", action.ItemOptions{}).Chosen() {
 			i.openIssue(number, nil)
 		}
-		if m.Item("Stop Working").Disabled(i.working.busy != "").Chosen() {
+		if action.Item(m, "Stop Working", action.ItemOptions{Disabled: i.working.busy != ""}).Chosen() {
 			i.stopWorking()
 		}
 	})
-	b.OnClick(func() { i.openIssue(number, nil) })
+	if b.Clicked() {
+		i.openIssue(number, nil)
+	}
 }
 
 func (i *Issues) ensureCompletionData() {

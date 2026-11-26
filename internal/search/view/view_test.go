@@ -447,3 +447,19 @@ func TestRecentSearchRows(t *testing.T) {
 	}
 	_ = strings.TrimSpace
 }
+
+func TestFlagTogglesRunTheSearchAgain(t *testing.T) {
+	f := newFixture(t, map[string]string{"a.txt": "Needle needle\n"})
+	f.search(ScopeText, "needle")
+	before := f.view.text.total
+	if err := f.tt.Click("Match Case"); err != nil {
+		t.Fatal(err)
+	}
+	if !f.view.st.MatchCase {
+		t.Fatal("Match Case did not toggle")
+	}
+	f.settle()
+	if f.view.text.total >= before {
+		t.Errorf("matches %d -> %d: the toggle did not search again", before, f.view.text.total)
+	}
+}

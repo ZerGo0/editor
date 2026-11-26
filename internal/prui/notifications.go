@@ -5,6 +5,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -128,6 +132,17 @@ func (p *PRs) openNotification(n Notification) {
 	}
 }
 
+func (p *PRs) NotificationsActions(c *ui.Context) {
+	if p.Ready() && action.IconButton(c, icons.Refresh, "Refresh notifications", action.IconOptions{ID: "refresh-notifications"}).Clicked() {
+		p.notifs.fetchedAt = time.Time{}
+		p.notifs.modified = ""
+	}
+}
+
+func (p *PRs) NotificationsLoading() bool {
+	return p.Ready() && p.notifs.loading
+}
+
 func (p *PRs) NotificationsView(c *ui.Context) {
 	if p.closed {
 		return
@@ -139,78 +154,65 @@ func (p *PRs) NotificationsView(c *ui.Context) {
 	p.notificationsDue(c)
 	ns := &p.notifs
 	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-		ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Padding(0, toolbarPad, toolbarPad, toolbarPad).Shrink(0).FillWidth().Children(func() {
-			mutedText(c, "Pull request notifications of this repository").Grow(1).SingleLine().MinWidth(0)
-			if ns.loading {
-				ui.Spinner(c).Label("Loading notifications")
-			}
-			if iconButton(c, "refresh-notifications", "Refresh notifications", icons.Refresh).Clicked() {
-				ns.fetchedAt = time.Time{}
-				ns.modified = ""
-			}
-		})
 		switch {
 		case ns.err != nil && len(ns.items) == 0:
-			errorBlock(c, ns.err, func() { ns.fetchedAt = time.Time{} })
+			ui.Column(c).FillWidth().Padding(token.GapInline.Px(), token.PadRow.Px()).Children(func() {
+				errorNotice(c, ns.err, func() { ns.fetchedAt = time.Time{} })
+			})
 		case !ns.loaded:
-			loadingRow(c, "Loading notifications...")
+			feedback.Loading(c, "Loading notifications...")
 		case len(ns.items) == 0:
-			mutedText(c, "You are all caught up. New pull request activity shows here.").Padding(rowPadY, rowPadX)
+			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Check, Title: "You are all caught up", Message: "New pull request activity shows here."})
 		default:
 			ns.list.Selected = &ns.row
 			ns.list.Key = func(i int) any { return ns.items[i].ID }
 			ns.list.Label = func(i int) string {
 				return fmt.Sprintf("%s, #%d, %s", ns.items[i].Title, ns.items[i].Number, ns.items[i].Reason)
 			}
-			list := ui.List(c, &ns.list, len(ns.items), func(i int) { p.notificationRow(c, ns.items[i]) }).Grow(1).FillWidth().MinHeight(0).Label("Notifications")
-			if list.Submitted() && ns.row >= 0 && ns.row < len(ns.items) {
+			el := list.View(c, &ns.list, len(ns.items), list.ViewOptions{Label: "Notifications"}, func(i int) list.Item { return p.notificationItem(c, ns.items[i]) })
+			if el.Submitted() && ns.row >= 0 && ns.row < len(ns.items) {
 				p.openNotification(ns.items[ns.row])
 			}
 		}
 	})
 }
 
-func (p *PRs) notificationRow(c *ui.Context, n Notification) {
-	t := c.Theme()
-	now := p.env.Now()
-	row := ui.Row(c).Gap(spacingMedium).AlignItems(ui.Start).Padding(rowPadY, rowPadX).FillWidth()
-	row.Children(func() {
-		dot := ui.Icon(c, icons.Dot).Size(iconSmall, iconSmall).Shrink(0).Margin(prRowGap, 0, 0, 0)
-		if n.Unread {
-			dot.TextColor(t.Accent).Label("Unread")
-		} else {
-			dot.TextColor(ui.Transparent)
-		}
-		ui.Column(c).Grow(1).MinWidth(0).Gap(prRowGap).Children(func() {
-			title := ui.Text(c, n.Title).FontSize(fontBody).SingleLine()
-			if n.Unread {
-				title.Bold()
-			}
-			ui.Row(c).Gap(spacingSmall + prRowGap).AlignItems(ui.Center).Children(func() {
-				mutedText(c, "#"+strconv.Itoa(n.Number)).SingleLine().Shrink(0)
-				mutedText(c, reasonLabel(n.Reason)).SingleLine().Shrink(1).MinWidth(0)
-				mutedText(c, relativeTime(now, n.Updated)).SingleLine().Shrink(0)
-			})
-		})
-	})
-	if row.RowClicked() {
-		p.openNotification(n)
+func (p *PRs) notificationItem(c *ui.Context, n Notification) list.Item {
+	pal := token.Of(c)
+	description := "#" + strconv.Itoa(n.Number) + prMetaSeparator + reasonLabel(n.Reason)
+	if when := relativeTime(p.env.Now(), n.Updated); when != "" {
+		description += prMetaSeparator + when
 	}
-	row.ContextMenu(func(m *ui.Menu) {
-		if m.Item("Open Pull Request").Chosen() {
-			p.openNotification(n)
-		}
-		if m.Item("Open on GitHub").Chosen() {
-			openExternal(c, pullURL(p.repo, n.Number))
-		}
-		m.Separator()
-		if m.Item("Mark as Read").Disabled(!n.Unread).Chosen() {
-			p.markNotification(n, false)
-		}
-		if m.Item("Mark as Done").Chosen() {
-			p.markNotification(n, true)
-		}
-	})
+	return list.Item{
+		Label:       n.Title,
+		Strong:      n.Unread,
+		Description: description,
+		Tooltip:     n.Title,
+		Leading: func(c *ui.Context) {
+			dot := ui.Icon(c, icons.Dot).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).Shrink(0)
+			if n.Unread {
+				dot.TextColor(pal.Accent.Base).Label("Unread")
+			} else {
+				dot.TextColor(ui.Transparent).AccessHidden(true)
+			}
+		},
+		OnClick: func() { p.openNotification(n) },
+		Menu: func(m *ui.Menu) {
+			if action.Item(m, "Open Pull Request", action.ItemOptions{}).Chosen() {
+				p.openNotification(n)
+			}
+			if action.Item(m, "Open on GitHub", action.ItemOptions{}).Chosen() {
+				openExternal(c, pullURL(p.repo, n.Number))
+			}
+			m.Separator()
+			if action.Item(m, "Mark as Read", action.ItemOptions{Disabled: !n.Unread}).Chosen() {
+				p.markNotification(n, false)
+			}
+			if action.Item(m, "Mark as Done", action.ItemOptions{}).Chosen() {
+				p.markNotification(n, true)
+			}
+		},
+	}
 }
 
 func reasonLabel(reason string) string {

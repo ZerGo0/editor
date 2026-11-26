@@ -12,6 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/detail"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/github"
@@ -25,9 +31,6 @@ const (
 	modeSince     = "since"
 	modeLocal     = "local"
 	layoutInline  = 1
-	threadPadX    = 10
-	threadPadY    = 6
-	threadGap     = 4
 	noPRInTabHint = "This pull request is not open, so comments cannot be added."
 )
 
@@ -442,21 +445,18 @@ func (p *PRs) diffView(c *ui.Context, t *diffTab) {
 	if p.closed {
 		return
 	}
-	th := c.Theme()
 	d := t.data
-	ui.Column(c).Fill().Background(th.Background).Children(func() {
+	detail.Page(c, func() {
 		p.diffHeader(c, t)
 		switch {
 		case t.err != nil:
-			ui.Column(c).Grow(1).FillWidth().Center().Gap(spacingMedium).Padding(messagePad).Children(func() {
-				ui.Text(c, "Cannot show "+t.file.Path).Bold()
-				ui.Text(c, errorText(t.err)).FontSize(fontSmall).TextColor(th.TextMuted).TextAlign(ui.Center)
-				if !errors.Is(t.err, ErrBinaryFile) && !errors.Is(t.err, ErrFileTooLarge) {
-					ui.Button(c, "Retry").OnClick(func() { p.loadDiff(t) })
-				}
-			})
+			var retry func()
+			if !errors.Is(t.err, ErrBinaryFile) && !errors.Is(t.err, ErrFileTooLarge) {
+				retry = func() { p.loadDiff(t) }
+			}
+			detail.Centered(c, func() { feedback.Error(c, "Cannot show "+t.file.Path, t.err, retry) })
 		case !t.ready || !t.engine.Ready():
-			ui.Column(c).Grow(1).FillWidth().Center().Children(func() { loadingRow(c, "Loading "+path.Base(t.file.Path)+"...") })
+			detail.Centered(c, func() { feedback.Loading(c, "Loading "+path.Base(t.file.Path)+"...") })
 		default:
 			st := t.state
 			st.Layout = editor.DiffSplit
@@ -475,24 +475,27 @@ func (p *PRs) diffView(c *ui.Context, t *diffTab) {
 }
 
 func (p *PRs) diffHeader(c *ui.Context, t *diffTab) {
-	th := c.Theme()
 	d := t.data
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().Padding(spacingMedium, spacingLarge).Shrink(0).FillWidth().Background(th.Surface).BorderWidth(0, 0, 1, 0).BorderColor(th.Border).Children(func() {
-		ui.Text(c, t.file.Path).FontSize(fontBody).Bold().SingleLine().Shrink(1).MinWidth(0)
-		ui.Text(c, "+"+strconv.Itoa(t.file.Additions)).FontSize(fontSmall).TextColor(th.Success).Shrink(0)
-		ui.Text(c, "-"+strconv.Itoa(t.file.Deletions)).FontSize(fontSmall).TextColor(th.Danger).Shrink(0)
-		if n := len(threadsForPath(d.threads, t.file.Path)); n > 0 && t.spec.mode == modePR {
-			ui.Icon(c, icons.Comment).Size(iconSmall, iconSmall).TextColor(th.TextMuted).Shrink(0).Label(fmt.Sprintf("%d threads", n))
-			mutedText(c, strconv.Itoa(n)).Shrink(0)
-		}
-		ui.Box(c).Grow(1)
-		if t.loading || d.loading {
-			ui.Spinner(c).Label("Loading")
-		}
-		if t.ready {
-			p.diffControls(c, t)
-		}
-		ui.Button(c, "Open Pull Request").OnClick(func() { p.openPR(d.number, nil) })
+	detail.Header(c, detail.HeaderOptions{
+		Title: t.file.Path,
+		Busy:  t.loading || d.loading,
+		Actions: func(c *ui.Context) {
+			smallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
+		},
+		Meta: func(c *ui.Context) {
+			pal := token.Of(c)
+			design.Text(c, "+"+strconv.Itoa(t.file.Additions), token.TextLabel).TextColor(pal.Tone(token.ToneSuccess)).Shrink(0)
+			design.Text(c, "-"+strconv.Itoa(t.file.Deletions), token.TextLabel).TextColor(pal.Tone(token.ToneError)).Shrink(0)
+			if n := len(threadsForPath(d.threads, t.file.Path)); n > 0 && t.spec.mode == modePR {
+				ui.Icon(c, icons.Comment).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(pal.Icon).Shrink(0).Label(fmt.Sprintf("%d threads", n))
+				mutedText(c, strconv.Itoa(n)).Shrink(0)
+			}
+		},
+		Toolbar: func(c *ui.Context) {
+			if t.ready {
+				p.diffControls(c, t)
+			}
+		},
 	})
 }
 
@@ -501,26 +504,26 @@ func (p *PRs) diffControls(c *ui.Context, t *diffTab) {
 	st := t.state
 	if t.spec.mode == modePR && d.pr.NodeID != "" {
 		viewed := d.viewed[t.file.Path]
-		if ui.Checkbox(c.Key("viewed"), &viewed, "Viewed").Changed() {
+		if action.Checkbox(c, "Viewed", &viewed, action.ChoiceOptions{ID: "viewed"}).Changed() {
 			p.setViewed(d, t.file.Path, viewed)
 		}
 	}
 	if t.spec.mode == modePR {
-		ui.Toggle(c.Key("hide-comments"), &t.hideComments, "Hide Comments")
-		ui.Button(c, "Comment on File").Disabled(!d.isOpen()).OnClick(func() { p.commentOnFile(t) })
-		ui.Button(c, "Compare with Local").OnClick(func() { p.openDiff(d, t.file, diffSpec{mode: modeLocal}) })
+		action.Checkbox(c, "Hide Comments", &t.hideComments, action.ChoiceOptions{ID: "hide-comments"})
+		smallButton(c, "Comment on File", !d.isOpen()).OnClick(func() { p.commentOnFile(t) })
+		smallButton(c, "Compare with Local", false).OnClick(func() { p.openDiff(d, t.file, diffSpec{mode: modeLocal}) })
 	}
-	ui.MenuButton(c, "Link", func(m *ui.Menu) { p.linkMenu(c, m, t) }).Label("Copy or open a link")
+	action.MenuButton(c, "Link", action.ButtonOptions{Small: true, ID: "link"}, func(m *ui.Menu) { p.linkMenu(c, m, t) }).Label("Copy or open a link")
 	files := p.diffFiles(t)
 	i := slices.IndexFunc(files, func(f github.PRFile) bool { return f.Path == t.file.Path })
-	ui.Button(c, "Previous File").Disabled(i <= 0).OnClick(func() { p.stepFile(t, -1) })
-	ui.Button(c, "Next File").Disabled(i < 0 || i+1 >= len(files)).OnClick(func() { p.stepFile(t, 1) })
-	ui.Segmented(c, &t.layout, "Split", "Unified").Label("Diff layout")
+	smallButton(c, "Previous File", i <= 0).OnClick(func() { p.stepFile(t, -1) })
+	smallButton(c, "Next File", i < 0 || i+1 >= len(files)).OnClick(func() { p.stepFile(t, 1) })
+	action.Segmented(c, "Diff layout", &t.layout, []string{"Split", "Unified"}, action.SegmentedOptions{})
 	diffmode.Controls(c, t.engine)
 	h, _ := st.CurrentHunk()
 	n := len(st.Hunks())
-	ui.Button(c, "Previous Change").Disabled(n == 0 || h <= 0).OnClick(func() { st.GoToHunk(h - 1) })
-	ui.Button(c, "Next Change").Disabled(n == 0 || h+1 >= n).OnClick(func() { st.GoToHunk(h + 1) })
+	smallButton(c, "Previous Change", n == 0 || h <= 0).OnClick(func() { st.GoToHunk(h - 1) })
+	smallButton(c, "Next Change", n == 0 || h+1 >= n).OnClick(func() { st.GoToHunk(h + 1) })
 }
 
 func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
@@ -535,27 +538,28 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 	if th == nil {
 		return
 	}
-	theme := c.Theme()
+	pal := token.Of(c)
 	now := p.env.Now()
-	box := ui.Column(c.Key(id)).FillWidth().Height(a.Height).ClipY().Padding(threadPadY, threadPadX).Gap(threadGap).Background(theme.Surface).Border(1, theme.Border).Radius(cardRadius)
+	box := ui.Column(c.Key(id)).FillWidth().Height(a.Height).ClipY().Padding(token.GapControl.Px(), token.PadPanel.Px()).Gap(token.GapInline.Px()).
+		Background(pal.Layer.Panel).Border(token.BorderWidth.Px(), pal.Border.Default).Radius(token.RadiusCard.Px())
 	thread := *th
 	box.Children(func() {
 		collapsed := thread.Resolved && !t.expanded[id]
-		ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).FillWidth().Children(func() {
+		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 			if thread.Resolved {
-				pill(c, "Resolved", theme.Success)
+				badge.Tag(c, "Resolved", badge.TagOptions{Tone: token.ToneSuccess})
 			}
 			if thread.Outdated {
-				mutedPill(c, "Outdated")
+				mutedTag(c, "Outdated")
 			}
 			if collapsed {
 				mutedText(c, fmt.Sprintf("%d comments", len(thread.Comments))).Grow(1)
-				ui.Button(c, "Show").Label("Show thread").OnClick(func() { t.expanded[id] = true })
+				ghostButton(c, "Show", "show-"+id).Label("Show thread").OnClick(func() { t.expanded[id] = true })
 				return
 			}
-			ui.Box(c).Grow(1)
+			design.Spacer(c)
 			if thread.Resolved {
-				ui.Button(c, "Hide").Label("Hide thread").OnClick(func() { delete(t.expanded, id) })
+				ghostButton(c, "Hide", "hide-"+id).Label("Hide thread").OnClick(func() { delete(t.expanded, id) })
 			}
 		})
 		if collapsed {
@@ -564,12 +568,12 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 		for i, cm := range thread.Comments {
 			p.threadComment(c, d, thread, i, cm, now)
 		}
-		ui.Row(c).Gap(spacingSmall).FillWidth().Children(func() {
-			ui.Button(c, "Reply").Disabled(d.busy != "").OnClick(func() { p.replyTo(d, thread) })
+		ui.Row(c).FillWidth().Gap(token.GapControl.Px()).Children(func() {
+			smallButton(c, "Reply", d.busy != "").OnClick(func() { p.replyTo(d, thread) })
 			if thread.Resolved {
-				ui.Button(c, "Unresolve").Disabled(d.busy != "").OnClick(func() { p.setResolved(d, thread, false) })
+				smallButton(c, "Unresolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, false) })
 			} else {
-				ui.Button(c, "Resolve").Disabled(d.busy != "").OnClick(func() { p.setResolved(d, thread, true) })
+				smallButton(c, "Resolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, true) })
 			}
 		})
 	})
@@ -578,22 +582,23 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 func (p *PRs) threadComment(c *ui.Context, d *prData, th github.Thread, i int, cm github.Comment, now time.Time) {
 	own := p.viewer != "" && cm.Author == p.viewer
 	suggestion, hasSuggestion := suggestionOf(cm.Body)
-	ui.Column(c.Key(i)).Gap(2).FillWidth().Children(func() {
-		ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).FillWidth().Children(func() {
-			ui.Text(c, cm.Author).FontSize(fontSmall).Bold()
+	ui.Column(c.Key(i)).FillWidth().Gap(token.GapTight.Px()).Children(func() {
+		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapRowIcon.Px()).Children(func() {
+			badge.Avatar(c, cm.Author, token.AvatarSize)
+			design.Text(c, cm.Author, token.TextStrong)
 			mutedText(c, relativeTime(now, cm.Created))
-			ui.Box(c).Grow(1)
+			design.Spacer(c)
 			if cm.URL != "" {
-				ui.Button(c, "Copy Link").Label("Copy link to comment by " + cm.Author).OnClick(func() { c.WriteClipboard(cm.URL) })
+				ghostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + cm.Author).OnClick(func() { c.WriteClipboard(cm.URL) })
 			}
 			if hasSuggestion && th.Side == github.SideRight && !th.Outdated {
-				ui.Button(c, "Apply Suggestion").Disabled(d.busy != "").OnClick(func() { p.applySuggestion(d, th, suggestion) })
+				ghostButton(c, "Apply Suggestion", "apply-"+strconv.Itoa(i)).Disabled(d.busy != "").OnClick(func() { p.applySuggestion(d, th, suggestion) })
 			}
 			if own {
-				ui.Button(c, "Edit").Label("Edit comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.editThreadComment(d, th, cm) })
-				ui.Button(c, "Delete").Label("Delete comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.deleteThreadComment(d, cm) })
+				ghostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.editThreadComment(d, th, cm) })
+				ghostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.deleteThreadComment(d, cm) })
 			}
 		})
-		ui.Text(c, cm.Body).FontSize(fontBody).Selectable()
+		design.Text(c, cm.Body, token.TextBody).Selectable()
 	})
 }

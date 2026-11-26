@@ -3,9 +3,16 @@ package prui
 import (
 	"context"
 	"fmt"
+	"path"
 	"strconv"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -22,8 +29,7 @@ const (
 	sectionSearch   = "search"
 
 	searchPlaceholder = "Search pull requests (GitHub syntax)"
-	toolbarPad        = 8
-	prRowGap          = 2
+	prMetaSeparator   = " · "
 	selfQualifier     = "@me"
 	sideViewName      = "Pull Requests"
 	doubleClickWindow = time.Second
@@ -98,7 +104,9 @@ const (
 	rowNote
 	rowError
 	rowFile
-	rowReviewBar
+	rowReviewOpen
+	rowReviewExit
+	rowReviewHide
 )
 
 type sideRow struct {
@@ -133,8 +141,12 @@ func (r sideRow) label() string {
 		return "Load more"
 	case rowCreate:
 		return "Create Pull Request"
-	case rowReviewBar:
-		return "Review actions"
+	case rowReviewOpen:
+		return "Open Pull Request"
+	case rowReviewExit:
+		return "Exit Review Mode"
+	case rowReviewHide:
+		return "Hide viewed files"
 	}
 	return r.text
 }
@@ -248,7 +260,10 @@ func (p *PRs) reviewRows() []sideRow {
 	if !sec.open {
 		return rows
 	}
-	rows = append(rows, sideRow{kind: rowReviewBar, sec: sec, data: d})
+	rows = append(rows, sideRow{kind: rowReviewOpen, sec: sec, data: d}, sideRow{kind: rowReviewExit, sec: sec, data: d})
+	if d != nil && d.loaded && d.viewedCount() > 0 {
+		rows = append(rows, sideRow{kind: rowReviewHide, sec: sec, data: d})
+	}
 	switch {
 	case d == nil || !d.loaded && d.err == nil:
 		return append(rows, sideRow{kind: rowLoading, sec: sec, text: "Loading changes..."})
@@ -280,7 +295,7 @@ func (p *PRs) currentRows() []sideRow {
 	case p.branch.Name == "":
 		return []sideRow{{kind: rowNote, sec: sec, text: "HEAD is detached. Check out a branch to create a pull request."}}
 	}
-	return []sideRow{{kind: rowCreate, sec: sec, text: p.branch.Name}}
+	return []sideRow{{kind: rowNote, sec: sec, text: "No pull request for " + p.branch.Name + "."}, {kind: rowCreate, sec: sec, text: p.branch.Name}}
 }
 
 func sectionRows(sec *section) []sideRow {
@@ -291,7 +306,7 @@ func sectionRows(sec *section) []sideRow {
 	case sec.loading && len(sec.items) == 0:
 		return []sideRow{{kind: rowLoading, sec: sec, text: "Loading..."}}
 	case sec.loaded && len(sec.items) == 0:
-		return []sideRow{{kind: rowNote, sec: sec, text: "No pull requests. Press refresh to check again."}}
+		return []sideRow{{kind: rowNote, sec: sec, text: "No pull requests"}}
 	}
 	for i := range sec.items {
 		rows = append(rows, sideRow{kind: rowPR, sec: sec, pr: &sec.items[i]})
@@ -344,32 +359,54 @@ func (p *PRs) SideView(c *ui.Context) {
 	p.ensureLoaded()
 	s := p.side
 	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-		p.sideToolbar(c)
+		p.sideSearch(c)
 		rows := p.sideRows()
 		s.list.Key = func(i int) any { return rows[i].key() }
-		s.list.Label = func(i int) string { return rows[i].label() }
-		list := ui.List(c, &s.list, len(rows), func(i int) { p.sideRowView(c, rows[i]) }).Grow(1).FillWidth().MinHeight(0).Label("Pull requests")
-		if list.Submitted() && s.row >= 0 && s.row < len(rows) {
+		s.list.Label = func(i int) string { return p.rowLabel(rows[i]) }
+		el := list.View(c, &s.list, len(rows), list.ViewOptions{Label: "Pull requests", Tree: true}, func(i int) list.Item { return p.sideItem(c, rows[i]) })
+		if el.Submitted() && s.row >= 0 && s.row < len(rows) {
 			r := rows[s.row]
 			if r.kind != rowHeader || c.Now().Sub(s.toggledAt) > doubleClickWindow {
 				p.activate(r)
 			}
 		}
+		if s.row >= 0 && s.row < len(rows) && rows[s.row].kind == rowHeader && s.list.Handle.Focused(c) {
+			sec := rows[s.row].sec
+			switch {
+			case !sec.open && c.Shortcut(0, ui.KeyRight):
+				sec.open = true
+			case sec.open && c.Shortcut(0, ui.KeyLeft):
+				sec.open = false
+			}
+		}
 	})
 }
 
-func (p *PRs) sideToolbar(c *ui.Context) {
+func (p *PRs) rowLabel(r sideRow) string {
+	label := r.label()
+	if r.kind == rowPR {
+		if text := checkStateLabel(p.checks[r.pr.Number]); text != "" {
+			label += ", " + text
+		}
+	}
+	return label
+}
+
+func (p *PRs) SideActions(c *ui.Context) {
+	if p.Ready() {
+		action.IconButton(c, icons.Refresh, "Refresh", action.IconOptions{ID: "refresh"}).OnClick(p.refresh)
+	}
+}
+
+func (p *PRs) sideSearch(c *ui.Context) {
 	s := p.side
-	ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Padding(0, toolbarPad, toolbarPad, toolbarPad).Shrink(0).FillWidth().Children(func() {
-		field := ui.SearchField(c.Key("search"), &s.field).Placeholder(searchPlaceholder).Label("Search pull requests").Grow(1).MinWidth(0)
+	ui.Column(c).FillWidth().Padding(token.GapInline.Px(), token.PadRow.Px(), token.GapControl.Px(), token.PadRow.Px()).Shrink(0).Children(func() {
+		field := field.SearchInput(c, "Search pull requests", &s.field, field.SearchOptions{Placeholder: searchPlaceholder, ID: "search"})
 		switch {
 		case field.Submitted():
 			p.runSearch(s.field)
 		case field.Changed() && s.field == "" && s.search != nil:
 			p.runSearch("")
-		}
-		if iconButton(c, "refresh", "Refresh", icons.Refresh).Clicked() {
-			p.refresh()
 		}
 	})
 }
@@ -384,6 +421,14 @@ func (p *PRs) activate(r sideRow) {
 		p.openDiff(r.data, *r.file, diffSpec{mode: modePR})
 	case rowCreate:
 		p.openCreate()
+	case rowReviewOpen:
+		p.openPR(p.current.pr.Number, p.current.pr)
+	case rowReviewExit:
+		if p.checkoutBusy == "" {
+			p.exitReview()
+		}
+	case rowReviewHide:
+		r.data.hideViewed = !r.data.hideViewed
 	case rowMore:
 		p.loadSection(r.sec, true)
 	case rowError:
@@ -391,75 +436,124 @@ func (p *PRs) activate(r sideRow) {
 	}
 }
 
-func (p *PRs) sideRowView(c *ui.Context, r sideRow) {
+func (p *PRs) sideItem(c *ui.Context, r sideRow) list.Item {
 	switch r.kind {
 	case rowHeader:
-		p.headerRow(c, r)
+		return p.headerItem(c, r)
 	case rowPR:
-		row := p.prRow(c, *r.pr)
-		if row.RowClicked() {
-			p.openPR(r.pr.Number, r.pr)
-		}
-		row.ContextMenu(func(m *ui.Menu) { p.prMenu(c, m, r.pr) })
+		return p.prItem(c, r.pr)
 	case rowFile:
-		p.fileRow(c, r)
-	case rowReviewBar:
-		p.reviewBar(c, r)
+		return p.fileItem(r)
+	case rowReviewOpen:
+		return list.Item{Depth: 1, Icon: icons.PullRequest, Label: r.label(), OnClick: func() { p.activate(r) }}
+	case rowReviewExit:
+		return list.Item{Depth: 1, Icon: icons.Close, Label: r.label(), Muted: p.checkoutBusy != "", OnClick: func() { p.activate(r) }}
+	case rowReviewHide:
+		return list.Item{Depth: 1, Content: func(c *ui.Context) {
+			action.Checkbox(c, "Hide viewed", &r.data.hideViewed, action.ChoiceOptions{ID: "hide-viewed"})
+		}}
 	case rowCreate:
-		row := ui.Column(c).Gap(messageGap).Padding(rowPadY, rowPadX, rowPadY, rowPadX+iconMedium).FillWidth()
-		row.Children(func() {
-			mutedText(c, "No pull request for "+r.text+".")
-			ui.PrimaryButton(c, "Create Pull Request").OnClick(p.openCreate)
-		})
-		if row.RowClicked() {
-			p.openCreate()
-		}
+		return list.Item{Depth: 1, Icon: icons.Plus, Label: r.label(), Strong: true, OnClick: func() { p.activate(r) }}
 	case rowMore:
-		row := ui.Row(c).Padding(rowPadY, rowPadX, rowPadY, rowPadX+iconMedium).FillWidth()
-		row.Children(func() {
-			ui.Button(c, "Load more").OnClick(func() { p.loadSection(r.sec, true) })
-		})
-		if row.RowClicked() {
-			p.loadSection(r.sec, true)
-		}
+		return list.Item{Depth: 1, Label: r.label(), OnClick: func() { p.activate(r) }}
 	case rowLoading:
-		loadingRow(c, r.text)
+		return list.Item{Depth: 1, Muted: true, Label: r.text, Leading: func(c *ui.Context) { feedback.Spinner(c, r.text) }}
 	case rowNote:
-		mutedText(c, r.text).Padding(rowPadY, rowPadX, rowPadY, rowPadX+iconMedium)
+		return list.Item{Depth: 1, Muted: true, Label: r.text, Tooltip: r.text}
 	case rowError:
-		errorBlock(c, r.err, func() { p.retrySection(r.sec, r.data) })
+		return list.Item{Depth: 1, Tone: token.ToneError, Label: errorText(r.err), Tooltip: errorText(r.err), Trailing: func(c *ui.Context) {
+			ghostButton(c, retryLabel, "retry").OnClick(func() { p.retrySection(r.sec, r.data) })
+		}}
 	}
+	return list.Item{}
 }
 
-func (p *PRs) headerRow(c *ui.Context, r sideRow) {
-	t := c.Theme()
-	row := ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Padding(rowPadY, rowPadX).FillWidth()
-	row.Children(func() {
-		svg := icons.ChevronRight
-		if r.sec.open {
-			svg = icons.ChevronDown
-		}
-		ui.Icon(c, svg).Size(iconSmall, iconSmall).TextColor(t.TextMuted).Shrink(0)
-		ui.Text(c, r.sec.title).FontSize(fontBody).Bold().SingleLine()
-		if r.sec == p.side.current && p.branch.Name != "" {
-			mutedText(c, p.branch.Name).SingleLine().MinWidth(0)
-		}
-		switch {
-		case r.text != "":
-			mutedPill(c, r.text)
-		case len(r.sec.items) > 0:
-			label := strconv.Itoa(len(r.sec.items))
-			if r.sec.more {
-				label += "+"
-			}
-			mutedPill(c, label)
-		}
-	})
-	if row.RowClicked() {
+func (p *PRs) headerItem(c *ui.Context, r sideRow) list.Item {
+	it := list.Item{Label: r.sec.title, Strong: true, Branch: true, Open: r.sec.open, Menu: func(m *ui.Menu) { p.sectionMenu(m, r.sec) }}
+	switch {
+	case r.sec == p.side.current && p.branch.Name != "":
+		it.Description = p.branch.Name
+	case r.text != "":
+		it.Description = r.text
+	default:
+		it.Count = len(r.sec.items)
+	}
+	it.OnClick = func() {
 		r.sec.open = !r.sec.open
 		p.side.toggledAt = c.Now()
 	}
-	row.ContextMenu(func(m *ui.Menu) { p.sectionMenu(m, r.sec) })
+	return it
+}
+
+func (p *PRs) prItem(c *ui.Context, pr *github.PullRequest) list.Item {
+	pal := token.Of(c)
+	description := "#" + strconv.Itoa(pr.Number)
+	if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
+		description += prMetaSeparator + when
+	}
+	return list.Item{
+		Depth:       1,
+		Label:       pr.Title,
+		Description: description,
+		Tooltip:     fmt.Sprintf("%s\n#%d by %s", pr.Title, pr.Number, pr.Author),
+		Leading: func(c *ui.Context) {
+			ui.Icon(c, icons.PullRequest).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(*pr))).Shrink(0).AccessHidden(true)
+		},
+		Trailing: func(c *ui.Context) {
+			if pr.Draft {
+				mutedTag(c, prStateDraft)
+			}
+			checkIcon(c, p.checks[pr.Number])
+			if pr.Author != "" {
+				badge.Avatar(c, pr.Author, token.AvatarSize)
+			}
+		},
+		OnClick: func() { p.openPR(pr.Number, pr) },
+		Menu:    func(m *ui.Menu) { p.prMenu(c, m, pr) },
+	}
+}
+
+func (p *PRs) fileItem(r sideRow) list.Item {
+	d, f := r.data, *r.file
+	it := list.Item{
+		Depth:       1,
+		Label:       path.Base(f.Path),
+		Description: pathDir(f.Path),
+		Tooltip:     f.Path,
+		Git:         fileGitStatus(f.Status),
+		Count:       d.commentCount(f.Path),
+		OnClick:     func() { p.openDiff(d, f, diffSpec{mode: modePR}) },
+	}
+	if d.pr.NodeID != "" {
+		it.Leading = func(c *ui.Context) { p.viewedBox(c, d, f.Path) }
+	}
+	return it
+}
+
+func (p *PRs) viewedBox(c *ui.Context, d *prData, filePath string) {
+	viewed := d.viewed[filePath]
+	if action.Checkbox(c, "", &viewed, action.ChoiceOptions{ID: "viewed"}).Label("Viewed " + filePath).Changed() {
+		p.setViewed(d, filePath, viewed)
+	}
+}
+
+func pathDir(p string) string {
+	if dir := path.Dir(p); dir != "." {
+		return dir
+	}
+	return ""
+}
+
+func fileGitStatus(status string) token.GitStatus {
+	switch status {
+	case statusAdded:
+		return token.GitAdded
+	case statusRemoved:
+		return token.GitDeleted
+	case statusRenamed:
+		return token.GitRenamed
+	}
+	return token.GitModified
 }
 
 func (p *PRs) sectionMenu(m *ui.Menu, sec *section) {
@@ -512,41 +606,6 @@ func (p *PRs) prMenu(c *ui.Context, m *ui.Menu, pr *github.PullRequest) {
 	}
 }
 
-func (p *PRs) fileRow(c *ui.Context, r sideRow) {
-	t := c.Theme()
-	d, f := r.data, *r.file
-	row := ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Padding(rowPadY/2, rowPadX, rowPadY/2, rowPadX+iconMedium).FillWidth()
-	row.Children(func() {
-		if d.pr.NodeID != "" {
-			viewed := d.viewed[f.Path]
-			if ui.Checkbox(c.Key("viewed"), &viewed, "").Label("Viewed " + f.Path).Changed() {
-				p.setViewed(d, f.Path, viewed)
-			}
-		}
-		ui.Text(c, fileStatusLetter(f.Status)).FontSize(fontSmall).Bold().Width(statLetterWidth).TextColor(fileStatusColor(t, f.Status)).Shrink(0)
-		ui.Text(c, f.Path).FontSize(fontBody).SingleLine().Grow(1).MinWidth(0)
-		if n := d.commentCount(f.Path); n > 0 {
-			ui.Icon(c, icons.Comment).Size(iconSmall, iconSmall).TextColor(t.TextMuted).Shrink(0).Label(fmt.Sprintf("%d comments", n))
-			mutedText(c, strconv.Itoa(n)).Shrink(0)
-		}
-	})
-	if row.RowClicked() {
-		p.openDiff(d, f, diffSpec{mode: modePR})
-	}
-}
-
-func (p *PRs) reviewBar(c *ui.Context, r sideRow) {
-	d := r.data
-	number := p.current.pr.Number
-	ui.Row(c).Gap(spacingSmall).AlignItems(ui.Center).Wrap().Padding(rowPadY/2, rowPadX, rowPadY/2, rowPadX+iconMedium).FillWidth().Children(func() {
-		ui.Button(c, "Open Pull Request").OnClick(func() { p.openPR(number, p.current.pr) })
-		ui.Button(c, "Exit Review Mode").Disabled(p.checkoutBusy != "").OnClick(p.exitReview)
-		if d != nil && d.loaded && d.viewedCount() > 0 {
-			ui.Toggle(c.Key("hide-viewed"), &d.hideViewed, "Hide viewed")
-		}
-	})
-}
-
 func (p *PRs) exitReview() {
 	pr := p.current.pr
 	if pr == nil || pr.BaseRef == "" {
@@ -573,30 +632,4 @@ func (p *PRs) askSaveQuery() {
 	}
 	query := p.side.search.query
 	p.h.Ask("Save Query", "Save", query, func(label string) error { return p.addQuery(label, query) })
-}
-
-func (p *PRs) prRow(c *ui.Context, pr github.PullRequest) ui.Element {
-	t := c.Theme()
-	now := p.env.Now()
-	row := ui.Row(c).Gap(spacingMedium).AlignItems(ui.Start).Padding(rowPadY, rowPadX).FillWidth()
-	row.Children(func() {
-		ui.Icon(c, icons.PullRequest).Size(iconMedium, iconMedium).TextColor(stateColor(t, pr)).Shrink(0).Margin(prRowGap, 0, 0, 0)
-		ui.Column(c).Grow(1).MinWidth(0).Gap(prRowGap).Children(func() {
-			ui.Text(c, pr.Title).FontSize(fontBody).SingleLine()
-			ui.Row(c).Gap(spacingSmall + prRowGap).AlignItems(ui.Center).Children(func() {
-				mutedText(c, "#"+strconv.Itoa(pr.Number)).SingleLine().Shrink(0)
-				if pr.Author != "" {
-					mutedText(c, pr.Author).SingleLine().Shrink(1).MinWidth(0)
-				}
-				if when := relativeTime(now, pr.Updated); when != "" {
-					mutedText(c, when).SingleLine().Shrink(0)
-				}
-				if pr.Draft {
-					mutedPill(c, prStateDraft)
-				}
-				checkIcon(c, p.checks[pr.Number])
-			})
-		})
-	})
-	return row
 }

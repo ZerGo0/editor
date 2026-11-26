@@ -21,7 +21,10 @@ const (
 
 func sideTester(i *Issues) *ui.Tester {
 	return ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).Fill().Children(func() { i.SideView(c) })
+		ui.Column(c).Fill().Children(func() {
+			ui.Row(c).Children(func() { i.SideActions(c) })
+			i.SideView(c)
+		})
 	}, sideWidth, sideHeight)
 }
 

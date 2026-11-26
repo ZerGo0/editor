@@ -4,31 +4,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	dpane "github.com/ZerGo0/editor/internal/design/pane"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	bodyFontSize    = 13
-	smallFontSize   = 12
-	headerPadY      = 2
-	headerPadX      = 8
-	footerPadY      = 4
-	footerPadX      = 12
-	infoSeparator   = "  \u00b7  "
-	iconButtonSize  = 22
-	iconSize        = 12
-	messageGap      = 8
-	messagePad      = 24
-	messageMaxWidth = 480
-	buttonRadius    = 5
-	toolbarLabel    = "Viewer actions"
+	infoSeparator = "  \u00b7  "
+	toolbarLabel  = "Viewer actions"
 )
 
 func (s *State) View(c *ui.Context) ui.Element {
 	s.svc = c.Services()
-	t := c.Theme()
-	col := ui.Column(c).Fill().Background(t.Background)
+	p := token.Of(c)
+	col := ui.Column(c).Fill().Background(p.Layer.Editor)
 	col.Children(func() {
 		s.header(c)
 		s.pane.body(c)
@@ -38,21 +31,20 @@ func (s *State) View(c *ui.Context) ui.Element {
 }
 
 func (s *State) header(c *ui.Context) {
-	t := c.Theme()
-	ui.Toolbar(c, func() {
+	p := token.Of(c)
+	dpane.Toolbar(c, toolbarLabel, func(c *ui.Context) {
 		s.pane.controls(c)
-		ui.Spacer(c)
+		design.Spacer(c)
 		if iconButton(c, "reveal", icons.Reveal, "Reveal in Finder", false) {
 			s.reveal()
 		}
-		if ui.Button(c.Key("open-default"), "Open With Default App").FontSize(smallFontSize).Clicked() {
+		if action.Button(c, "Open With Default App", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "open-default"}).Clicked() {
 			s.openDefault()
 		}
-		if ui.Button(c.Key("copy-path"), "Copy Path").FontSize(smallFontSize).Clicked() {
+		if action.Button(c, "Copy Path", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "copy-path"}).Clicked() {
 			s.copyPath(c)
 		}
-	}).Label(toolbarLabel).Padding(headerPadY, headerPadX).Shrink(0).FillWidth().Background(t.Surface).
-		BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
+	}).Padding(0, token.PadRow.Px()).FillWidth().Background(p.Layer.Panel).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default)
 }
 
 func (s *State) footer(c *ui.Context) {
@@ -60,9 +52,10 @@ func (s *State) footer(c *ui.Context) {
 	if text == "" {
 		return
 	}
-	t := c.Theme()
-	ui.Row(c).Padding(footerPadY, footerPadX).Shrink(0).FillWidth().BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Children(func() {
-		ui.Text(c, text).FontSize(smallFontSize).TextColor(t.TextMuted).SingleLine()
+	p := token.Of(c)
+	ui.Row(c).Height(token.StatusBarHeight.Px()).Padding(0, token.PadBarText.Px()).Shrink(0).FillWidth().AlignItems(ui.Center).Background(p.Layer.Panel).
+		BorderWidth(token.BorderWidth.Px(), 0, 0, 0).BorderColor(p.Border.Default).Children(func() {
+		design.Text(c, text, token.TextCaption).SingleLine()
 	})
 }
 
@@ -78,42 +71,22 @@ func joinInfo(parts ...string) string {
 	return strings.Join(kept, infoSeparator)
 }
 
-func message(c *ui.Context, title, detail string, actions func()) {
-	t := c.Theme()
-	ui.Column(c).Grow(1).FillWidth().Center().Gap(messageGap).Padding(messagePad).Children(func() {
-		ui.Text(c, title).Bold().FontSize(bodyFontSize).TextAlign(ui.Center)
-		if detail != "" {
-			ui.Text(c, detail).FontSize(smallFontSize).TextColor(t.TextMuted).TextAlign(ui.Center).MaxWidth(messageMaxWidth)
-		}
-		if actions != nil {
-			ui.Row(c).Gap(messageGap).Children(actions)
-		}
+func message(c *ui.Context, title, detail, actionLabel string, onAction func()) {
+	ui.Column(c).Grow(1).FillWidth().Center().Children(func() {
+		feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: detail, Action: actionLabel, OnAction: onAction})
 	})
 }
 
 func loadingView(c *ui.Context, label string) {
-	t := c.Theme()
-	ui.Column(c).Grow(1).FillWidth().Center().Gap(messageGap).Children(func() {
-		ui.Spinner(c).Label(label)
-		ui.Text(c, label).FontSize(smallFontSize).TextColor(t.TextMuted)
-	})
+	ui.Column(c).Grow(1).FillWidth().Center().Children(func() { feedback.Loading(c, label) })
 }
 
 func errorView(c *ui.Context, title string, err error, retry func()) {
-	message(c, title, err.Error(), func() {
-		if ui.Button(c.Key("retry"), "Retry").Clicked() {
-			retry()
-		}
-	})
+	ui.Column(c).Grow(1).FillWidth().Center().Children(func() { feedback.Error(c, title, err, retry) })
 }
 
+var iconKeys = map[string]string{"Zoom In": "⌘=", "Zoom Out": "⌘-"}
+
 func iconButton(c *ui.Context, key string, svg *ui.SVG, label string, disabled bool) bool {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(key)).Size(iconButtonSize, iconButtonSize).Radius(buttonRadius).Center().
-		TextColor(t.TextMuted).Label(label).Tooltip(label).Disabled(disabled)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
-	}
-	b.Children(func() { ui.Icon(c, svg).Size(iconSize, iconSize) })
-	return b.Clicked()
+	return action.IconButton(c, svg, label, action.IconOptions{ID: key, Disabled: disabled, Keys: iconKeys[label]}).Clicked()
 }

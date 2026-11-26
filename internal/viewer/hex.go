@@ -6,6 +6,10 @@ import (
 	"math"
 	"os"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/viewer/hexdump"
 	"github.com/egoist/mygo/ui"
 )
@@ -16,10 +20,6 @@ const (
 	hexShapeCacheMax = 1024
 	hexMeasureSample = "0"
 	hexCopyLimit     = 16 << 20
-	hexGotoWidth     = 180
-	hexBannerGap     = 8
-	hexBannerPadY    = 4
-	hexBannerPadX    = 12
 	hexDumpLabel     = "Hex dump"
 	hexUnreadable    = "unreadable"
 	hexNoSelection   = "No selection"
@@ -155,10 +155,10 @@ func (p *hexPane) controls(c *ui.Context) {
 		return
 	}
 	_, _, ok := p.selected()
-	if ui.Button(c.Key("copy-hex"), "Copy Hex").FontSize(smallFontSize).Tooltip("Copy the selected bytes as hex (Cmd+C)").Disabled(!ok).Clicked() {
+	if action.Button(c, "Copy Hex", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Copy the Selected Bytes as Hex", Keys: "⌘C", Disabled: !ok, ID: "copy-hex"}).Clicked() {
 		p.copySelection(true)
 	}
-	if ui.Button(c.Key("copy-text"), "Copy Text").FontSize(smallFontSize).Tooltip("Copy the selected bytes as text (Cmd+Shift+C)").Disabled(!ok).Clicked() {
+	if action.Button(c, "Copy Text", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Copy the Selected Bytes as Text", Keys: "⇧⌘C", Disabled: !ok, ID: "copy-text"}).Clicked() {
 		p.copySelection(false)
 	}
 }
@@ -172,7 +172,7 @@ func (p *hexPane) body(c *ui.Context) {
 	default:
 		p.banner(c)
 		if p.size == 0 {
-			message(c, "This file is empty", "There are no bytes to show.", nil)
+			message(c, "This file is empty", "There are no bytes to show.", "", nil)
 			return
 		}
 		p.dump(c)
@@ -180,27 +180,28 @@ func (p *hexPane) body(c *ui.Context) {
 }
 
 func (p *hexPane) banner(c *ui.Context) {
-	t := c.Theme()
-	ui.Row(c.Key("banner")).Gap(hexBannerGap).AlignItems(ui.Center).Padding(hexBannerPadY, hexBannerPadX).Shrink(0).FillWidth().
-		Background(t.Surface).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-		ui.Text(c, fmt.Sprintf("Binary file, %s bytes.", formatCount(p.size))).FontSize(smallFontSize)
+	pal := token.Of(c)
+	ui.Row(c.Key("banner")).Gap(token.GapControl.Px()).AlignItems(ui.Center).Height(token.ToolbarHeight.Px()).Padding(0, token.PadRow.Px(), 0, token.PadBarText.Px()).Shrink(0).FillWidth().
+		Background(pal.Layer.Panel).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(pal.Border.Default).Children(func() {
+		design.Text(c, fmt.Sprintf("Binary file, %s bytes.", formatCount(p.size)), token.TextLabel)
 		if p.s.opts.OpenAsText != nil {
-			if ui.Button(c.Key("open-as-text"), "Open as text anyway").FontSize(smallFontSize).Clicked() {
+			if action.Button(c, "Open as Text Anyway", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "open-as-text"}).Clicked() {
 				p.s.opts.OpenAsText()
 			}
 		}
-		ui.Spacer(c)
+		design.Spacer(c)
 		if p.goErr != "" {
-			ui.Text(c, p.goErr).FontSize(smallFontSize).TextColor(t.Danger).SingleLine()
+			design.Text(c, p.goErr, token.TextLabel).TextColor(pal.Severity.Error).SingleLine()
 		}
-		field := ui.TextInput(c.Key("goto"), &p.goTo).Placeholder("Go to offset (Cmd+G)").Label("Go to offset").
-			FontSize(smallFontSize).Width(hexGotoWidth).Disabled(p.size == 0).Bind(&p.goField)
-		if field.Changed() {
-			p.goErr = ""
-		}
-		if field.Submitted() {
-			p.jump()
-		}
+		ui.Column(c.Key("goto-field")).Width(token.FieldWidthSmall.Px()).Shrink(0).Children(func() {
+			goTo := field.TextInput(c, "Go to offset", &p.goTo, field.InputOptions{Placeholder: "Go to offset", Disabled: p.size == 0, ID: "goto"}).Bind(&p.goField)
+			if goTo.Changed() {
+				p.goErr = ""
+			}
+			if goTo.Submitted() {
+				p.jump()
+			}
+		})
 	})
 }
 
@@ -218,12 +219,12 @@ func (p *hexPane) jump() {
 }
 
 func (p *hexPane) dump(c *ui.Context) {
-	t := c.Theme()
-	p.barStyle = ui.ScrollbarStyle{}.Resolve(t)
+	pal := token.Of(c)
+	p.barStyle = token.ScrollbarStyle(pal)
 	p.measure()
 	e := ui.Box(c.Key("dump")).Grow(1).FillWidth().Focusable().FocusRing(false).Clip().Cursor(ui.CursorText).
 		Role(ui.RoleGroup).Label(hexDumpLabel).Bind(&p.s.focus)
-	e.HandleInput(p.input).Draw(func(pnt *ui.Painter, r ui.Rect) { p.paint(pnt, r, t) })
+	e.HandleInput(p.input).Draw(func(pnt *ui.Painter, r ui.Rect) { p.paint(pnt, r, pal) })
 }
 
 func (p *hexPane) font() ui.Font {
@@ -256,12 +257,12 @@ func (p *hexPane) fullRows() int { return max(1, int(p.viewH/p.lineH)) }
 
 func (p *hexPane) visibleRows() int { return int(math.Ceil(float64(p.viewH/p.lineH))) + 1 }
 
-func (p *hexPane) paint(pnt *ui.Painter, r ui.Rect, t *ui.Theme) {
+func (p *hexPane) paint(pnt *ui.Painter, r ui.Rect, t *token.Palette) {
 	if r.W != p.viewW || r.H != p.viewH {
 		p.viewW, p.viewH = r.W, r.H
 		p.s.svc.Invalidate()
 	}
-	pnt.Fill(r, t.Background, 0)
+	pnt.Fill(r, t.Layer.Editor, 0)
 	rows := hexdump.Rows(p.size)
 	x0 := r.X + hexPadX
 	hexX := x0 + float32(p.layout.HexStart())*p.charW
@@ -282,15 +283,15 @@ func (p *hexPane) paint(pnt *ui.Painter, r ui.Rect, t *ui.Theme) {
 		if hasSel {
 			p.paintSelection(pnt, t, start, end, selA, selB, hexX, asciiX, y)
 		}
-		p.drawText(pnt, hexdump.FormatOffset(start, p.layout.Digits), x0, y, t.TextMuted)
+		p.drawText(pnt, hexdump.FormatOffset(start, p.layout.Digits), x0, y, t.Text.Muted)
 		switch {
 		case pageErr == nil:
 			base, _ := hexdump.PageBounds(pageIdx, p.size)
 			data := page[start-base : end-base]
-			p.drawText(pnt, hexdump.FormatHex(data), hexX, y, t.Text)
-			p.drawText(pnt, hexdump.FormatASCII(data), asciiX, y, t.Text)
+			p.drawText(pnt, hexdump.FormatHex(data), hexX, y, t.Text.Primary)
+			p.drawText(pnt, hexdump.FormatASCII(data), asciiX, y, t.Text.Primary)
 		case !errors.Is(pageErr, hexdump.ErrLoading):
-			p.drawText(pnt, hexUnreadable, hexX, y, t.Danger)
+			p.drawText(pnt, hexUnreadable, hexX, y, t.Severity.Error)
 		}
 	}
 	bar := p.scrollbar()
@@ -305,7 +306,7 @@ func (p *hexPane) drawText(pnt *ui.Painter, text string, x, y float32, color ui.
 	pnt.TextLayout(sh.layout, x, y+(p.lineH-sh.h)/2, color)
 }
 
-func (p *hexPane) paintSelection(pnt *ui.Painter, t *ui.Theme, start, end, selA, selB int64, hexX, asciiX, y float32) {
+func (p *hexPane) paintSelection(pnt *ui.Painter, t *token.Palette, start, end, selA, selB int64, hexX, asciiX, y float32) {
 	from, to := max(selA, start), min(selB, end)
 	if from >= to {
 		return
@@ -313,8 +314,8 @@ func (p *hexPane) paintSelection(pnt *ui.Painter, t *ui.Theme, start, end, selA,
 	first, last := int(from-start), int(to-start-1)
 	hexStart := hexX + float32(hexdump.HexColumn(first))*p.charW
 	hexEnd := hexX + float32(hexdump.HexColumn(last)+2)*p.charW
-	pnt.Fill(ui.Rect{X: hexStart, Y: y, W: hexEnd - hexStart, H: p.lineH}, t.Selection, 0)
-	pnt.Fill(ui.Rect{X: asciiX + float32(first)*p.charW, Y: y, W: float32(last-first+1) * p.charW, H: p.lineH}, t.Selection, 0)
+	pnt.Fill(ui.Rect{X: hexStart, Y: y, W: hexEnd - hexStart, H: p.lineH}, t.Text.Selection, 0)
+	pnt.Fill(ui.Rect{X: asciiX + float32(first)*p.charW, Y: y, W: float32(last-first+1) * p.charW, H: p.lineH}, t.Text.Selection, 0)
 }
 
 func (p *hexPane) scrollbar() ui.Scrollbar {

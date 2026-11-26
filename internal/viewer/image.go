@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -18,7 +21,6 @@ const (
 const (
 	checkerSize     = 10
 	panStep         = 48
-	zoomLabelWidth  = 44
 	imageViewLabel  = "Image viewer"
 	svgPreviewLabel = "SVG preview"
 	pointerPrimary  = 0
@@ -185,15 +187,11 @@ func (p *imagePane) info() string {
 func (p *imagePane) body(c *ui.Context) {
 	switch {
 	case p.big != nil:
-		message(c, "This image is too large to show", p.big.Error(), func() {
-			if ui.Button(c.Key("open-preview"), "Open in Preview").Clicked() {
-				p.s.openInPreview()
-			}
-		})
+		message(c, "This image is too large to show", p.big.Error(), "Open in Preview", p.s.openInPreview)
 	case p.err != nil:
 		errorView(c, "Cannot show this image", p.err, p.load)
 	case p.empty:
-		message(c, "Nothing to preview", "Add SVG markup to the file to see it here.", nil)
+		message(c, "Nothing to preview", "Add SVG markup to the file to see it here.", "", nil)
 	case p.pic == nil:
 		loadingView(c, "Loading image")
 	default:
@@ -205,22 +203,20 @@ func (p *imagePane) controls(c *ui.Context) {
 	if p.pic == nil {
 		return
 	}
-	t := c.Theme()
 	if iconButton(c, "zoom-out", icons.ZoomOut, "Zoom Out", false) {
 		p.zoomStep(-1)
 	}
-	ui.Text(c.Key("zoom-level"), fmt.Sprintf("%d%%", percentLabel(p.effective()))).FontSize(smallFontSize).
-		TextColor(t.TextMuted).Width(zoomLabelWidth).TextAlign(ui.Center).SingleLine()
+	design.Text(c.Key("zoom-level"), fmt.Sprintf("%d%%", percentLabel(p.effective())), token.TextLabel).Width(token.ValueLabelWidth.Px()).TextAlign(ui.Center).SingleLine()
 	if iconButton(c, "zoom-in", icons.ZoomIn, "Zoom In", false) {
 		p.zoomStep(1)
 	}
-	if ui.Button(c.Key("fit"), "Fit").FontSize(smallFontSize).Tooltip("Fit to window").Clicked() {
+	if action.Button(c, "Fit", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Fit to Window", ID: "fit"}).Clicked() {
 		p.zoom = zoomState{fit: true, enlargeToFit: p.zoom.enlargeToFit}
 	}
-	if ui.Button(c.Key("actual"), "1:1").FontSize(smallFontSize).Label("Actual Size").Tooltip("Actual size (Cmd+0)").Clicked() {
+	if action.Button(c, "1:1", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Actual Size", Keys: "⌘0", ID: "actual"}).Label("Actual Size").Clicked() {
 		p.zoomTo(1)
 	}
-	ui.Segmented(c.Key("backdrop"), &p.backdrop, backdropLabels...).FontSize(smallFontSize).Label("Image background")
+	action.Segmented(c, "Image background", &p.backdrop, backdropLabels, action.SegmentedOptions{})
 	if p.player != nil {
 		label, icon := "Pause", icons.Pause
 		if !p.player.Playing() {
@@ -237,7 +233,7 @@ func (p *imagePane) controls(c *ui.Context) {
 }
 
 func (p *imagePane) canvas(c *ui.Context) {
-	t := c.Theme()
+	pal := token.Of(c)
 	if p.painted && !p.released && p.pic.bitmap != nil {
 		p.pic.bitmap.ReleasePixels()
 		p.released = true
@@ -250,7 +246,7 @@ func (p *imagePane) canvas(c *ui.Context) {
 	if p.pannable() {
 		box.Cursor(ui.CursorGrab)
 	}
-	box.HandleInput(p.input).Draw(func(pnt *ui.Painter, r ui.Rect) { p.paintBackdrop(pnt, r, t) })
+	box.HandleInput(p.input).Draw(func(pnt *ui.Painter, r ui.Rect) { p.paintBackdrop(pnt, r, pal) })
 	box.Children(func() { p.picture(c) })
 }
 
@@ -276,19 +272,19 @@ func (p *imagePane) picture(c *ui.Context) {
 	el.Size(w, h).Fit(ui.FillBox).Shrink(0).Translate(p.zoom.panX, p.zoom.panY)
 }
 
-func (p *imagePane) paintBackdrop(pnt *ui.Painter, r ui.Rect, t *ui.Theme) {
+func (p *imagePane) paintBackdrop(pnt *ui.Painter, r ui.Rect, t *token.Palette) {
 	p.painted = true
 	switch p.backdrop {
 	case backdropPlain:
-		pnt.Fill(r, t.Background, 0)
+		pnt.Fill(r, t.Layer.Editor, 0)
 	case backdropInverse:
-		pnt.Fill(r, t.Text, 0)
+		pnt.Fill(r, t.Text.Primary, 0)
 	default:
-		pnt.Fill(r, t.Background, 0)
+		pnt.Fill(r, t.Layer.Editor, 0)
 		for row, y := 0, float32(0); y < r.H; row, y = row+1, y+checkerSize {
 			for col, x := 0, float32(0); x < r.W; col, x = col+1, x+checkerSize {
 				if (row+col)%2 == 1 {
-					pnt.Fill(ui.Rect{X: r.X + x, Y: r.Y + y, W: min(checkerSize, r.W-x), H: min(checkerSize, r.H-y)}, t.SurfaceHover, 0)
+					pnt.Fill(ui.Rect{X: r.X + x, Y: r.Y + y, W: min(checkerSize, r.W-x), H: min(checkerSize, r.H-y)}, t.List.Hover, 0)
 				}
 			}
 		}

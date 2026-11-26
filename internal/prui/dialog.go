@@ -5,18 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	modal "github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	dialogWidth      = 460
-	dialogTextHeight = 120
-	pickerListHeight = 240
-	pickerRowHeight  = 28
-)
+const dialogTextLines = 6
 
 var errCancelled = errors.New("prui: cancelled")
 
@@ -272,46 +273,39 @@ func (p *PRs) Overlay(c *ui.Context) {
 
 func (p *PRs) dialogView(c *ui.Context) {
 	dl := &p.dialog
-	t := c.Theme()
-	ui.Modal(c, &dl.open, func() {
-		ui.Column(c).Gap(spacingMedium).Width(dialogWidth).Children(func() {
-			ui.Text(c, dl.title).Bold()
-			if dl.hint != "" {
-				mutedText(c, dl.hint)
+	modal.Modal(c, &dl.open, dl.title, modal.Options{Hint: dl.hint}, func() {
+		if len(dl.choices) > 0 {
+			action.Segmented(c, "Choice", &dl.choice, dl.choices, action.SegmentedOptions{})
+		}
+		if dl.subjectLabel != "" {
+			field.TextInput(c, dl.subjectLabel, &dl.subject, field.InputOptions{Placeholder: dl.subjectLabel})
+		}
+		if !dl.noBody {
+			field.TextArea(c, dl.title, &dl.body, field.AreaOptions{Placeholder: dl.placeholder, MinLines: dialogTextLines, AutoFocus: true, ID: "dialog-body"})
+		}
+		if dl.suggest != "" {
+			smallButton(c, "Insert Suggestion", false).OnClick(func() { dl.body = appendSuggestion(dl.body, dl.suggest) })
+		}
+		for i := range dl.checks {
+			action.Checkbox(c, dl.checks[i].label, &dl.checks[i].on, action.ChoiceOptions{ID: "check-" + strconv.Itoa(i)})
+		}
+		if dl.err != "" {
+			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: dl.err})
+		}
+		var cancel, ok ui.Element
+		modal.Actions(c, func() {
+			if dl.busy {
+				feedback.Spinner(c, "Working")
 			}
-			if len(dl.choices) > 0 {
-				ui.Segmented(c, &dl.choice, dl.choices...).Label("Choice")
-			}
-			if dl.subjectLabel != "" {
-				ui.TextInput(c, &dl.subject).Placeholder(dl.subjectLabel).FillWidth().Label(dl.subjectLabel)
-			}
-			if !dl.noBody {
-				ui.TextArea(c, &dl.body).AutoFocus().Placeholder(dl.placeholder).MinHeight(dialogTextHeight).FillWidth().Label(dl.title)
-			}
-			if dl.suggest != "" {
-				ui.Button(c, "Insert Suggestion").OnClick(func() { dl.body = appendSuggestion(dl.body, dl.suggest) })
-			}
-			for i := range dl.checks {
-				ui.Checkbox(c.Key(i), &dl.checks[i].on, dl.checks[i].label)
-			}
-			if dl.err != "" {
-				ui.Text(c, dl.err).FontSize(fontSmall).TextColor(t.Danger)
-			}
-			var cancel, ok ui.Element
-			ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Justify(ui.End).FillWidth().Children(func() {
-				if dl.busy {
-					ui.Spinner(c).Label("Working")
-				}
-				cancel = ui.Button(c, "Cancel")
-				ok = ui.PrimaryButton(c, dl.action).Disabled(dl.busy)
-			})
-			if cancel.Clicked() {
-				dl.open = false
-			}
-			if ok.Clicked() {
-				p.submitDialog()
-			}
+			cancel = action.Button(c, "Cancel", action.ButtonOptions{})
+			ok = action.Button(c, dl.action, action.ButtonOptions{Variant: action.Primary, Disabled: dl.busy})
 		})
+		if cancel.Clicked() {
+			dl.open = false
+		}
+		if ok.Clicked() {
+			p.submitDialog()
+		}
 	})
 	if !dl.open && dl.busy {
 		dl.open = true
@@ -320,51 +314,47 @@ func (p *PRs) dialogView(c *ui.Context) {
 
 func (p *PRs) pickerView(c *ui.Context) {
 	pk := &p.picker
-	t := c.Theme()
-	ui.Modal(c, &pk.open, func() {
-		ui.Column(c).Gap(spacingMedium).Width(dialogWidth).Children(func() {
-			ui.Text(c, pk.title).Bold()
-			ui.SearchField(c.Key("filter"), &pk.filter).Placeholder("Filter").Label("Filter").FillWidth()
-			switch {
-			case pk.loading:
-				loadingRow(c, "Loading...")
-			case pk.err != "" && len(pk.items) == 0:
-				ui.Text(c, pk.err).FontSize(fontSmall).TextColor(t.Danger)
-			default:
-				items := pk.visible()
-				if len(items) == 0 {
-					mutedText(c, "Nothing matches.")
-				}
-				ui.Scroll(c).Height(pickerListHeight).FillWidth().Children(func() {
-					for _, item := range items {
-						on := pk.selected[item]
-						if ui.Checkbox(c.Key(item), &on, item).Height(pickerRowHeight).Changed() {
-							if pk.single {
-								clear(pk.selected)
-							}
-							pk.selected[item] = on
+	modal.Modal(c, &pk.open, pk.title, modal.Options{}, func() {
+		field.SearchInput(c, "Filter", &pk.filter, field.SearchOptions{Placeholder: "Filter", ID: "filter"})
+		switch {
+		case pk.loading:
+			feedback.Loading(c, "Loading...")
+		case pk.err != "" && len(pk.items) == 0:
+			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: pk.err})
+		default:
+			items := pk.visible()
+			if len(items) == 0 {
+				mutedText(c, "Nothing matches.")
+			}
+			ui.Scroll(c).Height(token.ListHeightMax.Px()).FillWidth().Children(func() {
+				for _, item := range items {
+					on := pk.selected[item]
+					if action.Checkbox(c, item, &on, action.ChoiceOptions{ID: "pick-" + item}).Height(token.RowHeight.Px()).Changed() {
+						if pk.single {
+							clear(pk.selected)
 						}
+						pk.selected[item] = on
 					}
-				})
-			}
-			if pk.err != "" && len(pk.items) > 0 {
-				ui.Text(c, pk.err).FontSize(fontSmall).TextColor(t.Danger)
-			}
-			var cancel, ok ui.Element
-			ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Justify(ui.End).FillWidth().Children(func() {
-				if pk.busy {
-					ui.Spinner(c).Label("Working")
 				}
-				cancel = ui.Button(c, "Cancel")
-				ok = ui.PrimaryButton(c, pk.action).Disabled(pk.busy || pk.loading)
 			})
-			if cancel.Clicked() {
-				pk.open = false
+		}
+		if pk.err != "" && len(pk.items) > 0 {
+			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: pk.err})
+		}
+		var cancel, ok ui.Element
+		modal.Actions(c, func() {
+			if pk.busy {
+				feedback.Spinner(c, "Working")
 			}
-			if ok.Clicked() {
-				p.submitPicker()
-			}
+			cancel = action.Button(c, "Cancel", action.ButtonOptions{})
+			ok = action.Button(c, pk.action, action.ButtonOptions{Variant: action.Primary, Disabled: pk.busy || pk.loading})
 		})
+		if cancel.Clicked() {
+			pk.open = false
+		}
+		if ok.Clicked() {
+			p.submitPicker()
+		}
 	})
 	if !pk.open && pk.busy {
 		pk.open = true

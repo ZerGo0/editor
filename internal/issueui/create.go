@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
@@ -12,8 +18,7 @@ import (
 const (
 	createViewID      = "issue/new"
 	createViewTitle   = "Create Issue"
-	createFormWidth   = 640
-	createBodyHeight  = 180
+	createBodyLines   = 8
 	noMilestoneOption = "No milestone"
 	fenceChar         = "`"
 	minFenceLength    = 3
@@ -88,10 +93,9 @@ func (i *Issues) createView(c *ui.Context) {
 		return
 	}
 	f := i.create
-	t := c.Theme()
-	ui.Scroll(c).Fill().Background(t.Background).Children(func() {
-		ui.Column(c).Gap(spacingLarge).Padding(messagePad).MaxWidth(createFormWidth).FillWidth().Children(func() {
-			ui.Text(c, createViewTitle).FontSize(fontTitle).Bold()
+	detail.Page(c, func() {
+		detail.Body(c, createViewTitle, token.FormMaxWidth, func() {
+			design.Text(c, createViewTitle, token.TextHeading)
 			switch {
 			case f == nil:
 				mutedText(c, "Use Create Issue in the Issues view to start a new issue.")
@@ -105,53 +109,43 @@ func (i *Issues) createView(c *ui.Context) {
 }
 
 func (i *Issues) createFields(c *ui.Context, f *createForm) {
-	t := c.Theme()
-	field := func(label string, body func()) {
-		ui.Column(c).Gap(spacingSmall).FillWidth().Children(func() {
-			mutedText(c, label)
-			body()
-		})
-	}
-	field("Title", func() {
-		ui.TextInput(c.Key("title"), &f.title).AutoFocus().Placeholder("Issue title").FillWidth().Label("Title")
+	detail.Field(c, "Title", func() {
+		field.TextInput(c, "Title", &f.title, field.InputOptions{Placeholder: "Issue title", AutoFocus: true, ID: "title"})
 	})
-	field("Description", func() {
-		ui.TextArea(c.Key("body"), &f.body).Placeholder("Describe the issue (Markdown is supported)").MinHeight(createBodyHeight).FillWidth().Label("Description")
+	detail.Field(c, "Description", func() {
+		field.TextArea(c, "Description", &f.body, field.AreaOptions{Placeholder: "Describe the issue (Markdown is supported)", MinLines: createBodyLines, ID: "body"})
 	})
 	if i.meta.loading {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Children(func() {
-			ui.Spinner(c).Label("Loading labels, people and milestones")
+		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
+			feedback.Spinner(c, "Loading labels, people and milestones")
 			mutedText(c, "Loading labels, people and milestones...")
 		})
 	}
 	if i.meta.err != nil {
-		ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Wrap().Children(func() {
-			ui.Text(c, "Some choices could not be loaded: "+errorText(i.meta.err)).FontSize(fontSmall).TextColor(t.Danger)
-			ui.Button(c, "Retry").OnClick(i.loadMeta)
-		})
+		errorNotice(c, fmt.Errorf("Some choices could not be loaded: %s", errorText(i.meta.err)), i.loadMeta)
 	}
-	field("Labels", func() {
+	detail.Field(c, "Labels", func() {
 		ui.TokenField(c.Key("labels"), &f.labels, i.meta.labelNames()).Placeholder("Add a label").Label("Labels")
 	})
-	field("Assignees", func() {
+	detail.Field(c, "Assignees", func() {
 		ui.TokenField(c.Key("assignees"), &f.assignees, i.meta.userLogins()).Placeholder("Add a person").Label("Assignees")
 	})
-	field("Milestone", func() {
-		ui.Select(c.Key("milestone"), &f.milestone, i.meta.milestoneOptions()).Label("Milestone")
+	detail.Field(c, "Milestone", func() {
+		action.Select(c, "Milestone", &f.milestone, options(i.meta.milestoneOptions()), action.SelectOptions{ID: "milestone"})
 	})
 	blocked := f.blocked()
 	if f.err != "" {
-		ui.Text(c, f.err).FontSize(fontSmall).TextColor(t.Danger)
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: f.err})
 	}
-	ui.Row(c).Gap(spacingMedium).AlignItems(ui.Center).Justify(ui.End).FillWidth().Children(func() {
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Justify(ui.End).Gap(token.GapControl.Px()).Children(func() {
 		if f.busy != "" {
-			ui.Spinner(c).Label(f.busy)
+			feedback.Spinner(c, f.busy)
 			mutedText(c, f.busy+"...")
 		}
 		if blocked != "" {
 			mutedText(c, blocked)
 		}
-		ui.PrimaryButton(c, "Create").Label("Create issue").Disabled(blocked != "" || f.busy != "").OnClick(func() { i.submitCreate(f) })
+		action.Button(c, "Create", action.ButtonOptions{Variant: action.Primary, Disabled: blocked != "" || f.busy != ""}).Label("Create issue").OnClick(func() { i.submitCreate(f) })
 	})
 }
 

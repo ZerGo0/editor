@@ -6,14 +6,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	findGap       = 8
-	findPadY      = 6
-	findPadX      = 12
 	findPrefill   = 256
+	findLabel     = "Find"
 	statusSearch  = "Searching..."
 	statusNone    = "No matches"
 	statusChanged = "The text changed; search again"
@@ -66,16 +68,19 @@ func (s *State) stopSearch() {
 }
 
 func (s *State) findBar(c *ui.Context) {
-	t := c.Theme()
+	p := token.Of(c)
 	switch {
 	case c.Shortcut(ui.Cmd, ui.KeyG):
 		s.search(false)
 	case c.Shortcut(ui.Cmd|ui.Shift, ui.KeyG):
 		s.search(true)
 	}
-	ui.Row(c).Gap(findGap).Padding(findPadY, findPadX).AlignItems(ui.Center).Shrink(0).FillWidth().
-		Background(t.Surface).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-		in := ui.TextInput(c, &s.find.query).Grow(1).Placeholder("Find").Label("Find")
+	ui.Row(c).Gap(token.GapControl.Px()).Padding(token.GapInline.Px(), token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).FillWidth().
+		Background(p.Layer.Panel).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).Role(ui.RoleSearch).Label(findLabel).Children(func() {
+		matchCase := s.find.matchCase
+		in := field.TextInput(c, findLabel, &s.find.query, field.InputOptions{Placeholder: findLabel, Icon: icons.Search, Toggles: []field.Toggle{
+			{Icon: icons.CaseSensitive, Label: "Match Case", Keys: "⌥⌘C", On: &s.find.matchCase},
+		}})
 		if s.find.focusInput {
 			s.find.focusInput = false
 			in.Focus()
@@ -85,15 +90,16 @@ func (s *State) findBar(c *ui.Context) {
 			s.search(c.Modifiers()&ui.Shift != 0)
 		case in.Shortcut(0, ui.KeyEscape):
 			s.closeFind()
-		}
-		ui.Checkbox(c, &s.find.matchCase, "Match case")
-		if ui.Button(c, "Previous").Clicked() {
-			s.search(true)
-		}
-		if ui.Button(c, "Next").Clicked() {
+		case matchCase != s.find.matchCase && s.find.query != "":
 			s.search(false)
 		}
-		if ui.Button(c, "Done").Clicked() {
+		if action.IconButton(c, icons.ChevronUp, "Previous Match", action.IconOptions{Keys: "⇧⌘G"}).Clicked() {
+			s.search(true)
+		}
+		if action.IconButton(c, icons.ChevronDown, "Next Match", action.IconOptions{Keys: "⌘G"}).Clicked() {
+			s.search(false)
+		}
+		if action.IconButton(c, icons.Close, "Close", action.IconOptions{Keys: "Esc"}).Clicked() {
 			s.closeFind()
 		}
 	})
