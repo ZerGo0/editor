@@ -239,8 +239,6 @@ func (w *Workspace) acceptPalette(item palette.Item) {
 	switch v := item.Value.(type) {
 	case languagePick:
 		w.setLanguage(v)
-	case scratchPick:
-		w.createScratch(v)
 	case switcherPick:
 		w.openPick(v)
 	default:

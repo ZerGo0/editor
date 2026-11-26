@@ -79,18 +79,6 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 	})
 }
 
-func TestNewScratchFile(t *testing.T) {
-	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
-	app.Menu(win, "File", "New Scratch File...")
-	app.Type(win, "Plain Text")
-	app.Key(win, "Enter")
-	app.WaitNode(win, "scratch tab", RoleLabel("tab", "scratch_1.txt"))
-	app.WaitNode(win, "scratch row", func(n Node) bool { return n.Label == "scratch_1.txt" && n.Role != "tab" })
-	if _, err := os.Stat(filepath.Join(app.UserData, "scratches", "scratch_1.txt")); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestFolderSettingsOverrideUserSetting(t *testing.T) {
 	userData := t.TempDir()
 	if err := os.WriteFile(filepath.Join(userData, "settings.json"), []byte(`{"files.exclude": ["*.tmp"]}`), 0o644); err != nil {

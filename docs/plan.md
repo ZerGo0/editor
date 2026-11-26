@@ -65,7 +65,7 @@ Module path: `github.com/ZerGo0/editor`
 7. GitHub pull requests.
 8. Large-file mode.
 9. Problems/TODO, extra tokenizers, polish. Viewers for common non-text files: images (with zoom), SVG and Markdown preview, video, audio, PDF, and a hex view for other binary files.
-    - Chosen from the [IDE research](research/ide-features.md): EditorConfig and folder settings, hot exit, bracket pair colors and guides, scratch files, shortcuts that work on non-Latin keyboard layouts, untitled files (Cmd+N), and back and forward navigation (Ctrl+- and Ctrl+Shift+-). Ideas for later are in [IDEAS.md](../IDEAS.md).
+    - Chosen from the [IDE research](research/ide-features.md): EditorConfig and folder settings, hot exit, bracket pair colors and guides, shortcuts that work on non-Latin keyboard layouts, untitled files (Cmd+N), and back and forward navigation (Ctrl+- and Ctrl+Shift+-). Ideas for later are in [IDEAS.md](../IDEAS.md).
     - UI redesign: a design system (tokens and components in `internal/design`, documented in `docs/design.md`), then the workbench and all views rebuilt on it: VS Code title bar with command center, activity bar at the top of the sidebar, VS Code Source Control (commit box at the top, tree view, Graph section), and VS Code tab labels for files with the same name.
 10. UI and UX polish loop: a subagent uses the editor as a VS Code or JetBrains user would, lists broken or rough UI and UX, and the findings are fixed. At most 3 rounds.
 11. E2E loop: a reporter subagent runs and explores the E2E suite, an implementor subagent fixes bugs and adds tests. At most 3 rounds.

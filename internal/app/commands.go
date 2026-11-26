@@ -62,7 +62,6 @@ func (a *App) registerCommands() {
 	add("workbench.action.newWindow", categoryFile, "New Window", app(a.showWelcome))
 	add("workbench.action.files.openFolder", categoryFile, "Open Folder...", a.openFolderDialog)
 	add("workbench.action.files.newUntitledFile", categoryFile, "New Text File", ws((*workspace.Workspace).NewUntitled))
-	add("scratch.newFile", categoryFile, "New Scratch File...", ws((*workspace.Workspace).NewScratchFile))
 	add("explorer.newFile", categoryFile, "New File...", ws((*workspace.Workspace).NewFile))
 	add("explorer.newFolder", categoryFile, "New Folder...", ws((*workspace.Workspace).NewFolder))
 	add("workbench.action.toggleSidebarVisibility", categoryView, "Toggle Sidebar Visibility", ws((*workspace.Workspace).ToggleSidebar))

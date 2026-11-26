@@ -223,40 +223,6 @@ func TestFolderSettingsOverrideUserSettings(t *testing.T) {
 	}
 }
 
-func TestScratchFiles(t *testing.T) {
-	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
-	tt := ui.NewTester(func(c *ui.Context) { w.scratchesSection(c) }, testViewW, testViewH)
-	w.refreshScratches()
-	tt.Frame()
-	if !tt.HasText("No scratch files") {
-		t.Fatalf("empty state missing: %v", tt.Texts())
-	}
-	w.createScratch(scratchPick{})
-	w.createScratch(scratchPick{lang: editor.LanguageNamed("Go")})
-	dir := w.scratchDir()
-	for _, name := range []string{"scratch_1.txt", "scratch_2.go"} {
-		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := w.active.ActiveTab().Path; got != filepath.Join(dir, "scratch_2.go") {
-		t.Fatalf("active tab %s", got)
-	}
-	tt.Frame()
-	if _, ok := tt.Access("scratch_1.txt"); !ok {
-		t.Fatalf("scratch row missing: %v", tt.Texts())
-	}
-	if err := w.renameScratch(filepath.Join(dir, "scratch_2.go"), "main.go"); err != nil {
-		t.Fatal(err)
-	}
-	if got := w.active.ActiveTab().Path; got != filepath.Join(dir, "main.go") {
-		t.Fatalf("renamed tab %s", got)
-	}
-	if err := w.renameScratch(filepath.Join(dir, "main.go"), "../x.go"); err == nil {
-		t.Fatal("rename accepted a path outside the scratch folder")
-	}
-}
-
 func TestBracketColorsFollowSetting(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{"a.go": "f(a[b{c}])"})

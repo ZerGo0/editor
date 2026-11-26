@@ -71,7 +71,6 @@ type Workspace struct {
 	hot           hotExitState
 	ec            editorConfigState
 	brackets      bracketState
-	scratches     scratchState
 }
 
 func New(root string, saved session.Project, env *Env) *Workspace {
@@ -122,7 +121,6 @@ func (w *Workspace) Attach(win *mygo.Window) {
 	go w.watch(w.ctx)
 	w.reindex()
 	w.refreshIgnored()
-	w.attachScratches()
 	w.attachGit()
 	w.attachGitHub()
 }

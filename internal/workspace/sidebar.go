@@ -71,7 +71,6 @@ func (w *Workspace) explorerView(c *ui.Context) {
 	} else {
 		w.tree.View(c, c.Vibrancy(), filetreeHandlers(w))
 	}
-	w.scratchesSection(c)
 }
 
 func (w *Workspace) RefreshExplorer() {
