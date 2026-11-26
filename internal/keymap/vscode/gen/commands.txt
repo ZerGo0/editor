@@ -2,6 +2,8 @@ explorer.newFile
 explorer.newFolder
 markdown.showPreview
 markdown.showPreviewToSide
+notifications.clearAll
+notifications.showList
 search.action.focusNextSearchResult
 search.action.focusPreviousSearchResult
 todo.show
@@ -22,7 +24,9 @@ workbench.action.findAction
 workbench.action.findInFiles
 workbench.action.focusFirstEditorGroup
 workbench.action.focusNextGroup
+workbench.action.focusNextPart
 workbench.action.focusPreviousGroup
+workbench.action.focusPreviousPart
 workbench.action.focusSecondEditorGroup
 workbench.action.focusThirdEditorGroup
 workbench.action.gotoSymbol
@@ -31,6 +35,7 @@ workbench.action.installCommandLine
 workbench.action.keepEditor
 workbench.action.navigateBack
 workbench.action.navigateForward
+workbench.action.navigateToLastEditLocation
 workbench.action.newWindow
 workbench.action.nextEditor
 workbench.action.openFolderSettings
@@ -50,6 +55,7 @@ workbench.action.showCommands
 workbench.action.splitEditorDown
 workbench.action.splitEditorRight
 workbench.action.togglePanel
+workbench.action.togglePanelPosition
 workbench.action.toggleSidebarVisibility
 workbench.action.uninstallCommandLine
 workbench.action.unpinEditor
