@@ -19,7 +19,7 @@ type ChoiceOptions struct {
 
 func Checkbox(c *ui.Context, label string, checked *bool, o ChoiceOptions) ui.Element {
 	p := token.Of(c)
-	row := ui.CheckboxBase(c.Key(keyOf(o.ID, label)), checked).Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).
+	row := ui.CheckboxBase(c.Key(keyOf(o.ID, label)), checked).Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).MinHeight(token.HitTargetMin.Px()).
 		Label(label).Disabled(o.Disabled).Radius(token.RadiusInline.Px())
 	if o.Description != "" {
 		row.Description(o.Description)
@@ -44,7 +44,7 @@ func Checkbox(c *ui.Context, label string, checked *bool, o ChoiceOptions) ui.El
 
 func Switch(c *ui.Context, label string, on *bool, o ChoiceOptions) ui.Element {
 	p := token.Of(c)
-	row := ui.SwitchBase(c.Key(keyOf(o.ID, label)), on).Gap(token.GapControl.Px()).AlignItems(ui.Center).
+	row := ui.SwitchBase(c.Key(keyOf(o.ID, label)), on).Gap(token.GapControl.Px()).AlignItems(ui.Center).MinHeight(token.HitTargetMin.Px()).
 		Label(label).Disabled(o.Disabled).Radius(token.RadiusInline.Px())
 	if o.Description != "" {
 		row.Description(o.Description)
@@ -71,5 +71,5 @@ func choiceLabel(c *ui.Context, p *token.Palette, label string) {
 	if label == "" {
 		return
 	}
-	ui.Text(c, label).FontSize(token.TextBody.Px()).TextColor(p.Text.Primary).SingleLine()
+	token.TextBody.Apply(ui.Text(c, label)).TextColor(p.Text.Primary).SingleLine()
 }

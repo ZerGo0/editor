@@ -30,9 +30,11 @@ func Keys(c *ui.Context, keys string) ui.Element {
 		for _, chord := range KeyCaps(keys) {
 			ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).AccessHidden(true).Children(func() {
 				for _, k := range chord {
-					ui.Text(c, k).FontSize(token.TextCaption.Px()).TextColor(p.Key.Text).TextAlign(ui.Center).SingleLine().
-						Height(token.KeyCapHeight.Px()).MinWidth(token.KeyCapMinWidth.Px()).Padding(0, token.PadKeyX.Px()).Radius(token.RadiusControl.Px()).
-						Background(p.Key.Background).Border(token.BorderWidth.Px(), p.Key.Border).BorderWidth(token.BorderWidth.Px(), token.BorderWidth.Px(), token.KeyCapBottomWidth.Px(), token.BorderWidth.Px())
+					ui.Row(c).Height(token.KeyCapHeight.Px()).MinWidth(token.KeyCapMinWidth.Px()).Padding(0, token.PadKeyX.Px()).Radius(token.RadiusControl.Px()).
+						AlignItems(ui.Center).Justify(ui.Center).Background(p.Key.Background).Border(token.BorderWidth.Px(), p.Key.Border).
+						BorderWidth(token.BorderWidth.Px(), token.BorderWidth.Px(), token.KeyCapBottomWidth.Px(), token.BorderWidth.Px()).Children(func() {
+						token.TextCaption.WholeText(c, k).TextColor(p.Key.Text).SingleLine()
+					})
 				}
 			})
 		}

@@ -170,6 +170,7 @@ const (
 	GitIgnored
 	GitConflict
 	GitSubmodule
+	GitCopied
 )
 
 func (s GitStatus) Letter() string {
@@ -190,13 +191,15 @@ func (s GitStatus) Letter() string {
 		return "!"
 	case GitSubmodule:
 		return "S"
+	case GitCopied:
+		return "C"
 	}
 	return ""
 }
 
 func (p *Palette) GitColor(s GitStatus) ui.Color {
 	switch s {
-	case GitAdded:
+	case GitAdded, GitCopied:
 		return p.Git.Added
 	case GitModified:
 		return p.Git.Modified

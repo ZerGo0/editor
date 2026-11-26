@@ -47,7 +47,7 @@ func NavButton(c *ui.Context, icon *ui.SVG, command string, history func(m *ui.M
 		case b.Clicked():
 			action.Run(command)
 		}
-		ui.Box(c.Key("history-anchor")).Absolute().Left(0).Right(0).Bottom(0).Height(0).AccessHidden(true).
+		ui.Box(c.Key("history-anchor")).Absolute().Left(0).Right(0).Bottom(0).Height(0).AccessHidden(true).TabStop(false).
 			PopoverMenuButton(history, ui.PopoverMenuButtonOptions{Open: open})
 	})
 	return wrap

@@ -40,7 +40,7 @@ var (
 	HeaderHeight       = Size{22}
 	ViewTitleHeight    = Size{35}
 	TabHeight          = Size{35}
-	TitleBarHeight     = Size{35}
+	TitleBarHeight     = Size{36}
 	StatusBarHeight    = Size{22}
 	ToolbarHeight      = Size{28}
 	ControlHeight      = Size{26}

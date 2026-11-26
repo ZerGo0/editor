@@ -35,9 +35,14 @@ func Count(c *ui.Context, n int, o CountOptions) ui.Element {
 	if o.Small {
 		height = token.BadgeSmall.Px()
 	}
-	el := ui.Text(c, CountText(n)).FontSize(token.TextBadge.Px()).FontWeight(token.TextBadge.Weight()).TextColor(fg).
-		Background(bg).Radius(token.RadiusPill.Px()).MinWidth(height).Height(height).Padding(0, token.PadBadgeX.Px()).TextAlign(ui.Center).
-		SingleLine().Shrink(0)
+	el := ui.Row(c).Background(bg).Radius(token.RadiusPill.Px()).MinWidth(height).Height(height).Padding(0, token.PadBadgeX.Px()).
+		AlignItems(ui.Center).Justify(ui.Center).Shrink(0)
+	el.Children(func() {
+		text := token.TextBadge.Apply(ui.Text(c, CountText(n))).TextColor(fg).SingleLine()
+		if o.Label != "" {
+			text.AccessHidden(true)
+		}
+	})
 	if o.Label != "" {
 		el.Label(o.Label)
 	}

@@ -55,6 +55,10 @@ func (t TextStyle) Format(s string) string {
 }
 
 func (t TextStyle) Apply(el ui.Element) ui.Element {
+	return NudgeText(t.Boxed(el))
+}
+
+func (t TextStyle) Boxed(el ui.Element) ui.Element {
 	el.FontSize(t.size).FontWeight(t.weight)
 	if t.line > 0 {
 		el.LineHeight(t.line)

@@ -20,7 +20,7 @@ func ViewTitle(c *ui.Context, title string, o TitleOptions) ui.Element {
 		Padding(0, token.PadRow.Px(), 0, token.PadView.Px()).Gap(token.GapInline.Px())
 	show := o.ShowActions || row.Hovered() || row.FocusWithin()
 	row.Children(func() {
-		ui.Text(c, strings.ToUpper(title)).FontSize(token.TextCaption.Px()).TextColor(p.Text.Primary).SingleLine().
+		token.TextCaption.Apply(ui.Text(c, strings.ToUpper(title))).TextColor(p.Text.Primary).SingleLine().
 			Grow(1).MinWidth(0).Role(ui.RoleHeading).Level(1).Label(title)
 		if o.Actions != nil {
 			actions := ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(title + " Actions")

@@ -3,7 +3,9 @@ package token
 import "time"
 
 const (
-	TooltipDelay = 500 * time.Millisecond
+	TooltipDelay = 400 * time.Millisecond
+	EditorHover  = 300 * time.Millisecond
+	SpinnerDelay = 150 * time.Millisecond
 	LongPress    = 400 * time.Millisecond
 )
 

@@ -40,7 +40,7 @@ func Button(c *ui.Context, label string, o ButtonOptions) ui.Element {
 		if o.Icon != nil {
 			ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
 		}
-		ui.Text(c, label).FontSize(token.TextBody.Px()).TextColor(fg).SingleLine()
+		token.TextBody.Apply(ui.Text(c, label)).TextColor(fg).SingleLine()
 	})
 	return b
 }

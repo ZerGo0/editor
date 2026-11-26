@@ -28,6 +28,7 @@ type gallery struct {
 	stack                            pane.StackState
 	sectionOpen, sectionClosed       bool
 	selectedRow, treeRow             int
+	features                         featureState
 }
 
 func newGallery() *gallery {
@@ -65,6 +66,7 @@ func galleryColumn(c *ui.Context, g *gallery) {
 			galleryLists(c, g)
 			galleryBadges(c)
 			galleryFeedback(c)
+			galleryFeatures(c, g)
 		})
 	})
 }

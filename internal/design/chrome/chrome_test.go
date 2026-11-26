@@ -41,6 +41,41 @@ func TestNavButtons(t *testing.T) {
 	}
 }
 
+func TestNavButtonsSkipHistoryAnchor(t *testing.T) {
+	action.SetCommands(history{"back": {Title: "Go Back", Disabled: true}, "forward": {Title: "Go Forward", Disabled: true}})
+	t.Cleanup(func() { action.SetCommands(nil) })
+	menu := func(m *ui.Menu) { action.Item(m, "main.go", action.ItemOptions{}) }
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Row(c).Children(func() {
+			NavButton(c, icons.ArrowLeft, "back", menu)
+			NavButton(c, icons.ArrowRight, "forward", menu)
+			ui.Button(c, "Next")
+		})
+	}, testWidth, testHeight)
+	tt.Key(0, ui.KeyTab)
+	if !tt.Focused("Next") {
+		t.Fatal("Tab stops at a hidden history anchor")
+	}
+}
+
+func TestActivityBarPassesFocusToSelectedTab(t *testing.T) {
+	selected, focus := 1, false
+	items := []Activity{{Icon: icons.Folder, Label: "Explorer"}, {Icon: icons.Search, Label: "Search"}}
+	tt := ui.NewTester(func(c *ui.Context) {
+		bar := ActivityBar(c, "Activity Bar", &selected, items)
+		if focus {
+			focus = false
+			bar.Focus()
+		}
+	}, testWidth, testHeight)
+	focus = true
+	tt.Frame()
+	tt.Frame()
+	if !tt.Focused("Search") || tt.Focused("Explorer") {
+		t.Fatal("focus stays on the list, want the selected tab")
+	}
+}
+
 func TestTabStrip(t *testing.T) {
 	selected, closed := 0, -1
 	tabs := []Tab{{Label: "a.go"}, {Label: "b.go", Dirty: true}}

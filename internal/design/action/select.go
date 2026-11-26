@@ -37,7 +37,7 @@ func Select[T comparable](c *ui.Context, label string, selected *T, options []Op
 		trigger.Width(o.Width.Px())
 	}
 	trigger.Children(func() {
-		ui.Text(c, current).FontSize(token.TextBody.Px()).TextColor(p.Text.Primary).SingleLine().Grow(1).MinWidth(0)
+		token.TextBody.Apply(ui.Text(c, current)).TextColor(p.Text.Primary).SingleLine().Grow(1).MinWidth(0)
 		ui.Icon(c, icons.ChevronDown).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Shrink(0)
 	})
 	sel.Popup(func(panel ui.Element) {
@@ -52,7 +52,7 @@ func Select[T comparable](c *ui.Context, label string, selected *T, options []Op
 				color = p.Menu.SelectionText
 			}
 			item.Children(func() {
-				ui.Text(c, opt.Label).FontSize(token.TextBody.Px()).TextColor(color).SingleLine()
+				token.TextBody.Apply(ui.Text(c, opt.Label)).TextColor(color).SingleLine()
 			})
 		}
 	})

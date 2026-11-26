@@ -19,6 +19,7 @@ type SplitOptions struct {
 	ID        string
 	MenuLabel string
 	Menu      func(m *ui.Menu)
+	Wide      bool
 }
 
 func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
@@ -31,6 +32,9 @@ func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
 	var button ui.Element
 	group := ui.Row(c.Key(id)).Height(token.ControlHeight.Px()).Radius(token.RadiusControl.Px()).AlignItems(ui.Stretch).Shrink(0).
 		Role(ui.RoleGroup).Label(label).Disabled(o.Disabled)
+	if o.Wide {
+		group.FillWidth()
+	}
 	base, fg, border := variantColors(p, o.Variant, false, false)
 	separator := p.Control.ButtonBorder
 	if o.Variant == Primary {
@@ -47,7 +51,7 @@ func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
 			if o.Icon != nil {
 				ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
 			}
-			ui.Text(c, label).FontSize(token.TextBody.Px()).TextColor(fg).SingleLine()
+			token.TextBody.Apply(ui.Text(c, label)).TextColor(fg).SingleLine()
 		})
 		ui.Box(c).Width(token.BorderWidth.Px()).Height(token.IconSize.Px()).AlignSelf(ui.Center).Background(separator).Shrink(0)
 		arrow := ui.ButtonBase(c.Key("menu")).Width(token.SplitArrowWidth.Px()).Center().Shrink(0).

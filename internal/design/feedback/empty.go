@@ -10,6 +10,7 @@ type EmptyOptions struct {
 	Icon     *ui.SVG
 	Title    string
 	Message  string
+	Code     string
 	Action   string
 	OnAction func()
 	Link     string
@@ -31,6 +32,10 @@ func Empty(c *ui.Context, o EmptyOptions) ui.Element {
 				if o.Message != "" {
 					ui.Text(c, o.Message).FontSize(token.TextLabel.Px()).TextColor(p.Text.Secondary).TextAlign(ui.Center).
 						Wrap().LineHeight(token.LineHeight)
+				}
+				if o.Code != "" {
+					token.TextMono.Boxed(ui.Text(c, o.Code)).TextColor(p.Text.Primary).Selectable().Wrap().Background(p.Layer.Input).
+						Radius(token.RadiusControl.Px()).Padding(token.PadInputY.Px(), token.PadInputX.Px())
 				}
 				if o.Action != "" && o.OnAction != nil {
 					if action.Button(c, o.Action, action.ButtonOptions{Variant: action.Primary}).Margin(token.GapInline.Px(), 0, 0, 0).Clicked() {

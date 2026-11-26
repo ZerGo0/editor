@@ -8,8 +8,11 @@ import (
 )
 
 const (
-	closeLabel = "Close"
-	dirtyLabel = "Unsaved changes"
+	closeLabel   = "Close"
+	unpinLabel   = "Unpin"
+	dirtyLabel   = "Unsaved changes"
+	middleButton = 2
+	noTab        = -1
 )
 
 type Tab struct {
@@ -25,45 +28,82 @@ type Tab struct {
 }
 
 type TabStripOptions struct {
-	Label   string
-	OnClose func(i int)
-	Menu    func(i int, m *ui.Menu)
-	Actions func(c *ui.Context)
+	Label              string
+	OnClose            func(i int)
+	Menu               func(i int, m *ui.Menu)
+	Actions            func(c *ui.Context)
+	OnSelect           func(i int)
+	OnUnpin            func(i int)
+	OnAuxClick         func(i int)
+	OnDoubleClick      func(i int)
+	Drag               func(i int) any
+	Drop               func(at int, target ui.Element) bool
+	EmptyMenu          func(m *ui.Menu)
+	OnEmptyDoubleClick func()
+	Dragging           func(i int)
 }
 
 func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.Element {
 	p := token.Of(c)
-	strip := ui.Row(c.Key("tab-strip:" + o.Label)).FillWidth().Height(token.TabHeight.Px()).Shrink(0).Background(p.Layer.TabBar)
+	strip := ui.Row(c.Key("tab-strip:"+o.Label)).FillWidth().Height(token.TabHeight.Px()).Shrink(0).Background(p.Layer.TabBar).
+		Padding(0, 0, 0, token.GapInline.Px()).AlignItems(ui.Center)
+	shown := ui.Local(strip, "shown", func() int { return noTab })
 	strip.Children(func() {
-		parts := ui.TabsBase(c, selected, len(tabs))
-		parts.List.Grow(1).MinWidth(0).FillHeight().Label(o.Label).Children(func() {
-			for i, t := range tabs {
-				tabItem(c, p, parts.Tab(i), i == *selected, i, t, o)
+		ui.ScrollHorizontal(c).Shrink(1).MinWidth(0).FillHeight().Children(func() {
+			parts := ui.TabsBase(c, selected, len(tabs))
+			parts.List.FillHeight().AlignItems(ui.Center).Gap(token.GapTight.Px()).Label(o.Label).Children(func() {
+				for i, t := range tabs {
+					tab := parts.Tab(i)
+					tabItem(c, p, tab, i == *selected, i, t, o)
+					if i == *selected && *shown != i {
+						tab.ScrollIntoView()
+					}
+				}
+			})
+			if parts.List.Changed() && o.OnSelect != nil {
+				o.OnSelect(*selected)
 			}
 		})
+		*shown = *selected
+		rest := ui.Box(c.Key("rest")).Grow(1).FillHeight().MinWidth(token.TabMinWidth.Px() / 2)
+		if o.Drop != nil && o.Drop(len(tabs), rest) {
+			dropMark(c, p)
+		}
+		if o.EmptyMenu != nil {
+			rest.ContextMenu(o.EmptyMenu)
+		}
+		if o.OnEmptyDoubleClick != nil && rest.DoubleClicked() {
+			o.OnEmptyDoubleClick()
+		}
 		if o.Actions != nil {
-			ui.Row(c).FillHeight().Padding(0, token.PadRow.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).
+			ui.Row(c).FillHeight().Padding(0, token.GapInline.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).
 				Role(ui.RoleToolbar).Label(o.Label + " Actions").Children(func() { o.Actions(c) })
 		}
 	})
 	return strip
 }
 
+func dropMark(c *ui.Context, p *token.Palette) {
+	ui.Box(c).Absolute().Left(0).Top(token.GapInline.Px()).Bottom(token.GapInline.Px()).Width(token.Stroke2.Px()).
+		Background(p.Accent.Base).PassThrough()
+}
+
 func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int, t Tab, o TabStripOptions) {
 	hovered := tab.Hovered()
-	bg, fg := p.Tab.Inactive, p.Tab.InactiveText
+	fg := p.Tab.InactiveText
 	switch {
 	case active:
-		bg, fg = p.Tab.Active, p.Tab.ActiveText
+		tab.Background(p.List.InactiveSelection)
+		fg = p.Tab.ActiveText
 	case hovered:
-		bg = p.Tab.Hover
+		tab.Background(p.List.Hover)
 	}
 	if t.Git != token.GitNone {
 		fg = p.GitColor(t.Git)
 	}
-	tab.FillHeight().MinWidth(token.TabMinWidth.Px()).Padding(0, token.PadInputEnd.Px(), 0, token.PadTabX.Px()).
-		Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).Background(bg).Label(t.Label).
-		BorderWidth(0, token.BorderWidth.Px(), 0, 0).BorderColor(p.Tab.Border).FocusRingOffset(-token.FocusRingWidth.Px())
+	tab.Height(token.ControlHeight.Px()).MinWidth(token.TabMinWidth.Px()).MaxWidth(token.TabMaxWidth.Px()).
+		Padding(0, token.PadInputEnd.Px(), 0, token.PadControlX.Px()).Radius(token.RadiusCard.Px()).
+		Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).Label(t.Label).FocusRingOffset(-token.FocusRingWidth.Px())
 	if t.Tooltip != "" {
 		tab.Tooltip(t.Tooltip)
 	}
@@ -73,9 +113,17 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 	if o.Menu != nil {
 		tab.ContextMenu(func(m *ui.Menu) { o.Menu(i, m) })
 	}
+	if o.Drag != nil {
+		if data := o.Drag(i); data != nil {
+			tab.Drag(data)
+		}
+	}
+	if o.Dragging != nil && tab.Dragging() {
+		o.Dragging(i)
+	}
 	tab.Children(func() {
-		if active {
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(token.IndicatorWidth.Px()).Background(p.Tab.ActiveBorderTop)
+		if o.Drop != nil && o.Drop(i, tab) {
+			dropMark(c, p)
 		}
 		switch {
 		case t.Leading != nil:
@@ -90,23 +138,29 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 		if t.Description != "" {
 			token.TextLabel.Apply(ui.Text(c, t.Description)).TextColor(p.Text.Secondary).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
 		}
-		tabEnd(c, p, active, hovered, t, func() {
-			if o.OnClose != nil {
-				o.OnClose(i)
-			}
-		})
+		tabEnd(c, p, active, hovered, i, t, o)
 	})
+	if b, ok := tab.PressedButton(); ok && b == middleButton && o.OnAuxClick != nil {
+		o.OnAuxClick(i)
+	}
+	if o.OnDoubleClick != nil && tab.DoubleClicked() {
+		o.OnDoubleClick(i)
+	}
 }
 
-func tabEnd(c *ui.Context, p *token.Palette, active, hovered bool, t Tab, onClose func()) {
+func tabEnd(c *ui.Context, p *token.Palette, active, hovered bool, i int, t Tab, o TabStripOptions) {
 	slot := ui.Box(c).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Center().Shrink(0)
 	slot.Children(func() {
 		switch {
+		case t.Pinned && o.OnUnpin != nil:
+			if action.IconButton(c, icons.Pin, unpinLabel+" "+t.Label, action.IconOptions{Tooltip: unpinLabel}).Clicked() {
+				o.OnUnpin(i)
+			}
 		case t.Pinned:
 			ui.Icon(c, icons.Pin).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Icon).AccessHidden(true)
-		case active || hovered:
-			if action.IconButton(c, icons.Close, closeLabel+" "+t.Label, action.IconOptions{}).Clicked() {
-				onClose()
+		case hovered || slot.Hovered() || active && !t.Dirty:
+			if action.IconButton(c, icons.Close, closeLabel+" "+t.Label, action.IconOptions{Tooltip: closeLabel}).Clicked() && o.OnClose != nil {
+				o.OnClose(i)
 			}
 		case t.Dirty:
 			ui.Box(c).Size(token.DirtyDotSize.Px(), token.DirtyDotSize.Px()).Radius(token.RadiusPill.Px()).Background(p.Text.Primary).

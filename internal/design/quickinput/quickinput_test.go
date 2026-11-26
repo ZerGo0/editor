@@ -34,6 +34,17 @@ func TestKeyboard(t *testing.T) {
 	}
 }
 
+func TestRowReadsKeys(t *testing.T) {
+	items := []Item{{Label: "Go to File...", Keys: "⌘P"}}
+	tt := ui.NewTester(func(c *ui.Context) { View(c, "Command Palette", &State{}, items, Options{}) }, testWidth, testHeight)
+	for _, a := range tt.AccessAll() {
+		if a.Name == "Go to File..." && a.Description == "⌘P" {
+			return
+		}
+	}
+	t.Fatal("no row reads its keys as its description")
+}
+
 func TestEmptyList(t *testing.T) {
 	s := &State{Selected: 4}
 	tt := ui.NewTester(func(c *ui.Context) { View(c, "Go to File", s, nil, Options{}) }, testWidth, testHeight)

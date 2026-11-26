@@ -17,12 +17,27 @@ type Item struct {
 	Count         int
 	Strike        bool
 	Muted         bool
+	Strong        bool
+	Spans         []ui.Span
+	Rich          func(s Style) []ui.Span
+	Depth         int
+	Branch        bool
+	Open          bool
+	Trailing      func(c *ui.Context)
+	Content       func(c *ui.Context)
+	Tone          token.Tone
 	Tooltip       string
 	Actions       func(c *ui.Context)
 	Menu          func(m *ui.Menu)
 	OnClick       func()
 	OnDoubleClick func()
 	Drop          func(row ui.Element) bool
+}
+
+type Style struct {
+	Text      ui.Color
+	Secondary ui.Color
+	Highlight ui.Color
 }
 
 type State struct {
@@ -35,6 +50,7 @@ type State struct {
 	Open     bool
 	arrow    func() ui.Element
 	tree     bool
+	flat     bool
 }
 
 func Row(c *ui.Context, s State, it Item) ui.Element {
@@ -63,21 +79,33 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 		guides(row, s.Depth, p.List.IndentGuide)
 	}
 	row.Children(func() {
-		if s.tree {
+		if s.tree || s.flat {
 			twistie(c, p, s)
 		}
 		leading(c, p, it, active)
 		label(c, p, it, active)
+		if it.Trailing != nil {
+			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { it.Trailing(c) })
+		}
 		if it.Actions != nil && (hovered || active) {
 			ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { it.Actions(c) })
 		}
-		if it.Count > 0 {
+		switch {
+		case it.Count > 0 && it.Tone != token.ToneNeutral:
+			toneCount(c, p, it, active)
+		case it.Count > 0:
 			badge.Count(c, it.Count, badge.CountOptions{})
 		}
 		if it.Git != token.GitNone {
 			badge.Decoration(c, it.Git)
 		}
 	})
+	if s.flat {
+		row.Role(ui.RoleTreeItem).Level(s.Depth + 1)
+		if s.Branch {
+			row.Expanded(s.Open)
+		}
+	}
 	if it.Menu != nil {
 		row.ContextMenu(it.Menu)
 	}
@@ -92,10 +120,16 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 
 func twistie(c *ui.Context, p *token.Palette, s State) {
 	ui.Box(c).Width(float32(s.Depth) * token.IndentStep.Px()).Shrink(0)
-	if s.arrow == nil {
+	var arrow ui.Element
+	switch {
+	case s.arrow != nil:
+		arrow = s.arrow()
+	case s.flat:
+		arrow = ui.Box(c)
+	default:
 		return
 	}
-	arrow := s.arrow().Size(token.TwistieWidth.Px(), token.RowHeight.Px()).Center().Shrink(0)
+	arrow.Size(token.TwistieWidth.Px(), token.RowHeight.Px()).Center().Shrink(0)
 	if !s.Branch {
 		return
 	}
@@ -122,17 +156,33 @@ func leading(c *ui.Context, p *token.Palette, it Item, active bool) {
 }
 
 func label(c *ui.Context, p *token.Palette, it Item, active bool) {
+	if it.Content != nil {
+		ui.Row(c).Grow(1).MinWidth(0).FillHeight().AlignItems(ui.Center).Children(func() { it.Content(c) })
+		return
+	}
 	color, secondary, match := p.Text.Primary, p.Text.Secondary, p.List.Highlight
 	switch {
 	case active:
 		color, secondary, match = p.List.ActiveSelectionText, p.List.ActiveSelectionSecondary, p.List.FocusHighlight
+	case it.Tone != token.ToneNeutral:
+		color = p.Tone(it.Tone)
 	case it.Muted:
 		color = p.Git.Ignored
 	case it.Git != token.GitNone:
 		color = p.GitColor(it.Git)
 	}
-	ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapRowIcon.Px()).AlignItems(ui.Baseline).Children(func() {
-		name := ui.RichText(c, Spans(it.Label, it.Matches, color, match)...).FontSize(token.TextBody.Px()).SingleLine().Shrink(0).MinWidth(0)
+	token.NudgeText(ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapRowIcon.Px()).AlignItems(ui.Baseline)).Children(func() {
+		spans := it.Spans
+		if it.Rich != nil {
+			spans = it.Rich(Style{Text: color, Secondary: secondary, Highlight: match})
+		}
+		if spans == nil {
+			spans = Spans(it.Label, it.Matches, color, match)
+		}
+		name := ui.RichText(c, spans...).FontSize(token.TextBody.Px()).SingleLine().Shrink(1).MinWidth(0)
+		if it.Strong {
+			name.FontWeight(token.WeightSemibold)
+		}
 		if it.Strike {
 			name.Strikethrough()
 		}

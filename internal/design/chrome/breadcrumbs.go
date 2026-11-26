@@ -9,14 +9,15 @@ import (
 )
 
 type Crumb struct {
-	Label string
-	Icon  *ui.SVG
-	Menu  func(m *ui.Menu)
+	Label   string
+	Icon    *ui.SVG
+	Leading func(c *ui.Context)
+	Menu    func(m *ui.Menu)
 }
 
 func Breadcrumbs(c *ui.Context, label string, crumbs []Crumb) ui.Element {
 	p := token.Of(c)
-	return ui.Row(c.Key("breadcrumbs:"+label)).Height(token.RowHeight.Px()).FillWidth().Padding(0, token.PadRow.Px()).
+	return ui.Row(c.Key("breadcrumbs:"+label)).Height(token.RowHeight.Px()).FillWidth().MinWidth(0).Clip().Padding(0, token.PadRow.Px()).
 		AlignItems(ui.Center).Gap(token.GapTight.Px()).Role(ui.RoleNavigation).Label(label).FocusGroup(ui.Horizontal).
 		Children(func() {
 			for i, cr := range crumbs {
@@ -40,7 +41,9 @@ func crumb(c *ui.Context, p *token.Palette, i int, cr Crumb, last bool) {
 		b.Background(p.Control.Pressed)
 	}
 	b.Children(func() {
-		if cr.Icon != nil {
+		if cr.Leading != nil {
+			cr.Leading(c)
+		} else if cr.Icon != nil {
 			ui.Icon(c, cr.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Shrink(0).AccessHidden(true)
 		}
 		token.TextBody.Apply(ui.Text(c, cr.Label)).TextColor(color).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)

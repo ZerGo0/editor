@@ -17,12 +17,16 @@ type Activity struct {
 func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) ui.Element {
 	p := token.Of(c)
 	parts := ui.TabsBase(c, selected, len(items))
+	forward := parts.List.Focused()
 	parts.List.Height(token.ViewTitleHeight.Px()).FillWidth().Padding(0, token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).
 		Label(label).Children(func() {
 		for i, it := range items {
 			active := i == *selected
 			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ViewTitleHeight.Px()).Center().Shrink(0).Label(it.Label).
 				Tooltip(action.Hint(it.Label, it.Keys)).FocusRingOffset(-token.FocusRingWidth.Px())
+			if active && forward {
+				tab.Focus()
+			}
 			color := p.Bar.ActivityInactive
 			if active || tab.Hovered() {
 				color = p.Bar.ActivityActive

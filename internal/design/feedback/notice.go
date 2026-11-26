@@ -7,7 +7,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const dismissLabel = "Dismiss"
+const (
+	dismissLabel  = "Dismiss"
+	stickyTimeout = -1
+)
 
 type NoticeOptions struct {
 	Tone      token.Tone
@@ -71,8 +74,19 @@ type ToastOptions struct {
 	Message  string
 	Action   string
 	OnAction func()
+	ID       string
+	Sticky   bool
+	Busy     bool
+	OnClose  func()
 }
 
 func Toast(c *ui.Context, o ToastOptions) string {
-	return c.AddToast(ui.Toast{Title: o.Title, Description: o.Message, Type: o.Tone.String(), Action: o.Action, OnAction: o.OnAction})
+	t := ui.Toast{ID: o.ID, Title: o.Title, Description: o.Message, Type: o.Tone.String(), Action: o.Action, OnAction: o.OnAction, OnClose: o.OnClose}
+	if o.Sticky || o.Busy {
+		t.Timeout = stickyTimeout
+	}
+	if o.Busy {
+		t.Data = toastBusy{}
+	}
+	return c.AddToast(t)
 }

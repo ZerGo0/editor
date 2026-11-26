@@ -23,7 +23,7 @@ func Header(c *ui.Context, title string, open *bool, o SectionOptions) ui.Elemen
 	row := ui.Row(c.Key("header:"+title)).Height(token.HeaderHeight.Px()).FillWidth().Shrink(0).AlignItems(ui.Center).
 		Padding(0, token.PadRow.Px(), 0, 0).Gap(token.GapInline.Px())
 	if o.Border {
-		row.BorderWidth(token.BorderWidth.Px(), 0, 0, 0).BorderColor(p.Border.Section)
+		row.Height(token.HeaderHeight.Px()+token.BorderWidth.Px()).BorderWidth(token.BorderWidth.Px(), 0, 0, 0).BorderColor(p.Border.Section)
 	}
 	show := o.ShowActions || row.Hovered() || row.FocusWithin()
 	row.Children(func() {
@@ -36,7 +36,7 @@ func Header(c *ui.Context, title string, open *bool, o SectionOptions) ui.Elemen
 		toggle.Children(func() {
 			ui.Icon(c, icons.ChevronRight).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Icon).Rotate(target).
 				Margin(0, 0, 0, token.GapTight.Px()).Shrink(0)
-			ui.Text(c, strings.ToUpper(title)).FontSize(token.TextCaption.Px()).FontWeight(token.WeightBold).
+			token.TextCaption.Apply(ui.Text(c, strings.ToUpper(title))).FontWeight(token.WeightBold).
 				TextColor(p.Text.Primary).SingleLine().MinWidth(0).Shrink(1)
 		})
 		if toggle.Clicked() {

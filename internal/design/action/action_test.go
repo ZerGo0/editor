@@ -3,6 +3,7 @@ package action
 import (
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -70,6 +71,17 @@ func TestCheckboxAndSwitch(t *testing.T) {
 	tt.Key(0, ui.KeySpace)
 	if !checked || !on {
 		t.Fatalf("checked=%v on=%v, want both on", checked, on)
+	}
+}
+
+func TestBareSwitchMeetsHitTarget(t *testing.T) {
+	on := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Column(c).Children(func() { Switch(c, "", &on, ChoiceOptions{ID: "bare"}).Label("Minimap") })
+	}, testWidth, testHeight)
+	sw, ok := tt.AccessByRole(ui.RoleSwitch, "Minimap")
+	if !ok || sw.Bounds.H < token.HitTargetMin.Px() {
+		t.Fatalf("switch = %+v, want at least %v high", sw.Bounds, token.HitTargetMin.Px())
 	}
 }
 

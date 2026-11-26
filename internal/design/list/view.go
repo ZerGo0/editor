@@ -7,12 +7,14 @@ import (
 type ViewOptions struct {
 	Label string
 	Empty func(c *ui.Context)
+	Tree  bool
 }
 
 func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int) Item) ui.Element {
 	l := ui.List(c, s, n).Grow(1).FillWidth().MinHeight(0).Label(o.Label).Background(ui.Transparent)
 	l.Rows(func(r ui.ListRow) {
-		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered()}, item(r.Index))
+		it := item(r.Index)
+		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, flat: o.Tree}, it)
 	})
 	if n == 0 && o.Empty != nil {
 		l.Children(func() { o.Empty(c) })

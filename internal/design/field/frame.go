@@ -63,9 +63,12 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 			return
 		}
 		in.Invalid(true)
-		msg := ui.Text(c, f.error).FontSize(token.TextLabel.Px()).TextColor(p.Text.Primary).Wrap().FillWidth().
-			Padding(token.PadInputY.Px(), token.PadInputX.Px()).Background(p.Severity.ErrorBackground).
-			Border(token.BorderWidth.Px(), p.Severity.ErrorBorder).Radius(0, 0, token.RadiusControl.Px(), token.RadiusControl.Px()).Role(ui.RoleAlert)
+		msg := ui.Row(c).FillWidth().Padding(token.PadInputY.Px(), token.PadInputX.Px()).Background(p.Severity.ErrorBackground).
+			Border(token.BorderWidth.Px(), p.Severity.ErrorBorder).Radius(0, 0, token.RadiusControl.Px(), token.RadiusControl.Px()).
+			Role(ui.RoleAlert).Label(f.error)
+		msg.Children(func() {
+			token.TextLabel.Apply(ui.Text(c, f.error)).TextColor(p.Text.Primary).Wrap().Grow(1).MinWidth(0).AccessHidden(true)
+		})
 		in.ErrorMessage(msg)
 	})
 	return in

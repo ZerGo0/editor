@@ -115,6 +115,9 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 				badge.Keys(c, it.Keys)
 			}
 		})
+		if it.Keys != "" {
+			row.Description(it.Keys)
+		}
 		if row.Clicked() {
 			res.Accepted = i
 		}
