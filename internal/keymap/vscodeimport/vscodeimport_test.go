@@ -36,7 +36,7 @@ const fixture = `// VS Code keybindings
 	{ "key": "cmd+g", "command": "workbench.action.gotoLine", "when": "editorTextFocus && !editorReadonly" },
 	{ "key": "ctrl+e", "command": "workbench.action.quickOpen", "args": ">" },
 	{ "key": "ctrl+shift+e", "command": "workbench.action.quickOpen", "args": "?" },
-	{ "key": "f18", "command": "editor.action.commentLine" },
+	{ "key": "capslock", "command": "editor.action.commentLine" },
 	{ "key": "ctrl+t", "command": "workbench.action.terminal.new" },
 	{ "key": "alt+k", "command": "cursorUp", "when": "terminalFocus || vim.active" },
 	{ "key": "ctrl+h", "command": "editor.action.startFindReplaceAction" },
@@ -94,7 +94,7 @@ func TestConvertMapsAndSkips(t *testing.T) {
 	}
 	for key, part := range map[string]string{
 		"ctrl+shift+e": "prefix",
-		"f18":          "unsupported key",
+		"capslock":     "unsupported key",
 		"ctrl+t":       "unsupported command",
 		"ctrl+u":       "unsupported command",
 		"":             "no key",
@@ -302,7 +302,7 @@ func TestSummaryStates(t *testing.T) {
 	s.Report = Report{
 		Source:        Source{Product: "Code"},
 		Total:         3,
-		Plan:          Plan{Add: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Inactive: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Skipped: []Skipped{{Entry: keymap.Entry{Key: "f18", Command: "x"}, Reason: "unsupported key f18"}}, Duplicates: 1},
+		Plan:          Plan{Add: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Inactive: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Skipped: []Skipped{{Entry: keymap.Entry{Key: "capslock", Command: "x"}, Reason: "unsupported key capslock"}}, Duplicates: 1},
 		Backup:        "/tmp/keybindings.json.backup",
 		Dispatch:      keymap.DispatchKeyCode,
 		DispatchFound: true,
@@ -315,7 +315,7 @@ func TestSummaryStates(t *testing.T) {
 		"Set keyboard.dispatch to \"keyCode\".",
 		"Imported but inactive",
 		"Not imported",
-		"unsupported key f18",
+		"unsupported key capslock",
 	} {
 		if !tt.HasText(text) {
 			t.Errorf("summary does not show %q", text)

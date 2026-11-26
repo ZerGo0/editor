@@ -246,7 +246,7 @@ func (v *KeysView) capture(ev ui.InputEvent) bool {
 		return true
 	}
 	stroke := keymap.StrokeFor(ev)
-	if ev.Kind != ui.InputKeyDown || stroke.Key == ui.KeyUnknown {
+	if ev.Kind != ui.InputKeyDown || stroke.Key == ui.KeyUnknown && !stroke.ByCode() {
 		return false
 	}
 	switch {

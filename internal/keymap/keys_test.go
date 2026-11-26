@@ -11,18 +11,18 @@ func TestParseChord(t *testing.T) {
 		in   string
 		want Chord
 	}{
-		{"cmd+p", Chord{{ui.Super, ui.KeyP}}},
-		{"Meta+Shift+P", Chord{{ui.Super | ui.Shift, ui.KeyP}}},
-		{"Option+Esc", Chord{{ui.Alt, ui.KeyEscape}}},
-		{"cmd+k cmd+s", Chord{{ui.Super, ui.KeyK}, {ui.Super, ui.KeyS}}},
-		{"  ctrl+`  ", Chord{{ui.Ctrl, ui.KeyBackquote}}},
-		{"cmd+\\", Chord{{ui.Super, ui.KeyBackslash}}},
-		{"F12", Chord{{0, ui.KeyF12}}},
-		{"cmd+1", Chord{{ui.Super, ui.Key1}}},
-		{"win+p", Chord{{ui.Super, ui.KeyP}}},
-		{"back", Chord{{0, ui.KeyBack}}},
-		{"forward", Chord{{0, ui.KeyForward}}},
-		{"BrowserBack", Chord{{0, ui.KeyBack}}},
+		{"cmd+p", Chord{{Mods: ui.Super, Key: ui.KeyP}}},
+		{"Meta+Shift+P", Chord{{Mods: ui.Super | ui.Shift, Key: ui.KeyP}}},
+		{"Option+Esc", Chord{{Mods: ui.Alt, Key: ui.KeyEscape}}},
+		{"cmd+k cmd+s", Chord{{Mods: ui.Super, Key: ui.KeyK}, {Mods: ui.Super, Key: ui.KeyS}}},
+		{"  ctrl+`  ", Chord{{Mods: ui.Ctrl, Key: ui.KeyBackquote}}},
+		{"cmd+\\", Chord{{Mods: ui.Super, Key: ui.KeyBackslash}}},
+		{"F12", Chord{{Mods: 0, Key: ui.KeyF12}}},
+		{"cmd+1", Chord{{Mods: ui.Super, Key: ui.Key1}}},
+		{"win+p", Chord{{Mods: ui.Super, Key: ui.KeyP}}},
+		{"back", Chord{{Mods: 0, Key: ui.KeyBack}}},
+		{"forward", Chord{{Mods: 0, Key: ui.KeyForward}}},
+		{"BrowserBack", Chord{{Mods: 0, Key: ui.KeyBack}}},
 	}
 	for _, tt := range tests {
 		got, err := ParseChord(tt.in)
@@ -39,7 +39,7 @@ func TestParseChord(t *testing.T) {
 func TestParseChordInvalid(t *testing.T) {
 	for _, in := range []string{
 		"", "   ", "cmd", "cmd+", "+p", "cmd++p", "foo+p", "cmd+foo", "cmd+cmd+p",
-		"cmd+meta+p", "a b c", "f13", "hyper+a",
+		"cmd+meta+p", "a b c", "f25", "numpad_foo", "hyper+a",
 	} {
 		if got, err := ParseChord(in); err == nil {
 			t.Errorf("ParseChord(%q) = %v, want error", in, got)
@@ -53,6 +53,7 @@ func TestChordRoundTrip(t *testing.T) {
 		"cmd+[", "cmd+]", "-", "=", ",", ".", "/", ";", "'", "`", "\\",
 		"enter", "tab", "space", "backspace", "delete", "insert", "home", "end",
 		"left", "right", "up", "down", "0", "9", "z", "browserback", "browserforward",
+		"numpad0", "cmd+numpad_add", "ctrl+numpad_subtract", "f13", "shift+f20", "f24", "numlock", "contextmenu",
 	} {
 		chord, err := ParseChord(in)
 		if err != nil {
@@ -178,14 +179,14 @@ func TestStrokeForFallsBackToPhysicalKey(t *testing.T) {
 		ev   ui.InputEvent
 		want Stroke
 	}{
-		{"cyrillic s with cmd", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS, Mods: ui.Super}, Stroke{ui.Super, ui.KeyS}},
-		{"greek p with cmd and shift", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyP, Mods: ui.Super | ui.Shift}, Stroke{ui.Super | ui.Shift, ui.KeyP}},
-		{"hebrew c with ctrl", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyC, Mods: ui.Ctrl}, Stroke{ui.Ctrl, ui.KeyC}},
-		{"arabic k with alt", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyK, Mods: ui.Alt}, Stroke{ui.Alt, ui.KeyK}},
-		{"typing without modifiers stays text", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS}, Stroke{0, ui.KeyUnknown}},
-		{"shift alone stays text", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS, Mods: ui.Shift}, Stroke{ui.Shift, ui.KeyUnknown}},
-		{"latin layout keeps the typed key", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyY, Mods: ui.Super}, Stroke{ui.Super, ui.KeyZ}},
-		{"no physical key reported", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, Mods: ui.Super}, Stroke{ui.Super, ui.KeyUnknown}},
+		{"cyrillic s with cmd", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS, Mods: ui.Super}, Stroke{Mods: ui.Super, Key: ui.KeyS}},
+		{"greek p with cmd and shift", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyP, Mods: ui.Super | ui.Shift}, Stroke{Mods: ui.Super | ui.Shift, Key: ui.KeyP}},
+		{"hebrew c with ctrl", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyC, Mods: ui.Ctrl}, Stroke{Mods: ui.Ctrl, Key: ui.KeyC}},
+		{"arabic k with alt", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyK, Mods: ui.Alt}, Stroke{Mods: ui.Alt, Key: ui.KeyK}},
+		{"typing without modifiers stays text", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS}, Stroke{Mods: 0, Key: ui.KeyUnknown}},
+		{"shift alone stays text", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, PhysicalKey: ui.KeyS, Mods: ui.Shift}, Stroke{Mods: ui.Shift, Key: ui.KeyUnknown}},
+		{"latin layout keeps the typed key", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyY, Mods: ui.Super}, Stroke{Mods: ui.Super, Key: ui.KeyZ}},
+		{"no physical key reported", ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyUnknown, Mods: ui.Super}, Stroke{Mods: ui.Super, Key: ui.KeyUnknown}},
 	}
 	for _, tt := range tests {
 		if got := StrokeFor(tt.ev); got != tt.want {
@@ -201,14 +202,14 @@ func TestStrokeForFallsBackToPhysicalKey(t *testing.T) {
 
 func TestKeyCodeDispatchUsesThePhysicalKey(t *testing.T) {
 	azerty := ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyW, Mods: ui.Super}
-	if got, want := DispatchKeyCode.Stroke(azerty), (Stroke{ui.Super, ui.KeyW}); got != want {
+	if got, want := DispatchKeyCode.Stroke(azerty), (Stroke{Mods: ui.Super, Key: ui.KeyW}); got != want {
 		t.Errorf("keyCode: Stroke = %v, want %v", got, want)
 	}
-	if got, want := DispatchCode.Stroke(azerty), (Stroke{ui.Super, ui.KeyZ}); got != want {
+	if got, want := DispatchCode.Stroke(azerty), (Stroke{Mods: ui.Super, Key: ui.KeyZ}); got != want {
 		t.Errorf("code: Stroke = %v, want %v", got, want)
 	}
 	plain := ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyZ, PhysicalKey: ui.KeyW}
-	if got, want := DispatchKeyCode.Stroke(plain), (Stroke{0, ui.KeyZ}); got != want {
+	if got, want := DispatchKeyCode.Stroke(plain), (Stroke{Mods: 0, Key: ui.KeyZ}); got != want {
 		t.Errorf("keyCode without modifiers: Stroke = %v, want %v", got, want)
 	}
 }
@@ -221,6 +222,38 @@ func TestBrowserKeysHaveNoAccelerator(t *testing.T) {
 		}
 		if got := chord[0].Accelerator(); got != "" {
 			t.Errorf("%s accelerator = %q, want none", key, got)
+		}
+	}
+}
+
+func TestStrokeForCodeKeys(t *testing.T) {
+	tests := []struct {
+		ev   ui.InputEvent
+		want Stroke
+	}{
+		{ui.InputEvent{Kind: ui.InputKeyDown, Mods: ui.Super, Key: ui.Key1, Code: ui.CodeNumpad1}, Stroke{Mods: ui.Super, Code: ui.CodeNumpad1}},
+		{ui.InputEvent{Kind: ui.InputKeyDown, Mods: ui.Super, Key: ui.Key1, Code: ui.CodeDigit1}, Stroke{Mods: ui.Super, Key: ui.Key1}},
+		{ui.InputEvent{Kind: ui.InputKeyDown, Code: ui.CodeF13}, Stroke{Code: ui.CodeF13}},
+		{ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyEnter, Code: ui.CodeNumpadEnter}, Stroke{Key: ui.KeyEnter}},
+	}
+	for _, tt := range tests {
+		if got := StrokeFor(tt.ev); got != tt.want {
+			t.Errorf("StrokeFor(%+v) = %+v, want %+v", tt.ev, got, tt.want)
+		}
+	}
+}
+
+func TestCodeKeyLabels(t *testing.T) {
+	for in, want := range map[string]string{"cmd+numpad_add": "⌘Num+", "shift+f13": "⇧F13", "numpad0": "Num0"} {
+		chord, err := ParseChord(in)
+		if err != nil {
+			t.Fatalf("ParseChord(%q) error: %v", in, err)
+		}
+		if got := chord.Label(); got != want {
+			t.Errorf("%q label = %q, want %q", in, got, want)
+		}
+		if acc := chord[0].Accelerator(); acc != "" {
+			t.Errorf("%q accelerator = %q, want none", in, acc)
 		}
 	}
 }

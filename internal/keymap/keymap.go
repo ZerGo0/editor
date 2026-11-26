@@ -223,7 +223,9 @@ func (k *Keymap) editorBindings() []editor.Binding {
 		strokes = append(strokes, s)
 	}
 	for _, b := range k.singles {
-		strokes = append(strokes, b.Chord[0])
+		if !b.Chord[0].ByCode() {
+			strokes = append(strokes, b.Chord[0])
+		}
 	}
 	var out []editor.Binding
 	seen := map[Stroke]bool{}

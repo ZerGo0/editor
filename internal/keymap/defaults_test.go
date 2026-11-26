@@ -83,6 +83,8 @@ func TestMacPresetMatchesVSCode(t *testing.T) {
 		"f12":               "",
 		"cmd+k v":           "markdown.showPreviewToSide",
 		"cmd+0":             "",
+		"cmd+numpad_add":    "workbench.action.zoomIn",
+		"cmd+numpad0":       "workbench.action.zoomReset",
 	} {
 		if got := lookup(t, k, key); got != want {
 			t.Errorf("%s runs %q, want %q", key, got, want)
@@ -113,7 +115,7 @@ func TestWindowsPresetMatchesVSCode(t *testing.T) {
 }
 
 func TestPresetTablesParse(t *testing.T) {
-	unrepresentable := []string{"numpad", "[", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "pausebreak", "capslock", "contextmenu"}
+	unrepresentable := []string{"capslock"}
 	for name, table := range map[string][]vscode.Entry{"macOS": vscode.MacOS, "Windows": vscode.Windows} {
 		for _, e := range table {
 			if _, err := keymap.ParseChord(e.Key); err != nil {

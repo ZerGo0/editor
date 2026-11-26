@@ -22,6 +22,7 @@ const (
 type Stroke struct {
 	Mods ui.Modifiers
 	Key  ui.Key
+	Code ui.KeyCode
 }
 
 type Chord []Stroke
@@ -111,6 +112,7 @@ func buildKeyInfos() map[ui.Key]keyInfo {
 		ui.KeyBackquote:    {"`", "`", "`"},
 		ui.KeyBack:         {"browserback", "Back", ""},
 		ui.KeyForward:      {"browserforward", "Forward", ""},
+		ui.KeyContextMenu:  {"contextmenu", "ContextMenu", ""},
 	}
 	for i, key := range letters {
 		name := string(rune('a' + i))
@@ -163,8 +165,9 @@ func parseStroke(s string) (Stroke, error) {
 	if alias, ok := keyNameAliases[keyName]; ok {
 		keyName = alias
 	}
-	key, ok := keysByName[keyName]
-	if !ok {
+	key, isKey := keysByName[keyName]
+	code, isCode := codesByName[keyName]
+	if !isKey && !isCode {
 		return Stroke{}, fmt.Errorf("keymap: unknown key %q in %q", parts[len(parts)-1], s)
 	}
 	var mods ui.Modifiers
@@ -178,7 +181,7 @@ func parseStroke(s string) (Stroke, error) {
 		}
 		mods |= mod
 	}
-	return Stroke{Mods: mods, Key: key}, nil
+	return Stroke{Mods: mods, Key: key, Code: code}, nil
 }
 
 func StrokeFor(ev ui.InputEvent) Stroke {
@@ -186,6 +189,9 @@ func StrokeFor(ev ui.InputEvent) Stroke {
 }
 
 func (d Dispatch) Stroke(ev ui.InputEvent) Stroke {
+	if _, ok := codeInfos[ev.Code]; ok {
+		return Stroke{Mods: ev.Mods, Code: ev.Code}
+	}
 	key := ev.Key
 	_, known := keyInfos[key]
 	byPosition := ev.Mods&shortcutMods != 0 && ev.PhysicalKey != ui.KeyUnknown
@@ -195,8 +201,21 @@ func (d Dispatch) Stroke(ev ui.InputEvent) Stroke {
 	return Stroke{Mods: ev.Mods, Key: key}
 }
 
-func (s Stroke) String() string {
+func (s Stroke) ByCode() bool {
+	return s.Code != ui.CodeUnknown
+}
+
+func (s Stroke) info() (keyInfo, bool) {
+	if s.ByCode() {
+		info, ok := codeInfos[s.Code]
+		return info, ok
+	}
 	info, ok := keyInfos[s.Key]
+	return info, ok
+}
+
+func (s Stroke) String() string {
+	info, ok := s.info()
 	if !ok {
 		return ""
 	}
@@ -210,7 +229,7 @@ func (s Stroke) String() string {
 }
 
 func (s Stroke) label() string {
-	info, ok := keyInfos[s.Key]
+	info, ok := s.info()
 	if !ok {
 		return ""
 	}
@@ -234,8 +253,8 @@ func modifierByMod(mod ui.Modifiers) modifierInfo {
 }
 
 func (s Stroke) Accelerator() string {
-	info, ok := keyInfos[s.Key]
-	if !ok {
+	info, ok := s.info()
+	if !ok || info.accel == "" {
 		return ""
 	}
 	var parts []string

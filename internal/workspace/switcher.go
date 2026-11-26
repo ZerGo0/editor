@@ -19,6 +19,7 @@ type switcherPick struct {
 func (w *Workspace) observeInput(ev ui.InputEvent) {
 	w.observeShift(ev)
 	w.observeSwitcher(ev)
+	w.observeCodeKey(ev)
 }
 
 func (w *Workspace) switcherOpen() bool {

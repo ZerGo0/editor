@@ -12,13 +12,19 @@ const noticeDuration = 3 * time.Second
 type keyState struct {
 	pending     keymap.Chord
 	swallowText bool
+	byCode      bool
 }
 
 func (w *Workspace) shortcuts(c *ui.Context) {
 	km := w.env.Keys.Current
+	byCode := w.keys.byCode
+	w.keys.byCode = false
+	shortcut := func(s keymap.Stroke) bool {
+		return !s.ByCode() && c.Shortcut(s.Mods, s.Key) && !byCode
+	}
 	if len(w.keys.pending) > 0 {
 		for _, s := range km.Completions(w.keys.pending[0]) {
-			if c.Shortcut(s.Mods, s.Key) {
+			if shortcut(s) {
 				w.runChord(append(w.keys.pending, s))
 				return
 			}
@@ -29,7 +35,7 @@ func (w *Workspace) shortcuts(c *ui.Context) {
 		return
 	}
 	for _, s := range km.Prefixes() {
-		if c.Shortcut(s.Mods, s.Key) {
+		if shortcut(s) {
 			w.keys.pending = keymap.Chord{s}
 			w.notice = ""
 			return
@@ -42,7 +48,7 @@ func (w *Workspace) shortcuts(c *ui.Context) {
 		if s, ok := km.MenuStroke(b.Command); ok && s == b.Chord[0] && w.env.Commands.InMenu(b.Command) {
 			continue
 		}
-		if s := b.Chord[0]; c.Shortcut(s.Mods, s.Key) {
+		if shortcut(b.Chord[0]) {
 			w.run(b.Command)
 			return
 		}
