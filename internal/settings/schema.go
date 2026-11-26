@@ -1,0 +1,187 @@
+package settings
+
+import "encoding/json"
+
+type Kind int
+
+const (
+	Bool Kind = iota
+	Int
+	Number
+	String
+	Enum
+	IntList
+	StringList
+	JSON
+)
+
+type Def struct {
+	Key         string
+	Title       string
+	Description string
+	Category    string
+	Kind        Kind
+	Default     any
+	Options     []string
+	Min, Max    float64
+	AppWide     bool
+}
+
+const (
+	CategoryEditor    = "Text Editor"
+	CategoryFiles     = "Files"
+	CategorySearch    = "Search"
+	CategoryWorkbench = "Workbench"
+	CategoryWindow    = "Window"
+	CategoryGit       = "Git"
+	CategoryDiff      = "Diff Editor"
+	CategoryGitHub    = "GitHub Issues"
+)
+
+var Categories = []string{CategoryEditor, CategoryFiles, CategorySearch, CategoryWorkbench, CategoryWindow, CategoryGit, CategoryDiff, CategoryGitHub}
+
+const (
+	FontFamily           = "editor.fontFamily"
+	FontSize             = "editor.fontSize"
+	LineHeight           = "editor.lineHeight"
+	TabSize              = "editor.tabSize"
+	InsertSpaces         = "editor.insertSpaces"
+	DetectIndentation    = "editor.detectIndentation"
+	WordWrap             = "editor.wordWrap"
+	LineNumbers          = "editor.lineNumbers"
+	RenderWhitespace     = "editor.renderWhitespace"
+	Rulers               = "editor.rulers"
+	IndentGuides         = "editor.guides.indentation"
+	ScrollBeyondLastLine = "editor.scrollBeyondLastLine"
+	AutoClosingBrackets  = "editor.autoClosingBrackets"
+	Folding              = "editor.folding"
+	BracketColors        = "editor.bracketPairColorization.enabled"
+	LineHighlight        = "editor.renderLineHighlight"
+	CursorStyle          = "editor.cursorStyle"
+	AutoSave             = "files.autoSave"
+	AutoSaveDelay        = "files.autoSaveDelay"
+	TrimTrailing         = "files.trimTrailingWhitespace"
+	FinalNewline         = "files.insertFinalNewline"
+	HotExit              = "files.hotExit"
+	Exclude              = "files.exclude"
+	SearchExclude        = "search.exclude"
+	SearchUseIgnoreFiles = "search.useIgnoreFiles"
+	SearchSmartCase      = "search.smartCase"
+	EnablePreview        = "workbench.editor.enablePreview"
+	RestoreWindows       = "window.restoreWindows"
+	ZoomLevel            = "window.zoomLevel"
+	GitAutoFetch         = "git.autofetch"
+	GitPullMode          = "git.pullMode"
+	GitLogPageSize       = "git.logPageSize"
+	DiffIgnoreWhitespace = "diff.ignoreWhitespace"
+	DiffShowMoves        = "diff.showMoves"
+	IssueBranchTitle     = "githubIssues.issueBranchTitle"
+	IssueAssignWorking   = "githubIssues.assignWhenWorking"
+	IssueCommitFormat    = "githubIssues.workingIssueFormatScm"
+	IssueQueries         = "githubIssues.queries"
+	IssueLinkBranch      = "githubIssues.linkBranchOnGitHub"
+)
+
+const (
+	WrapOff = "off"
+	WrapOn  = "on"
+
+	NumbersOn       = "on"
+	NumbersOff      = "off"
+	NumbersRelative = "relative"
+
+	WhitespaceNone      = "none"
+	WhitespaceSelection = "selection"
+	WhitespaceTrailing  = "trailing"
+	WhitespaceAll       = "all"
+
+	CursorLine      = "line"
+	CursorBlock     = "block"
+	CursorUnderline = "underline"
+
+	AutoSaveOff         = "off"
+	AutoSaveAfterDelay  = "afterDelay"
+	AutoSaveFocusChange = "onFocusChange"
+
+	HotExitOff     = "off"
+	HotExitOnClose = "onExitAndWindowClose"
+
+	PullMerge  = "merge"
+	PullRebase = "rebase"
+	PullFFOnly = "ff-only"
+
+	DiffWhitespaceNone        = "none"
+	DiffWhitespaceTrim        = "trim"
+	DiffWhitespaceIgnore      = "ignore"
+	DiffWhitespaceIgnoreBlank = "ignoreBlankLines"
+)
+
+const (
+	defaultFontSize      = 13
+	minFontSize          = 6
+	maxFontSize          = 72
+	defaultLineHeight    = 1.5
+	minLineHeight        = 1
+	maxLineHeight        = 3
+	defaultTabSize       = 4
+	maxTabSize           = 16
+	defaultAutoSaveDelay = 1000
+	minAutoSaveDelay     = 100
+	maxAutoSaveDelay     = 60000
+	maxZoomLevel         = 8
+	maxAutoFetchMinutes  = 1440
+	defaultLogPageSize   = 300
+	minLogPageSize       = 50
+	maxLogPageSize       = 5000
+)
+
+var Defs = []Def{
+	{Key: FontFamily, Title: "Font Family", Description: "The font of the text editor. Empty uses the system monospaced font.", Category: CategoryEditor, Kind: String, Default: ""},
+	{Key: FontSize, Title: "Font Size", Description: "The font size of the text editor, in points.", Category: CategoryEditor, Kind: Int, Default: defaultFontSize, Min: minFontSize, Max: maxFontSize},
+	{Key: LineHeight, Title: "Line Height", Description: "The height of a line as a multiple of the font size.", Category: CategoryEditor, Kind: Number, Default: defaultLineHeight, Min: minLineHeight, Max: maxLineHeight},
+	{Key: DetectIndentation, Title: "Detect Indentation", Description: "Use the indentation of the language and the file. When off, Tab Size and Insert Spaces apply.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: TabSize, Title: "Tab Size", Description: "The number of columns a tab takes.", Category: CategoryEditor, Kind: Int, Default: defaultTabSize, Min: 1, Max: maxTabSize},
+	{Key: InsertSpaces, Title: "Insert Spaces", Description: "Insert spaces when Tab is pressed.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: WordWrap, Title: "Word Wrap", Description: "Wrap long lines at the width of the editor.", Category: CategoryEditor, Kind: Enum, Default: WrapOff, Options: []string{WrapOff, WrapOn}},
+	{Key: LineNumbers, Title: "Line Numbers", Description: "Show line numbers in the gutter.", Category: CategoryEditor, Kind: Enum, Default: NumbersOn, Options: []string{NumbersOn, NumbersRelative, NumbersOff}},
+	{Key: RenderWhitespace, Title: "Render Whitespace", Description: "Where spaces and tabs show as dots and arrows.", Category: CategoryEditor, Kind: Enum, Default: WhitespaceSelection, Options: []string{WhitespaceNone, WhitespaceSelection, WhitespaceTrailing, WhitespaceAll}},
+	{Key: Rulers, Title: "Rulers", Description: "Columns at which vertical guides show, for example 80, 120.", Category: CategoryEditor, Kind: IntList, Default: []int{}},
+	{Key: IndentGuides, Title: "Indent Guides", Description: "Show guides at each indentation level.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: ScrollBeyondLastLine, Title: "Scroll Beyond Last Line", Description: "Let the editor scroll until the last line is at the top.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: AutoClosingBrackets, Title: "Auto Closing Brackets", Description: "Close brackets and quotes as they are typed.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: Folding, Title: "Folding", Description: "Show fold markers in the gutter.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: BracketColors, Title: "Bracket Pair Colorization", Description: "Color matching brackets by how deep they nest.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: LineHighlight, Title: "Highlight Current Line", Description: "Highlight the lines that have a cursor.", Category: CategoryEditor, Kind: Bool, Default: true},
+	{Key: CursorStyle, Title: "Cursor Style", Description: "The shape of the cursor.", Category: CategoryEditor, Kind: Enum, Default: CursorLine, Options: []string{CursorLine, CursorBlock, CursorUnderline}},
+	{Key: AutoSave, Title: "Auto Save", Description: "Save modified files automatically: after a delay, or when the editor loses focus.", Category: CategoryFiles, Kind: Enum, Default: AutoSaveOff, Options: []string{AutoSaveOff, AutoSaveAfterDelay, AutoSaveFocusChange}},
+	{Key: AutoSaveDelay, Title: "Auto Save Delay", Description: "Milliseconds to wait after a change before a file saves, when Auto Save is afterDelay.", Category: CategoryFiles, Kind: Int, Default: defaultAutoSaveDelay, Min: minAutoSaveDelay, Max: maxAutoSaveDelay},
+	{Key: TrimTrailing, Title: "Trim Trailing Whitespace", Description: "Remove spaces and tabs at the end of lines when a file saves.", Category: CategoryFiles, Kind: Bool, Default: false},
+	{Key: FinalNewline, Title: "Insert Final Newline", Description: "End the file with a newline when it saves.", Category: CategoryFiles, Kind: Bool, Default: false},
+	{Key: HotExit, Title: "Hot Exit", Description: "Keep unsaved changes when a window closes or the app quits, and restore them when the project opens again. Off asks to save them.", Category: CategoryFiles, Kind: Enum, Default: HotExitOnClose, Options: []string{HotExitOnClose, HotExitOff}},
+	{Key: Exclude, Title: "Exclude", Description: "Glob patterns of files and folders to hide, for example **/node_modules.", Category: CategoryFiles, Kind: StringList, Default: []string{"**/.git", "**/.DS_Store"}},
+	{Key: SearchExclude, Title: "Exclude", Description: "Glob patterns of files and folders that Search skips, besides Files: Exclude, for example **/node_modules.", Category: CategorySearch, Kind: StringList, Default: []string{"**/node_modules", "**/bower_components"}},
+	{Key: SearchUseIgnoreFiles, Title: "Use Ignore Files", Description: "Skip the files that .gitignore lists when Search uses the exclude settings.", Category: CategorySearch, Kind: Bool, Default: true},
+	{Key: SearchSmartCase, Title: "Smart Case", Description: "Search ignoring case when the text has no capital letters, and matching case when it has.", Category: CategorySearch, Kind: Bool, Default: false},
+	{Key: EnablePreview, Title: "Enable Preview", Description: "A single click opens a file in a preview tab, which the next file replaces until you edit or pin it.", Category: CategoryWorkbench, Kind: Bool, Default: true},
+	{Key: RestoreWindows, Title: "Restore Windows", Description: "Open the projects of the last session when the app starts.", Category: CategoryWindow, Kind: Bool, Default: true, AppWide: true},
+	{Key: ZoomLevel, Title: "Zoom Level", Description: "The zoom of all windows. 0 is 100%, each step is 10% more or less.", Category: CategoryWindow, Kind: Int, Default: 0, Min: -maxZoomLevel, Max: maxZoomLevel, AppWide: true},
+	{Key: GitAutoFetch, Title: "Autofetch", Description: "Minutes between automatic fetches of all remotes. 0 turns autofetch off.", Category: CategoryGit, Kind: Int, Default: 0, Min: 0, Max: maxAutoFetchMinutes},
+	{Key: GitPullMode, Title: "Pull Mode", Description: "How Pull and Update Project join the remote changes: merge, rebase, or fast-forward only.", Category: CategoryGit, Kind: Enum, Default: PullMerge, Options: []string{PullMerge, PullRebase, PullFFOnly}},
+	{Key: GitLogPageSize, Title: "Log Page Size", Description: "The number of commits the Git log loads at a time.", Category: CategoryGit, Kind: Int, Default: defaultLogPageSize, Min: minLogPageSize, Max: maxLogPageSize},
+	{Key: DiffIgnoreWhitespace, Title: "Ignore Whitespace", Description: "Which whitespace changes diffs hide: none, at line ends (trim), all (ignore), or all plus blank lines.", Category: CategoryDiff, Kind: Enum, Default: DiffWhitespaceNone, Options: []string{DiffWhitespaceNone, DiffWhitespaceTrim, DiffWhitespaceIgnore, DiffWhitespaceIgnoreBlank}, AppWide: true},
+	{Key: DiffShowMoves, Title: "Show Moved Code", Description: "Mark blocks of code that moved to another place in a diff.", Category: CategoryDiff, Kind: Bool, Default: true, AppWide: true},
+	{Key: IssueBranchTitle, Title: "Issue Branch Title", Description: "The branch name for Start Working on Issue. Variables: ${user}, ${issueNumber}, ${issueTitle}, ${sanitizedIssueTitle}, ${owner}, ${repository}. Empty uses ${user}/issue${issueNumber}.", Category: CategoryGitHub, Kind: String, Default: ""},
+	{Key: IssueAssignWorking, Title: "Assign When Working", Description: "Assign the issue to you when you start working on it.", Category: CategoryGitHub, Kind: Bool, Default: true},
+	{Key: IssueCommitFormat, Title: "Working Issue Commit Message", Description: "The commit message template while you work on an issue. Variables: ${issueTitle}, ${issueNumber}. Empty uses the issue title and a Fixes line.", Category: CategoryGitHub, Kind: String, Default: ""},
+	{Key: IssueQueries, Title: "Queries", Description: "The issue queries of the GitHub view: a list of objects with label, query and an optional groupBy. Empty uses My Issues, Created Issues and Recent Issues.", Category: CategoryGitHub, Kind: JSON, Default: json.RawMessage(nil)},
+	{Key: IssueLinkBranch, Title: "Link Branch on GitHub", Description: "Create the issue branch on GitHub so that the issue links to it.", Category: CategoryGitHub, Kind: Bool, Default: false},
+}
+
+func DefFor(key string) *Def {
+	for i := range Defs {
+		if Defs[i].Key == key {
+			return &Defs[i]
+		}
+	}
+	return nil
+}
