@@ -95,8 +95,13 @@ func changedFileItem(rel string, code byte, open func(preview, focus bool)) list
 }
 
 func toolbarRow(c *ui.Context, label string, children func()) ui.Element {
+	return sizedToolbarRow(c, label, token.ToolbarHeight.Px(), children)
+}
+
+func sizedToolbarRow(c *ui.Context, label string, height float32, children func()) ui.Element {
 	p := token.Of(c)
-	return ui.Row(c).FillWidth().Height(token.ToolbarHeight.Px()).Shrink(0).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).
-		AlignItems(ui.Center).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).Role(ui.RoleToolbar).Label(label).
-		Children(children)
+	row := ui.Row(c).FillWidth().MinWidth(0).Height(height).Shrink(0).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).
+		AlignItems(ui.Center).Role(ui.RoleToolbar).Label(label).Children(children)
+	ui.Box(c).FillWidth().Height(token.BorderWidth.Px()).Shrink(0).Background(p.Border.Default).AccessHidden(true)
+	return row
 }

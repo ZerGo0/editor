@@ -68,7 +68,7 @@ func (g *Git) popupCommands() []popupCommand {
 		return nil
 	}
 	return []popupCommand{
-		{label: "New Branch...", icon: icons.Plus, run: func() { g.newBranch("") }},
+		{label: "Create Branch...", icon: icons.Plus, run: func() { g.newBranch("") }},
 		{label: "Checkout Tag or Revision...", icon: icons.Tag, run: g.checkoutRevision},
 		{label: "Manage Remotes...", icon: icons.Settings, run: g.openRemotes},
 		{label: "Fetch", icon: icons.Fetch, run: g.fetch},

@@ -15,6 +15,8 @@ import (
 const (
 	containsShown = 6
 	filesSplit    = 55
+
+	selectCommitHint = "Select a commit to see its files and details"
 )
 
 type commitDetails struct {
@@ -63,7 +65,9 @@ func commitSource(cm git.Commit, f git.ChangedFile) diffSource {
 func (s *logState) detailsView(c *ui.Context) {
 	cm, ok := s.selectedCommit()
 	if !ok {
-		emptyState(c, "Select a commit", "Its changed files and details show here.")
+		ui.Column(c).Fill().Padding(token.PadPanel.Px()).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
+			secondary(c, selectCommitHint).SingleLine().MinWidth(0).Tooltip(selectCommitHint)
+		})
 		return
 	}
 	d := &s.details

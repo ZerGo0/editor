@@ -35,6 +35,7 @@ type diffTab struct {
 	loading bool
 	err     error
 	gen     int
+	bar     diffBar
 }
 
 func (g *Git) openDiff(kind diffKind, rel string) {
@@ -170,7 +171,7 @@ func (t *diffTab) body(c *ui.Context) {
 		t.g.diffOpts.apply(t.state)
 		t.state.HunkActions = t.hasHunkActions() && !t.engine.Filtered()
 		t.state.Annotations = t.engine.Annotations(nil)
-		editor.DiffView(c.Key("diff"), t.state).Grow(1).FillWidth()
+		t.diffWithBars(c)
 	}
 }
 

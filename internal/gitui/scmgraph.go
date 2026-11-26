@@ -21,6 +21,8 @@ const (
 	graphMaxBadges = 3
 	fileRowLoading = -1
 	commitRow      = -2
+
+	incomingInkNudgeX float32 = 1
 )
 
 type graphFiles struct {
@@ -303,7 +305,7 @@ func (g *Git) commitMarkers(c *ui.Context, cm git.Commit, remotes map[string]boo
 	p := token.Of(c)
 	switch {
 	case s.incoming[cm.OID]:
-		ui.Icon(c, icons.Pull).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Severity.Info).Label("Incoming").Tooltip("Incoming commit")
+		ui.Icon(c, icons.Pull).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).Translate(incomingInkNudgeX, 0).TextColor(p.Severity.Info).Label("Incoming").Tooltip("Incoming commit")
 	case s.outgoing[cm.OID]:
 		ui.Icon(c, icons.Push).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Severity.Success).Label("Outgoing").Tooltip("Outgoing commit")
 	}
@@ -326,11 +328,11 @@ func refTags(c *ui.Context, refs []string, remotes map[string]bool, limit int) {
 	badges := refBadges(refs, remotes)
 	for j, b := range badges {
 		if limit > 0 && j == limit {
-			badge.Tag(c, fmt.Sprintf("+%d", len(badges)-limit), badge.TagOptions{Tooltip: refNames(badges[limit:])})
+			wholeTag(c, fmt.Sprintf("+%d", len(badges)-limit), badge.TagOptions{Tooltip: refNames(badges[limit:])})
 			return
 		}
 		tone, icon := refTone(b.kind)
-		badge.Tag(c, b.name, badge.TagOptions{Tone: tone, Icon: icon, Tooltip: b.name})
+		wholeTag(c, refLabel(b.name), badge.TagOptions{Tone: tone, Icon: icon, Tooltip: b.name})
 	}
 }
 

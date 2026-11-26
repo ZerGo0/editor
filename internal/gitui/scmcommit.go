@@ -408,7 +408,9 @@ func (g *Git) operationCard(c *ui.Context, st git.RepoState) {
 			})
 		})
 		if conflicts > 0 {
-			secondary(c, fmt.Sprintf("%d conflicted files", conflicts))
+			ui.Row(c).FillWidth().Height(token.IconSize.Px()).AlignItems(ui.Center).Children(func() {
+				secondary(c, fmt.Sprintf("%d conflicted files", conflicts))
+			})
 		}
 		switch {
 		case conflicts > 0:

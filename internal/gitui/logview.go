@@ -2,6 +2,7 @@ package gitui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -54,6 +55,8 @@ type logState struct {
 	focus      string
 	focusPages int
 	details    commitDetails
+	listWidth  float32
+	measured   bool
 }
 
 func newLogState(g *Git, fixedPath string) *logState {
@@ -268,10 +271,10 @@ func (s *logState) view(c *ui.Context) {
 }
 
 func (s *logState) filterBar(c *ui.Context) {
-	toolbarRow(c, "Log Filters", func() {
+	sizedToolbarRow(c, "Log Filters", token.ToolbarHeight.Px(), func() {
 		changed := false
 		filterField := func(label, placeholder, id string, value *string) {
-			ui.Row(c).Width(token.FieldWidthSmall.Px()).Shrink(0).Children(func() {
+			ui.Row(c).Grow(1).Basis(0).MinWidth(0).MaxWidth(token.FieldWidthSmall.Px()).Role(ui.RoleGroup).Label(label + " Field").Children(func() {
 				if field.TextInput(c, label, value, field.InputOptions{Placeholder: placeholder, ID: id}).Changed() {
 					changed = true
 				}
@@ -279,9 +282,7 @@ func (s *logState) filterBar(c *ui.Context) {
 		}
 		filterField("Filter by Text", "Text or hash", "text", &s.filter.text)
 		branch := s.filter.branch
-		ui.Row(c).Width(token.FieldWidthSmall.Px()).Shrink(0).Children(func() {
-			action.Select(c, "Filter by Branch", &s.filter.branch, s.g.branchOptions(), action.SelectOptions{ID: "branch"})
-		})
+		action.Select(c, "Filter by Branch", &s.filter.branch, s.g.branchOptions(), action.SelectOptions{ID: "branch"}).Grow(1).Basis(0).MinWidth(0).MaxWidth(token.FieldWidthSmall.Px())
 		if s.filter.branch != branch {
 			s.applyFilter()
 		}
@@ -354,12 +355,16 @@ func (s *logState) listView(c *ui.Context) {
 		l.Rows(func(row ui.ListRow) {
 			rc := row.Context
 			st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered()}
-			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], gw, remotes))
+			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], gw, remotes, st.Selected && st.Focused))
 		})
 		if l.Submitted() {
 			if cm, ok := s.selectedCommit(); ok {
 				s.open(cm)
 			}
+		}
+		if w := l.Bounds().W; w != s.listWidth || !s.measured {
+			s.listWidth, s.measured = w, true
+			c.Invalidate()
 		}
 		if s.err != nil {
 			ui.Row(c).FillWidth().Padding(token.GapStack.Px(), token.PadView.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).Children(func() {
@@ -376,12 +381,56 @@ func (s *logState) listView(c *ui.Context) {
 	}
 }
 
-func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes map[string]bool) list.Item {
+type logColumns struct {
+	tags   int
+	author bool
+	date   bool
+	hash   bool
+}
+
+func (s *logState) rowRoom(gw float32) float32 {
+	return s.listWidth - 2*token.PadRow.Px() - gw - token.GapRowIcon.Px()
+}
+
+func authorWidth() float32 { return token.ColumnMedium.Px() + token.ColumnSmall.Px()/half }
+
+func tagSlot() float32 { return authorWidth() + token.GapInline.Px() }
+
+func subjectMin() float32 { return 2 * token.ColumnMedium.Px() }
+
+func (s *logState) columns(gw float32, refs int) logColumns {
+	if s.listWidth == 0 {
+		return logColumns{}
+	}
+	room := s.rowRoom(gw)
+	budget := room - subjectMin()
+	gap := token.GapInline.Px()
+	var cols logColumns
+	for _, col := range []struct {
+		width float32
+		on    *bool
+	}{{authorWidth(), &cols.author}, {token.ColumnMedium.Px(), &cols.date}, {token.ColumnSmall.Px(), &cols.hash}} {
+		if budget-tagSlot() >= col.width+gap {
+			*col.on = true
+			budget -= col.width + gap
+		}
+	}
+	cols.tags = min(refs, max(int(budget/tagSlot()), 0))
+	return cols
+}
+
+func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes map[string]bool, active bool) list.Item {
 	merge := len(cm.Parents) > 1
 	p := token.Of(c)
+	color := p.Text.Primary
+	switch {
+	case active:
+		color = p.List.ActiveSelectionText
+	case merge:
+		color = p.Git.Ignored
+	}
 	return list.Item{
 		Label: cm.Subject,
-		Muted: merge,
 		Leading: func(c *ui.Context) {
 			if gw == 0 || i >= len(s.graph) {
 				return
@@ -391,12 +440,32 @@ func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes
 				drawGraphRow(pt, r, p, p.Layer.Panel, gr, merge)
 			})
 		},
-		Trailing: func(c *ui.Context) {
-			refTags(c, cm.Refs, remotes, maxBadges)
-			secondary(c, cm.Author).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
-			secondary(c, formatTime(cm.AuthorTime, c.Now())).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
-			secondary(c, shortHash(cm.OID)).SingleLine().Width(token.ColumnSmall.Px()).Shrink(0)
+		Content: func(c *ui.Context) {
+			s.rowContent(c, cm, gw, s.columns(gw, len(refBadges(cm.Refs, remotes))), color, remotes)
 		},
 		Menu: func(m *ui.Menu) { s.commitMenu(c, m, cm) },
 	}
+}
+
+func (s *logState) rowContent(c *ui.Context, cm git.Commit, gw float32, cols logColumns, color ui.Color, remotes map[string]bool) {
+	row := ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapInline.Px()).AlignItems(ui.Center)
+	if room := s.rowRoom(gw); s.listWidth > 0 && room > 0 {
+		row.Grow(0).Shrink(1).Width(float32(math.Floor(float64(room))))
+	}
+	row.Children(func() {
+		token.TextBody.Apply(ui.Text(c, cm.Subject)).TextColor(color).SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
+		if cols.tags > 0 {
+			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { refTags(c, cm.Refs, remotes, cols.tags) })
+		}
+		author := authorWidth()
+		if cols.author {
+			secondary(c, cm.Author).SingleLine().Width(author).Shrink(0)
+		}
+		if cols.date {
+			secondary(c, formatTime(cm.AuthorTime, c.Now())).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
+		}
+		if cols.hash {
+			secondary(c, shortHash(cm.OID)).SingleLine().Width(token.ColumnSmall.Px()).Shrink(0)
+		}
+	})
 }
