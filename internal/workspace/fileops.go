@@ -39,7 +39,10 @@ func filetreeHandlers(w *Workspace) filetree.Handlers {
 		Trash:  w.trash,
 		Paste:  w.pasteEntries,
 		Move:   w.moveEntries,
+		Leave:  func() { w.focusTab = w.active.ActiveTab() },
+		Import: func(paths []string, dir string) { w.pasteEntries(paths, dir, false) },
 		Notify: w.setNotice,
+		Marker: w.problemMarker,
 	}
 }
 
@@ -120,9 +123,10 @@ func (w *Workspace) NewFolder() {
 }
 
 func (w *Workspace) startCreate(dir string, folder bool) {
+	fromEditor := !w.focus.side && w.active.ActiveTab() != nil
 	w.ShowSideView(ExplorerView)
 	w.tools.explorerCollapsed = false
-	w.tree.StartCreate(dir, folder)
+	w.tree.StartCreate(dir, folder, fromEditor)
 }
 
 func (w *Workspace) resolveName(dir, name string) (string, error) {

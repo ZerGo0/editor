@@ -7,10 +7,12 @@ import (
 	"slices"
 
 	"github.com/ZerGo0/editor/internal/command"
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/workspace"
+	"github.com/ZerGo0/editor/resources"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -36,15 +38,17 @@ type projectWindow struct {
 }
 
 type App struct {
-	options  Options
-	store    *session.Store
-	settings *settings.Store
-	keys     *keymap.Store
-	commands *command.Registry
-	env      *workspace.Env
-	projects map[string]*projectWindow
-	welcome  *mygo.Window
-	quitting bool
+	options    Options
+	store      *session.Store
+	settings   *settings.Store
+	keys       *keymap.Store
+	commands   *command.Registry
+	env        *workspace.Env
+	projects   map[string]*projectWindow
+	welcome    *mygo.Window
+	recentList ui.ListState
+	quitting   bool
+	drawing    *workspace.Workspace
 }
 
 func New(options Options) *App {
@@ -75,8 +79,12 @@ func (a *App) Run(args []string) error {
 	})
 	mygo.App.OnQuitCanceled(func() { a.quitting = false })
 	mygo.App.WhenReady(func() {
+		if err := resources.RegisterFonts(); err != nil {
+			log.Printf("fonts: %v", err)
+		}
 		a.loadSession()
 		a.loadConfig()
+		action.SetCommands(commandSource{app: a})
 		a.refreshMenu()
 		if !a.openArgs(args, wd) {
 			a.restore()
@@ -154,9 +162,8 @@ func (a *App) openProject(root string) *projectWindow {
 		StateKey:       "project:" + root,
 		TitleBarStyle:  mygo.TitleBarHiddenInset,
 		TitleBarHeight: workspace.TitleBarHeight,
-		Vibrancy:       mygo.VibrancySidebar,
 		Hidden:         a.options.Hidden,
-		Content:        ui.View(ws.View),
+		Content:        ui.View(a.projectView(ws)),
 	})
 	ws.Attach(win)
 	pw := &projectWindow{win: win, ws: ws}

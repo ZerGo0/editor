@@ -1,66 +1,30 @@
 package workspace
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	iconButtonSize   = 24
-	iconButtonIcon   = 16
-	iconButtonRadius = 5
-	sectionFontSize  = 11
-	uiFontSize       = 13
-	smallFontSize    = 12
-)
-
-func iconButton(c *ui.Context, key, label, tooltip string, svg *ui.SVG, active bool, action func()) ui.Element {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(key)).Size(iconButtonSize, iconButtonSize).Radius(iconButtonRadius).Center().
-		Label(label).Tooltip(tooltip).Shrink(0)
-	color := t.TextMuted
-	if active {
-		color = t.Text
+func (w *Workspace) iconButton(c *ui.Context, icon *ui.SVG, label, command string, active bool, fn func()) ui.Element {
+	b := action.IconButton(c, icon, label, action.IconOptions{Keys: w.keyLabel(command), Active: active})
+	if b.Clicked() {
+		fn()
 	}
-	if pressable(b, t) {
-		color = t.Text
-	}
-	b.TextColor(color).Children(func() { ui.Icon(c, svg).Size(iconButtonIcon, iconButtonIcon) })
-	b.OnClick(action)
 	return b
 }
 
-func pressable(b ui.Element, t *ui.Theme) bool {
-	switch {
-	case b.Pressed():
-		b.Background(t.SurfacePressed)
-	case b.Hovered():
-		b.Background(t.SurfaceHover)
-	default:
-		return false
-	}
-	return true
-}
-
 func (w *Workspace) withKeys(label, command string) string {
-	if keys := w.keyLabel(command); keys != "" {
-		return label + " (" + keys + ")"
-	}
-	return label
+	return action.Hint(label, w.keyLabel(command))
 }
 
 func (w *Workspace) commandItem(m *ui.Menu, label, command string) {
-	item := m.Item(label)
+	o := action.ItemOptions{ID: command}
 	if chords := w.env.Keys.Current.For(command); len(chords) > 0 && len(chords[0]) == 1 {
-		item.Shortcut(chords[0][0].Mods, chords[0][0].Key)
+		o.Mods, o.Key = chords[0][0].Mods, chords[0][0].Key
+	} else if len(chords) > 0 {
+		o.Detail = chords[0].Label()
 	}
-	if item.Chosen() {
+	if action.Item(m, label, o).Chosen() {
 		w.run(command)
 	}
-}
-
-func activeAccent(c *ui.Context) ui.Color {
-	if c.WindowActive() {
-		return c.Theme().Accent
-	}
-	return c.Theme().TextMuted
 }

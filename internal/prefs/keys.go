@@ -5,21 +5,34 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/command"
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/keymap"
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	keysColumnWidth   = 140
-	sourceColumnWidth = 64
-	actionColumnWidth = 150
-	commandMinWidth   = 160
-	keyRowHeight      = 32
-	recorderWidth     = 420
-	maxStrokes        = 2
-	sourceUser        = "User"
-	sourceDefault     = "Default"
+	maxStrokes      = 2
+	sourceUser      = "User"
+	sourceDefault   = "Default"
+	keysLabel       = "Keyboard Shortcuts"
+	keysSearchLabel = "Search keyboard shortcuts"
+	keysJSONOpen    = "Open Keyboard Shortcuts (JSON)"
+	recordHint      = "Press Enter to save, or Escape to cancel."
+	waitingKeys     = "Waiting for keys..."
+	copyCommandID   = "Copy Command ID"
+	rowActionSlots  = 3
 )
+
+var actionsWidth = rowActionSlots*token.IconButtonSize.Px() + (rowActionSlots-1)*token.GapTight.Px()
 
 type KeysView struct {
 	Keys     *keymap.Store
@@ -44,9 +57,8 @@ type recorder struct {
 	focus   ui.Handle
 }
 
-func (v *KeysView) rows() []keyRow {
+func (v *KeysView) rows(f keyFilter) []keyRow {
 	km := v.Keys.Current
-	q := strings.ToLower(strings.TrimSpace(v.query))
 	var out []keyRow
 	for _, cmd := range v.Commands.All() {
 		var bound []keymap.Binding
@@ -57,18 +69,16 @@ func (v *KeysView) rows() []keyRow {
 				}
 			}
 		}
-		match := func(keys string) bool {
-			return q == "" || strings.Contains(strings.ToLower(cmd.Label()+" "+cmd.ID+" "+keys), q)
-		}
+		text := cmd.Label() + " " + cmd.ID
 		if len(bound) == 0 {
-			if match("") {
+			if f.match(text, false, false) {
 				out = append(out, keyRow{cmd: cmd})
 			}
 			continue
 		}
 		for i := range bound {
 			b := bound[i]
-			if match(b.Chord.Label() + " " + b.Chord.String()) {
+			if f.match(text+" "+b.Chord.Label()+" "+b.Chord.String(), true, b.User) {
 				out = append(out, keyRow{cmd: cmd, binding: &b})
 			}
 		}
@@ -77,86 +87,135 @@ func (v *KeysView) rows() []keyRow {
 }
 
 func (v *KeysView) View(c *ui.Context) {
-	t := c.Theme()
-	rows := v.rows()
-	ui.Column(c).Grow(1).FillWidth().Children(func() {
-		toolbar(c, func() {
-			ui.TextInput(c.Key("keys-search"), &v.query).Placeholder("Search by command or key").Label("Search keyboard shortcuts").Grow(1)
-			if ui.Button(c, "Open Keyboard Shortcuts (JSON)").Clicked() {
+	f := parseKeyFilter(v.query)
+	rows := v.rows(f)
+	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
+		toolbar(c, keysLabel, func() {
+			ui.Box(c).Grow(1).MinWidth(0).Children(func() {
+				field.SearchInput(c, keysSearchLabel, &v.query, field.SearchOptions{Placeholder: "Search by command, ID or key, @source:user", ID: "keys-search"})
+			})
+			if action.Button(c, keysJSONOpen, action.ButtonOptions{Variant: action.Ghost, Icon: icons.File}).Clicked() {
 				v.OpenJSON()
 			}
 		})
-		problems(c, t, append(slices.Clone(v.Keys.Current.Errors), nonEmpty(v.err)...))
-		ui.Row(c).Padding(6, contentPadding).Gap(12).FillWidth().Shrink(0).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-			header(c, t, "Command").Grow(1).MinWidth(commandMinWidth)
-			header(c, t, "Keybinding").Width(keysColumnWidth)
-			header(c, t, "Source").Width(sourceColumnWidth)
-			ui.Box(c).Width(actionColumnWidth)
-		})
-		ui.List(c, &v.list, len(rows), func(i int) { v.row(c, t, rows[i]) }).Grow(1).FillWidth().Padding(0, contentPadding)
-	})
-	v.recorderView(c, t)
-}
-
-func header(c *ui.Context, t *ui.Theme, text string) ui.Element {
-	return ui.Text(c, text).FontSize(detailFontSize).Bold().TextColor(t.TextMuted).SingleLine()
-}
-
-func (v *KeysView) row(c *ui.Context, t *ui.Theme, r keyRow) {
-	key := r.cmd.ID
-	if r.binding != nil {
-		key += " " + r.binding.Chord.String()
-	}
-	row := ui.Row(c.Key(key)).Height(keyRowHeight).Gap(12).AlignItems(ui.Center).FillWidth().BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
-	hovered := row.Hovered() || row.FocusWithin()
-	if hovered {
-		row.Background(t.SurfaceHover)
-	}
-	row.Children(func() {
-		ui.Row(c).Gap(8).Grow(1).MinWidth(commandMinWidth).AlignItems(ui.Center).Clip().Children(func() {
-			ui.Text(c, r.cmd.Label()).SingleLine().Shrink(1).MinWidth(0)
-			ui.Text(c, r.cmd.ID).FontSize(detailFontSize).TextColor(t.TextMuted).SingleLine().Shrink(1).MinWidth(0)
-		})
-		keys, source := "", ""
-		if r.binding != nil {
-			keys, source = r.binding.Chord.Label(), sourceDefault
-			if r.binding.User {
-				source = sourceUser
-			}
+		problems(c, append(slices.Clone(v.Keys.Current.Errors), nonEmpty(v.err)...))
+		v.header(c)
+		l := list.View(c, &v.list, len(rows), list.ViewOptions{Label: keysLabel, Empty: func(c *ui.Context) {
+			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No keyboard shortcuts found", Message: "No command matches the search.",
+				Action: "Clear Search", OnAction: func() { v.query = "" }})
+		}}, func(i int) list.Item { return v.item(rows[i], i) })
+		if sel := v.list.Selected; sel != nil && *sel >= 0 && *sel < len(rows) && l.Shortcut(0, ui.KeyEnter) {
+			v.record(rows[*sel])
 		}
-		ui.Text(c, keys).SingleLine().Width(keysColumnWidth)
-		ui.Text(c, source).FontSize(detailFontSize).TextColor(t.TextMuted).SingleLine().Width(sourceColumnWidth)
-		ui.Row(c).Gap(4).Width(actionColumnWidth).Shrink(0).Justify(ui.End).Children(func() {
-			if !hovered {
-				return
-			}
-			label := "Add"
-			if r.binding != nil {
-				label = "Change"
-			}
-			if smallButton(c, t, label, label+" keybinding of "+r.cmd.Label()) {
-				v.rec = recorder{open: true, command: r.cmd.ID, old: r.binding}
-			}
-			if r.binding != nil && smallButton(c, t, "Remove", "Remove keybinding of "+r.cmd.Label()) {
-				v.remove(r.cmd.ID, r.binding)
-			}
-			if v.customized(r.cmd.ID) && smallButton(c, t, "Reset", "Reset keybindings of "+r.cmd.Label()) {
-				v.reset(r.cmd.ID)
-			}
-		})
 	})
-	if row.DoubleClicked() {
-		v.rec = recorder{open: true, command: r.cmd.ID, old: r.binding}
+	v.recorderView(c)
+}
+
+func (v *KeysView) header(c *ui.Context) {
+	p := token.Of(c)
+	ui.Row(c).Height(token.HeaderHeight.Px()).FillWidth().Shrink(0).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).
+		BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Section).Children(func() {
+		design.Text(c, "Command", token.TextCaption).Grow(1).MinWidth(0)
+		v.columns(c, func() { design.Text(c, "Keybinding", token.TextCaption) }, func() { design.Text(c, "When", token.TextCaption) },
+			func() { design.Text(c, "Source", token.TextCaption) }, nil)
+	})
+}
+
+func (v *KeysView) columns(c *ui.Context, keys, when, source, actions func()) {
+	ui.Row(c).Width(token.KeyColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Clip().Children(keys)
+	ui.Row(c).Width(token.WhenColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Clip().Children(when)
+	ui.Row(c).Width(token.SourceColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Children(source)
+	ui.Row(c).Width(actionsWidth).Shrink(0).Gap(token.GapTight.Px()).Justify(ui.End).AlignItems(ui.Center).Children(func() {
+		if actions != nil {
+			actions()
+		}
+	})
+}
+
+func (v *KeysView) item(r keyRow, i int) list.Item {
+	label := r.cmd.Label()
+	return list.Item{
+		Tooltip:       r.cmd.ID,
+		Menu:          func(m *ui.Menu) { v.menu(m, r) },
+		OnDoubleClick: func() { v.record(r) },
+		Content: func(c *ui.Context) {
+			p := token.Of(c)
+			row := ui.Row(c).Grow(1).MinWidth(0).FillHeight().Gap(token.GapControl.Px()).AlignItems(ui.Center)
+			selected := v.list.Selected != nil && *v.list.Selected == i
+			show := row.Hovered() || selected
+			keys, when, source := "", "", ""
+			if r.binding != nil {
+				keys, source = r.binding.Chord.Label(), sourceDefault
+				if r.binding.User {
+					source = sourceUser
+				}
+				if r.binding.When != nil {
+					when = r.binding.When.String()
+				}
+			}
+			row.Label(label).Description(strings.Join(slices.DeleteFunc([]string{r.cmd.ID, keys, when, source}, func(s string) bool { return s == "" }), ", "))
+			row.Children(func() {
+				ui.RichText(c, ui.Span{Text: label + "  ", Color: p.Text.Primary}, ui.Span{Text: r.cmd.ID, Color: p.Text.Secondary}).
+					FontSize(token.TextBody.Px()).SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
+				v.columns(c, func() {
+					if keys != "" {
+						badge.Keys(c, keys)
+					}
+				}, func() {
+					design.Text(c, when, token.TextMono).SingleLine().Shrink(1).MinWidth(0).AccessHidden(true)
+				}, func() {
+					design.Text(c, source, token.TextCaption).SingleLine().AccessHidden(true)
+				}, func() {
+					if show {
+						v.actions(c, r)
+					}
+				})
+			})
+		},
 	}
 }
 
-func smallButton(c *ui.Context, t *ui.Theme, text, label string) bool {
-	b := ui.ButtonBase(c.Key(text)).Padding(2, 8).Radius(4).Label(label)
-	if b.Hovered() {
-		b.Background(t.SurfacePressed)
+func (v *KeysView) actions(c *ui.Context, r keyRow) {
+	label := r.cmd.Label()
+	if r.binding == nil {
+		if action.IconButton(c, icons.Plus, "Add keybinding of "+label, action.IconOptions{Tooltip: "Add Keybinding", ID: "add"}).Clicked() {
+			v.record(r)
+		}
+	} else {
+		if action.IconButton(c, icons.Edit, "Change keybinding of "+label, action.IconOptions{Tooltip: "Change Keybinding", ID: "change"}).Clicked() {
+			v.record(r)
+		}
+		if action.IconButton(c, icons.Minus, "Remove keybinding of "+label, action.IconOptions{Tooltip: "Remove Keybinding", ID: "remove"}).Clicked() {
+			v.remove(r.cmd.ID, r.binding)
+		}
 	}
-	b.Children(func() { ui.Text(c, text).FontSize(detailFontSize).TextColor(t.Accent) })
-	return b.Clicked()
+	if v.customized(r.cmd.ID) && action.IconButton(c, icons.Undo, "Reset keybindings of "+label, action.IconOptions{Tooltip: "Reset Keybinding", ID: "reset"}).Clicked() {
+		v.reset(r.cmd.ID)
+	}
+}
+
+func (v *KeysView) menu(m *ui.Menu, r keyRow) {
+	change := "Add Keybinding..."
+	if r.binding != nil {
+		change = "Change Keybinding..."
+	}
+	if m.Item(change).Chosen() {
+		v.record(r)
+	}
+	if r.binding != nil && m.Item("Remove Keybinding").Chosen() {
+		v.remove(r.cmd.ID, r.binding)
+	}
+	if m.Item("Reset Keybinding").Disabled(!v.customized(r.cmd.ID)).Chosen() {
+		v.reset(r.cmd.ID)
+	}
+	m.Separator()
+	if m.Item(copyCommandID).Chosen() {
+		mygo.Clipboard.WriteText(r.cmd.ID)
+	}
+}
+
+func (v *KeysView) record(r keyRow) {
+	v.rec = recorder{open: true, command: r.cmd.ID, old: r.binding}
 }
 
 func (v *KeysView) customized(id string) bool {
@@ -204,32 +263,32 @@ func (v *KeysView) assign(id string, old *keymap.Binding, chord keymap.Chord) {
 	v.write(append(entries, keymap.Entry{Key: chord.String(), Command: id}))
 }
 
-func (v *KeysView) recorderView(c *ui.Context, t *ui.Theme) {
+func (v *KeysView) recorderView(c *ui.Context) {
 	r := &v.rec
 	if !r.open {
 		return
 	}
-	ui.Modal(c, &r.open, func() {
-		ui.Column(c).Gap(10).Width(recorderWidth).Children(func() {
-			title := "Press the keys for " + v.title(r.command)
-			ui.Text(c, title).Bold()
-			ui.Text(c, "Press Enter to save, or Escape to cancel.").FontSize(detailFontSize).TextColor(t.TextMuted)
-			box := ui.Row(c.Key("capture")).Height(keyRowHeight).FillWidth().Center().Radius(6).Background(t.Surface).
-				BorderWidth(1).BorderColor(t.Focus).Focusable().AutoFocus().Label(title).Bind(&r.focus)
-			box.HandleInput(func(ev ui.InputEvent) bool { return v.capture(ev) })
-			box.Children(func() {
-				text := r.chord.Label()
-				if text == "" {
-					text = "Waiting for keys..."
-				}
-				ui.Text(c, text)
-			})
-			if len(r.chord) > 0 {
-				if b, ok := v.Keys.Current.Lookup(r.chord); ok && b.Command != r.command {
-					ui.Text(c, "Already used by "+v.title(b.Command)+".").FontSize(detailFontSize).TextColor(t.Warning)
-				}
+	title := "Press the keys for " + v.title(r.command)
+	dialog.Modal(c, &r.open, title, dialog.Options{Hint: recordHint}, func() {
+		p := token.Of(c)
+		box := ui.Row(c.Key("capture")).Height(token.ControlHeight.Px()).FillWidth().Center().Radius(token.RadiusControl.Px()).
+			Background(p.Layer.Input).Border(token.BorderWidth.Px(), p.Accent.Focus).Focusable().AutoFocus().Label(title).Bind(&r.focus)
+		box.HandleInput(func(ev ui.InputEvent) bool { return v.capture(ev) })
+		box.Children(func() {
+			if len(r.chord) == 0 {
+				design.Text(c, waitingKeys, token.TextCaption)
+				return
 			}
+			badge.Keys(c, r.chord.Label())
 		})
+		if len(r.chord) > 0 {
+			if b, ok := v.Keys.Current.Lookup(r.chord); ok && b.Command != r.command {
+				design.Inline(c, token.GapRowIcon, func() {
+					ui.Icon(c, feedback.ToneIcon(token.ToneWarning)).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Severity.Warning)
+					design.Text(c, "Already used by "+v.title(b.Command)+".", token.TextBody)
+				})
+			}
+		}
 	})
 }
 

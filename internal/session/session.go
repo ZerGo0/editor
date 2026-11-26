@@ -24,9 +24,18 @@ type Tab struct {
 	Pinned  bool    `json:"pinned,omitempty"`
 }
 
+type Location struct {
+	Path string `json:"path"`
+	Line int    `json:"line,omitempty"`
+	Col  int    `json:"col,omitempty"`
+}
+
 type Group struct {
-	Tabs   []Tab `json:"tabs"`
-	Active int   `json:"active"`
+	Tabs    []Tab      `json:"tabs"`
+	Active  int        `json:"active"`
+	Back    []Location `json:"back,omitempty"`
+	Forward []Location `json:"forward,omitempty"`
+	Recent  []string   `json:"recent,omitempty"`
 }
 
 type Node struct {
@@ -48,6 +57,12 @@ type Project struct {
 	Panel         string          `json:"panel,omitempty"`
 	PanelPercent  float32         `json:"panelPercent,omitempty"`
 	Search        json.RawMessage `json:"search,omitempty"`
+	PanelRight    bool            `json:"panelRight,omitempty"`
+	OpenEditors   bool            `json:"openEditors,omitempty"`
+	Collapsed     []string        `json:"collapsed,omitempty"`
+	HiddenViews   []string        `json:"hiddenViews,omitempty"`
+	StatusHidden  []string        `json:"statusHidden,omitempty"`
+	LastEdit      *Location       `json:"lastEdit,omitempty"`
 }
 
 type State struct {

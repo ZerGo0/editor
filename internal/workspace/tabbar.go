@@ -1,31 +1,25 @@
 package workspace
 
 import (
+	"os"
 	"slices"
-	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/chrome"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/viewer"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
+	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	tabBarHeight    = 35
-	tabIconSize     = 16
-	tabButtonSize   = 20
-	tabButtonIcon   = 14
-	tabDotIcon      = 8
-	tabPaddingStart = 10
-	tabPaddingEnd   = 4
-	tabGap          = 6
-	tabAccentHeight = 2
-	tabDropWidth    = 2
-	middleButton    = 2
-	hiddenOpacity   = 0
-	pinnedLabel     = "pinned"
-	modifiedLabel   = "modified"
+	tabStripLabel    = "Editor Tabs"
+	moreActionsLabel = "More Actions..."
+	previewToSideID  = "markdown.showPreviewToSide"
 )
 
 type tabDrag struct {
@@ -33,29 +27,75 @@ type tabDrag struct {
 	tab   *layout.Tab
 }
 
-func (w *Workspace) tabBar(c *ui.Context, g *layout.Group) {
-	t := c.Theme()
-	ui.Row(c).Height(tabBarHeight).Shrink(0).FillWidth().Background(t.Surface).Children(func() {
-		ui.ScrollHorizontal(c).Shrink(1).MinWidth(0).FillHeight().Children(func() {
-			tabs := ui.TabsBase(c, &g.Active, len(g.Tabs))
-			tabs.List.FillHeight().AlignItems(ui.Stretch).Children(func() {
-				for i, tab := range slices.Clone(g.Tabs) {
-					w.tab(c, g, tabs.Tab(i), i, tab)
-				}
-			})
-			if tabs.List.Changed() {
-				w.activate(g, g.ActiveTab())
-			}
-		})
-		rest := ui.Box(c).Grow(1).FillHeight().BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
-		if rest.DoubleClicked() {
-			w.active = g
-			w.NewUntitled()
+type dragState struct {
+	seen, shown bool
+}
+
+func (w *Workspace) beginDragFrame() {
+	w.drag.shown, w.drag.seen = w.drag.seen, false
+}
+
+func (w *Workspace) tabLabels() map[string]string {
+	var paths []string
+	for _, t := range w.tabs() {
+		if onDisk(t.Path) {
+			paths = append(paths, t.Path)
 		}
-		rest.ContextMenu(func(m *ui.Menu) { w.groupMenu(m, g) })
-		w.dropTarget(rest, g, len(g.Tabs))
-		w.editorActions(c, g)
+	}
+	return tablabel.Describe(paths)
+}
+
+func (w *Workspace) tabTooltip(p string) string {
+	if onDisk(p) {
+		return p
+	}
+	return w.tabTitle(p)
+}
+
+func (w *Workspace) tabBar(c *ui.Context, g *layout.Group) {
+	tabs := slices.Clone(g.Tabs)
+	labels := w.tabLabels()
+	items := make([]chrome.Tab, len(tabs))
+	for i, t := range tabs {
+		d := w.doc(t.Path)
+		items[i] = chrome.Tab{Label: w.tabTitle(t.Path), Description: labels[t.Path], Tooltip: w.tabTooltip(t.Path),
+			Leading: func(c *ui.Context) { w.tabIcon(c, t.Path) }, Dirty: d != nil && d.Modified(), Preview: t.Preview, Pinned: t.Pinned}
+	}
+	selected := g.Active
+	closeTab := func(i int) { w.requestClose(g, []*layout.Tab{tabs[i]}) }
+	chrome.TabStrip(c, &selected, items, chrome.TabStripOptions{
+		Label:         tabStripLabel,
+		OnSelect:      func(i int) { w.activate(g, tabs[i]) },
+		OnClose:       closeTab,
+		OnAuxClick:    closeTab,
+		OnUnpin:       func(i int) { g.SetPinned(tabs[i], false) },
+		OnDoubleClick: func(i int) { tabs[i].Preview = false },
+		Menu:          func(i int, m *ui.Menu) { w.tabMenu(m, g, tabs[i]) },
+		Drag:          func(i int) any { return tabDrag{g, tabs[i]} },
+		Dragging:      func(int) { w.drag.seen = true },
+		Drop: func(at int, el ui.Element) bool {
+			w.dropTarget(el, g, at)
+			return dragging(el)
+		},
+		EmptyMenu:          func(m *ui.Menu) { w.groupMenu(m, g) },
+		OnEmptyDoubleClick: func() { w.active = g; w.NewUntitled() },
+		Actions:            func(c *ui.Context) { w.editorActions(c, g) },
 	})
+}
+
+func (w *Workspace) editorActions(c *ui.Context, g *layout.Group) {
+	tab := g.ActiveTab()
+	if tab != nil && !isVirtual(tab.Path) && previewable(tab.Path) {
+		if action.IconButton(c, icons.Preview, previewToSideLabel, action.IconOptions{Keys: w.keyLabel(previewToSideID)}).Clicked() {
+			w.activate(g, tab)
+			w.OpenPreviewToSide()
+		}
+	}
+	if action.IconButton(c, icons.Split, splitRightLabel, action.IconOptions{Keys: w.keyLabel(splitRightID), ID: "split-group"}).Clicked() {
+		w.active = g
+		w.Split(false)
+	}
+	action.MenuIconButton(c, icons.More, moreActionsLabel, action.IconOptions{}, func(m *ui.Menu) { w.groupMenu(m, g) })
 }
 
 func (w *Workspace) dropTarget(el ui.Element, g *layout.Group, at int) {
@@ -65,6 +105,9 @@ func (w *Workspace) dropTarget(el ui.Element, g *layout.Group, at int) {
 	if paths, ok := ui.Drop[filetree.Paths](el); ok {
 		w.openDropped(g, paths)
 	}
+	if files := el.DroppedFiles(); len(files) > 0 {
+		w.openDropped(g, files)
+	}
 }
 
 func dragging(el ui.Element) bool {
@@ -73,105 +116,16 @@ func dragging(el ui.Element) bool {
 	return tab || files
 }
 
-func (w *Workspace) tab(c *ui.Context, g *layout.Group, el ui.Element, i int, tab *layout.Tab) {
-	t := c.Theme()
-	name := w.tabTitle(tab.Path)
-	active := g.ActiveTab() == tab
-	hovered := el.Hovered()
-	el.Gap(tabGap).Padding(0, tabPaddingEnd, 0, tabPaddingStart).AlignItems(ui.Center).Label(name).Drag(tabDrag{g, tab})
-	modified := false
-	if d := w.doc(tab.Path); d != nil {
-		modified = d.Modified()
-	}
-	if desc := tabDescription(tab.Pinned, modified); desc != "" {
-		el.Description(desc)
-	}
-	switch {
-	case active:
-		el.Background(t.Background).BorderWidth(0, 1, 0, 0)
-	case hovered:
-		el.Background(t.SurfaceHover).BorderWidth(0, 1, 1, 0)
-	default:
-		el.BorderWidth(0, 1, 1, 0)
-	}
-	el.BorderColor(t.Border)
-	el.Children(func() {
-		if active && g == w.active {
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(tabAccentHeight).Background(activeAccent(c))
-		}
-		if dragging(el) {
-			ui.Box(c).Absolute().Top(0).Bottom(0).Left(0).Width(tabDropWidth).Background(t.Accent)
-		}
-		w.tabIcon(c, tab.Path)
-		text := ui.Text(c, name).FontSize(uiFontSize).SingleLine()
-		if tab.Preview {
-			text.Italic()
-		}
-		if !active {
-			text.TextColor(t.TextMuted)
-		}
-		w.tabButton(c, g, tab, name, active, hovered, modified)
-	})
-	if b, ok := el.PressedButton(); ok && b == middleButton {
-		w.requestClose(g, []*layout.Tab{tab})
-	}
-	if el.DoubleClicked() {
-		tab.Preview = false
-	}
-	el.ContextMenu(func(m *ui.Menu) { w.tabMenu(m, g, tab) })
-	w.dropTarget(el, g, i)
-}
-
-func tabDescription(pinned, modified bool) string {
-	var parts []string
-	if pinned {
-		parts = append(parts, pinnedLabel)
-	}
-	if modified {
-		parts = append(parts, modifiedLabel)
-	}
-	return strings.Join(parts, ", ")
-}
-
 func (w *Workspace) tabIcon(c *ui.Context, p string) {
 	if !isVirtual(p) {
-		icons.FileIcon(c, w.tabTitle(p), false, false, tabIconSize)
+		icons.FileIcon(c, w.tabTitle(p), false, false, token.IconSize.Px())
 		return
 	}
 	svg := icons.File
 	if p == SettingsTab || p == KeybindingsTab {
 		svg = icons.Settings
 	}
-	ui.Icon(c, svg).Size(tabIconSize, tabIconSize).TextColor(c.Theme().TextMuted).Shrink(0)
-}
-
-func (w *Workspace) tabButton(c *ui.Context, g *layout.Group, tab *layout.Tab, name string, active, tabHovered, modified bool) {
-	t := c.Theme()
-	label, svg, size := "Close "+name, icons.Close, float32(tabButtonIcon)
-	if tab.Pinned {
-		label, svg = "Unpin "+name, icons.Pin
-	}
-	b := ui.ButtonBase(c.Key("close")).Size(tabButtonSize, tabButtonSize).Radius(iconButtonRadius).Center().Shrink(0).
-		TextColor(t.TextMuted).Label(label).Tooltip(label)
-	hovered := pressable(b, t)
-	if hovered {
-		b.TextColor(t.Text)
-	}
-	switch {
-	case tab.Pinned:
-	case modified && !hovered:
-		svg, size = icons.Dot, tabDotIcon
-	case !active && !tabHovered:
-		b.Opacity(hiddenOpacity)
-	}
-	b.Children(func() { ui.Icon(c, svg).Size(size, size) })
-	b.OnClick(func() {
-		if tab.Pinned {
-			g.SetPinned(tab, false)
-			return
-		}
-		w.requestClose(g, []*layout.Tab{tab})
-	})
+	ui.Icon(c, svg).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(token.Of(c).Icon).Shrink(0).AccessHidden(true)
 }
 
 func (w *Workspace) tabMenu(m *ui.Menu, g *layout.Group, tab *layout.Tab) {
@@ -273,11 +227,40 @@ func (w *Workspace) moveTab(d tabDrag, to *layout.Group, at int) {
 	w.activate(to, tab)
 }
 
+func (w *Workspace) splitWith(d tabDrag, g *layout.Group, vertical, before bool) {
+	if d.group == g && len(g.Tabs) == 1 {
+		return
+	}
+	added := w.newGroup()
+	if !w.layout.Split(g, added, vertical) {
+		return
+	}
+	if before {
+		swapSplit(w.layout, g, added)
+	}
+	w.moveTab(d, added, 0)
+}
+
+func swapSplit(n *layout.Node, first, second *layout.Group) bool {
+	if n.Group != nil {
+		return false
+	}
+	if n.First.Group == first && n.Second.Group == second {
+		n.First, n.Second = n.Second, n.First
+		return true
+	}
+	return swapSplit(n.First, first, second) || swapSplit(n.Second, first, second)
+}
+
 func (w *Workspace) openDropped(g *layout.Group, paths []string) {
 	w.active = g
 	for _, p := range paths {
-		if !w.tree.IsDir(p) {
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
 			w.OpenFile(p, false, true)
 		}
 	}
+}
+
+func previewable(p string) bool {
+	return viewer.Detect(p, nil).Previewable()
 }

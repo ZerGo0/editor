@@ -18,7 +18,6 @@ import (
 const (
 	importKeybindingsCommand = "workbench.action.importVSCodeKeybindings"
 	replaceInFilesCommand    = "workbench.action.replaceInFiles"
-	legacyGoToLineCommand    = "editor.goToLine"
 	importViewID             = "vscode-keybindings-import"
 	importViewTitle          = "VS Code Keybindings Import"
 	importButton             = 0
@@ -37,13 +36,9 @@ func (a *App) registerKeymapCommands() {
 			}
 		}
 	}
-	// TECHDEBT: Registers the legacy editor.goToLine ID as a second command because workspace status.go and config.go still run it, so the palette lists Go to Line twice; switch them to workbench.action.gotoLine and remove this entry.
 	a.commands.Add(
 		&command.Command{ID: importKeybindingsCommand, Category: categoryPreferences, Title: "Import VS Code Keybindings", Run: a.importVSCodeKeybindings},
-		&command.Command{ID: replaceInFilesCommand, Category: categorySearch, Title: "Replace in Files", Run: inWorkspace((*workspace.Workspace).FindInFiles)},
-		&command.Command{ID: legacyGoToLineCommand, Category: categoryGo, Title: "Go to Line/Column...", Run: func(win *mygo.Window) {
-			a.commands.Run(keymap.CanonicalID(legacyGoToLineCommand), win)
-		}},
+		&command.Command{ID: replaceInFilesCommand, Category: categorySearch, Title: "Replace in Files", Run: inWorkspace((*workspace.Workspace).ReplaceInFiles)},
 	)
 	statePath := filepath.Join(userDataDir(), dataDir, vscodeimport.PromptStateFile)
 	go a.offerVSCodeImport(statePath)

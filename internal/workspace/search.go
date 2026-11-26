@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 	"unicode"
@@ -31,7 +30,6 @@ const (
 	reindexDelay       = time.Second
 	maxRecentFiles     = 50
 	doubleShiftWindow  = 400 * time.Millisecond
-	paletteIconSize    = 16
 	beforeReplaceLabel = "Before Replace"
 )
 
@@ -43,6 +41,7 @@ type searchState struct {
 	timer   *time.Timer
 	cancel  context.CancelFunc
 	shiftAt time.Time
+	engine  *everywhere.Search
 }
 
 func (w *Workspace) initSearch(saved session.Project) {
@@ -78,8 +77,9 @@ func (w *Workspace) initSearch(saved session.Project) {
 			w.search.view.Restore(st)
 		}
 	}
+	w.search.engine = engine
 	w.addSideView(toolView{id: SearchView, title: "Search", command: "workbench.view.search", icon: icons.Search, view: w.search.view.View, badge: w.search.view.Count})
-	w.palette.Icon = paletteIcon
+	w.initQuickOpen()
 }
 
 func (w *Workspace) snapshotSearch(p *session.Project) {
@@ -176,11 +176,7 @@ func (w *Workspace) commandItems() []palette.Item {
 }
 
 func (w *Workspace) ShowCommands() {
-	w.palette.Show("Command Palette", palette.Tab{
-		Placeholder: "Type the name of a command to run",
-		Search:      palette.Static(w.commandItems()),
-		Hint:        "Enter to run",
-	})
+	w.QuickOpen(commandsPrefix)
 }
 
 func (w *Workspace) ShowSearch() {
@@ -198,8 +194,11 @@ func (w *Workspace) FindInFiles() {
 }
 
 func (w *Workspace) GoToSymbolInEditor() {
-	w.ShowSideView(SearchView)
-	w.search.view.FocusEditorSymbols()
+	w.QuickOpen(editorSymPrefix)
+}
+
+func (w *Workspace) GoToSymbolInWorkspace() {
+	w.QuickOpen(projectSymPrefix)
 }
 
 func (w *Workspace) NextSearchResult() {
@@ -233,23 +232,6 @@ func wordAt(line string, col int) string {
 		end++
 	}
 	return string(runes[start:end])
-}
-
-func (w *Workspace) acceptPalette(item palette.Item) {
-	switch v := item.Value.(type) {
-	case languagePick:
-		w.setLanguage(v)
-	case switcherPick:
-		w.openPick(v)
-	default:
-		w.run(item.ID)
-	}
-}
-
-func paletteIcon(c *ui.Context, item palette.Item) {
-	if v, ok := item.Value.(switcherPick); ok && !isVirtual(v.tab.Path) {
-		icons.FileIcon(c, filepath.Base(v.tab.Path), false, false, paletteIconSize)
-	}
 }
 
 func (w *Workspace) openLocation(loc searchview.Location, o searchview.OpenOptions) {

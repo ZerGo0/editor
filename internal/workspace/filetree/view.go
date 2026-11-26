@@ -4,24 +4,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	RowHeight     = 22
-	iconSize      = 16
-	chevronSize   = 12
-	indentWidth   = 12
-	arrowWidth    = 16
-	iconGap       = 6
-	rowInset      = 6
-	editHeight    = 20
-	editFontSize  = 13
-	cutOpacity    = 0.5
-	emptyPadding  = 16
-	emptyGap      = 8
-	emptyFontSize = 12
+	filesLabel   = "Files"
+	emptyMessage = "This folder is empty."
+	newFileLabel = "New File"
 )
 
 type Paths []string
@@ -34,26 +28,20 @@ type Handlers struct {
 	Trash  func(p string)
 	Paste  func(paths []string, dir string, cut bool)
 	Move   func(paths []string, dir string)
+	Leave  func()
+	Import func(paths []string, dir string)
 	Notify func(text string)
+	Marker func(p string) (count int, tone token.Tone)
 }
 
 func (t *Tree) Focus() {
 	t.focus = true
 }
 
-func (t *Tree) View(c *ui.Context, vibrant bool, h Handlers) ui.Element {
-	th := c.Theme()
-	focused := t.state.List.Handle.FocusWithin(c)
-	local := *th
-	if !focused {
-		local.Accent, local.InactiveAccent, local.AccentText = th.SurfacePressed, th.SurfacePressed, th.Text
-	}
-	box := ui.Themed(c, &local).Grow(1).FillWidth().MinHeight(0).Background(ui.Transparent)
-	hovered := box.Hovered()
+func (t *Tree) View(c *ui.Context, h Handlers) ui.Element {
+	box := ui.Column(c).Grow(1).FillWidth().MinHeight(0)
 	submitted := false
 	box.Children(func() {
-		var cur ui.OutlineRow
-		t.state.Prefix = func(r ui.OutlineRow) { cur = r }
 		t.state.List.Label = func(i int) string { return t.label(t.state.Item(i)) }
 		t.state.List.DragRows = func(rows []int) any {
 			var out Paths
@@ -67,22 +55,17 @@ func (t *Tree) View(c *ui.Context, vibrant bool, h Handlers) ui.Element {
 			}
 			return out
 		}
-		roots := t.rows(t.Root)
+		roots := t.visibleRows(t.Root)
 		t.slotBuilt = false
-		outline := ui.Outline(c, &t.state, roots, t.rows, func(p string) { t.item(c, p, cur, h, focused, hovered) }).
-			Grow(1).FillWidth().Padding(0, rowInset).Label("Files")
-		if vibrant {
-			outline.Background(ui.Transparent)
-		}
+		outline := list.Tree(c, &t.state, roots, t.visibleRows, list.ViewOptions{Label: filesLabel, Empty: t.empty},
+			func(p string) list.Item { return t.item(c, p, h) })
 		outline.ContextMenu(func(m *ui.Menu) { h.Menu(m, t.Root) })
 		if paths, ok := ui.Drop[Paths](outline); ok {
 			h.Move(paths, t.Root)
 		}
-		outline.Children(func() {
-			if len(roots) == 0 {
-				t.empty(c)
-			}
-		})
+		if files := outline.DroppedFiles(); len(files) > 0 && h.Import != nil {
+			h.Import(files, t.Root)
+		}
 		submitted = outline.Submitted()
 		t.placeEdit(c, box, h)
 	})
@@ -94,17 +77,11 @@ func (t *Tree) label(p string) string {
 	if t.isPlaceholder(p) {
 		return t.editLabel()
 	}
-	return filepath.Base(p)
+	return t.name(p)
 }
 
 func (t *Tree) empty(c *ui.Context) {
-	th := c.Theme()
-	ui.Column(c).Padding(emptyPadding).Gap(emptyGap).FillWidth().Children(func() {
-		ui.Text(c, "This folder is empty.").FontSize(emptyFontSize).TextColor(th.TextMuted)
-		if ui.Button(c, "New File").Label("Create a New File").Clicked() {
-			t.StartCreate(t.Root, false)
-		}
-	})
+	feedback.Empty(c, feedback.EmptyOptions{Message: emptyMessage, Link: newFileLabel, OnLink: func() { t.StartCreate(t.Root, false, false) }})
 }
 
 func (t *Tree) placeEdit(c *ui.Context, box ui.Element, h Handlers) {
@@ -116,7 +93,7 @@ func (t *Tree) placeEdit(c *ui.Context, box ui.Element, h Handlers) {
 		return
 	}
 	b := box.LayoutBounds()
-	t.editInput(c, h).Absolute().Left(t.slot.X - b.X).Top(t.slot.Y - b.Y).Width(t.slot.W)
+	ui.Box(c).Absolute().Left(t.slot.X - b.X).Top(t.slot.Y - b.Y).Width(t.slot.W).Children(func() { t.editInput(c, h) })
 }
 
 func (t *Tree) afterBuild(c *ui.Context, h Handlers, submitted bool) {
@@ -201,77 +178,47 @@ func (t *Tree) toggle(p string) {
 	t.state.Open.Add(p)
 }
 
-func (t *Tree) item(c *ui.Context, p string, r ui.OutlineRow, h Handlers, focused, hovered bool) {
-	th := c.Theme()
+func (t *Tree) item(c *ui.Context, p string, h Handlers) list.Item {
 	dir := t.isDir[p]
-	onAccent := focused && p == t.Selected()
-	row := ui.Row(c).Height(RowHeight).FillWidth().AlignItems(ui.Center)
-	row.Children(func() {
-		guides(c, r.Depth, hovered)
-		arrow := r.Arrow().Size(arrowWidth, RowHeight).Center()
-		if r.Branch {
-			arrow.Children(func() {
-				svg := icons.ChevronRight
-				if r.Open {
-					svg = icons.ChevronDown
-				}
-				icon := ui.Icon(c, svg).Size(chevronSize, chevronSize)
-				if !onAccent {
-					icon.TextColor(th.TextMuted)
-				}
-			})
-		}
-		icons.FileIcon(c, filepath.Base(p), dir || t.isPlaceholder(p) && t.edit.folder, r.Open, iconSize)
-		ui.Box(c).Width(iconGap).Shrink(0)
-		if e := t.edit; e != nil && (t.isPlaceholder(p) || !e.create && e.path == p) {
-			slot := ui.Box(c).Grow(1).Height(editHeight)
+	name := t.name(p)
+	it := list.Item{
+		Label: name,
+		Leading: func(c *ui.Context) {
+			icons.FileIcon(c, filepath.Base(p), dir || t.isPlaceholder(p) && t.edit.folder, t.state.Open.Has(p), token.IconSize.Px())
+		},
+		Muted: t.isCut(p) || t.IsIgnored(p),
+		Git:   t.gitStatus(p),
+	}
+	if e := t.edit; e != nil && (t.isPlaceholder(p) || !e.create && e.path == p) {
+		it.Content = func(c *ui.Context) {
+			slot := ui.Box(c).Grow(1).FillHeight()
 			t.slot, t.slotBuilt = slot.LayoutBounds(), true
-			return
 		}
-		name := ui.Text(c, filepath.Base(p)).SingleLine().Grow(1).MinWidth(0)
-		if !onAccent && t.IsIgnored(p) {
-			name.TextColor(th.TextMuted)
-		}
-	})
-	if t.isCut(p) {
-		row.Opacity(cutOpacity)
+		return it
 	}
-	if t.isPlaceholder(p) {
-		return
+	if h.Marker != nil && !dir {
+		it.Count, it.Tone = h.Marker(p)
 	}
-	switch {
-	case row.RowDoubleClicked() && !dir:
-		h.Open(p, false, true)
-	case row.RowClicked():
-		t.activate(p, true, h)
+	if it.Tone != token.ToneNeutral {
+		it.Git = token.GitNone
 	}
-	row.ContextMenu(func(m *ui.Menu) { h.Menu(m, p) })
+	it.Menu = func(m *ui.Menu) { h.Menu(m, p) }
+	it.OnClick = func() { t.activate(p, true, h) }
 	if !dir {
-		return
+		it.OnDoubleClick = func() { h.Open(p, false, true) }
+		return it
 	}
-	if _, over := ui.DragOver[Paths](row); over {
-		row.Background(th.Selection).Radius(th.Radius)
-	}
-	if paths, ok := ui.Drop[Paths](row); ok {
-		h.Move(paths, p)
-	}
-}
-
-func guides(c *ui.Context, depth int, visible bool) {
-	if depth == 0 {
-		return
-	}
-	box := ui.Box(c).Width(float32(depth) * indentWidth).Height(RowHeight).Shrink(0)
-	if !visible {
-		return
-	}
-	color := c.Theme().Border
-	box.Draw(func(p *ui.Painter, r ui.Rect) {
-		for i := range depth {
-			x := r.X + float32(i)*indentWidth + arrowWidth/2
-			p.Fill(ui.Rect{X: x, Y: r.Y, W: 1, H: r.H}, color, 0)
+	it.Drop = func(row ui.Element) bool {
+		if paths, ok := ui.Drop[Paths](row); ok {
+			h.Move(paths, p)
 		}
-	})
+		if files := row.DroppedFiles(); len(files) > 0 && h.Import != nil {
+			h.Import(files, p)
+		}
+		_, over := ui.DragOver[Paths](row)
+		return over
+	}
+	return it
 }
 
 func (t *Tree) editLabel() string {
@@ -289,11 +236,7 @@ func (t *Tree) editLabel() string {
 func (t *Tree) editInput(c *ui.Context, h Handlers) ui.Element {
 	e := t.edit
 	label := t.editLabel()
-	input := ui.TextInput(c, &e.value).AutoFocus().Height(editHeight).FontSize(editFontSize).
-		Padding(0, 4).Label(label).Placeholder(label).Invalid(e.err != "")
-	if e.err != "" {
-		input.Tooltip(e.err)
-	}
+	input := field.TextInput(c, label, &e.value, field.InputOptions{Placeholder: label, AutoFocus: true, Error: e.err})
 	if !e.selected && input.Focused() {
 		e.selected = true
 		stem := strings.TrimSuffix(e.value, filepath.Ext(e.value))
@@ -305,6 +248,10 @@ func (t *Tree) editInput(c *ui.Context, h Handlers) ui.Element {
 	switch {
 	case input.Shortcut(0, ui.KeyEscape):
 		t.CancelEdit()
+		if e.returnFocus {
+			t.focus = false
+			h.Leave()
+		}
 	case input.Submitted():
 		t.commit(h, true)
 	case input.Focused():

@@ -1,0 +1,87 @@
+package workspace
+
+import (
+	"slices"
+
+	"github.com/egoist/mygo/ui"
+)
+
+type part int
+
+const (
+	partNone part = iota
+	partSide
+	partEditor
+	partPanel
+)
+
+type focusFlags struct {
+	side, panel bool
+	want        part
+}
+
+func (w *Workspace) parts() []part {
+	var out []part
+	if !w.sidebarHidden {
+		out = append(out, partSide)
+	}
+	out = append(out, partEditor)
+	if w.tools.panelOpen && len(w.tools.panels) > 0 {
+		out = append(out, partPanel)
+	}
+	return out
+}
+
+func (w *Workspace) currentPart() part {
+	switch {
+	case w.focus.side:
+		return partSide
+	case w.focus.panel:
+		return partPanel
+	}
+	return partEditor
+}
+
+func (w *Workspace) FocusNextPart() {
+	w.cyclePart(1)
+}
+
+func (w *Workspace) FocusPreviousPart() {
+	w.cyclePart(-1)
+}
+
+func (w *Workspace) cyclePart(delta int) {
+	ps := w.parts()
+	i := max(slices.Index(ps, w.currentPart()), 0)
+	w.focusPart(ps[(i+delta+len(ps))%len(ps)])
+}
+
+func (w *Workspace) focusPart(p part) {
+	switch {
+	case p == partEditor:
+		w.focusTab = w.active.ActiveTab()
+	case p == partSide && w.tools.side == ExplorerView:
+		w.tree.Focus()
+	default:
+		w.focus.want = p
+	}
+}
+
+func (w *Workspace) FocusSideView(id string) {
+	w.ShowSideView(id)
+	w.focusPart(partSide)
+}
+
+func (w *Workspace) takeFocus(p part, el ui.Element) {
+	if w.focus.want == p {
+		w.focus.want = partNone
+		el.Focus()
+	}
+}
+
+func (w *Workspace) escape(c *ui.Context) {
+	if w.noteCenter && !w.palette.IsOpen() && !w.prompt.open && c.Shortcut(0, ui.KeyEscape) {
+		w.noteCenter = false
+		w.focusTab = w.active.ActiveTab()
+	}
+}

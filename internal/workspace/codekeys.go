@@ -25,7 +25,6 @@ func (w *Workspace) observeCodeKey(ev ui.InputEvent) {
 		w.runChord(append(w.keys.pending, s))
 	case slices.Contains(km.Prefixes(), s):
 		w.keys.pending = keymap.Chord{s}
-		w.notice = ""
 	default:
 		b, ok := km.Lookup(keymap.Chord{s})
 		if !ok {

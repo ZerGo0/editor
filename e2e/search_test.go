@@ -18,12 +18,17 @@ func waitScope(app *App, win int, scope string) {
 	app.WaitNode(win, scope+" scope", func(n Node) bool { return n.Role == "tab" && n.Label == scope && n.Has("checked") })
 }
 
+func waitQuickOpen(app *App, win int, title string) {
+	app.t.Helper()
+	app.WaitNode(win, title+" quick open", RoleLabel("dialog", title))
+}
+
 func TestGoToFileOpensFile(t *testing.T) {
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Go to File...")
-	waitScope(app, win, "Files")
+	waitQuickOpen(app, win, "Go to File")
 	app.Type(win, "srvgo")
-	app.WaitNode(win, "server.go result", Label("server/server.go"))
+	app.WaitNode(win, "server.go result", func(n Node) bool { return strings.HasPrefix(n.Label, "server.go") })
 	app.Key(win, "Enter")
 	app.WaitNode(win, "server.go tab", RoleLabel("tab", "server.go"))
 }
@@ -42,11 +47,9 @@ func TestFindInFilesOpensMatch(t *testing.T) {
 func TestSymbolSearchFindsType(t *testing.T) {
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Go to Symbol in Workspace...")
-	waitScope(app, win, "Symbols")
+	waitQuickOpen(app, win, "Go to Symbol in Workspace")
 	app.Type(win, "Handler")
-	app.WaitNode(win, "symbol row", func(n Node) bool {
-		return strings.HasPrefix(n.Label, "Handler") && strings.HasSuffix(n.Label, "server/server.go")
-	})
+	app.WaitNode(win, "symbol row", func(n Node) bool { return n.Role != "textField" && strings.HasPrefix(n.Label, "Handler") })
 	app.Key(win, "Enter")
 	app.WaitNode(win, "server.go tab", RoleLabel("tab", "server.go"))
 }

@@ -92,8 +92,10 @@ func (a *App) viewMenu() *mygo.MenuItem {
 		a.item("workbench.view.scm", "Source Control"),
 		a.item("workbench.view.github", "GitHub"),
 		a.item("workbench.action.togglePanel", ""),
+		a.item("workbench.action.togglePanelPosition", ""),
 		a.item("workbench.actions.view.problems", "Problems"),
 		a.item("todo.show", "TODO"),
+		a.item("notifications.showList", "Notifications"),
 		mygo.Separator(),
 		a.item("workbench.action.splitEditorRight", "Split Right"),
 		a.item("workbench.action.splitEditorDown", "Split Down"),
@@ -112,6 +114,10 @@ func (a *App) viewMenu() *mygo.MenuItem {
 
 func (a *App) goMenu() *mygo.MenuItem {
 	return &mygo.MenuItem{Label: "Go", Submenu: []*mygo.MenuItem{
+		a.item("workbench.action.navigateBack", "Back"),
+		a.item("workbench.action.navigateForward", "Forward"),
+		a.item("workbench.action.navigateToLastEditLocation", "Last Edit Location"),
+		mygo.Separator(),
 		a.item("workbench.action.searchEverywhere", ""),
 		a.item("workbench.action.quickOpen", ""),
 		a.item("workbench.action.showAllSymbols", ""),

@@ -68,6 +68,7 @@ const (
 	SearchUseIgnoreFiles = "search.useIgnoreFiles"
 	SearchSmartCase      = "search.smartCase"
 	EnablePreview        = "workbench.editor.enablePreview"
+	ColorTheme           = "workbench.colorTheme"
 	RestoreWindows       = "window.restoreWindows"
 	ZoomLevel            = "window.zoomLevel"
 	GitAutoFetch         = "git.autofetch"
@@ -83,6 +84,10 @@ const (
 )
 
 const (
+	ThemeSystem = "System"
+	ThemeLight  = "Light"
+	ThemeDark   = "Dark"
+
 	WrapOff = "off"
 	WrapOn  = "on"
 
@@ -136,7 +141,7 @@ const (
 )
 
 var Defs = []Def{
-	{Key: FontFamily, Title: "Font Family", Description: "The font of the text editor. Empty uses the system monospaced font.", Category: CategoryEditor, Kind: String, Default: ""},
+	{Key: FontFamily, Title: "Font Family", Description: "The font of the text editor. Empty uses the bundled JetBrains Mono.", Category: CategoryEditor, Kind: String, Default: ""},
 	{Key: FontSize, Title: "Font Size", Description: "The font size of the text editor, in points.", Category: CategoryEditor, Kind: Int, Default: defaultFontSize, Min: minFontSize, Max: maxFontSize},
 	{Key: LineHeight, Title: "Line Height", Description: "The height of a line as a multiple of the font size.", Category: CategoryEditor, Kind: Number, Default: defaultLineHeight, Min: minLineHeight, Max: maxLineHeight},
 	{Key: DetectIndentation, Title: "Detect Indentation", Description: "Use the indentation of the language and the file. When off, Tab Size and Insert Spaces apply.", Category: CategoryEditor, Kind: Bool, Default: true},
@@ -162,6 +167,7 @@ var Defs = []Def{
 	{Key: SearchExclude, Title: "Exclude", Description: "Glob patterns of files and folders that Search skips, besides Files: Exclude, for example **/node_modules.", Category: CategorySearch, Kind: StringList, Default: []string{"**/node_modules", "**/bower_components"}},
 	{Key: SearchUseIgnoreFiles, Title: "Use Ignore Files", Description: "Skip the files that .gitignore lists when Search uses the exclude settings.", Category: CategorySearch, Kind: Bool, Default: true},
 	{Key: SearchSmartCase, Title: "Smart Case", Description: "Search ignoring case when the text has no capital letters, and matching case when it has.", Category: CategorySearch, Kind: Bool, Default: false},
+	{Key: ColorTheme, Title: "Color Theme", Description: "The appearance of the windows. System follows the macOS appearance.", Category: CategoryWorkbench, Kind: Enum, Default: ThemeSystem, Options: []string{ThemeSystem, ThemeLight, ThemeDark}, AppWide: true},
 	{Key: EnablePreview, Title: "Enable Preview", Description: "A single click opens a file in a preview tab, which the next file replaces until you edit or pin it.", Category: CategoryWorkbench, Kind: Bool, Default: true},
 	{Key: RestoreWindows, Title: "Restore Windows", Description: "Open the projects of the last session when the app starts.", Category: CategoryWindow, Kind: Bool, Default: true, AppWide: true},
 	{Key: ZoomLevel, Title: "Zoom Level", Description: "The zoom of all windows. 0 is 100%, each step is 10% more or less.", Category: CategoryWindow, Kind: Int, Default: 0, Min: -maxZoomLevel, Max: maxZoomLevel, AppWide: true},

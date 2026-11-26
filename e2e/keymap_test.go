@@ -64,9 +64,11 @@ func TestWindowsKeymapBindsCtrlPToGoToFile(t *testing.T) {
 	app.Menu(win, "View", "Command Palette...")
 	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
 	app.Type(win, "go to file")
-	app.WaitNode(win, "Go to File with Ctrl+P", RoleLabel("listItem", "Go: Go to File... ⌃P"))
+	app.WaitNode(win, "Go to File with Ctrl+P", func(n Node) bool {
+		return n.Label == "Go: Go to File..." && n.Description == "⌃P"
+	})
 	app.Key(win, "Enter")
-	waitScope(app, win, "Files")
+	waitQuickOpen(app, win, "Go to File")
 }
 
 func TestWindowsKeymapCtrlHShowsReplace(t *testing.T) {

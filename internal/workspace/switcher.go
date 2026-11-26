@@ -23,7 +23,7 @@ func (w *Workspace) observeInput(ev ui.InputEvent) {
 }
 
 func (w *Workspace) switcherOpen() bool {
-	return w.palette.IsOpen() && w.palette.Title() == switcherTitle
+	return w.palette.IsOpen() && w.palette.Label() == switcherTitle
 }
 
 func (w *Workspace) observeSwitcher(ev ui.InputEvent) {
@@ -59,17 +59,23 @@ func (w *Workspace) showSwitcher() {
 		return len(w.search.recent)
 	}
 	slices.SortStableFunc(picks, func(a, b switcherPick) int { return rank(a) - rank(b) })
+	labels := w.tabLabels()
 	items := make([]palette.Item, len(picks))
 	for i, p := range picks {
-		items[i] = palette.Item{Label: w.tabTitle(p.tab.Path), Value: p}
-		if dir := w.rel(filepath.Dir(p.tab.Path)); !isVirtual(p.tab.Path) && dir != "." {
-			items[i].Detail = dir
+		path := p.tab.Path
+		items[i] = palette.Item{Label: w.tabTitle(path), Value: p, Leading: func(c *ui.Context) { w.tabIcon(c, path) }}
+		switch {
+		case labels[path] != "":
+			items[i].Detail = labels[path]
+		case !isVirtual(path) && w.rel(filepath.Dir(path)) != ".":
+			items[i].Detail = w.rel(filepath.Dir(path))
 		}
 	}
-	w.palette.Show(switcherTitle, palette.Tab{
+	w.palette.Show(palette.Mode{
+		Label:       switcherTitle,
 		Placeholder: "Select an open editor",
 		Search:      palette.Static(items),
-		Hint:        "Release Control to open",
+		Accept:      func(it palette.Item) { w.openPick(it.Value.(switcherPick)) },
 	})
 }
 

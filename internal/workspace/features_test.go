@@ -145,8 +145,8 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 			t.Fatalf("%s did not restore %q", path, want)
 		}
 	}
-	if !strings.Contains(w2.notice, "changed on disk") {
-		t.Fatalf("notice = %q", w2.notice)
+	if notes := w2.notes.List(); len(notes) == 0 || !strings.Contains(notes[0].Title, "changed on disk") {
+		t.Fatalf("notices = %v", notes)
 	}
 	if !w2.save([]*document.Document{w2.doc(p)}) {
 		t.Fatal("save failed")

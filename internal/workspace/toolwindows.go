@@ -1,26 +1,27 @@
 package workspace
 
 import (
-	"strconv"
-	"strings"
+	"slices"
 
+	"github.com/ZerGo0/editor/internal/design/chrome"
+	"github.com/ZerGo0/editor/internal/design/pane"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	ExplorerView        = "explorer"
-	defaultPanelPercent = 70
-	panelHeaderHeight   = 35
-	panelTitlePadding   = 8
-	panelTitleGap       = 6
-	panelHeaderPadding  = 8
-	panelHeaderGap      = 2
-	panelUnderline      = 1
-	countFontSize       = 10
-	countPadding        = 5
-	countHeight         = 16
+	ExplorerView          = "explorer"
+	defaultPanelPercent   = 70
+	defaultSidePanel      = 65
+	panelLabel            = "Panel"
+	togglePanelPositionID = "workbench.action.togglePanelPosition"
+	maximizePanelLabel    = "Maximize Panel Size"
+	restorePanelLabel     = "Restore Panel Size"
+	closePanelLabel       = "Close Panel"
+	panelRightLabel       = "Move Panel Right"
+	panelBottomLabel      = "Move Panel to Bottom"
 )
 
 type toolView struct {
@@ -40,9 +41,13 @@ type toolState struct {
 	panel             string
 	panelPercent      float32
 	panelMax          bool
+	panelRight        bool
+	sidePercent       float32
 	hiddenViews       map[string]bool
 	explorerCollapsed bool
-	sideHovered       bool
+	openEditors       bool
+	openList          ui.ListState
+	revealed          string
 	collapsed         map[string]bool
 }
 
@@ -50,6 +55,17 @@ func (w *Workspace) initTools(saved session.Project) {
 	w.tools.sideViews = []toolView{{id: ExplorerView, title: "Explorer", command: "workbench.view.explorer", icon: icons.Explorer, view: w.explorerView}}
 	w.tools.side = cmpOr(saved.SideView, ExplorerView)
 	w.tools.collapsed = map[string]bool{}
+	for _, id := range saved.Collapsed {
+		w.tools.collapsed[id] = true
+	}
+	w.tools.hiddenViews = map[string]bool{}
+	for _, id := range saved.HiddenViews {
+		w.tools.hiddenViews[id] = true
+	}
+	for _, id := range saved.StatusHidden {
+		w.statusHidden[id] = true
+	}
+	w.tools.openEditors, w.tools.panelRight, w.tools.sidePercent = saved.OpenEditors, saved.PanelRight, defaultSidePanel
 	w.tools.panelOpen, w.tools.panel = saved.PanelOpen, saved.Panel
 	w.tools.panelPercent = saved.PanelPercent
 	if w.tools.panelPercent <= 0 {
@@ -66,6 +82,19 @@ func cmpOr(a, b string) string {
 
 func (w *Workspace) snapshotTools(p *session.Project) {
 	p.SideView, p.PanelOpen, p.Panel, p.PanelPercent = w.tools.side, w.tools.panelOpen, w.tools.panel, w.tools.panelPercent
+	p.PanelRight, p.OpenEditors = w.tools.panelRight, w.tools.openEditors
+	p.Collapsed, p.HiddenViews, p.StatusHidden = trueKeys(w.tools.collapsed), trueKeys(w.tools.hiddenViews), trueKeys(w.statusHidden)
+}
+
+func trueKeys(m map[string]bool) []string {
+	var out []string
+	for k, on := range m {
+		if on {
+			out = append(out, k)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 func (w *Workspace) addSideView(v toolView) {
@@ -116,75 +145,80 @@ func (w *Workspace) ToggleMaximizedPanel() {
 	w.tools.panelMax = !w.tools.panelMax
 }
 
-func countBadge(c *ui.Context, n int) {
-	if n <= 0 {
-		return
-	}
-	t := c.Theme()
-	ui.Text(c, strconv.Itoa(n)).FontSize(countFontSize).TextColor(t.Text).Background(t.SurfacePressed).
-		Radius(countHeight/2).Height(countHeight).MinWidth(countHeight).TextAlign(ui.Center).Padding(0, countPadding).Shrink(0)
+func (w *Workspace) TogglePanelPosition() {
+	w.tools.panelRight = !w.tools.panelRight
+	w.tools.panelOpen = true
 }
 
 func (w *Workspace) withPanel(c *ui.Context, editors func()) {
 	switch {
 	case !w.tools.panelOpen || len(w.tools.panels) == 0:
-		ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(editors)
+		ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(editors)
 	case w.tools.panelMax:
-		ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() { w.panelView(c) })
+		ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(func() { w.panelView(c) })
+	case w.tools.panelRight:
+		ui.SplitPercent(c, &w.tools.sidePercent, editors, func() { w.panelView(c) }).SplitReset(defaultSidePanel).Grow(1).FillWidth().MinWidth(0)
 	default:
-		ui.SplitVerticalPercent(c, &w.tools.panelPercent, editors, func() { w.panelView(c) }).SplitReset(defaultPanelPercent).Grow(1).FillWidth()
+		ui.SplitVerticalPercent(c, &w.tools.panelPercent, editors, func() { w.panelView(c) }).SplitReset(defaultPanelPercent).Grow(1).FillWidth().MinWidth(0)
 	}
 }
 
 func (w *Workspace) panelView(c *ui.Context) {
-	t := c.Theme()
+	p := token.Of(c)
 	v := findView(w.tools.panels, w.tools.panel)
-	ui.Column(c).Fill().Background(t.Background).BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Children(func() {
-		header := ui.Row(c).Height(panelHeaderHeight).Shrink(0).FillWidth().Padding(0, panelHeaderPadding).Gap(panelHeaderGap).AlignItems(ui.Center)
+	col := ui.Column(c).Fill().MinWidth(0).Background(p.Layer.Panel).BorderColor(p.Border.Default).Role(ui.RoleRegion).Label(panelLabel)
+	if w.tools.panelRight {
+		col.BorderWidth(0, 0, 0, token.BorderWidth.Px())
+	} else {
+		col.BorderWidth(token.BorderWidth.Px(), 0, 0, 0)
+	}
+	w.focus.panel = col.FocusWithin()
+	col.Children(func() {
+		header := ui.Row(c).Height(token.ViewTitleHeight.Px()).Shrink(0).FillWidth().MinWidth(0).Clip().Padding(0, token.PadRow.Px()).
+			Gap(token.GapInline.Px()).AlignItems(ui.Center)
 		header.Children(func() {
-			for _, p := range w.tools.panels {
-				w.panelTitle(c, p, p.id == v.id)
+			selected := slices.IndexFunc(w.tools.panels, func(t toolView) bool { return t.id == v.id })
+			tabs := make([]chrome.ViewTab, len(w.tools.panels))
+			for i, t := range w.tools.panels {
+				tabs[i] = chrome.ViewTab{Title: t.title, Keys: w.keyLabel(t.command)}
+				if t.badge != nil {
+					tabs[i].Badge = t.badge()
+				}
 			}
-			gap := ui.Box(c).Grow(1).FillHeight()
+			ui.ScrollHorizontal(c).Shrink(1).MinWidth(0).FillHeight().Children(func() {
+				viewTabs := chrome.ViewTabs(c, panelLabel, &selected, tabs)
+				w.takeFocus(partPanel, viewTabs)
+				if viewTabs.Changed() {
+					w.tools.panel = w.tools.panels[selected].id
+				}
+			})
+			gap := ui.Box(c).Grow(1).FillHeight().MinWidth(0)
 			if gap.DoubleClicked() {
 				w.ToggleMaximizedPanel()
 			}
 			if v.actions != nil {
-				v.actions(c)
+				ui.Row(c).Shrink(1).MinWidth(0).Clip().FillHeight().Gap(token.GapTight.Px()).AlignItems(ui.Center).Children(func() { v.actions(c) })
 			}
-			maxIcon, maxLabel := icons.ChevronUp, "Maximize Panel Size"
-			if w.tools.panelMax {
-				maxIcon, maxLabel = icons.ChevronDown, "Restore Panel Size"
-			}
-			iconButton(c, "maximize-panel", maxLabel, maxLabel, maxIcon, false, w.ToggleMaximizedPanel)
-			iconButton(c, "close-panel", "Close Panel", w.withKeys("Close Panel", "workbench.action.togglePanel"), icons.Close, false, w.TogglePanel)
+			pane.Separator(c, true)
+			w.panelActions(c)
 		})
 		header.ContextMenu(w.panelMenu)
-		ui.Column(c.Key("panel-view-" + v.id)).Grow(1).FillWidth().MinHeight(0).Children(func() { v.view(c) })
+		ui.Column(c.Key("panel-view-" + v.id)).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(func() { v.view(c) })
 	})
 }
 
-func (w *Workspace) panelTitle(c *ui.Context, p toolView, active bool) {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key("panel-"+p.id)).FillHeight().Padding(0, panelTitlePadding).Gap(panelTitleGap).AlignItems(ui.Center).
-		Label(p.title).Tooltip(w.withKeys(p.title, p.command)).AccessSelected(active)
-	color := t.TextMuted
-	if active || b.Hovered() || b.Pressed() {
-		color = t.Text
+func (w *Workspace) panelActions(c *ui.Context) {
+	posIcon, posLabel := icons.SidebarRight, panelRightLabel
+	if w.tools.panelRight {
+		posIcon, posLabel = icons.Panel, panelBottomLabel
 	}
-	b.Children(func() {
-		ui.Column(c).FillHeight().Justify(ui.Center).Children(func() {
-			ui.Text(c, strings.ToUpper(p.title)).FontSize(sectionFontSize).TextColor(color).SingleLine()
-			line := ui.Box(c).Absolute().Left(0).Right(0).Bottom(0).Height(panelUnderline)
-			if active {
-				line.Background(activeAccent(c))
-			}
-		})
-		if p.badge != nil {
-			countBadge(c, p.badge())
-		}
-	})
-	b.OnClick(func() { w.tools.panel = p.id })
+	w.iconButton(c, posIcon, posLabel, togglePanelPositionID, false, w.TogglePanelPosition)
+	maxIcon, maxLabel := icons.ChevronUp, maximizePanelLabel
+	if w.tools.panelMax {
+		maxIcon, maxLabel = icons.ChevronDown, restorePanelLabel
+	}
+	w.iconButton(c, maxIcon, maxLabel, "workbench.action.toggleMaximizedPanel", false, w.ToggleMaximizedPanel)
+	w.iconButton(c, icons.Close, closePanelLabel, togglePanelID, false, w.TogglePanel)
 }
 
 func (w *Workspace) panelMenu(m *ui.Menu) {
@@ -194,12 +228,17 @@ func (w *Workspace) panelMenu(m *ui.Menu) {
 		}
 	}
 	m.Separator()
-	label := "Maximize Panel Size"
+	label := maximizePanelLabel
 	if w.tools.panelMax {
-		label = "Restore Panel Size"
+		label = restorePanelLabel
 	}
 	if m.Item(label).Chosen() {
 		w.ToggleMaximizedPanel()
 	}
-	w.commandItem(m, "Close Panel", "workbench.action.togglePanel")
+	pos := panelRightLabel
+	if w.tools.panelRight {
+		pos = panelBottomLabel
+	}
+	w.commandItem(m, pos, togglePanelPositionID)
+	w.commandItem(m, closePanelLabel, togglePanelID)
 }

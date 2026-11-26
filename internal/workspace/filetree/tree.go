@@ -28,20 +28,23 @@ type Tree struct {
 	edit      *edit
 	slot      ui.Rect
 	slotBuilt bool
+	chainTop  map[string]string
+	git       gitState
 }
 
 type edit struct {
-	path     string
-	create   bool
-	folder   bool
-	value    string
-	err      string
-	focused  bool
-	selected bool
+	path        string
+	create      bool
+	folder      bool
+	value       string
+	err         string
+	focused     bool
+	selected    bool
+	returnFocus bool
 }
 
 func New(root string, expanded []string) *Tree {
-	t := &Tree{Root: root, dirs: map[string][]string{}, isDir: map[string]bool{root: true}, row: -1}
+	t := &Tree{Root: root, dirs: map[string][]string{}, isDir: map[string]bool{root: true}, row: -1, chainTop: map[string]string{}}
 	t.state.Generation = 1
 	t.state.List.Selected = &t.row
 	for _, p := range expanded {
@@ -77,6 +80,44 @@ func (t *Tree) rows(p string) []string {
 		return append([]string{t.placeholder()}, kids...)
 	}
 	return kids
+}
+
+func (t *Tree) visibleRows(p string) []string {
+	rows := t.rows(p)
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = t.compact(r)
+	}
+	return out
+}
+
+func (t *Tree) compact(p string) string {
+	top := p
+	for t.isDir[p] && (t.edit == nil || !t.edit.create || t.edit.path != p) {
+		kids := t.children(p)
+		if len(kids) != 1 || !t.isDir[kids[0]] {
+			break
+		}
+		p = kids[0]
+	}
+	if p == top {
+		delete(t.chainTop, p)
+		return p
+	}
+	t.chainTop[p] = top
+	return p
+}
+
+func (t *Tree) name(p string) string {
+	top, ok := t.chainTop[p]
+	if !ok {
+		return filepath.Base(p)
+	}
+	rel, err := filepath.Rel(filepath.Dir(top), p)
+	if err != nil {
+		return filepath.Base(p)
+	}
+	return filepath.ToSlash(rel)
 }
 
 func (t *Tree) placeholder() string {
@@ -212,13 +253,13 @@ func (t *Tree) StartRename(p string) {
 	t.pending = p
 }
 
-func (t *Tree) StartCreate(dir string, folder bool) {
+func (t *Tree) StartCreate(dir string, folder, returnFocus bool) {
 	t.CancelEdit()
 	if dir != t.Root {
 		t.Expand(dir)
 	}
 	t.isDir[dir] = true
-	t.edit = &edit{path: dir, create: true, folder: folder}
+	t.edit = &edit{path: dir, create: true, folder: folder, returnFocus: returnFocus}
 	t.state.Generation++
 	t.pending = t.placeholder()
 }

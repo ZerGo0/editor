@@ -7,7 +7,6 @@ import (
 
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
-	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/viewer"
@@ -15,11 +14,10 @@ import (
 )
 
 const (
-	previewPrefix        = "preview:"
-	previewTitlePrefix   = "Preview "
-	previewToSideLabel   = "Open Preview to the Side"
-	noPreviewNotice      = "Preview is available for Markdown and SVG files."
-	editorActionsPadding = 6
+	previewPrefix      = "preview:"
+	previewTitlePrefix = "Preview "
+	previewToSideLabel = "Open Preview to the Side"
+	noPreviewNotice    = "Preview is available for Markdown and SVG files."
 )
 
 type viewerState struct {
@@ -199,18 +197,4 @@ func (w *Workspace) openPreview(g *layout.Group) {
 		g = w.sideGroup()
 	}
 	w.openIn(g, p, false, true)
-}
-
-func (w *Workspace) editorActions(c *ui.Context, g *layout.Group) {
-	tab := g.ActiveTab()
-	if tab == nil || isVirtual(tab.Path) || !viewer.Detect(tab.Path, nil).Previewable() {
-		return
-	}
-	t := c.Theme()
-	ui.Row(c).FillHeight().Shrink(0).AlignItems(ui.Center).Padding(0, editorActionsPadding).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-		iconButton(c, "open-preview", previewToSideLabel, w.withKeys(previewToSideLabel, "markdown.showPreviewToSide"), icons.Preview, false, func() {
-			w.activate(g, tab)
-			w.OpenPreviewToSide()
-		})
-	})
 }

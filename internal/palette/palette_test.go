@@ -9,42 +9,72 @@ import (
 const (
 	testViewW = 800
 	testViewH = 600
-	testTop   = 10
 )
 
-func TestHighlightSelectedUsesTextColor(t *testing.T) {
-	th := &ui.Theme{Text: ui.RGBA(1, 2, 3, 255), Accent: ui.RGBA(9, 8, 7, 255)}
-	for _, tc := range []struct {
-		selected bool
-		want     ui.Color
-	}{{false, th.Accent}, {true, th.Text}} {
-		spans := Highlight("abc", []int{1}, th, tc.selected)
-		if len(spans) != 3 || spans[1].Text != "b" || spans[1].Weight != matchWeight || spans[1].Color != tc.want {
-			t.Fatalf("selected %v: spans %+v", tc.selected, spans)
-		}
+func items(labels ...string) []Item {
+	out := make([]Item, len(labels))
+	for i, l := range labels {
+		out[i] = Item{ID: l, Label: l}
+	}
+	return out
+}
+
+func TestPrefixPicksMode(t *testing.T) {
+	var got string
+	p := Palette{Modes: []Mode{
+		{Label: "Files", Search: Static(items("main.go")), Accept: func(it Item) { got = "file " + it.ID }},
+		{Prefix: ">", Label: "Commands", Search: Static(items("Save", "Close")), Accept: func(it Item) { got = "cmd " + it.ID }},
+	}}
+	p.Open(">clo")
+	if p.Label() != "Commands" || len(p.items) != 1 {
+		t.Fatalf("mode %q, items %v", p.Label(), p.items)
+	}
+	p.Accept()
+	if got != "cmd Close" || p.IsOpen() {
+		t.Fatalf("accepted %q, open %v", got, p.IsOpen())
+	}
+	p.Open("")
+	if p.Label() != "Files" {
+		t.Fatalf("empty query mode = %q", p.Label())
 	}
 }
 
-func TestPaletteHintsIconsAndAccept(t *testing.T) {
-	var p Palette
-	var icons []string
-	var accepted []string
-	p.Icon = func(_ *ui.Context, item Item) { icons = append(icons, item.Label) }
-	p.Show("Pick", Tab{Search: Static([]Item{{ID: "1", Label: "one"}, {ID: "2", Label: "two"}}), Hint: "Enter to run"})
-	tt := ui.NewTester(func(c *ui.Context) {
-		p.View(c, testTop, func(item Item) { accepted = append(accepted, item.ID) })
-	}, testViewW, testViewH)
-	for _, hint := range []string{moveHint, "Enter to run", closeHint} {
-		if !tt.HasText(hint) {
-			t.Fatalf("hint %q is not shown", hint)
-		}
+func TestQueryItemKeepsPaletteOpen(t *testing.T) {
+	p := Palette{Modes: []Mode{
+		{Prefix: "?", Label: "Help", Search: Static([]Item{{Label: "Commands", Query: ">"}})},
+		{Prefix: ">", Label: "Commands", Search: Static(items("Save"))},
+	}}
+	p.Open("?")
+	p.Accept()
+	if !p.IsOpen() || p.Label() != "Commands" || p.state.Query != ">" {
+		t.Fatalf("open %v, mode %q, query %q", p.IsOpen(), p.Label(), p.state.Query)
 	}
-	if len(icons) == 0 {
-		t.Fatal("the icon hook is not called")
+}
+
+func TestLateResultsOfOldQueryAreDropped(t *testing.T) {
+	var pending []func([]Item)
+	p := Palette{Modes: []Mode{{Label: "Files", Search: func(_ string, done func([]Item)) { pending = append(pending, done) }}}}
+	p.Open("a")
+	p.state.Query = "ab"
+	p.refresh()
+	pending[0](items("old"))
+	pending[1](items("new"))
+	if len(p.items) != 1 || p.items[0].Label != "new" {
+		t.Fatalf("items = %v", p.items)
+	}
+}
+
+func TestShowListMovesAndRenders(t *testing.T) {
+	var accepted string
+	var p Palette
+	p.Show(Mode{Label: "Open Editors", Search: Static(items("one", "two")), Accept: func(it Item) { accepted = it.ID }})
+	tt := ui.NewTester(p.View, testViewW, testViewH)
+	if !tt.HasText("one") || !tt.HasText("two") {
+		t.Fatal("the items are not shown")
 	}
 	p.Move(1)
 	p.Accept()
-	if len(accepted) != 1 || accepted[0] != "2" || p.IsOpen() {
-		t.Fatalf("accepted %v, open %v", accepted, p.IsOpen())
+	if accepted != "two" || p.IsOpen() {
+		t.Fatalf("accepted %q, open %v", accepted, p.IsOpen())
 	}
 }

@@ -1,21 +1,16 @@
 package workspace
 
 import (
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/resources"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	watermarkLabel      = "No open files"
-	watermarkRowHeight  = 28
-	watermarkGap        = 2
-	watermarkLabelWidth = 170
-	watermarkKeysWidth  = 120
-	watermarkColumnGap  = 12
-	watermarkRowPadding = 8
-	keycapPadding       = 5
-	keycapHeight        = 18
-	keycapRadius        = 4
-	doubleShiftLabel    = "Double ⇧"
+	watermarkLabel   = "No open files"
+	doubleShiftLabel = "⇧ ⇧"
 )
 
 type watermarkHint struct {
@@ -31,38 +26,25 @@ var watermarkHints = []watermarkHint{
 }
 
 func (w *Workspace) watermark(c *ui.Context) {
-	ui.Column(c).Grow(1).FillWidth().Center().Gap(watermarkGap).Label(watermarkLabel).Children(func() {
-		for _, h := range watermarkHints {
-			keys := h.keys
-			if keys == "" {
-				keys = w.keyLabel(h.command)
-			}
-			w.watermarkRow(c, h, keys)
+	ui.Column(c).Grow(1).FillWidth().Center().Gap(token.GapSection.Px()).Role(ui.RoleRegion).Label(watermarkLabel).Children(func() {
+		if logo := resources.Logo(); logo != nil {
+			ui.Image(c, logo).Size(token.WatermarkLogoSize.Px(), token.WatermarkLogoSize.Px()).Opacity(token.OpacityDisabled.Value()).
+				AccessHidden(true)
 		}
-	})
-}
-
-func (w *Workspace) watermarkRow(c *ui.Context, h watermarkHint, keys string) {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(h.command)).Height(watermarkRowHeight).Padding(0, watermarkRowPadding).Gap(watermarkColumnGap).
-		AlignItems(ui.Center).Radius(iconButtonRadius).Label(h.label)
-	color := t.TextMuted
-	if pressable(b, t) {
-		color = t.Text
-	}
-	b.Children(func() {
-		ui.Text(c, h.label).TextColor(color).SingleLine().Width(watermarkLabelWidth).TextAlign(ui.End)
-		ui.Row(c).Width(watermarkKeysWidth).Children(func() {
-			if keys != "" {
-				keycap(c, keys)
+		ui.Column(c).Width(token.WatermarkWidth.Px()).Gap(token.GapStack.Px()).Children(func() {
+			for _, h := range watermarkHints {
+				keys := h.keys
+				if keys == "" {
+					keys = w.keyLabel(h.command)
+				}
+				if keys == "" {
+					continue
+				}
+				ui.Row(c).FillWidth().Gap(token.GapGroup.Px()).AlignItems(ui.Center).Children(func() {
+					design.Text(c, h.label, token.TextLabel).Grow(1).Basis(0).TextAlign(ui.End).SingleLine()
+					ui.Row(c).Grow(1).Basis(0).Children(func() { badge.Keys(c, keys) })
+				})
 			}
 		})
 	})
-	b.OnClick(func() { w.run(h.command) })
-}
-
-func keycap(c *ui.Context, keys string) {
-	t := c.Theme()
-	ui.Text(c, keys).FontSize(smallFontSize).TextColor(t.TextMuted).SingleLine().Height(keycapHeight).Padding(0, keycapPadding).
-		Radius(keycapRadius).Background(t.Surface).Border(1, t.Border)
 }

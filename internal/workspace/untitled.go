@@ -59,10 +59,11 @@ func splitUntitled(docs []*document.Document) (files, untitled []*document.Docum
 
 func (w *Workspace) saveThen(docs []*document.Document, done func()) {
 	files, untitled := splitUntitled(docs)
-	if !w.save(files) {
-		return
-	}
-	w.saveUntitled(untitled, done)
+	w.confirmOverwrite(files, func() {
+		if w.save(files) {
+			w.saveUntitled(untitled, done)
+		}
+	})
 }
 
 func (w *Workspace) saveUntitled(docs []*document.Document, done func()) {

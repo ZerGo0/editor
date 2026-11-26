@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	modifiedState    = "modified"
+	modifiedState    = "Unsaved changes"
 	closeButtonInset = 14
 )
 
@@ -63,7 +63,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 	app.WaitNode(win, "modified a.txt tab", tabModified("a.txt"))
 	app.Menu(win, "File", "Close Window")
 	app.Eventually("project window closed", func() bool {
-		return !slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.Title == filepath.Base(root) && w.Visible })
+		return !slices.ContainsFunc(app.Windows(), func(w Window) bool { return strings.HasSuffix(w.Title, filepath.Base(root)) && w.Visible })
 	})
 	app.Quit()
 	if data, err := os.ReadFile(filepath.Join(root, "a.txt")); err != nil || string(data) != "alpha\n" {
@@ -71,7 +71,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 	}
 
 	again := LaunchWith(t, userData, root)
-	win = again.WaitWindow(filepath.Base(root))
+	win = again.WaitWindow("a.txt - " + filepath.Base(root))
 	again.Idle(win)
 	again.WaitNode(win, "restored a.txt tab", tabModified("a.txt"))
 	again.WaitNode(win, "restored text", func(n Node) bool {

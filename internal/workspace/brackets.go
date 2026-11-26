@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/ZerGo0/editor/internal/bracketcolor"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
@@ -37,8 +38,8 @@ func (w *Workspace) initBrackets() {
 	w.brackets = bracketState{scans: map[string]*bracketScan{}, views: map[*editor.State]bracketView{}}
 }
 
-func bracketPalette(t *ui.Theme) []ui.Color {
-	return []ui.Color{t.Warning, t.Accent, t.Success}
+func bracketPalette(p *token.Palette) []ui.Color {
+	return []ui.Color{p.Severity.Warning, p.Accent.Base, p.Severity.Success}
 }
 
 func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
@@ -65,7 +66,7 @@ func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
 		}
 	}
 	first, last := st.VisibleLines()
-	t := c.Theme()
+	t := token.Of(c)
 	v, ok := w.brackets.views[st]
 	if ok && v.version == version && v.lang == lang && v.dark == t.Dark && first >= v.from && last <= v.to {
 		return
@@ -83,7 +84,7 @@ func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
 	var rs []editor.Replacement
 	for ; i < len(bs) && bs[i].Offset < end; i++ {
 		b := bs[i]
-		color := t.Danger
+		color := t.Severity.Error
 		if !b.Unexpected {
 			color = colors[b.Depth%len(colors)]
 		}

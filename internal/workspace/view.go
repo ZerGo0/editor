@@ -1,46 +1,58 @@
 package workspace
 
 import (
+	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
 )
 
+var appearances = map[string]design.Appearance{
+	settings.ThemeLight: design.AppearanceLight,
+	settings.ThemeDark:  design.AppearanceDark,
+}
+
+func ApplyTheme(c *ui.Context, s *settings.Store) *token.Palette {
+	return design.Apply(c, design.Settings{Appearance: appearances[s.String(settings.ColorTheme)], SystemAccent: true})
+}
+
 func (w *Workspace) View(c *ui.Context) {
 	c.SetZoom(w.zoom())
-	vibrant := c.Vibrancy()
-	if vibrant {
-		c.Root().Background(ui.Transparent)
-	}
+	p := ApplyTheme(c, w.env.Settings)
+	c.Root().Background(p.Layer.Editor)
 	w.syncEdited()
+	w.syncTitle()
 	w.updateProblems()
+	w.beginDragFrame()
 	c.Root().ObserveInput(w.observeInput)
+	w.escape(c)
 	w.shortcuts(c)
 	w.focusedTab = nil
 	ui.Column(c).Fill().Children(func() {
-		w.titleBar(c, vibrant)
+		w.titleBar(c)
 		ui.Row(c).Grow(1).FillWidth().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
-			w.activityBar(c, vibrant)
 			if w.sidebarHidden {
 				w.main(c)
 				return
 			}
-			ui.Split(c, &w.sidebarWidth, func() { w.sidebar(c, vibrant) }, func() { w.main(c) }).
+			w.clampSidebar(c)
+			ui.Split(c, &w.sidebarWidth, func() { w.sidebar(c) }, func() { w.main(c) }).
 				SplitReset(defaultSidebarWidth).Grow(1).FillHeight()
 		})
-		w.statusBar(c, vibrant)
+		w.statusBar(c)
 	})
+	w.trackNavigation()
 	w.endViewerFrame()
 	w.gitFrame()
 	w.autoSave(w.focusedTab)
 	w.syncBackups()
 	w.overlays(c)
-	paletteOpen := w.palette.IsOpen()
-	w.palette.View(c, w.paletteTop(), w.acceptPalette)
-	if paletteOpen && !w.palette.IsOpen() && w.focusTab == nil {
-		w.focusTab = w.active.ActiveTab()
-		c.Invalidate()
-	}
+	w.quickInputView(c)
 	w.promptView(c)
+	w.showNotices(c)
+	feedback.ToastHost(c)
 }
 
 func (w *Workspace) overlays(c *ui.Context) {
@@ -62,7 +74,7 @@ func (w *Workspace) syncEdited() {
 }
 
 func (w *Workspace) main(c *ui.Context) {
-	ui.Column(c).Fill().Background(c.Theme().Background).Children(func() {
+	ui.Column(c).Fill().MinWidth(0).Background(token.Of(c).Layer.Editor).Children(func() {
 		w.withPanel(c, func() { w.node(c, w.layout) })
 	})
 }

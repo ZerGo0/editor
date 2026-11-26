@@ -3,6 +3,8 @@ package workspace
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/insights"
 	"github.com/ZerGo0/editor/internal/problems"
@@ -12,9 +14,10 @@ import (
 )
 
 const (
-	ProblemsPanel       = "problems"
-	TODOPanel           = "todo"
-	problemsFilterWidth = 220
+	ProblemsPanel  = "problems"
+	TODOPanel      = "todo"
+	collapseLabel  = "Collapse All"
+	problemsFilter = "Filter Problems"
 )
 
 type problemEntry struct {
@@ -36,7 +39,7 @@ func (w *Workspace) initInsights() {
 	w.insights.todos = todo.NewIndex()
 	w.insights.problems = map[string]*problemEntry{}
 	w.addPanel(toolView{id: ProblemsPanel, title: "Problems", command: "workbench.actions.view.problems", icon: icons.Problems, view: w.problemsView, badge: w.problemCount, actions: w.problemsActions})
-	w.addPanel(toolView{id: TODOPanel, title: "TODO", command: "todo.show", icon: icons.Todo, view: w.todoView, actions: w.todoActions})
+	w.addPanel(toolView{id: TODOPanel, title: "TODO", command: "todo.show", icon: icons.Todo, view: w.todoView, badge: w.todoCount, actions: w.todoActions})
 }
 
 func (w *Workspace) todoView(c *ui.Context) {
@@ -47,7 +50,7 @@ func (w *Workspace) todoView(c *ui.Context) {
 		for i, f := range files {
 			groups[i].Path = f.Path
 			for _, it := range f.Items {
-				groups[i].Entries = append(groups[i].Entries, insights.Entry{Icon: icons.Todo, Color: accent, Title: it.Tag, Detail: it.Text, Line: it.Line, Col: it.Col})
+				groups[i].Entries = append(groups[i].Entries, insights.Entry{Icon: icons.Todo, Tone: token.ToneInfo, Title: it.Tag, Detail: it.Text, Line: it.Line, Col: it.Col})
 			}
 		}
 		return groups
@@ -55,19 +58,33 @@ func (w *Workspace) todoView(c *ui.Context) {
 }
 
 func (w *Workspace) problemsActions(c *ui.Context) {
-	t := c.Theme()
-	ui.TextInput(c, &w.insights.problemList.Filter).Width(problemsFilterWidth).
-		Placeholder("Filter (text, path)").Label("Filter Problems").Background(t.Surface)
-	iconButton(c, "collapse-problems", "Collapse All", "Collapse All", icons.CollapseAll, false, w.insights.problemList.CollapseAll)
+	field.SearchInput(c, problemsFilter, &w.insights.problemList.Filter, field.SearchOptions{Placeholder: "Filter (text, path)"}).
+		Width(token.SettingsNavWidth.Px())
+	w.iconButton(c, icons.CollapseAll, collapseLabel, "", false, w.insights.problemList.CollapseAll)
 }
 
 func (w *Workspace) todoActions(c *ui.Context) {
-	iconButton(c, "collapse-todo", "Collapse All", "Collapse All", icons.CollapseAll, false, w.insights.todoList.CollapseAll)
+	w.iconButton(c, icons.CollapseAll, collapseLabel, "", false, w.insights.todoList.CollapseAll)
 }
 
-func accent(t *ui.Theme) ui.Color  { return t.Accent }
-func danger(t *ui.Theme) ui.Color  { return t.Danger }
-func warning(t *ui.Theme) ui.Color { return t.Warning }
+func (w *Workspace) problemMarker(p string) (int, token.Tone) {
+	e := w.insights.problems[p]
+	if e == nil || len(e.items) == 0 {
+		return 0, token.ToneNeutral
+	}
+	tone := token.ToneWarning
+	for _, it := range e.items {
+		if it.Severity == problems.Error {
+			tone = token.ToneError
+			break
+		}
+	}
+	return len(e.items), tone
+}
+
+func (w *Workspace) todoCount() int {
+	return w.insights.todos.Count()
+}
 
 func (w *Workspace) problemCount() int {
 	n := 0
@@ -85,7 +102,7 @@ func (w *Workspace) configProblems() []insights.Group {
 		}
 		g := insights.Group{Path: path}
 		for _, e := range errs {
-			g.Entries = append(g.Entries, insights.Entry{Icon: icons.Error, Color: danger, Title: e})
+			g.Entries = append(g.Entries, insights.Entry{Icon: icons.Error, Tone: token.ToneError, Title: e})
 		}
 		out = append(out, g)
 	}
@@ -139,11 +156,11 @@ func problemEntryOf(p problems.Problem) insights.Entry {
 	e := insights.Entry{Title: p.Message, Detail: p.Source, Line: p.Line, Col: p.Col}
 	switch p.Severity {
 	case problems.Error:
-		e.Icon, e.Color = icons.Error, danger
+		e.Icon, e.Tone = icons.Error, token.ToneError
 	case problems.Warning:
-		e.Icon, e.Color = icons.Warning, warning
+		e.Icon, e.Tone = icons.Warning, token.ToneWarning
 	default:
-		e.Icon, e.Color = icons.Info, accent
+		e.Icon, e.Tone = icons.Info, token.ToneInfo
 	}
 	return e
 }

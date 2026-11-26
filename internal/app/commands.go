@@ -84,21 +84,29 @@ func (a *App) registerCommands() {
 	}
 	add("workbench.view.search", categoryView, "Show Search", ws((*workspace.Workspace).ShowSearch))
 	add("workbench.action.searchEverywhere", categoryGo, "Search Everywhere", search(searchview.ScopeAll))
-	add("workbench.action.quickOpen", categoryGo, "Go to File...", search(searchview.ScopeFiles))
+	add("workbench.action.quickOpen", categoryGo, "Go to File...", ws(func(w *workspace.Workspace) { w.QuickOpen("") }))
 	add("workbench.action.findAction", categoryGo, "Find Action...", search(searchview.ScopeActions))
-	add("workbench.action.showAllSymbols", categoryGo, "Go to Symbol in Workspace...", search(searchview.ScopeSymbols))
+	add("workbench.action.showAllSymbols", categoryGo, "Go to Symbol in Workspace...", ws((*workspace.Workspace).GoToSymbolInWorkspace))
 	add("workbench.action.findInFiles", categoryGo, "Find in Files", ws((*workspace.Workspace).FindInFiles))
 	add("workbench.action.gotoSymbol", categoryGo, "Go to Symbol in Editor...", ws((*workspace.Workspace).GoToSymbolInEditor))
 	add("search.action.focusNextSearchResult", categorySearch, "Focus Next Search Result", ws((*workspace.Workspace).NextSearchResult))
 	add("search.action.focusPreviousSearchResult", categorySearch, "Focus Previous Search Result", ws((*workspace.Workspace).PreviousSearchResult))
 	add("workbench.action.togglePanel", categoryView, "Toggle Panel", ws((*workspace.Workspace).TogglePanel))
+	add("workbench.action.togglePanelPosition", categoryView, "Toggle Panel Position", ws((*workspace.Workspace).TogglePanelPosition))
+	add("workbench.action.navigateBack", categoryGo, "Go Back", ws((*workspace.Workspace).NavigateBack))
+	add("workbench.action.navigateForward", categoryGo, "Go Forward", ws((*workspace.Workspace).NavigateForward))
+	add("workbench.action.navigateToLastEditLocation", categoryGo, "Go to Last Edit Location", ws((*workspace.Workspace).NavigateToLastEdit))
+	add("workbench.action.focusNextPart", categoryView, "Focus Next Part", ws((*workspace.Workspace).FocusNextPart))
+	add("workbench.action.focusPreviousPart", categoryView, "Focus Previous Part", ws((*workspace.Workspace).FocusPreviousPart))
+	add("notifications.showList", categoryView, "Show Notifications", ws((*workspace.Workspace).ToggleNotifications))
+	add("notifications.clearAll", categoryView, "Clear All Notifications", ws((*workspace.Workspace).ClearNotifications))
 	add("workbench.actions.view.problems", categoryView, "Show Problems", ws(func(w *workspace.Workspace) { w.ShowPanel(workspace.ProblemsPanel) }))
 	add("todo.show", categoryView, "Show TODO", ws(func(w *workspace.Workspace) { w.ShowPanel(workspace.TODOPanel) }))
 	for _, act := range history.Actions {
 		add(act.ID, act.Category, act.Title, ws(func(w *workspace.Workspace) { w.RunHistory(act.ID) }))
 	}
-	add("workbench.view.scm", categoryView, "Show Source Control", ws(func(w *workspace.Workspace) { w.ShowSideView(workspace.SourceControlView) }))
-	add("workbench.view.github", categoryView, "Show GitHub", ws(func(w *workspace.Workspace) { w.ShowSideView(workspace.GitHubView) }))
+	add("workbench.view.scm", categoryView, "Show Source Control", ws(func(w *workspace.Workspace) { w.FocusSideView(workspace.SourceControlView) }))
+	add("workbench.view.github", categoryView, "Show GitHub", ws(func(w *workspace.Workspace) { w.FocusSideView(workspace.GitHubView) }))
 	for _, act := range gitui.Actions {
 		add(act.ID, act.Category, act.Title, ws(func(w *workspace.Workspace) { w.RunGit(act.ID) }))
 	}

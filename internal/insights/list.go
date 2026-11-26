@@ -3,35 +3,24 @@ package insights
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	rowHeight    = 22
-	fontSize     = 13
-	iconSize     = 16
-	severitySize = 14
-	chevronSize  = 12
-	arrowWidth   = 20
-	rowGap       = 6
-	rowPaddingX  = 6
-	entryIndent  = 20
-	emptyPadding = 16
-	emptyGap     = 8
-	emptyFont    = 12
-	countFont    = 11
-	countPadding = 6
-	countHeight  = 16
 	noGroup      = -1
+	filterNoHits = "No results match the filter."
+	clearFilter  = "Clear Filter"
 )
 
 type Entry struct {
 	Icon      *ui.SVG
-	Color     func(t *ui.Theme) ui.Color
+	Tone      token.Tone
 	Title     string
 	Detail    string
 	Line, Col int
@@ -140,7 +129,6 @@ func (l *List) entry(k rowKey) (Group, Entry, bool) {
 
 func (l *List) View(c *ui.Context, label, empty string, key uint64, groups func() []Group, rel func(string) string, open func(path string, line, col int)) {
 	l.build(key, groups)
-	t := c.Theme()
 	if len(l.groups) == 0 {
 		l.empty(c, empty)
 		return
@@ -157,38 +145,21 @@ func (l *List) View(c *ui.Context, label, empty string, key uint64, groups func(
 		_, e, _ := l.entry(k)
 		return e.Title
 	}
-	focused := l.state.List.Handle.FocusWithin(c)
-	local := *t
-	if !focused {
-		local.Accent, local.InactiveAccent, local.AccentText = t.SurfacePressed, t.SurfacePressed, t.Text
-	}
-	var cur ui.OutlineRow
-	l.state.Prefix = func(r ui.OutlineRow) { cur = r }
-	submitted := false
-	ui.Themed(c, &local).Fill().Background(ui.Transparent).Children(func() {
-		submitted = ui.Outline(c, &l.state, l.roots, l.children, func(k rowKey) {
-			if k.entry == noGroup {
-				l.groupRow(c, cur, k, rel, open)
-				return
-			}
-			l.entryRow(c, k, rel, open)
-		}).Fill().Padding(0, rowPaddingX).Background(ui.Transparent).Label(label).Submitted()
-	})
+	submitted := list.Tree(c, &l.state, l.roots, l.children, list.ViewOptions{Label: label}, func(k rowKey) list.Item {
+		if k.entry == noGroup {
+			return l.groupItem(c, k, rel, open)
+		}
+		return l.entryItem(c, k, rel, open)
+	}).Submitted()
 	l.shortcuts(c, rel, open, submitted)
 }
 
 func (l *List) empty(c *ui.Context, empty string) {
-	t := c.Theme()
-	ui.Column(c).Fill().Center().Gap(emptyGap).Padding(emptyPadding).Children(func() {
-		if l.Filter == "" || len(l.all) == 0 {
-			ui.Text(c, empty).FontSize(emptyFont).TextColor(t.TextMuted)
-			return
-		}
-		ui.Text(c, "No results match the filter.").FontSize(emptyFont).TextColor(t.TextMuted)
-		if ui.Button(c, "Clear Filter").Clicked() {
-			l.Filter = ""
-		}
-	})
+	if l.Filter == "" || len(l.all) == 0 {
+		feedback.Empty(c, feedback.EmptyOptions{Message: empty})
+		return
+	}
+	feedback.Empty(c, feedback.EmptyOptions{Message: filterNoHits, Link: clearFilter, OnLink: func() { l.Filter = "" }})
 }
 
 func (l *List) shortcuts(c *ui.Context, rel func(string) string, open func(path string, line, col int), submitted bool) {
@@ -238,78 +209,64 @@ func (l *List) copy(c *ui.Context, k rowKey, rel func(string) string, message bo
 	c.WriteClipboard(text)
 }
 
-func (l *List) groupRow(c *ui.Context, r ui.OutlineRow, k rowKey, rel func(string) string, open func(path string, line, col int)) {
-	t := c.Theme()
+func (l *List) groupItem(c *ui.Context, k rowKey, rel func(string) string, open func(path string, line, col int)) list.Item {
 	g := l.groups[l.byPath[k.path]]
-	name := rel(g.Path)
-	dir := filepath.Dir(name)
-	row := ui.Row(c).Height(rowHeight).FillWidth().Gap(rowGap).AlignItems(ui.Center)
-	row.Children(func() {
-		r.Arrow().Size(arrowWidth, rowHeight).Center().Children(func() {
-			svg := icons.ChevronRight
-			if r.Open {
-				svg = icons.ChevronDown
-			}
-			ui.Icon(c, svg).Size(chevronSize, chevronSize).TextColor(t.TextMuted)
-		})
-		icons.FileIcon(c, filepath.Base(g.Path), false, false, iconSize)
-		ui.Text(c, filepath.Base(g.Path)).FontSize(fontSize).SingleLine().Shrink(0)
-		if dir != "." {
-			ui.Text(c, dir).FontSize(fontSize).TextColor(t.TextMuted).SingleLine().Shrink(1).MinWidth(0)
-		}
-		ui.Box(c).Grow(1)
-		ui.Text(c, strconv.Itoa(len(g.Entries))).FontSize(countFont).TextColor(t.Text).Background(t.SurfacePressed).
-			Radius(countHeight/2).Height(countHeight).MinWidth(countHeight).TextAlign(ui.Center).Padding(0, countPadding).Shrink(0)
-	})
-	if row.RowClicked() {
-		l.activate(k, open)
+	name := filepath.Base(g.Path)
+	dir := filepath.Dir(rel(g.Path))
+	if dir == "." {
+		dir = ""
 	}
-	row.ContextMenu(func(m *ui.Menu) {
-		if m.Item("Open File").Chosen() {
-			open(g.Path, -1, 0)
-		}
-		if m.Item("Copy Path").Chosen() {
-			l.copy(c, k, rel, false)
-		}
-		m.Separator()
-		if m.Item("Collapse All").Chosen() {
-			l.CollapseAll()
-		}
-	})
+	return list.Item{
+		Label:       name,
+		Description: dir,
+		Leading:     func(c *ui.Context) { icons.FileIcon(c, name, false, false, token.IconSize.Px()) },
+		Count:       len(g.Entries),
+		OnClick:     func() { l.activate(k, open) },
+		Menu: func(m *ui.Menu) {
+			if m.Item("Open File").Chosen() {
+				open(g.Path, -1, 0)
+			}
+			if m.Item("Copy Path").Chosen() {
+				l.copy(c, k, rel, false)
+			}
+			m.Separator()
+			if m.Item("Collapse All").Chosen() {
+				l.CollapseAll()
+			}
+		},
+	}
 }
 
-func (l *List) entryRow(c *ui.Context, k rowKey, rel func(string) string, open func(path string, line, col int)) {
-	t := c.Theme()
+func (l *List) entryItem(c *ui.Context, k rowKey, rel func(string) string, open func(path string, line, col int)) list.Item {
 	_, e, ok := l.entry(k)
 	if !ok {
-		return
+		return list.Item{}
 	}
-	row := ui.Row(c).Height(rowHeight).FillWidth().Gap(rowGap).AlignItems(ui.Center).Padding(0, 0, 0, entryIndent)
-	row.Children(func() {
-		if e.Icon != nil {
-			icon := ui.Icon(c, e.Icon).Size(severitySize, severitySize).Shrink(0)
-			if e.Color != nil {
-				icon.TextColor(e.Color(t))
+	detail := fmt.Sprintf("[Ln %d, Col %d]", e.Line+1, e.Col+1)
+	if e.Detail != "" {
+		detail = e.Detail + "  " + detail
+	}
+	it := list.Item{
+		Label:       e.Title,
+		Description: detail,
+		OnClick:     func() { open(k.path, e.Line, e.Col) },
+		Menu: func(m *ui.Menu) {
+			if m.Item("Copy").Shortcut(ui.Cmd, ui.KeyC).Chosen() {
+				l.copy(c, k, rel, false)
 			}
-		}
-		ui.Text(c, e.Title).FontSize(fontSize).SingleLine().Shrink(1).MinWidth(0)
-		if e.Detail != "" {
-			ui.Text(c, e.Detail).FontSize(fontSize).TextColor(t.TextMuted).SingleLine().Shrink(1).MinWidth(0)
-		}
-		ui.Text(c, fmt.Sprintf("[Ln %d, Col %d]", e.Line+1, e.Col+1)).FontSize(fontSize).TextColor(t.TextMuted).SingleLine().Shrink(0)
-	})
-	if row.RowClicked() {
-		open(k.path, e.Line, e.Col)
+			if m.Item("Copy Message").Chosen() {
+				l.copy(c, k, rel, true)
+			}
+			if l.EntryMenu != nil {
+				l.EntryMenu(m, k.path, e)
+			}
+		},
 	}
-	row.ContextMenu(func(m *ui.Menu) {
-		if m.Item("Copy").Shortcut(ui.Cmd, ui.KeyC).Chosen() {
-			l.copy(c, k, rel, false)
+	if e.Icon != nil {
+		tone := e.Tone
+		it.Leading = func(c *ui.Context) {
+			ui.Icon(c, e.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(token.Of(c).Tone(tone)).Shrink(0).AccessHidden(true)
 		}
-		if m.Item("Copy Message").Chosen() {
-			l.copy(c, k, rel, true)
-		}
-		if l.EntryMenu != nil {
-			l.EntryMenu(m, k.path, e)
-		}
-	})
+	}
+	return it
 }

@@ -1,59 +1,70 @@
 package workspace
 
 import (
+	"github.com/ZerGo0/editor/internal/design/chrome"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
-	searchview "github.com/ZerGo0/editor/internal/search/view"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	halfPercent          = 50
-	titleBarPadding      = 8
-	commandCenterWidth   = 480
-	commandCenterMin     = 160
-	commandCenterHeight  = 24
-	commandCenterRadius  = 6
-	commandCenterIcon    = 14
-	commandCenterGap     = 6
-	commandCenterAlpha   = 0.6
-	paletteGap           = 4
-	doubleShiftKeyLabel  = "\u21e7\u21e7"
-	searchEverywhereName = "Search Everywhere"
+	halfPercent      = 50
+	titleSeparator   = " - "
+	navigateBackID   = "workbench.action.navigateBack"
+	navigateFwdID    = "workbench.action.navigateForward"
+	quickOpenID      = "workbench.action.quickOpen"
+	toggleSidebarID  = "workbench.action.toggleSidebarVisibility"
+	togglePanelID    = "workbench.action.togglePanel"
+	splitRightID     = "workbench.action.splitEditorRight"
+	splitRightLabel  = "Split Right"
+	sidebarLabel     = "Toggle Primary Side Bar"
+	panelToggleLabel = "Toggle Panel"
 )
 
-func (w *Workspace) paletteTop() float32 {
-	return (TitleBarHeight-commandCenterHeight)/2 + paletteGap
-}
-
-func (w *Workspace) titleBar(c *ui.Context, vibrant bool) {
-	t := c.Theme()
+func (w *Workspace) titleBar(c *ui.Context) {
+	p := token.Of(c)
 	bar := c.TitleBar()
-	left, right := bar.Left+titleBarPadding, bar.Right+titleBarPadding
-	row := ui.Row(c).Height(TitleBarHeight).Shrink(0).FillWidth().AlignItems(ui.Center).
-		Padding(0, right, 0, left).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).DragWindow()
-	if !vibrant {
-		row.Background(t.Surface)
-	}
-	row.Children(func() {
-		ui.Box(c).Grow(1).Basis(0)
-		w.commandCenter(c)
-		ui.Row(c).Grow(1).Basis(max(left-right, 0)).Justify(ui.End).AlignItems(ui.Center).Gap(2).Children(func() {
-			iconButton(c, "sidebar", "Toggle Sidebar", w.withKeys("Toggle Primary Side Bar", "workbench.action.toggleSidebarVisibility"), icons.Sidebar, !w.sidebarHidden, w.ToggleSidebar)
-			iconButton(c, "panel", "Toggle Panel", w.withKeys("Toggle Panel", "workbench.action.togglePanel"), icons.Panel, w.tools.panelOpen, w.TogglePanel)
-			iconButton(c, "split", "Split Right", w.withKeys("Split Editor Right", "workbench.action.splitEditorRight"), icons.Split, false, func() { w.Split(false) })
+	left, right := bar.Left+token.PadRow.Px(), bar.Right+token.PadRow.Px()
+	ui.Row(c).Height(token.TitleBarHeight.Px()).Shrink(0).FillWidth().AlignItems(ui.Center).Padding(0, right, 0, left).
+		Background(p.Layer.TitleBar).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).DragWindow().
+		Children(func() {
+			ui.Box(c).Grow(1).Basis(0)
+			ui.Row(c).Grow(2).Basis(0).MinWidth(0).MaxWidth(token.CommandCenterWidth.Px()).AlignItems(ui.Center).
+				Gap(token.GapInline.Px()).Children(func() {
+				chrome.NavButton(c, icons.ArrowLeft, navigateBackID, func(m *ui.Menu) { w.historyMenu(m, true) })
+				chrome.NavButton(c, icons.ArrowRight, navigateFwdID, func(m *ui.Menu) { w.historyMenu(m, false) })
+				chrome.CommandCenter(c, w.Name, quickOpenID)
+			})
+			ui.Row(c).Grow(1).Basis(max(left-right, 0)).Justify(ui.End).AlignItems(ui.Center).Gap(token.GapTight.Px()).
+				Role(ui.RoleToolbar).Label("Layout Controls").Children(func() {
+				w.iconButton(c, icons.Sidebar, sidebarLabel, toggleSidebarID, !w.sidebarHidden, w.ToggleSidebar)
+				w.iconButton(c, icons.Panel, panelToggleLabel, togglePanelID, w.tools.panelOpen, w.TogglePanel)
+				w.iconButton(c, icons.Split, splitRightLabel, splitRightID, false, func() { w.Split(false) })
+			})
 		})
-	})
 }
 
-func (w *Workspace) commandCenter(c *ui.Context) {
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key("command-center")).Height(commandCenterHeight).Width(commandCenterWidth).MinWidth(commandCenterMin).Shrink(1).
-		Radius(commandCenterRadius).Border(1, t.Border).Background(t.Background.Alpha(commandCenterAlpha)).Center().Gap(commandCenterGap).
-		Label(searchEverywhereName).Tooltip(searchEverywhereName + " (" + doubleShiftKeyLabel + ")")
-	pressable(b, t)
-	b.TextColor(t.TextMuted).Children(func() {
-		ui.Icon(c, icons.Search).Size(commandCenterIcon, commandCenterIcon)
-		ui.Text(c, w.Name).FontSize(smallFontSize).SingleLine().MinWidth(0)
-	})
-	b.OnClick(func() { w.FocusSearch(searchview.ScopeAll) })
+type titleState struct {
+	text, file string
+}
+
+func (w *Workspace) syncTitle() {
+	if w.win == nil {
+		return
+	}
+	title, file := w.Name, ""
+	if t := w.active.ActiveTab(); t != nil {
+		title = w.tabTitle(t.Path) + titleSeparator + w.Name
+		if onDisk(t.Path) {
+			file = t.Path
+		}
+	}
+	if title != w.title.text {
+		w.title.text = title
+		w.win.SetTitle(title)
+	}
+	if file != w.title.file {
+		w.title.file = file
+		w.win.SetRepresentedFile(file)
+	}
 }

@@ -1,18 +1,19 @@
 package workspace
 
 import (
-	"log"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ZerGo0/editor/internal/backup"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/largefile"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/viewer"
-	"github.com/egoist/mygo"
+	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -25,13 +26,14 @@ type docEntry struct {
 	saving    bool
 	kind      viewer.Kind
 	stamp     fileStamp
+	since     time.Time
 }
 
 func (w *Workspace) entry(path string) *docEntry {
 	if e, ok := w.docs[path]; ok {
 		return e
 	}
-	e := &docEntry{loading: true}
+	e := &docEntry{loading: true, since: time.Now()}
 	w.docs[path] = e
 	asText := w.viewers.asText[path]
 	meta, restore := w.takeBackup(path)
@@ -215,14 +217,6 @@ func (w *Workspace) reloadChanged(dir string) {
 	}
 }
 
-func (w *Workspace) showError(title string, err error) {
-	if w.win == nil {
-		log.Printf("%s: %v", title, err)
-		return
-	}
-	go mygo.Dialog.Error(title, err.Error())
-}
-
 func (w *Workspace) saveLarge(d *document.Document) {
 	e := w.docs[d.Path]
 	if e == nil || e.saving {
@@ -230,11 +224,12 @@ func (w *Workspace) saveLarge(d *document.Document) {
 	}
 	e.saving = true
 	name := filepath.Base(d.Path)
-	w.setNotice("Saving " + name + "...")
+	id := w.notify(notices.Notice{Tone: token.ToneInfo, Title: "Saving " + name + "...", Busy: true})
 	go func() {
 		err := d.SaveLarge(w.ctx, nil)
 		w.update(func() {
 			e.saving = false
+			w.notes.Close(id)
 			if err != nil {
 				w.showError("Cannot save "+name, err)
 				return

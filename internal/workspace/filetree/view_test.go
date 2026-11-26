@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -57,7 +59,7 @@ func newTestTree(t *testing.T, files ...string) (*Tree, *ui.Tester, *calls, stri
 		Move:   func([]string, string) {},
 		Notify: func(string) {},
 	}
-	tt := ui.NewTester(func(c *ui.Context) { tree.View(c, false, h) }, testViewW, testViewH)
+	tt := ui.NewTester(func(c *ui.Context) { tree.View(c, h) }, testViewW, testViewH)
 	return tree, tt, got, root
 }
 
@@ -111,14 +113,14 @@ func TestTreeRenameInline(t *testing.T) {
 
 func TestTreeCreateInlineAndEscape(t *testing.T) {
 	tree, tt, got, root := newTestTree(t, "a.txt")
-	tree.StartCreate(root, false)
+	tree.StartCreate(root, false, false)
 	tt.Frame()
 	tt.Type("notes.md")
 	tt.Key(0, ui.KeyEnter)
 	if want := filepath.Join(root, "notes.md"); len(got.created) != 1 || got.created[0] != want {
 		t.Fatalf("created %v, want %s", got.created, want)
 	}
-	tree.StartCreate(root, true)
+	tree.StartCreate(root, true, false)
 	tt.Frame()
 	if _, ok := tt.AccessByRole(ui.RoleTextField, "New Folder"); !ok {
 		t.Fatal("no New Folder field")
@@ -140,5 +142,30 @@ func TestTreeCopyPaste(t *testing.T) {
 	a := filepath.Join(root, "a.txt")
 	if len(got.pasted) != 2 || got.pasted[0] != a || got.pasted[1] != root {
 		t.Fatalf("pasted %v", got.pasted)
+	}
+}
+
+func TestTreeCompactsSingleChildFolders(t *testing.T) {
+	tree, tt, _, root := newTestTree(t, "src/app/main/x.go", "src/b.go")
+	tree.state.Open.Add(filepath.Join(root, "src"))
+	tree.state.Generation++
+	tt.Frame()
+	if _, ok := tt.AccessByRole(ui.RoleTreeItem, "app/main"); !ok {
+		t.Fatal("the single-child folder chain is not one row")
+	}
+}
+
+func TestTreeGitDecorations(t *testing.T) {
+	tree, _, _, root := newTestTree(t, "a/b.txt", "c.txt")
+	tree.SetGit([]git.FileStatus{{Path: "a/b.txt", Index: '.', WorkTree: 'M'}, {Path: "c.txt", Index: '?', WorkTree: '?'}})
+	tree.isDir[filepath.Join(root, "a")] = true
+	if s := tree.gitStatus(filepath.Join(root, "a", "b.txt")); s != token.GitModified {
+		t.Fatalf("file status = %v", s)
+	}
+	if s := tree.gitStatus(filepath.Join(root, "a")); s != token.GitModified {
+		t.Fatalf("folder status = %v", s)
+	}
+	if s := tree.gitStatus(filepath.Join(root, "c.txt")); s != token.GitUntracked {
+		t.Fatalf("untracked status = %v", s)
 	}
 }

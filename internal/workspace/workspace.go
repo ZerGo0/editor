@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/design/pane"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/gitui"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/history"
@@ -16,14 +18,14 @@ import (
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
+	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	TitleBarHeight      = 52
-	defaultSidebarWidth = 260
-)
+const defaultSidebarWidth = 260
+
+var TitleBarHeight = int(token.TitleBarHeight.Px())
 
 type Workspace struct {
 	Root          string
@@ -51,8 +53,12 @@ type Workspace struct {
 	palette       palette.Palette
 	prompt        prompt
 	keys          keyState
-	notice        string
-	noticeSeq     int
+	notes         notices.Store
+	noteCenter    bool
+	nav           navState
+	focus         focusFlags
+	title         titleState
+	drag          dragState
 	closed        []string
 	settingsView  *prefs.SettingsView
 	keysView      *prefs.KeysView
@@ -65,6 +71,7 @@ type Workspace struct {
 	prs           *prui.PRs
 	issues        *issueui.Issues
 	issueSettings issueui.Settings
+	githubPanes   pane.StackState
 	viewers       viewerState
 	settings      *settings.Store
 	folderStamp   fileStamp
@@ -109,8 +116,12 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	w.initGit()
 	w.initGitHub()
 	w.layout = w.restoreNode(saved.Layout)
+	if l := saved.LastEdit; l != nil {
+		w.nav.lastEdit = &session.Location{Path: w.abs(l.Path), Line: l.Line, Col: l.Col}
+	}
 	groups := w.layout.Groups()
 	w.active = groups[min(max(saved.ActiveGroup, 0), len(groups)-1)]
+	w.focusTab = w.active.ActiveTab()
 	w.initHotExit()
 	return w
 }
@@ -206,6 +217,7 @@ func (w *Workspace) restoreNode(n *session.Node) *layout.Node {
 			})
 		}
 		g.Active = min(max(n.Group.Active, 0), max(len(g.Tabs)-1, 0))
+		w.restoreNav(g, n.Group)
 		return layout.Leaf(g)
 	case n.First == nil:
 		return w.restoreNode(n.Second)
@@ -226,6 +238,7 @@ func (w *Workspace) Snapshot() session.Project {
 		Expanded:      expanded,
 		Layout:        w.snapshotNode(w.layout),
 		ActiveGroup:   slices.Index(w.layout.Groups(), w.active),
+		LastEdit:      w.lastEditSnapshot(),
 	}
 	w.snapshotTools(&p)
 	w.snapshotSearch(&p)
@@ -251,5 +264,6 @@ func (w *Workspace) snapshotNode(n *layout.Node) *session.Node {
 		}
 		g.Tabs = append(g.Tabs, st)
 	}
+	w.snapshotNav(n.Group, g)
 	return &session.Node{Group: g}
 }

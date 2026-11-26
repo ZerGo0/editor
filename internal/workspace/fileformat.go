@@ -111,10 +111,11 @@ func (w *Workspace) ChangeLanguage() {
 		}
 		items = append(items, item)
 	}
-	w.palette.Show(languagePickTitle, palette.Tab{
+	w.palette.Show(palette.Mode{
+		Label:       languagePickTitle,
 		Placeholder: "Select a language mode",
 		Search:      palette.Static(items),
-		Hint:        "Enter to select",
+		Accept:      func(it palette.Item) { w.setLanguage(it.Value.(languagePick)) },
 	})
 }
 

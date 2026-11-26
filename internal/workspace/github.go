@@ -3,8 +3,8 @@ package workspace
 import (
 	"encoding/json"
 	"reflect"
-	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/insights"
 	"github.com/ZerGo0/editor/internal/issueui"
@@ -13,6 +13,8 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
+
+var githubSections = []string{sectionPullRequests, sectionIssues, sectionNotifications}
 
 const (
 	GitHubView           = "github"
@@ -25,14 +27,8 @@ const (
 	mentionTrigger       = "@"
 )
 
-type viewSection struct {
-	id, title string
-	view      func(c *ui.Context)
-	badge     func() int
-}
-
 func (w *Workspace) initGitHub() {
-	w.addSideView(toolView{id: GitHubView, title: "GitHub", command: "workbench.view.github", icon: icons.PullRequest, view: w.githubView, badge: w.githubBadge})
+	w.addSideView(toolView{id: GitHubView, title: "GitHub", command: "workbench.view.github", icon: icons.Github, view: w.githubView, badge: w.githubBadge})
 	w.statusLeft = append(w.statusLeft, w.githubStatusItems)
 	w.insights.todoList.EntryMenu = w.todoMenu
 }
@@ -96,52 +92,24 @@ func (w *Workspace) githubView(c *ui.Context) {
 		loading(c)
 		return
 	}
-	w.viewSections(c, []viewSection{
-		{id: sectionPullRequests, title: w.prs.Title(), view: w.prs.SideView, badge: w.prs.Badge},
-		{id: sectionIssues, title: w.issues.Title(), view: w.issues.SideView, badge: w.issues.Badge},
-		{id: sectionNotifications, title: w.prs.NotificationsTitle(), view: w.prs.NotificationsView, badge: w.prs.NotificationsBadge},
-	})
-}
-
-func (w *Workspace) viewSections(c *ui.Context, sections []viewSection) {
-	open := 0
-	for i, s := range sections {
-		w.sectionHeader(c, s, i > 0)
-		if w.tools.collapsed[s.id] {
-			continue
+	if w.prs.StateView(c) {
+		return
+	}
+	if w.githubPanes.Collapsed == nil {
+		w.githubPanes.Collapsed = map[string]bool{}
+		for _, id := range githubSections {
+			w.githubPanes.Collapsed[id] = w.tools.collapsed[id]
 		}
-		open++
-		ui.Column(c.Key("section-" + s.id)).Grow(1).FillWidth().MinHeight(0).Children(func() { s.view(c) })
 	}
-	if open == 0 {
-		ui.Box(c).Grow(1)
-	}
-}
-
-func (w *Workspace) sectionHeader(c *ui.Context, s viewSection, border bool) {
-	t := c.Theme()
-	collapsed := w.tools.collapsed[s.id]
-	row := ui.Row(c).Height(sectionHeight).Shrink(0).FillWidth().AlignItems(ui.Center).Padding(0, sideActionsPadding, 0, sectionPadding)
-	if border {
-		row.BorderWidth(1, 0, 0, 0).BorderColor(t.Border)
-	}
-	row.Children(func() {
-		head := ui.ButtonBase(c.Key("section-head-" + s.id)).Grow(1).MinWidth(0).FillHeight().AlignItems(ui.Center).Justify(ui.Start).Gap(sectionGap).
-			Label(s.title).Expanded(!collapsed).Radius(iconButtonRadius)
-		head.Children(func() {
-			chevron := icons.ChevronDown
-			if collapsed {
-				chevron = icons.ChevronRight
-			}
-			ui.Icon(c, chevron).Size(sectionChevron, sectionChevron).TextColor(t.TextMuted)
-			ui.Text(c, strings.ToUpper(s.title)).FontSize(sectionFontSize).Bold().SingleLine().MinWidth(0).Shrink(1)
-			ui.Box(c).Grow(1)
-			if s.badge != nil {
-				countBadge(c, s.badge())
-			}
-		})
-		head.OnClick(func() { w.tools.collapsed[s.id] = !collapsed })
+	pane.Stack(c, &w.githubPanes, []pane.Pane{
+		{ID: sectionPullRequests, Title: w.prs.Title(), Count: w.prs.Badge(), Actions: w.prs.SideActions, Body: w.prs.SideView},
+		{ID: sectionIssues, Title: w.issues.Title(), Count: w.issues.Badge(), Actions: w.issues.SideActions, Body: w.issues.SideView},
+		{ID: sectionNotifications, Title: w.prs.NotificationsTitle(), Count: w.prs.NotificationsBadge(), Actions: w.prs.NotificationsActions,
+			Busy: w.prs.NotificationsLoading(), Body: w.prs.NotificationsView},
 	})
+	for _, id := range githubSections {
+		w.tools.collapsed[id] = w.githubPanes.Collapsed[id]
+	}
 }
 
 func (w *Workspace) RunPullRequests(id string) {
@@ -151,6 +119,9 @@ func (w *Workspace) RunPullRequests(id string) {
 	if id == prui.ActionSearch {
 		w.ShowSideView(GitHubView)
 		w.tools.collapsed[sectionPullRequests] = false
+		if w.githubPanes.Collapsed != nil {
+			w.githubPanes.Collapsed[sectionPullRequests] = false
+		}
 	}
 	w.prs.Run(id)
 }

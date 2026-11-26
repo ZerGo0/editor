@@ -84,8 +84,12 @@ func (w *Workspace) unsavedOnlyIn(closing []*layout.Tab) []*document.Document {
 
 func (w *Workspace) removeTabs(g *layout.Group, tabs []*layout.Tab) {
 	w.rememberClosed(tabs)
+	active := g.ActiveTab()
 	for _, t := range tabs {
 		g.Close(g.Index(t))
+	}
+	if slices.Contains(tabs, active) && len(g.Tabs) > 0 {
+		g.Active = w.mruTab(g)
 	}
 	if len(g.Tabs) == 0 && w.layout.Remove(g) && w.active == g {
 		w.active = w.layout.Groups()[0]

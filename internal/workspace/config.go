@@ -3,6 +3,7 @@ package workspace
 import (
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
@@ -31,7 +32,8 @@ func (w *Workspace) zoom() float32 {
 
 func (w *Workspace) configure(st *editor.State) {
 	s := w.settings
-	st.Font = ui.Font{Family: s.String(settings.FontFamily), Size: float32(s.Int(settings.FontSize))}
+	st.Font = ui.Font{Family: cmpOr(s.String(settings.FontFamily), token.FontEditor), Size: float32(s.Int(settings.FontSize))}
+	st.HoverDelay = token.EditorHover
 	st.LineHeight = float32(s.Number(settings.LineHeight))
 	st.TabSize, st.Indent = 0, editor.IndentAuto
 	if !s.Bool(settings.DetectIndentation) {
@@ -58,7 +60,7 @@ func (w *Workspace) configure(st *editor.State) {
 func (w *Workspace) editorMenu(m *ui.Menu) {
 	m.Separator()
 	w.commandItem(m, "Go to Symbol in Editor...", "workbench.action.gotoSymbol")
-	w.commandItem(m, "Go to Line/Column...", "editor.goToLine")
+	w.commandItem(m, "Go to Line/Column...", gotoLineID)
 	w.gitEditorItems(m)
 	w.githubEditorItems(m)
 	m.Separator()
