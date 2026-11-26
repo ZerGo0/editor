@@ -35,6 +35,9 @@ func galleryButtons(c *ui.Context, g *gallery) {
 			})
 			action.ToggleIconButton(c, icons.CaseSensitive, "Match Case", &g.matchCase, action.IconOptions{Keys: "⌥⌘C"})
 			action.ToggleIconButton(c, icons.WholeWord, "Match Whole Word", &g.wholeWord, action.IconOptions{Keys: "⌥⌘W"})
+			if action.ExpandButton(c, "Toggle Replace", g.expanded, action.IconOptions{}).Clicked() {
+				g.expanded = !g.expanded
+			}
 		})
 	})
 }

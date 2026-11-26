@@ -5,6 +5,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/document"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
@@ -55,6 +56,7 @@ func (w *Workspace) configure(st *editor.State) {
 	st.Bindings = w.env.Keys.Current.EditorBindings()
 	st.OnInput = w.editorInput
 	st.ContextMenu = w.editorMenu
+	st.RenderFindBar = findwidget.ForEditor(st)
 }
 
 func (w *Workspace) editorMenu(m *ui.Menu) {

@@ -206,7 +206,8 @@ All components take `c *ui.Context` first, then the label, then any bound value,
 ### action
 
 - `Button(c, label, ButtonOptions{Variant, Icon, Keys, Tooltip, Disabled, Small, ID})`: Secondary (default), Primary, Ghost.
-- `IconButton(c, icon, label, IconOptions{Keys, Tooltip, Active, Disabled, Tone, ID})`, `MenuIconButton(..., menu)`, `ToggleIconButton(c, icon, label, &on, IconOptions{})`.
+- `IconButton(c, icon, label, IconOptions{Keys, Tooltip, Active, Disabled, KeepFocus, Tone, ID})`, `MenuIconButton(..., menu)`, `ToggleIconButton(c, icon, label, &on, IconOptions{})`. `KeepFocus` leaves the focus in the field the button acts on.
+- `ExpandButton(c, label, expanded, IconOptions{})`: a chevron as high as its row that shows or hides a part, such as Toggle Replace in the find widget.
 - `SplitButton(c, label, SplitOptions{..., Menu})`: the main button plus a chevron menu.
 - `Checkbox(c, label, &checked, ChoiceOptions{Description, Disabled, ID})`, `Switch(c, label, &on, ChoiceOptions{})`.
 - `Select(c, label, &value, []Option[T]{{Value, Label}}, SelectOptions{Disabled, ID, Width})`.

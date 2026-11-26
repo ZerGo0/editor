@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -119,6 +120,7 @@ func (t *diffTab) apply(oldText, newText string, live *editor.Buffer) {
 		t.dropState()
 		d := &editor.DiffState{Layout: editor.DiffLayout(t.layout)}
 		d.RenderHunkActions = t.hunkActions
+		d.RenderFindBar = findwidget.Render
 		t.engine = diffmode.NewEngine(t.g.ctx, d, t.g.post)
 		t.engine.Install(nil)
 		t.state, t.live, t.liveBuf = d, live != nil, live

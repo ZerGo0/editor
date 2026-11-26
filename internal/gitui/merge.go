@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -81,7 +82,7 @@ func (t *mergeTool) setup(base, ours, theirs string) {
 	pane := func(text string, readOnly bool) *editor.State {
 		buf := editor.NewBuffer(text)
 		buf.SetLanguage(lang)
-		return &editor.State{Buffer: buf, ReadOnly: readOnly}
+		return &editor.State{Buffer: buf, ReadOnly: readOnly, RenderFindBar: findwidget.Render}
 	}
 	t.model = newMergeModel(base, ours, theirs)
 	t.ours, t.theirs = pane(ours, true), pane(theirs, true)

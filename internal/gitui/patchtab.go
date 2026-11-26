@@ -7,6 +7,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -223,7 +224,7 @@ func (t *patchTab) patchView(c *ui.Context, it patchItem) {
 	if t.shown != t.selected || t.state == nil || t.shownWS != mode {
 		t.dropState()
 		fp := diffmode.FilterPatch(*it.patch, mode)
-		d := &editor.DiffState{}
+		d := &editor.DiffState{RenderFindBar: findwidget.Render}
 		d.SetPatch(fp)
 		abs := t.g.paths.abs(it.title)
 		if d.New != nil {

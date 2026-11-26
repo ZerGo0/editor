@@ -3,8 +3,10 @@
 package icons
 
 var (
+	ArrowDown     = load("arrow-down")
 	ArrowLeft     = load("arrow-left")
 	ArrowRight    = load("arrow-right")
+	ArrowUp       = load("arrow-up")
 	CaseSensitive = load("case-sensitive")
 	Check         = load("check")
 	ChevronDown   = load("chevron-down")
@@ -56,6 +58,7 @@ var (
 	ReplaceAll    = load("replace-all")
 	Reveal        = load("reveal")
 	Search        = load("search")
+	Selection     = load("selection")
 	Settings      = load("settings")
 	Sidebar       = load("sidebar")
 	SidebarRight  = load("sidebar-right")

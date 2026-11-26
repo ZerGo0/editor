@@ -6,18 +6,20 @@ import (
 )
 
 type IconOptions struct {
-	Keys     string
-	Tooltip  string
-	Active   bool
-	Disabled bool
-	Tone     token.Tone
-	ID       string
+	Keys      string
+	Tooltip   string
+	Active    bool
+	Disabled  bool
+	KeepFocus bool
+	Tone      token.Tone
+	ID        string
 }
 
 func IconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions) ui.Element {
 	p := token.Of(c)
 	b := ui.ButtonBase(c.Key(keyOf(o.ID, label))).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Radius(token.RadiusControl.Px()).
 		Center().Shrink(0).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled)
+	keepFocus(b, o)
 	bg := p.Fill(b.Hovered(), b.Pressed())
 	if o.Active && bg == ui.Transparent {
 		bg = p.Control.Toggled
@@ -40,6 +42,7 @@ func ToggleIconButton(c *ui.Context, icon *ui.SVG, label string, on *bool, o Ico
 	p := token.Of(c)
 	b := ui.ToggleBase(c.Key(keyOf(o.ID, label)), on).Size(token.ToggleSize.Px(), token.ToggleSize.Px()).Radius(token.RadiusInline.Px()).
 		Center().Shrink(0).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled)
+	keepFocus(b, o)
 	color := p.Icon
 	switch {
 	case *on:
@@ -52,4 +55,10 @@ func ToggleIconButton(c *ui.Context, icon *ui.SVG, label string, on *bool, o Ico
 		ui.Icon(c, icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(color)
 	})
 	return b
+}
+
+func keepFocus(b ui.Element, o IconOptions) {
+	if o.KeepFocus {
+		b.KeepFocus()
+	}
 }

@@ -48,7 +48,7 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 				f.trailing()
 			}
 			for _, t := range f.toggles {
-				action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys})
+				action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys, KeepFocus: true})
 			}
 		})
 		border := p.Border.Input

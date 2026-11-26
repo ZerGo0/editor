@@ -41,6 +41,34 @@ func TestFindBarSearchesAndCloses(t *testing.T) {
 	}
 }
 
+func TestFindBarMultilineQuery(t *testing.T) {
+	d := openTemp(t, []byte("alpha\r\nbeta\r\ngamma\r\n"))
+	waitIndexed(t, d)
+	s := &State{Doc: d}
+	tt := ui.NewTester(func(c *ui.Context) { View(c, s) }, testViewW, testViewH)
+	s.openFind()
+	tt.Frame()
+	tt.Type("beta")
+	tt.Frame()
+	tt.Key(ui.Ctrl, ui.KeyEnter)
+	tt.Frame()
+	tt.Type("gamma")
+	tt.Frame()
+	if s.find.query != "beta\ngamma" {
+		t.Fatalf("query %q, want Ctrl+Enter to insert a newline", s.find.query)
+	}
+	tt.Key(0, ui.KeyEnter)
+	waitFound(t, tt, s)
+	if a, b := s.selection(); a != 7 || b != 18 {
+		t.Fatalf("selection %d..%d, want 7..18 across the CRLF", a, b)
+	}
+	tt.Key(ui.Shift, ui.KeyEnter)
+	waitFound(t, tt, s)
+	if a, b := s.selection(); a != 7 || b != 18 {
+		t.Fatalf("selection %d..%d after Shift+Enter, want the only match 7..18", a, b)
+	}
+}
+
 func waitFound(t *testing.T, tt *ui.Tester, s *State) {
 	t.Helper()
 	for range 200 {

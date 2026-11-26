@@ -15,4 +15,9 @@ var (
 	SourceColumnWidth  = Size{72}
 	WhenColumnWidth    = Size{200}
 	ModifiedBarWidth   = Stroke2
+	FindInputWidth     = Size{220}
+	FindStatusWidth    = Size{68}
+	FindLineHeight     = Size{16}
 )
+
+const FindInputMaxLines = 8

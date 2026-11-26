@@ -53,6 +53,30 @@ func TestToggleIconButtonKeyboard(t *testing.T) {
 	}
 }
 
+func TestExpandButton(t *testing.T) {
+	open := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Row(c).Height(token.ToolbarHeight.Px()).Children(func() {
+			if ExpandButton(c, "Toggle Replace", open, IconOptions{Keys: "⌥⌘F"}).Clicked() {
+				open = !open
+			}
+		})
+	}, testWidth, testHeight)
+	info, ok := tt.AccessByRole(ui.RoleButton, "Toggle Replace")
+	if !ok || info.Expanded || info.Description != "Toggle Replace (⌥⌘F)" {
+		t.Fatalf("expand button = %+v, want a collapsed button with its keys in the tooltip", info)
+	}
+	if info.Bounds.W != token.HitTargetMin.Px() || info.Bounds.H != token.ToolbarHeight.Px() {
+		t.Fatalf("expand button is %vx%v, want %v wide and as high as its row", info.Bounds.W, info.Bounds.H, token.HitTargetMin.Px())
+	}
+	tt.Key(0, ui.KeyTab)
+	tt.Key(0, ui.KeySpace)
+	tt.Frame()
+	if info, _ := tt.AccessByRole(ui.RoleButton, "Toggle Replace"); !open || !info.Expanded {
+		t.Fatal("Space does not expand the button")
+	}
+}
+
 func TestCheckboxAndSwitch(t *testing.T) {
 	checked, on := false, false
 	tt := ui.NewTester(func(c *ui.Context) {

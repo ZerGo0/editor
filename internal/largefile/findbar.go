@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -75,10 +75,10 @@ func (s *State) findBar(c *ui.Context) {
 	case c.Shortcut(ui.Cmd|ui.Shift, ui.KeyG):
 		s.search(true)
 	}
-	ui.Row(c).Gap(token.GapControl.Px()).Padding(token.GapInline.Px(), token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).FillWidth().
+	ui.Row(c).Gap(token.GapControl.Px()).Padding(token.GapInline.Px(), token.PadRow.Px()).AlignItems(ui.Start).Shrink(0).FillWidth().
 		Background(p.Layer.Panel).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).Role(ui.RoleSearch).Label(findLabel).Children(func() {
 		matchCase := s.find.matchCase
-		in := field.TextInput(c, findLabel, &s.find.query, field.InputOptions{Placeholder: findLabel, Icon: icons.Search, Toggles: []field.Toggle{
+		in, submit := findwidget.Field(c, findLabel, &s.find.query, findwidget.FieldOptions{Toggles: []field.Toggle{
 			{Icon: icons.CaseSensitive, Label: "Match Case", Keys: "⌥⌘C", On: &s.find.matchCase},
 		}})
 		if s.find.focusInput {
@@ -86,22 +86,26 @@ func (s *State) findBar(c *ui.Context) {
 			in.Focus()
 		}
 		switch {
-		case in.Submitted():
-			s.search(c.Modifiers()&ui.Shift != 0)
+		case submit == findwidget.Enter:
+			s.search(false)
+		case submit == findwidget.ShiftEnter:
+			s.search(true)
 		case in.Shortcut(0, ui.KeyEscape):
 			s.closeFind()
 		case matchCase != s.find.matchCase && s.find.query != "":
 			s.search(false)
 		}
-		if action.IconButton(c, icons.ChevronUp, "Previous Match", action.IconOptions{Keys: "⇧⌘G"}).Clicked() {
-			s.search(true)
-		}
-		if action.IconButton(c, icons.ChevronDown, "Next Match", action.IconOptions{Keys: "⌘G"}).Clicked() {
-			s.search(false)
-		}
-		if action.IconButton(c, icons.Close, "Close", action.IconOptions{Keys: "Esc"}).Clicked() {
-			s.closeFind()
-		}
+		ui.Row(c).Height(token.ControlHeight.Px()).AlignItems(ui.Center).Gap(token.GapTight.Px()).Shrink(0).Children(func() {
+			if findwidget.PreviousMatch.Clicked(c, false) {
+				s.search(true)
+			}
+			if findwidget.NextMatch.Clicked(c, false) {
+				s.search(false)
+			}
+			if findwidget.Close.Clicked(c, false) {
+				s.closeFind()
+			}
+		})
 	})
 }
 
@@ -110,6 +114,10 @@ func (s *State) search(backward bool) {
 	if query == "" {
 		s.openFind()
 		return
+	}
+	// TECHDEBT: A newline in the query matches the caret line's ending only; accept both endings in the matcher if files mix them.
+	if ending := s.lineEnding(); ending != "\n" {
+		query = strings.ReplaceAll(query, "\n", ending)
 	}
 	s.stopSearch()
 	ctx, cancel := context.WithCancel(context.Background())

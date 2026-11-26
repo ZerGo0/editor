@@ -19,7 +19,7 @@ const (
 
 type gallery struct {
 	checked, unchecked, on, off      bool
-	matchCase, wholeWord             bool
+	matchCase, wholeWord, expanded   bool
 	textValue, invalid, query, notes string
 	choice                           string
 	tab, activity                    int

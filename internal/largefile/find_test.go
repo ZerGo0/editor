@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -56,6 +58,52 @@ func TestFindAcrossBoundaries(t *testing.T) {
 		if got[len(got)-1-i] != int64(p) {
 			t.Fatalf("backward matches %v, want %v reversed", got, positions)
 		}
+	}
+}
+
+func TestFindMultilineAcrossBoundaries(t *testing.T) {
+	const pattern = "tail\nhead"
+	lineEnd := strings.Index(pattern, "\n")
+	data := bytes.Repeat([]byte("filler line\n"), 3*findChunk/len("filler line\n"))
+	positions := []int{blockSize - lineEnd, 3*blockSize - lineEnd - 1, findChunk - lineEnd, 2*findChunk - len(pattern) + 1}
+	for _, p := range positions {
+		copy(data[p:], pattern)
+	}
+	d := openTemp(t, data)
+	ctx := context.Background()
+	var got []int
+	for from := int64(0); ; {
+		start, end, found, err := d.Find(ctx, from, pattern, false, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !found {
+			break
+		}
+		if end-start != int64(len(pattern)) {
+			t.Fatalf("match %d..%d has the wrong length", start, end)
+		}
+		got = append(got, int(start))
+		from = end
+	}
+	if !slices.Equal(got, positions) {
+		t.Fatalf("forward matches %v, want %v", got, positions)
+	}
+	got = got[:0]
+	for from := d.Len(); ; {
+		start, _, found, err := d.Find(ctx, from, pattern, false, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !found {
+			break
+		}
+		got = append(got, int(start))
+		from = start
+	}
+	slices.Reverse(got)
+	if !slices.Equal(got, positions) {
+		t.Fatalf("backward matches %v, want %v", got, positions)
 	}
 }
 
