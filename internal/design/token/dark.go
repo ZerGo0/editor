@@ -1,0 +1,152 @@
+package token
+
+import "github.com/egoist/mygo/ui"
+
+func darkPalette() Palette {
+	h := ui.Hex
+	return Palette{
+		Dark: true,
+		Layer: Layers{
+			TitleBar:    h("#181818"),
+			ActivityBar: h("#181818"),
+			SideBar:     h("#181818"),
+			Editor:      h("#1F1F1F"),
+			Panel:       h("#181818"),
+			StatusBar:   h("#181818"),
+			TabBar:      h("#181818"),
+			Input:       h("#313131"),
+			Menu:        h("#1F1F1F"),
+			Widget:      h("#202020"),
+			QuickInput:  h("#222222"),
+		},
+		Text: Texts{
+			Primary:   h("#CCCCCC"),
+			Strong:    h("#FFFFFF"),
+			Secondary: h("#9D9D9D"),
+			Muted:     h("#989898"),
+			Disabled:  h("#CCCCCC80"),
+			Link:      h("#4DAAFC"),
+			Selection: h("#264F78"),
+		},
+		Icon: h("#CCCCCC"),
+		Accent: Accents{
+			Base:  h("#0078D4"),
+			Hover: h("#026EC1"),
+			Text:  h("#FFFFFF"),
+			Focus: h("#0078D4"),
+		},
+		Control: Controls{
+			Hover:              h("#5A5D5E50"),
+			Pressed:            h("#686B6C70"),
+			Toggled:            h("#383A49"),
+			ToggleActive:       h("#2489DB82"),
+			ToggleActiveBorder: h("#2488DB"),
+			ButtonBorder:       h("#FFFFFF1A"),
+			Secondary:          h("#313131"),
+			SecondaryHover:     h("#3C3C3C"),
+			SecondaryText:      h("#CCCCCC"),
+			Checkbox:           h("#313131"),
+			Scrollbar:          h("#79797966"),
+		},
+		Border: Borders{
+			Default: h("#2B2B2B"),
+			Input:   h("#3C3C3C"),
+			Widget:  h("#454545"),
+			Section: h("#2B2B2B"),
+		},
+		List: Lists{
+			Hover:                    h("#2A2D2E"),
+			ActiveSelection:          h("#04395E"),
+			ActiveSelectionText:      h("#FFFFFF"),
+			ActiveSelectionSecondary: h("#CCCCCC"),
+			InactiveSelection:        h("#37373D"),
+			FocusOutline:             h("#0078D4"),
+			Drop:                     h("#062F4A"),
+			Highlight:                h("#2AAAFF"),
+			FocusHighlight:           h("#2AAAFF"),
+			IndentGuide:              h("#585858"),
+			PickSelection:            h("#04395E"),
+			PickSelectionText:        h("#FFFFFF"),
+			PickHighlight:            h("#2AAAFF"),
+		},
+		Tab: Tabs{
+			Active:          h("#1F1F1F"),
+			Inactive:        h("#181818"),
+			Hover:           h("#1F1F1F"),
+			Border:          h("#2B2B2B"),
+			ActiveBorderTop: h("#0078D4"),
+			ActiveText:      h("#FFFFFF"),
+			InactiveText:    h("#9D9D9D"),
+		},
+		Bar: Bars{
+			StatusText:          h("#CCCCCC"),
+			StatusHover:         h("#F1F1F133"),
+			CommandCenter:       h("#CCCCCC0D"),
+			CommandCenterHover:  h("#CCCCCC1A"),
+			CommandCenterBorder: h("#CCCCCC33"),
+			ActivityActive:      h("#E7E7E7"),
+			ActivityInactive:    h("#9D9D9D"),
+			ActivityIndicator:   h("#E7E7E7"),
+		},
+		Menu: Menus{
+			Selection:     h("#0078D4"),
+			SelectionText: h("#FFFFFF"),
+			Separator:     h("#454545"),
+			Border:        h("#454545"),
+		},
+		Badge: Badges{
+			Background: h("#616161"),
+			Text:       h("#F8F8F8"),
+			Accent:     h("#0078D4"),
+			AccentText: h("#FFFFFF"),
+		},
+		Key: Keys{
+			Background: h("#8080802B"),
+			Border:     h("#33333399"),
+			Bottom:     h("#44444499"),
+			Text:       h("#CCCCCC"),
+		},
+		Severity: Severities{
+			Error:             h("#F48771"),
+			Warning:           h("#CCA700"),
+			Info:              h("#3794FF"),
+			Success:           h("#3FB950"),
+			ErrorBackground:   h("#5A1D1D"),
+			ErrorBorder:       h("#BE1100"),
+			WarningBackground: h("#352A05"),
+			WarningBorder:     h("#B89500"),
+			InfoBackground:    h("#063B49"),
+			InfoBorder:        h("#007ACC"),
+		},
+		Git: GitColors{
+			Added:     h("#81B88B"),
+			Modified:  h("#E2C08D"),
+			Deleted:   h("#E8786A"),
+			Renamed:   h("#73C991"),
+			Untracked: h("#73C991"),
+			Ignored:   h("#959595"),
+			Conflict:  h("#ED8796"),
+			Submodule: h("#8DB9E2"),
+		},
+		Diff: DiffColors{
+			InsertedLine:   h("#9BB95533"),
+			RemovedLine:    h("#FF000033"),
+			InsertedText:   h("#9CCC2C33"),
+			RemovedText:    h("#FF000033"),
+			GutterAdded:    h("#2EA043"),
+			GutterModified: h("#0078D4"),
+			GutterDeleted:  h("#F85149"),
+		},
+		Shadow:   h("#0000005C"),
+		Avatar:   avatarPalette(),
+		OnAvatar: h("#FFFFFF"),
+	}
+}
+
+func avatarPalette() [avatarColors]ui.Color {
+	h := ui.Hex
+	return [avatarColors]ui.Color{
+		h("#0063B1"), h("#7A3FD6"), h("#A3008F"), h("#00796B"),
+		h("#A34A00"), h("#2E7D32"), h("#C62828"), h("#4C5BB0"),
+	}
+}

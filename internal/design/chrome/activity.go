@@ -1,0 +1,42 @@
+package chrome
+
+import (
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/egoist/mygo/ui"
+)
+
+type Activity struct {
+	Icon  *ui.SVG
+	Label string
+	Keys  string
+	Badge int
+}
+
+func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) ui.Element {
+	p := token.Of(c)
+	parts := ui.TabsBase(c, selected, len(items))
+	parts.List.Height(token.ViewTitleHeight.Px()).FillWidth().Padding(0, token.PadRow.Px()).AlignItems(ui.Center).Shrink(0).
+		Label(label).Children(func() {
+		for i, it := range items {
+			active := i == *selected
+			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ViewTitleHeight.Px()).Center().Shrink(0).Label(it.Label).
+				Tooltip(action.Hint(it.Label, it.Keys)).FocusRingOffset(-token.FocusRingWidth.Px())
+			color := p.Bar.ActivityInactive
+			if active || tab.Hovered() {
+				color = p.Bar.ActivityActive
+			}
+			tab.Children(func() {
+				ui.Icon(c, it.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(color).AccessHidden(true)
+				if active {
+					ui.Box(c).Absolute().Left(0).Right(0).Bottom(0).Height(token.IndicatorWidth.Px()).Background(p.Bar.ActivityIndicator)
+				}
+				if it.Badge > 0 {
+					badge.Count(c, it.Badge, badge.CountOptions{Accent: true, Small: true}).Absolute().Top(token.GapInline.Px()).Right(0)
+				}
+			})
+		}
+	})
+	return parts.List
+}

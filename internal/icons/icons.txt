@@ -60,3 +60,8 @@ edit PencilEdit02Icon
 fetch CloudDownloadIcon
 force-push ArrowUpDoubleIcon
 chevron-left ArrowLeft01Icon
+github GithubIcon
+arrow-left ArrowLeft02Icon
+arrow-right ArrowRight02Icon
+sidebar-right SidebarRightIcon
+copy Copy01Icon

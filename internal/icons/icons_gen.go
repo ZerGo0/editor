@@ -3,6 +3,8 @@
 package icons
 
 var (
+	ArrowLeft     = load("arrow-left")
+	ArrowRight    = load("arrow-right")
 	CaseSensitive = load("case-sensitive")
 	Check         = load("check")
 	ChevronDown   = load("chevron-down")
@@ -14,6 +16,7 @@ var (
 	CollapseAll   = load("collapse-all")
 	Comment       = load("comment")
 	Commit        = load("commit")
+	Copy          = load("copy")
 	Dot           = load("dot")
 	Edit          = load("edit")
 	Error         = load("error")
@@ -28,6 +31,7 @@ var (
 	FolderOpen    = load("folder-open")
 	ForcePush     = load("force-push")
 	GitBranch     = load("git-branch")
+	Github        = load("github")
 	History       = load("history")
 	Info          = load("info")
 	ListView      = load("list-view")
@@ -54,6 +58,7 @@ var (
 	Search        = load("search")
 	Settings      = load("settings")
 	Sidebar       = load("sidebar")
+	SidebarRight  = load("sidebar-right")
 	Split         = load("split")
 	Stash         = load("stash")
 	Tag           = load("tag")
