@@ -11,17 +11,18 @@ import (
 )
 
 const (
-	largeLimit = 1 << 20
-	largeLines = 60_000
+	editLimitEnv = "EDITOR_E2E_EDIT_LIMIT"
+	largeLimit   = 1 << 20
+	largeLines   = 60_000
 )
 
 func TestLargeFileOpensEditsAndSaves(t *testing.T) {
-	t.Setenv("EDITOR_E2E_EDIT_LIMIT", strconv.Itoa(largeLimit))
+	t.Parallel()
 	var b strings.Builder
 	for i := range largeLines {
 		b.WriteString("line " + strconv.Itoa(i) + " of the large file\n")
 	}
-	app, win, root := openProject(t, map[string]string{"big.log": b.String()})
+	app, win, root := openProjectEnv(t, map[string]string{"big.log": b.String()}, []string{editLimitEnv + "=" + strconv.Itoa(largeLimit)})
 	app.Click(win, app.WaitNode(win, "big.log row", RoleLabel("treeItem", "big.log")), 2)
 	app.WaitNode(win, "large file mode", Label("Large file mode"))
 	app.Type(win, "HEAD ")

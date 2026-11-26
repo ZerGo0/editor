@@ -8,6 +8,7 @@ import (
 )
 
 func TestLocalHistoryShowsSavedVersions(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))

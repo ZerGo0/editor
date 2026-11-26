@@ -64,6 +64,7 @@ const sampleDiff = "diff --git a/main.go b/main.go\n" +
 	"new mode 100755\n"
 
 func TestParseDiffSample(t *testing.T) {
+	t.Parallel()
 	files, err := parseDiff([]byte(sampleDiff))
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +116,7 @@ func TestParseDiffSample(t *testing.T) {
 }
 
 func TestParseDiffMalformed(t *testing.T) {
+	t.Parallel()
 	bad := []string{
 		"@@ -1 +1 @@\n-a\n+b\n",
 		"diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,3 +1,3 @@\n a\n",
@@ -137,6 +139,7 @@ func TestParseDiffMalformed(t *testing.T) {
 }
 
 func TestDiffCommands(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	first := commitFile(t, repo, "a.txt", numbered(10), "first")

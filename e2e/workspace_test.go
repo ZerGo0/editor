@@ -11,8 +11,13 @@ import (
 
 func openProject(t *testing.T, files map[string]string) (*App, int, string) {
 	t.Helper()
+	return openProjectEnv(t, files, nil)
+}
+
+func openProjectEnv(t *testing.T, files map[string]string, env []string) (*App, int, string) {
+	t.Helper()
 	root := Project(t, files)
-	app := Launch(t, root)
+	app := LaunchEnv(t, t.TempDir(), env, root)
 	win := app.WaitWindow(filepath.Base(root))
 	app.Idle(win)
 	return app, win, root
@@ -49,6 +54,7 @@ func countRole(nodes []Node, role string) int {
 }
 
 func TestProjectFromArgsShowsFileTree(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n", "pkg/util.go": "package pkg\n"})
 	app.WaitNode(win, "main.go row", RoleLabel("treeItem", "main.go"))
 	dir := app.WaitNode(win, "pkg row", RoleLabel("treeItem", "pkg"))
@@ -59,6 +65,7 @@ func TestProjectFromArgsShowsFileTree(t *testing.T) {
 }
 
 func TestSingleClickReplacesPreviewTab(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n", "b.txt": "beta\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 1)
 	app.WaitNode(win, "a.txt tab", RoleLabel("tab", "a.txt"))
@@ -70,6 +77,7 @@ func TestSingleClickReplacesPreviewTab(t *testing.T) {
 }
 
 func TestDoubleClickPinsTab(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n", "b.txt": "beta\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	app.WaitNode(win, "a.txt tab", RoleLabel("tab", "a.txt"))
@@ -81,6 +89,7 @@ func TestDoubleClickPinsTab(t *testing.T) {
 }
 
 func TestEditAndSaveWritesFile(t *testing.T) {
+	t.Parallel()
 	app, win, root := openProject(t, map[string]string{"note.txt": "hello\n"})
 	app.Click(win, app.WaitNode(win, "note.txt row", RoleLabel("treeItem", "note.txt")), 2)
 	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
@@ -95,6 +104,7 @@ func TestEditAndSaveWritesFile(t *testing.T) {
 }
 
 func TestSplitRightShowsTwoEditors(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
@@ -103,6 +113,7 @@ func TestSplitRightShowsTwoEditors(t *testing.T) {
 }
 
 func TestCloseTabShowsPlaceholder(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	app.WaitNode(win, "a.txt tab", RoleLabel("tab", "a.txt"))

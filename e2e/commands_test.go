@@ -17,6 +17,7 @@ func writeFile(t *testing.T, path, text string) {
 }
 
 func TestCommandPaletteRunsCommand(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
@@ -29,6 +30,7 @@ func TestCommandPaletteRunsCommand(t *testing.T) {
 }
 
 func TestChordOpensKeyboardShortcuts(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
 	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
@@ -39,6 +41,7 @@ func TestChordOpensKeyboardShortcuts(t *testing.T) {
 }
 
 func TestUserKeybindingRunsCommand(t *testing.T) {
+	t.Parallel()
 	userData := t.TempDir()
 	writeFile(t, filepath.Join(userData, "keybindings.json"), "// mine\n[{\"key\": \"cmd+e\", \"command\": \"workbench.action.closeAllEditors\"}]\n")
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
@@ -51,6 +54,7 @@ func TestUserKeybindingRunsCommand(t *testing.T) {
 }
 
 func TestSettingsFileReloadsLive(t *testing.T) {
+	t.Parallel()
 	userData := t.TempDir()
 	root := Project(t, map[string]string{"a.txt": "alpha\n", "skip.log": "x\n"})
 	app := LaunchWith(t, userData, root)
@@ -64,6 +68,7 @@ func TestSettingsFileReloadsLive(t *testing.T) {
 }
 
 func TestSettingsSwitchWritesFile(t *testing.T) {
+	t.Parallel()
 	userData := t.TempDir()
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	app := LaunchWith(t, userData, root)
@@ -82,6 +87,7 @@ func TestSettingsSwitchWritesFile(t *testing.T) {
 }
 
 func TestNewFileFromMenu(t *testing.T) {
+	t.Parallel()
 	app, win, root := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Menu(win, "File", "New File...")
 	field := app.WaitNode(win, "name field", RoleLabel("textField", "New File"))

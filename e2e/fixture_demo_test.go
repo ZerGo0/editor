@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -27,6 +28,7 @@ const (
 	demoTabCount       = 30
 	demoOnlyRemote     = "only-on-the-remote-with-a-long-branch-name-for-remote-tracking-rows"
 	demoLongTag        = "very-long-tag-name-for-the-enterprise-edition-stable-release-candidate-number-three"
+	demoCacheDirPrefix = "editor-e2e-demo-"
 )
 
 var demoTags = []string{"v0.1.0", "v1.0.0", "v1.1.0-beta.2", "release/2026.11.0-rc.1+build.5678", demoLongTag}
@@ -109,15 +111,68 @@ func demoWrite(t *testing.T, path, text string) {
 	}
 }
 
+var demoCache struct {
+	once sync.Once
+	dir  string
+	demo DemoProject
+	ok   bool
+}
+
+func removeDemoCache() {
+	if demoCache.dir != "" {
+		_ = os.RemoveAll(demoCache.dir)
+	}
+}
+
 func NewDemoProject(t *testing.T) DemoProject {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
+	demoCache.once.Do(func() {
+		dir, err := os.MkdirTemp("", demoCacheDirPrefix)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		demoCache.dir = dir
+		parent, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		demoCache.demo = buildDemoProject(t, parent)
+		demoCache.ok = true
+	})
+	if !demoCache.ok {
+		t.Fatal("the demo project fixture failed to build")
+	}
 	parent, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
+	return copyDemoProject(t, demoCache.demo, parent)
+}
+
+func copyDemoProject(t *testing.T, from DemoProject, parent string) DemoProject {
+	t.Helper()
+	fromParent := filepath.Dir(from.Root)
+	if out, err := exec.Command("cp", "-Rp", filepath.Join(fromParent, demoRepoDir), filepath.Join(fromParent, demoRemoteDir), parent).CombinedOutput(); err != nil {
+		t.Fatalf("copy the demo project: %v\n%s", err, out)
+	}
+	rebase := func(path string) string { return filepath.Join(parent, strings.TrimPrefix(path, fromParent)) }
+	d := from
+	d.Root, d.Remote, d.BigFile = rebase(from.Root), rebase(from.Remote), rebase(from.BigFile)
+	d.TabFiles = make([]string, len(from.TabFiles))
+	for i, p := range from.TabFiles {
+		d.TabFiles[i] = rebase(p)
+	}
+	newDemoGit(t, d.Root).run("remote", "set-url", demoRemoteName, d.Remote)
+	return d
+}
+
+func buildDemoProject(t *testing.T, parent string) DemoProject {
+	t.Helper()
 	d := DemoProject{Root: filepath.Join(parent, demoRepoDir), Remote: filepath.Join(parent, demoRemoteDir), Commits: demoCommitCount, ChangelogDir: demoChangelogDir}
 	if err := os.MkdirAll(d.Root, 0o755); err != nil {
 		t.Fatal(err)
@@ -280,6 +335,7 @@ func lines(out string) []string {
 }
 
 func TestDemoProjectFixture(t *testing.T) {
+	t.Parallel()
 	d := NewDemoProject(t)
 	g := newDemoGit(t, d.Root)
 	var commits int
@@ -327,7 +383,11 @@ func TestDemoProjectFixture(t *testing.T) {
 			t.Errorf("tab file: %v", err)
 		}
 	}
-	again := NewDemoProject(t)
+	parent, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	again := buildDemoProject(t, parent)
 	if a, b := g.run("rev-parse", "main", "origin/main", "stash@{0}^{tree}"), newDemoGit(t, again.Root).run("rev-parse", "main", "origin/main", "stash@{0}^{tree}"); a != b {
 		t.Errorf("fixture is not deterministic:\n%s\n%s", a, b)
 	}

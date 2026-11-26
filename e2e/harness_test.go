@@ -21,18 +21,22 @@ import (
 )
 
 const (
-	binaryName      = "editor-e2e"
-	socketEnv       = "MYGO_AUTOMATION"
-	userDataEnv     = "EDITOR_E2E_USER_DATA"
-	artifactsEnv    = "EDITOR_E2E_ARTIFACTS"
-	startTimeout    = 20 * time.Second
-	quitTimeout     = 10 * time.Second
-	waitTimeout     = 5 * time.Second
-	pollInterval    = 50 * time.Millisecond
-	idleTimeoutMs   = 300
-	socketTempRoot  = "/tmp"
-	socketDirPrefix = "editor-e2e-"
-	codeTimeout     = "timeout"
+	binaryName         = "editor-e2e"
+	socketEnv          = "MYGO_AUTOMATION"
+	userDataEnv        = "EDITOR_E2E_USER_DATA"
+	artifactsEnv       = "EDITOR_E2E_ARTIFACTS"
+	startTimeout       = 20 * time.Second
+	quitTimeout        = 10 * time.Second
+	waitTimeout        = 5 * time.Second
+	pollInterval       = 50 * time.Millisecond
+	launchPollInterval = 10 * time.Millisecond
+	idleTimeoutMs      = 300
+	socketTempRoot     = "/tmp"
+	socketDirPrefix    = "editor-e2e-"
+	codeTimeout        = "timeout"
+	runtimeDirName     = "run"
+	runtimeDirPerm     = 0o700
+	runtimeDirEnv      = "XDG_RUNTIME_DIR"
 )
 
 var appBinary string
@@ -52,6 +56,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	removeDemoCache()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)
 }
@@ -127,15 +132,25 @@ func Launch(t *testing.T, args ...string) *App {
 
 func LaunchWith(t *testing.T, userData string, args ...string) *App {
 	t.Helper()
+	return LaunchEnv(t, userData, nil, args...)
+}
+
+func LaunchEnv(t *testing.T, userData string, env []string, args ...string) *App {
+	t.Helper()
 	sockDir, err := os.MkdirTemp(socketTempRoot, socketDirPrefix)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
+	runtimeDir := filepath.Join(sockDir, runtimeDirName)
+	if err := os.Mkdir(runtimeDir, runtimeDirPerm); err != nil {
+		t.Fatal(err)
+	}
 	sock := filepath.Join(sockDir, "app.sock")
 	a := &App{t: t, UserData: userData, output: &syncBuffer{}, done: make(chan struct{})}
 	a.cmd = exec.Command(appBinary, args...)
-	a.cmd.Env = append(os.Environ(), socketEnv+"="+sock, userDataEnv+"="+userData)
+	a.cmd.Env = append(os.Environ(), socketEnv+"="+sock, userDataEnv+"="+userData, runtimeDirEnv+"="+runtimeDir)
+	a.cmd.Env = append(a.cmd.Env, env...)
 	a.cmd.Stdout, a.cmd.Stderr = a.output, a.output
 	if err := a.cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -160,7 +175,7 @@ func LaunchWith(t *testing.T, userData string, args ...string) *App {
 		if time.Now().After(deadline) {
 			t.Fatalf("app did not listen on %s: %v\n%s", sock, err, a.output.String())
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(launchPollInterval)
 	}
 }
 

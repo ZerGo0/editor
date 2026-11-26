@@ -12,6 +12,7 @@ const (
 )
 
 func TestFindReplaceMultilineQuery(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "one\ntwo\nthree\none\ntwo\n"})
 	editor := openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Alt+F")

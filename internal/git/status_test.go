@@ -21,6 +21,7 @@ const sampleStatus = "# branch.oid 1111111111111111111111111111111111111111\x00"
 	"! ignored.log\x00"
 
 func TestParseStatus(t *testing.T) {
+	t.Parallel()
 	st, err := parseStatus([]byte(sampleStatus))
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +59,7 @@ func TestParseStatus(t *testing.T) {
 }
 
 func TestParseStatusDetachedAndInitial(t *testing.T) {
+	t.Parallel()
 	st, err := parseStatus([]byte("# branch.oid (initial)\x00# branch.head (detached)\x00"))
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +70,7 @@ func TestParseStatusDetachedAndInitial(t *testing.T) {
 }
 
 func TestParseStatusMalformed(t *testing.T) {
+	t.Parallel()
 	bad := []string{
 		"1 .M N...\x00",
 		"2 R. N... 100644 100644 100644 aaaa aaaa R100 only-new\x00",
@@ -90,6 +93,7 @@ func TestParseStatusMalformed(t *testing.T) {
 }
 
 func TestStatusRepo(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	st, err := repo.Status(ctx)
@@ -124,6 +128,7 @@ func TestStatusRepo(t *testing.T) {
 }
 
 func TestOpenNotRepo(t *testing.T) {
+	t.Parallel()
 	_, err := Open(context.Background(), t.TempDir())
 	if !errors.Is(err, ErrNotRepo) {
 		t.Fatalf("got %v", err)
@@ -131,6 +136,7 @@ func TestOpenNotRepo(t *testing.T) {
 }
 
 func TestOpenSubdirectory(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	put(t, repo, "a/b/file.txt", "x")
 	sub, err := Open(context.Background(), repo.Root+"/a/b")
@@ -143,6 +149,7 @@ func TestOpenSubdirectory(t *testing.T) {
 }
 
 func TestErrorMessage(t *testing.T) {
+	t.Parallel()
 	sample := &Error{Args: []string{"commit", "-m", "x"}, Stderr: "fatal: first line\nsecond", ExitCode: 128}
 	if got := sample.Error(); got != "git commit: fatal: first line (exit 128)" {
 		t.Fatalf("got %q", got)
@@ -159,6 +166,7 @@ func TestErrorMessage(t *testing.T) {
 }
 
 func TestCancelledContext(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -168,12 +176,14 @@ func TestCancelledContext(t *testing.T) {
 }
 
 func TestAvailable(t *testing.T) {
+	t.Parallel()
 	if !Available() {
 		t.Fatal("git should be on PATH")
 	}
 }
 
 func TestShow(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	if _, err := repo.Show(ctx, "HEAD", "a.txt"); !errors.Is(err, ErrNotFound) {

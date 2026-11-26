@@ -5,6 +5,7 @@ package e2e
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ZerGo0/editor/e2e/qa"
@@ -77,13 +78,21 @@ func unreachableFlag(view, context string, err error) qa.Flag {
 }
 
 func TestOverflowAndEdgeCases(t *testing.T) {
-	demo := NewDemoProject(t)
+	t.Parallel()
 	measure := uiTextMeasurer()
 	var all []qa.Flag
+	var mu sync.Mutex
+	t.Cleanup(func() {
+		for _, a := range qa.Stale(all, overflowAllow) {
+			t.Errorf("stale allowlist entry (remove it): %+v", a)
+		}
+	})
 	for _, cfg := range overflowConfigs {
 		for _, theme := range overflowThemes {
 			context := contextName(cfg, theme)
 			t.Run(context, func(t *testing.T) {
+				t.Parallel()
+				demo := NewDemoProject(t)
 				q := LaunchQA(t, demo.Root, QAOptions{Width: cfg.Width, Height: cfg.Height, SidebarWidth: cfg.Sidebar, Theme: theme, Tabs: demo.TabFiles, ActiveTab: 0})
 				var flags []qa.Flag
 				visit := func(view string) {
@@ -101,7 +110,9 @@ func TestOverflowAndEdgeCases(t *testing.T) {
 				}
 				flags = qa.Dedupe(flags)
 				kept, _ := qa.Filter(flags, overflowAllow)
+				mu.Lock()
 				all = append(all, flags...)
+				mu.Unlock()
 				report := qa.Format(kept)
 				q.Report("overflow-"+context, report)
 				q.SaveCrops("overflow-"+context, kept, q.Snapshot().Window)
@@ -110,8 +121,5 @@ func TestOverflowAndEdgeCases(t *testing.T) {
 				}
 			})
 		}
-	}
-	for _, a := range qa.Stale(all, overflowAllow) {
-		t.Errorf("stale allowlist entry (remove it): %+v", a)
 	}
 }

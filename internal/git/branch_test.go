@@ -7,6 +7,7 @@ import (
 )
 
 func TestParseBranchesSample(t *testing.T) {
+	t.Parallel()
 	sample := strings.Join([]string{
 		"refs/heads/main\x00aaaa\x00*\x00origin/main\x00ahead 2, behind 1\x001700000000\x00Subject one",
 		"refs/heads/gone\x00bbbb\x00 \x00origin/gone\x00gone\x001700000001\x00Subject two",
@@ -39,6 +40,7 @@ func TestParseBranchesSample(t *testing.T) {
 }
 
 func TestParseTagsSample(t *testing.T) {
+	t.Parallel()
 	tags, err := parseTags("refs/tags/v1\x00aaaa\x00\x001700000000\x00light\nrefs/tags/v2\x00tagobj\x00commit2\x001700000001\x00annotated\n")
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func TestParseTagsSample(t *testing.T) {
 }
 
 func TestBranchLifecycle(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	base := commitFile(t, repo, "a.txt", "a\n", "base")
@@ -133,6 +136,7 @@ func TestBranchLifecycle(t *testing.T) {
 }
 
 func TestCompareMergeCherryPickRevertReset(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	base := commitFile(t, repo, "a.txt", "a\n", "base")
@@ -212,6 +216,7 @@ func TestCompareMergeCherryPickRevertReset(t *testing.T) {
 }
 
 func TestMergeFailureWithoutConflict(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	commitFile(t, repo, "a.txt", "a\n", "base")
 	res, err := repo.Merge(context.Background(), "no-such-branch", MergeOptions{})

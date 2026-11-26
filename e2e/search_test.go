@@ -19,6 +19,7 @@ func waitQuickOpen(app *App, win int, title string) {
 }
 
 func TestGoToFileOpensFile(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Go to File...")
 	waitQuickOpen(app, win, "Go to File")
@@ -29,6 +30,7 @@ func TestGoToFileOpensFile(t *testing.T) {
 }
 
 func TestFindInFilesOpensMatch(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Find in Files")
 	app.WaitNode(win, "search field", RoleLabel("textField", "Search"))
@@ -40,16 +42,26 @@ func TestFindInFilesOpensMatch(t *testing.T) {
 }
 
 func TestSymbolSearchFindsType(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Go to Symbol in Workspace...")
 	waitQuickOpen(app, win, "Go to Symbol in Workspace")
 	app.Type(win, "Handler")
-	app.WaitNode(win, "symbol row", func(n Node) bool { return n.Role != "textField" && strings.HasPrefix(n.Label, "Handler") })
+	app.Eventually("symbol row", func() bool {
+		if _, ok := app.Find(win, func(n Node) bool { return n.Role != "textField" && strings.HasPrefix(n.Label, "Handler") }); ok {
+			return true
+		}
+		app.Key(win, "Cmd+A")
+		app.Key(win, "Backspace")
+		app.Type(win, "Handler")
+		return false
+	})
 	app.Key(win, "Enter")
 	app.WaitNode(win, "server.go tab", RoleLabel("tab", "server.go"))
 }
 
 func TestSearchViewHasNoScopeChips(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "Go", "Find in Files")
 	app.WaitNode(win, "search field", RoleLabel("textField", "Search"))

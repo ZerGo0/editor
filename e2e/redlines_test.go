@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ZerGo0/editor/e2e/qa"
@@ -66,6 +67,14 @@ func (q *QAApp) hover(n qa.Node) {
 	q.Settle()
 }
 
+var redlineAllowMu sync.Mutex
+
+func allowedFindings(allow *redline.Allowlist, res redline.Result) []int {
+	redlineAllowMu.Lock()
+	defer redlineAllowMu.Unlock()
+	return allow.Check(res)
+}
+
 func checkViewRedlines(t *testing.T, q *QAApp, allow *redline.Allowlist, view, state, theme string) {
 	t.Helper()
 	res, err := q.Redlines(fmt.Sprintf("%s-%s-%s", view, state, themeSuffix(theme)))
@@ -73,7 +82,7 @@ func checkViewRedlines(t *testing.T, q *QAApp, allow *redline.Allowlist, view, s
 		t.Error(err)
 		return
 	}
-	if bad := allow.Check(res); len(bad) > 0 {
+	if bad := allowedFindings(allow, res); len(bad) > 0 {
 		t.Errorf("%d redline findings in %s (fix them, or add a reviewed entry to e2e/%s):\n%s",
 			len(bad), res.Name, redlineAllowFile, res.Describe(bad))
 	}
@@ -87,13 +96,28 @@ var redlineHoverTargets = map[string]func(qa.Node) bool{
 }
 
 func TestViewRedlines(t *testing.T) {
-	demo := NewDemoProject(t)
+	t.Parallel()
 	allow, err := redline.LoadAllowlist(redlineAllowFile)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		stale := allow.Stale()
+		if len(stale) == 0 {
+			return
+		}
+		if os.Getenv(redlineUpdateEnv) == "" {
+			t.Errorf("e2e/%s has entries that match no finding; remove them with %s=1:\n%s", redlineAllowFile, redlineUpdateEnv, strings.Join(stale, "\n"))
+			return
+		}
+		if err := allow.Prune(); err != nil {
+			t.Error(err)
+		}
+	})
 	for _, theme := range []string{themeDark, themeLight} {
 		t.Run(theme, func(t *testing.T) {
+			t.Parallel()
+			demo := NewDemoProject(t)
 			q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Theme: theme, Tabs: demo.TabFiles})
 			visit := func(view string) {
 				checkViewRedlines(t, q, allow, view, stateDefault, theme)
@@ -118,14 +142,5 @@ func TestViewRedlines(t *testing.T) {
 				visit(step.Name)
 			}
 		})
-	}
-	if stale := allow.Stale(); len(stale) > 0 {
-		if os.Getenv(redlineUpdateEnv) == "" {
-			t.Errorf("e2e/%s has entries that match no finding; remove them with %s=1:\n%s", redlineAllowFile, redlineUpdateEnv, strings.Join(stale, "\n"))
-			return
-		}
-		if err := allow.Prune(); err != nil {
-			t.Fatal(err)
-		}
 	}
 }

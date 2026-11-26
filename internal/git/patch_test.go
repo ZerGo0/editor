@@ -40,6 +40,7 @@ func modifiedDiff() FileDiff {
 }
 
 func TestBuildPatchForward(t *testing.T) {
+	t.Parallel()
 	fd := modifiedDiff()
 	got := string(BuildPatch(fd, lineSet([2]int{0, 3}, [2]int{1, 1}, [2]int{1, 2}), false))
 	want := "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n" +
@@ -58,6 +59,7 @@ func TestBuildPatchForward(t *testing.T) {
 }
 
 func TestBuildPatchReverse(t *testing.T) {
+	t.Parallel()
 	fd := modifiedDiff()
 	got := string(BuildPatch(fd, lineSet([2]int{0, 1}), true))
 	want := "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n" +
@@ -72,6 +74,7 @@ func TestBuildPatchReverse(t *testing.T) {
 }
 
 func TestBuildPatchNewAndDeletedFiles(t *testing.T) {
+	t.Parallel()
 	added := FileDiff{NewPath: "n.txt", Header: []string{"new file mode 100755"}, Hunks: []Hunk{{OldStart: 0, OldLines: 0, NewStart: 1, NewLines: 3, Lines: []Line{
 		{Kind: '+', Text: "1"}, {Kind: '+', Text: "2"}, {Kind: '+', Text: "3"},
 	}}}}
@@ -132,6 +135,7 @@ func changeLine(fd FileDiff, kind byte, text string) func(int, int) bool {
 }
 
 func TestPartialStaging(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	original := numbered(30)
@@ -187,6 +191,7 @@ func TestPartialStaging(t *testing.T) {
 }
 
 func TestPartialStagingNoNewlineAtEOF(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "f.txt", "a\nb\nc", "init")
@@ -202,6 +207,7 @@ func TestPartialStagingNoNewlineAtEOF(t *testing.T) {
 }
 
 func TestPartialStagingDeletedFile(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "d.txt", "1\n2\n3\n", "init")
@@ -228,6 +234,7 @@ func TestPartialStagingDeletedFile(t *testing.T) {
 }
 
 func TestStageUnstageDiscard(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	put(t, repo, "star*.txt", "literal\n")

@@ -30,6 +30,7 @@ func render(chunks []Chunk) string {
 func lines(s string) []string { return strings.Fields(s) }
 
 func TestMerge3Table(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, base, ours, theirs, want string
 	}{
@@ -64,6 +65,7 @@ func TestMerge3Table(t *testing.T) {
 }
 
 func TestMerge3KeepsBaseText(t *testing.T) {
+	t.Parallel()
 	chunks := Merge3(lines("a b c"), lines("a X c"), lines("a Y c"))
 	conflict := chunks[1]
 	if conflict.Kind != ChunkConflict || strings.Join(conflict.Base, "") != "b" {
@@ -91,6 +93,7 @@ func lcsLength(a, b []int) int {
 }
 
 func TestMatchLinesIsOptimalLCS(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(7))
 	for trial := 0; trial < 600; trial++ {
 		alphabet := 2 + rng.Intn(6)
@@ -125,6 +128,7 @@ func bigFile(rng *rand.Rand, n int) []string {
 }
 
 func TestMerge3Performance(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(3))
 	base := bigFile(rng, 4000)
 	ours := append([]string(nil), base...)
@@ -164,6 +168,7 @@ func mergedText(chunks []Chunk) (string, bool) {
 }
 
 func TestMerge3AgreesWithGitMergeFile(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewSource(11))
 	dir := t.TempDir()
 	edit := func(base []string) []string {
@@ -220,6 +225,7 @@ func TestMerge3AgreesWithGitMergeFile(t *testing.T) {
 }
 
 func TestSplitLines(t *testing.T) {
+	t.Parallel()
 	if got := SplitLines(""); got != nil {
 		t.Fatalf("empty: %v", got)
 	}

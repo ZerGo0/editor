@@ -19,6 +19,7 @@ func shelfRepo(t *testing.T) (*Repo, Shelf) {
 }
 
 func TestShelfRoundTrip(t *testing.T) {
+	t.Parallel()
 	repo, shelf := shelfRepo(t)
 	ctx := context.Background()
 	modified := strings.Replace(numbered(20), "line 5\n", "five\n", 1)
@@ -74,6 +75,7 @@ func TestShelfRoundTrip(t *testing.T) {
 }
 
 func TestShelfKeepAndFallbackToPlainApply(t *testing.T) {
+	t.Parallel()
 	repo, shelf := shelfRepo(t)
 	ctx := context.Background()
 	put(t, repo, "a.txt", strings.Replace(numbered(20), "line 5\n", "five\n", 1))
@@ -110,6 +112,7 @@ func TestShelfKeepAndFallbackToPlainApply(t *testing.T) {
 }
 
 func TestShelfErrorsAndIDs(t *testing.T) {
+	t.Parallel()
 	repo, shelf := shelfRepo(t)
 	ctx := context.Background()
 	if _, err := shelf.Shelve(ctx, repo, "nothing", nil, false); !errors.Is(err, ErrNothingToShelve) {
@@ -165,6 +168,7 @@ func TestShelfErrorsAndIDs(t *testing.T) {
 }
 
 func TestShelfDeletedFile(t *testing.T) {
+	t.Parallel()
 	repo, shelf := shelfRepo(t)
 	ctx := context.Background()
 	if err := removePath(repo, "b.txt"); err != nil {

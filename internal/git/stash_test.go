@@ -7,6 +7,7 @@ import (
 )
 
 func TestStash(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "a.txt", "a\n", "init")
@@ -79,6 +80,7 @@ func TestStash(t *testing.T) {
 }
 
 func TestStashApplyConflict(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "a.txt", "a\n", "init")

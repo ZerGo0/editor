@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"sync"
+
 	"github.com/ZerGo0/editor/e2e/qa"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/egoist/mygo/ui"
@@ -13,8 +15,12 @@ const (
 	measureHeight = 300
 )
 
+var measureMu sync.Mutex
+
 func uiTextMeasurer() qa.TextMeasurer {
 	return func(texts []string, size float64) []float64 {
+		measureMu.Lock()
+		defer measureMu.Unlock()
 		widths := make([]float64, len(texts))
 		view := func(c *ui.Context) {
 			design.Apply(c, design.Settings{Appearance: design.AppearanceLight})

@@ -24,6 +24,7 @@ func subjects(t *testing.T, repo *Repo, rng string) string {
 }
 
 func TestRebaseTodo(t *testing.T) {
+	t.Parallel()
 	repo, base, ids := rebaseRepo(t)
 	items, err := repo.RebaseTodo(context.Background(), base)
 	if err != nil || len(items) != 4 {
@@ -43,6 +44,7 @@ func TestRebaseTodo(t *testing.T) {
 }
 
 func TestRebaseInteractiveDropRewordSquash(t *testing.T) {
+	t.Parallel()
 	repo, base, ids := rebaseRepo(t)
 	ctx := context.Background()
 	items := []TodoItem{
@@ -77,6 +79,7 @@ func TestRebaseInteractiveDropRewordSquash(t *testing.T) {
 }
 
 func TestRebaseInteractiveFixupAndDefaultMessages(t *testing.T) {
+	t.Parallel()
 	repo, base, ids := rebaseRepo(t)
 	items := []TodoItem{
 		{Action: ActionPick, OID: ids[0]},
@@ -97,6 +100,7 @@ func TestRebaseInteractiveFixupAndDefaultMessages(t *testing.T) {
 }
 
 func TestRebaseInteractiveEditStop(t *testing.T) {
+	t.Parallel()
 	repo, base, ids := rebaseRepo(t)
 	ctx := context.Background()
 	items := []TodoItem{
@@ -135,6 +139,7 @@ func TestRebaseInteractiveEditStop(t *testing.T) {
 }
 
 func TestRebaseInteractiveConflictAbort(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	base := commitFile(t, repo, "f.txt", "1\n", "base")
@@ -162,6 +167,7 @@ func TestRebaseInteractiveConflictAbort(t *testing.T) {
 }
 
 func TestRebaseInteractiveValidation(t *testing.T) {
+	t.Parallel()
 	repo, base, ids := rebaseRepo(t)
 	ctx := context.Background()
 	bad := [][]TodoItem{
@@ -182,6 +188,7 @@ func TestRebaseInteractiveValidation(t *testing.T) {
 }
 
 func TestShellQuoteAndTodoText(t *testing.T) {
+	t.Parallel()
 	if got := shellQuote("it's here"); got != "'it'\\''s here'" {
 		t.Fatalf("got %s", got)
 	}

@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseRemotes(t *testing.T) {
+	t.Parallel()
 	text := "origin\thttps://example.com/a.git (fetch)\norigin\thttps://example.com/a.git (push)\n" +
 		"fork\tgit@example.com:me/a.git (fetch)\nfork\tgit@example.com:me/push.git (push)"
 	got, err := parseRemotes(text)
@@ -29,6 +30,7 @@ func TestParseRemotes(t *testing.T) {
 }
 
 func TestLineSplitter(t *testing.T) {
+	t.Parallel()
 	var lines []string
 	s := &lineSplitter{emit: func(l string) { lines = append(lines, l) }}
 	for _, chunk := range []string{"Counting 10%\rCounting 50%\rCount", "ing 100%\nResolving\r\n", "tail"} {
@@ -72,6 +74,7 @@ func cloneOf(t *testing.T, remote string) *Repo {
 }
 
 func TestRemotesListing(t *testing.T) {
+	t.Parallel()
 	s := setupRemote(t)
 	remotes, err := s.repo.Remotes(context.Background())
 	if err != nil || len(remotes) != 1 || remotes[0].Name != "origin" || remotes[0].FetchURL != s.remote || remotes[0].PushURL != s.remote {
@@ -80,6 +83,7 @@ func TestRemotesListing(t *testing.T) {
 }
 
 func TestPushFetchPull(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := setupRemote(t)
 	repo := s.repo
@@ -168,6 +172,7 @@ func TestPushFetchPull(t *testing.T) {
 }
 
 func TestPullMergeAndConflict(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := setupRemote(t)
 	repo := s.repo
@@ -208,6 +213,7 @@ func TestPullMergeAndConflict(t *testing.T) {
 }
 
 func TestPushForceAndTags(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := setupRemote(t)
 	repo := s.repo
@@ -247,6 +253,7 @@ func TestPushForceAndTags(t *testing.T) {
 }
 
 func TestOutgoingWithoutUpstream(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := setupRemote(t)
 	repo := s.repo

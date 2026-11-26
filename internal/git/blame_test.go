@@ -29,6 +29,7 @@ const sampleBlame = "1111111111111111111111111111111111111111 1 1 2\n" +
 	"\t\ttabbed\n"
 
 func TestParseBlame(t *testing.T) {
+	t.Parallel()
 	lines, err := parseBlame([]byte(sampleBlame))
 	if err != nil {
 		t.Fatal(err)
@@ -63,6 +64,7 @@ func TestParseBlame(t *testing.T) {
 }
 
 func TestBlame(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	first := commitFile(t, repo, "a.txt", "one\ntwo\nthree\n", "first")
@@ -104,6 +106,7 @@ func TestBlame(t *testing.T) {
 }
 
 func TestLineLog(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	c1 := commitFile(t, repo, "a.txt", "one\ntwo\nthree\nfour\n", "create")

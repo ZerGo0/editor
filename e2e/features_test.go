@@ -38,6 +38,7 @@ func focusEditor(app *App, win int) {
 }
 
 func TestNewUntitledFile(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Menu(win, "File", "New Text File")
 	app.WaitNode(win, "Untitled-1 tab", RoleLabel("tab", "Untitled-1"))
@@ -52,6 +53,7 @@ func TestNewUntitledFile(t *testing.T) {
 }
 
 func TestHotExitRestoresUnsavedText(t *testing.T) {
+	t.Parallel()
 	userData := t.TempDir()
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	app := LaunchWith(t, userData, root)
@@ -80,6 +82,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 }
 
 func TestFolderSettingsOverrideUserSetting(t *testing.T) {
+	t.Parallel()
 	userData := t.TempDir()
 	if err := os.WriteFile(filepath.Join(userData, "settings.json"), []byte(`{"files.exclude": ["*.tmp"]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -106,6 +109,7 @@ func TestFolderSettingsOverrideUserSetting(t *testing.T) {
 }
 
 func TestClosingFirstTabKeepsOthers(t *testing.T) {
+	t.Parallel()
 	names := []string{"a.txt", "b.txt", "c.txt"}
 	app, win, _ := openProject(t, map[string]string{"a.txt": "a\n", "b.txt": "b\n", "c.txt": "c\n"})
 	for _, name := range names {

@@ -17,6 +17,7 @@ func openInEditor(t *testing.T, app *App, win int, name string) Node {
 }
 
 func TestCtrlGOpensGoToLine(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Ctrl+G")
@@ -24,6 +25,7 @@ func TestCtrlGOpensGoToLine(t *testing.T) {
 }
 
 func TestCmdAltFShowsReplace(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Alt+F")
@@ -31,6 +33,7 @@ func TestCmdAltFShowsReplace(t *testing.T) {
 }
 
 func TestCmdShiftHOpensSearchView(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Shift+H")
@@ -38,6 +41,7 @@ func TestCmdShiftHOpensSearchView(t *testing.T) {
 }
 
 func TestCmdSlashCommentsLine(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n\nfunc main() {}\n"})
 	field := openInEditor(t, app, win, "main.go")
 	app.Key(win, "Cmd+/")
@@ -59,6 +63,7 @@ func launchWindowsKeymap(t *testing.T, files map[string]string) (*App, int) {
 }
 
 func TestWindowsKeymapBindsCtrlPToGoToFile(t *testing.T) {
+	t.Parallel()
 	app, win := launchWindowsKeymap(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Menu(win, "View", "Command Palette...")
@@ -72,6 +77,7 @@ func TestWindowsKeymapBindsCtrlPToGoToFile(t *testing.T) {
 }
 
 func TestWindowsKeymapCtrlHShowsReplace(t *testing.T) {
+	t.Parallel()
 	app, win := launchWindowsKeymap(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Ctrl+H")

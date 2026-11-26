@@ -43,6 +43,7 @@ func (q *QAApp) DragSplitter(toX float64) {
 }
 
 func TestSidebarWidthStaysWithinLimits(t *testing.T) {
+	t.Parallel()
 	demo := NewDemoProject(t)
 	min := float64(token.SidebarMinWidth.Px())
 	q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Theme: themeDark, Tabs: demo.TabFiles[:fewTabs]})

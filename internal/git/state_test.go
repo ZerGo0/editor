@@ -21,6 +21,7 @@ func conflictRepo(t *testing.T) (*Repo, string) {
 }
 
 func TestConflictingMerge(t *testing.T) {
+	t.Parallel()
 	repo, topic := conflictRepo(t)
 	ctx := context.Background()
 	if st, err := repo.State(ctx); err != nil || st.Kind != StateNone {
@@ -94,6 +95,7 @@ func splitFields(s string) []string {
 }
 
 func TestAcceptOursMarkResolvedAndAbort(t *testing.T) {
+	t.Parallel()
 	repo, _ := conflictRepo(t)
 	ctx := context.Background()
 	if _, err := repo.Merge(ctx, "topic", MergeOptions{}); err != nil {
@@ -139,6 +141,7 @@ func TestAcceptOursMarkResolvedAndAbort(t *testing.T) {
 }
 
 func TestModifyDeleteConflict(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "d.txt", "1\n2\n", "base")
@@ -171,6 +174,7 @@ func TestModifyDeleteConflict(t *testing.T) {
 }
 
 func TestCherryPickAndRevertStates(t *testing.T) {
+	t.Parallel()
 	repo, topic := conflictRepo(t)
 	ctx := context.Background()
 	res, err := repo.CherryPick(ctx, topic)
@@ -203,6 +207,7 @@ func TestCherryPickAndRevertStates(t *testing.T) {
 }
 
 func TestRebaseConflictState(t *testing.T) {
+	t.Parallel()
 	repo, _ := conflictRepo(t)
 	ctx := context.Background()
 	g(t, repo, "switch", "--quiet", "topic")
@@ -231,6 +236,7 @@ func TestRebaseConflictState(t *testing.T) {
 }
 
 func TestBisectState(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "a.txt", "1\n", "one")
@@ -248,6 +254,7 @@ func TestBisectState(t *testing.T) {
 }
 
 func TestStateFromFiles(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	repo := &Repo{Root: dir, GitDir: dir}
 	ctx := context.Background()
@@ -306,6 +313,7 @@ func TestStateFromFiles(t *testing.T) {
 }
 
 func TestParseConflictsSample(t *testing.T) {
+	t.Parallel()
 	data := "100644 aaaa 1\ta b.txt\x00100644 bbbb 2\ta b.txt\x00100644 cccc 3\ta b.txt\x00100644 dddd 2\tüni.txt\x00"
 	got, err := parseConflicts([]byte(data))
 	if err != nil {
@@ -323,6 +331,7 @@ func TestParseConflictsSample(t *testing.T) {
 }
 
 func TestParseWorktreesAndSubmodulesSamples(t *testing.T) {
+	t.Parallel()
 	trees, err := parseWorktrees([]byte("worktree /a\x00HEAD aaaa\x00branch refs/heads/main\x00\x00worktree /b c\x00HEAD bbbb\x00detached\x00locked reason\x00\x00worktree /bare\x00bare\x00\x00worktree /p\x00HEAD cccc\x00branch refs/heads/x\x00prunable gone\x00\x00"))
 	if err != nil {
 		t.Fatal(err)

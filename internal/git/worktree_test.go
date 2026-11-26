@@ -8,6 +8,7 @@ import (
 )
 
 func TestWorktrees(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "a.txt", "a\n", "init")
@@ -75,6 +76,7 @@ func TestWorktrees(t *testing.T) {
 }
 
 func TestSubmodules(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	lib := newRepo(t)
 	commitFile(t, lib, "lib.txt", "lib\n", "lib init")

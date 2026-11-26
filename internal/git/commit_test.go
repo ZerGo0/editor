@@ -10,6 +10,7 @@ import (
 )
 
 func TestCommit(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	if _, err := repo.LastCommitMessage(ctx); !errors.Is(err, ErrNotFound) {
@@ -53,6 +54,7 @@ func TestCommit(t *testing.T) {
 }
 
 func TestCommitErrors(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	if _, err := repo.Commit(ctx, CommitOptions{Message: "  \n"}); !errors.Is(err, ErrEmptyMessage) {
@@ -70,6 +72,7 @@ func TestCommitErrors(t *testing.T) {
 }
 
 func TestCommitOnlyPathsAndNoVerify(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commitFile(t, repo, "a.txt", "a\n", "init")

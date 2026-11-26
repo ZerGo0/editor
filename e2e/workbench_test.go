@@ -61,6 +61,7 @@ func pngData(t *testing.T) string {
 }
 
 func TestSourceControlCommitsChange(t *testing.T) {
+	t.Parallel()
 	root := gitProject(t, map[string]string{"main.go": "package main\n"})
 	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -81,6 +82,7 @@ func TestSourceControlCommitsChange(t *testing.T) {
 }
 
 func TestImageOpensViewer(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"shot.png": pngData(t)})
 	row := app.WaitNode(win, "shot.png row", RoleLabel("treeItem", "shot.png"))
 	app.Click(win, row, 1)
@@ -90,6 +92,7 @@ func TestImageOpensViewer(t *testing.T) {
 }
 
 func TestGitHubViewShowsOneEmptyStateWithoutRepository(t *testing.T) {
+	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n"})
 	app.Menu(win, "View", "GitHub")
 	app.WaitNode(win, "empty state", Label("No Git repository"))

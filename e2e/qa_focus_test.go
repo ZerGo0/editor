@@ -5,6 +5,7 @@ package e2e
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ZerGo0/editor/e2e/qa"
@@ -134,12 +135,20 @@ func escapeFlag(view, what string, tree *qa.Tree, still func(qa.Node) bool) []qa
 }
 
 func TestKeyboardFocusWalk(t *testing.T) {
-	demo := NewDemoProject(t)
+	t.Parallel()
 	var all []qa.Flag
+	var mu sync.Mutex
+	t.Cleanup(func() {
+		for _, a := range qa.Stale(all, focusAllow) {
+			t.Errorf("stale allowlist entry (remove it): %+v", a)
+		}
+	})
 	collect := func(t *testing.T, q *QAApp, name string, flags []qa.Flag) {
 		t.Helper()
 		kept, _ := qa.Filter(qa.Dedupe(flags), focusAllow)
+		mu.Lock()
 		all = append(all, flags...)
+		mu.Unlock()
 		report := qa.Format(kept)
 		q.Report("focus-"+name, report)
 		if len(kept) > 0 {
@@ -147,6 +156,8 @@ func TestKeyboardFocusWalk(t *testing.T) {
 		}
 	}
 	t.Run("window-start", func(t *testing.T) {
+		t.Parallel()
+		demo := NewDemoProject(t)
 		q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Tabs: demo.TabFiles, Theme: themeDark})
 		var flags []qa.Flag
 		forward := q.Walk(tabKey, maxFocusSteps)
@@ -163,6 +174,8 @@ func TestKeyboardFocusWalk(t *testing.T) {
 		collect(t, q, "window-start", flags)
 	})
 	t.Run("views", func(t *testing.T) {
+		t.Parallel()
+		demo := NewDemoProject(t)
 		q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Tabs: demo.TabFiles, Theme: themeDark})
 		var flags []qa.Flag
 		for _, step := range demoViewSteps() {
@@ -181,6 +194,8 @@ func TestKeyboardFocusWalk(t *testing.T) {
 		collect(t, q, "views", flags)
 	})
 	t.Run("escape", func(t *testing.T) {
+		t.Parallel()
+		demo := NewDemoProject(t)
 		q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Tabs: demo.TabFiles, Theme: themeDark})
 		var flags []qa.Flag
 		focusEditor := func() qa.FocusStop {
@@ -244,7 +259,4 @@ func TestKeyboardFocusWalk(t *testing.T) {
 		}
 		collect(t, q, "escape", flags)
 	})
-	for _, a := range qa.Stale(all, focusAllow) {
-		t.Errorf("stale allowlist entry (remove it): %+v", a)
-	}
 }

@@ -8,6 +8,7 @@ import (
 )
 
 func TestWhitespaceModeFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		mode WhitespaceMode
 		want []string
@@ -26,6 +27,7 @@ func TestWhitespaceModeFlags(t *testing.T) {
 }
 
 func TestWhitespaceModeKeysRoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, e := range whitespaceModes {
 		got, ok := ParseWhitespaceMode(e.mode.Key())
 		if !ok || got != e.mode {
@@ -41,6 +43,7 @@ func TestWhitespaceModeKeysRoundTrip(t *testing.T) {
 }
 
 func TestDiffTextsHonorsMode(t *testing.T) {
+	t.Parallel()
 	if !Available() {
 		t.Skip("git is not installed")
 	}

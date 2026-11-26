@@ -9,6 +9,7 @@ import (
 )
 
 func TestParseCommitFields(t *testing.T) {
+	t.Parallel()
 	fields := []string{
 		"aaaa", "bbbb cccc", "Ada", "ada@example.com", "1700000000", "Bob", "bob@example.com", "1700000100",
 		"HEAD -> main, tag: v1, origin/main", "Subject line", "Body line 1\nBody line 2\n",
@@ -34,6 +35,7 @@ func TestParseCommitFields(t *testing.T) {
 }
 
 func TestParseNameStatus(t *testing.T) {
+	t.Parallel()
 	files, err := parseNameStatus([]byte("M\x00a.txt\x00R087\x00old.txt\x00new.txt\x00A\x00sp ace.txt\x00"))
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +68,7 @@ func historyRepo(t *testing.T) (*Repo, map[string]string) {
 }
 
 func TestLog(t *testing.T) {
+	t.Parallel()
 	repo, ids := historyRepo(t)
 	ctx := context.Background()
 	all, err := repo.Log(ctx, LogOptions{})
@@ -128,6 +131,7 @@ func TestLog(t *testing.T) {
 }
 
 func TestLogUnbornAndFollow(t *testing.T) {
+	t.Parallel()
 	repo := newRepo(t)
 	ctx := context.Background()
 	commits, err := repo.Log(ctx, LogOptions{})
@@ -158,6 +162,7 @@ func TestLogUnbornAndFollow(t *testing.T) {
 }
 
 func TestCommitFilesMerge(t *testing.T) {
+	t.Parallel()
 	repo, ids := historyRepo(t)
 	files, err := repo.CommitFiles(context.Background(), ids["merge"])
 	if err != nil || len(files) != 1 || files[0].Path != "f.txt" || files[0].Status != 'A' {
@@ -168,6 +173,7 @@ func TestCommitFilesMerge(t *testing.T) {
 func commit(oid string, parents ...string) Commit { return Commit{OID: oid, Parents: parents} }
 
 func TestLanes(t *testing.T) {
+	t.Parallel()
 	t.Run("linear", func(t *testing.T) {
 		rows := Lanes([]Commit{commit("c", "b"), commit("b", "a"), commit("a")})
 		for i, row := range rows {
@@ -250,6 +256,7 @@ func TestLanes(t *testing.T) {
 }
 
 func TestLanesNeverReusesLiveColumn(t *testing.T) {
+	t.Parallel()
 	commits := []Commit{
 		commit("h1", "p1"), commit("h2", "p2"), commit("h3", "p3"),
 		commit("p1"), commit("p2", "p3"), commit("p3"),

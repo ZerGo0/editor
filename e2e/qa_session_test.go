@@ -20,11 +20,9 @@ import (
 
 const (
 	windowKindContent  = "content"
-	runtimeDirEnv      = "XDG_RUNTIME_DIR"
-	runtimeDirPrefix   = "editor-qa-"
 	frameStatsEnv      = "MYGO_FRAME_STATS"
 	frameStatsAll      = "all"
-	settleTimeoutMs    = 3000
+	settleTimeoutMs    = 300
 	windowStateFile    = "window-state.json"
 	sessionFileName    = "session.json"
 	settingsFileName   = "settings.json"
@@ -120,25 +118,13 @@ func writeJSON(t *testing.T, path string, v any) {
 	}
 }
 
-func isolateInstance(t *testing.T) {
-	t.Helper()
-	dir, err := os.MkdirTemp(socketTempRoot, runtimeDirPrefix)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	t.Setenv(runtimeDirEnv, dir)
-}
-
 func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 	t.Helper()
-	isolateInstance(t)
+	frameStats := ""
 	if o.FrameStats {
-		t.Setenv(frameStatsEnv, frameStatsAll)
-	} else {
-		t.Setenv(frameStatsEnv, "")
+		frameStats = frameStatsAll
 	}
-	app := LaunchWith(t, seedUserData(t, root, o), root)
+	app := LaunchEnv(t, seedUserData(t, root, o), []string{frameStatsEnv + "=" + frameStats}, root)
 	var win int
 	app.Eventually("project window", func() bool {
 		for _, w := range app.Windows() {
