@@ -1,0 +1,72 @@
+version: "3"
+
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+output: prefixed
+
+tasks:
+  install:
+    desc: Install the dependencies
+    cmds:
+      - go mod download
+
+  update:
+    desc: Update the dependencies
+    cmds:
+      - go get -u ./... && go mod tidy
+
+  dev:
+    desc: Start the app with live reload
+    cmds:
+      - go tool mygo dev
+
+  build:
+    desc: Package the app into build/
+    cmds:
+      - go tool mygo build
+
+  icons:
+    desc: Generate the Hugeicons SVG files listed in internal/icons/icons.txt
+    dir: internal/icons
+    cmds:
+      - go run ./gen
+
+  fmt:
+    desc: Format the Go code
+    cmds:
+      - go fmt ./...
+
+  check:
+    desc: Run vet, MyGo vet, format and unit test checks
+    cmds:
+      - go tool mygo vet .
+      - go vet -tags e2e ./...
+      - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - task: test
+
+  test:
+    desc: Run the unit and view tests
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go test ./...
+
+  test:e2e:
+    desc: Run the end-to-end tests against a built app
+    cmds:
+      - go test -tags e2e -count=1 ./e2e/...
+
+  aislop:
+    desc: Run agent quality gates on current changes
+    cmds:
+      - quality-gates run
+
+  ai-cleanup:
+    desc: Replace AI typography in repository files with plain ASCII
+    cmds:
+      - quality-gates cleanup
+
+  aislop:setup:
+    desc: Install llama.cpp and the shared Slopo model/runtime
+    cmds:
+      - quality-gates setup

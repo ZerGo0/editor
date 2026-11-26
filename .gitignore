@@ -1,0 +1,5 @@
+/build/
+/editor
+/.mygo/
+/.task/
+mygo_windows_*.syso

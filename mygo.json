@@ -1,0 +1,6 @@
+{
+  "name": "Editor",
+  "identifier": "com.zergo0.editor",
+  "version": "0.1.0",
+  "out": "build"
+}

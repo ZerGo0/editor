@@ -1,0 +1,17 @@
+# Repository metadata, generated output, and local build artifacts.
+.git/
+.aislop/
+.fallow/
+.slopo/
+.task/
+.mygo/
+**/build/
+**/vendor/
+
+# Generated Go code and icon assets.
+**/*_gen.go
+internal/icons/*.svg
+internal/fileicons/svg/
+
+# Vendored agent skills.
+.agents/
