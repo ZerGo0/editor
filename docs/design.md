@@ -324,3 +324,24 @@ Files with violations today (count in parentheses):
 - The tester cannot force hover, so the gallery shows hover through tests rather than screenshots.
 - A long-press history menu uses a hidden anchor with `PopoverMenuButtonOptions.Open`; MyGo has no long-press menu on a button.
 - Native menus ignore the palette; use popover menus for themed menus.
+
+## Owner decisions (2026-11-26)
+
+| Topic | Decision |
+|---|---|
+| Appearance | Follow the system, with a setting to force Light or Dark (`workbench.colorTheme`: System, Light, Dark). |
+| Accent | The macOS system accent color. |
+| Surfaces | Opaque theme colors for the title bar, sidebar, panel and status bar. No vibrancy. |
+| Density | VS Code default: 22 px rows, 35 px tabs, 22 px status bar, 13 px UI text. |
+| Editor font | JetBrains Mono 13 px, bundled with its OFL license. |
+| Tabs | Xcode-like: rounded, borderless tabs with a soft fill for the active tab. |
+| Status bar | Neutral. Color only for warnings and conflicts. |
+| Title bar | 36 px. The command center shows the project name. The window title is "file - project". |
+| Motion | Subtle, 100 to 150 ms fades and small moves. Off with Reduce Motion. |
+| Panel | Bottom by default. A command moves it to the right and remembers it. |
+| Icons | Hugeicons 1.5 px stroke at 16 px. The selected view icon uses the filled variant. |
+| Problems and TODO | Bottom panel tabs, with counts in the status bar. |
+| Preview tabs | On for single clicks. |
+| Open Editors | Shown in the Explorer, collapsed by default. |
+| Empty editor group | App logo and the shortcut list. |
+| Minimap | Off. |
