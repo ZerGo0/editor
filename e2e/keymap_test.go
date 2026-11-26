@@ -34,7 +34,7 @@ func TestCmdShiftHOpensSearchView(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Shift+H")
-	waitScope(app, win, "Text")
+	app.WaitNode(win, "search field", RoleLabel("textField", "Search"))
 }
 
 func TestCmdSlashCommentsLine(t *testing.T) {

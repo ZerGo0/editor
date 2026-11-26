@@ -43,6 +43,18 @@ func (v *View) replaceMatch(f *fileNode, i int) {
 	v.applyReplace([]replaceTarget{{file: f, accept: acceptSet(f.matches[i : i+1])}}, false)
 }
 
+func (v *View) showsReplace(r row) bool {
+	return v.scope == ScopeText && v.st.ShowReplace && (r.kind == rowMatch || r.kind == rowFile)
+}
+
+func (v *View) replaceRow(r row) {
+	if r.kind == rowMatch {
+		v.replaceMatch(r.file, r.match)
+		return
+	}
+	v.replaceFile(r.file)
+}
+
 func (v *View) replaceFile(f *fileNode) {
 	if !v.canReplace() {
 		return

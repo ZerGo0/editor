@@ -51,10 +51,11 @@ func TestTextSearchRowsAndLabels(t *testing.T) {
 	if a, ok := f.tt.AccessByRole(ui.RoleTextField, "Search"); !ok || a.Name != "Search" {
 		t.Errorf("search field: %+v %v", a, ok)
 	}
-	for _, scope := range scopeNames {
-		if _, ok := f.tt.AccessByRole(ui.RoleTab, scope); !ok {
-			t.Errorf("no scope tab %q", scope)
-		}
+	if _, ok := f.tt.AccessByRole(ui.RoleTab, "Files"); ok {
+		t.Error("scope chips are gone: Files is a Quick Open prefix")
+	}
+	if _, ok := f.tt.Access("Search Scope"); !ok {
+		t.Error("no scope menu in the view actions")
 	}
 }
 
@@ -100,6 +101,7 @@ func TestRegexError(t *testing.T) {
 
 func TestPrefixRoutingAndScopeKeys(t *testing.T) {
 	f := newFixture(t, map[string]string{"a.go": "x"})
+	f.view.setScope(ScopeAll)
 	f.focusField()
 	f.tt.Type(">")
 	f.tt.Frame()
@@ -107,16 +109,9 @@ func TestPrefixRoutingAndScopeKeys(t *testing.T) {
 		t.Fatalf("scope %v query %q", f.view.scope, f.view.st.Query)
 	}
 	f.tt.Key(0, ui.KeyTab)
-	if f.view.scope != ScopeGit {
-		t.Fatalf("tab went to %v", f.view.scope)
-	}
-	f.tt.Key(ui.Shift, ui.KeyTab)
-	if f.view.scope != ScopeActions {
-		t.Fatalf("shift+tab went to %v", f.view.scope)
-	}
 	f.tt.Key(ui.Cmd, ui.Key4)
-	if f.view.scope != ScopeText {
-		t.Fatalf("cmd+4 went to %v", f.view.scope)
+	if f.view.scope != ScopeActions {
+		t.Fatalf("tab or cmd+4 changed the scope to %v", f.view.scope)
 	}
 	f.view.switchScope(ScopeAll)
 	f.focusField()

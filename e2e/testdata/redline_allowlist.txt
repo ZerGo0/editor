@@ -1,19 +1,3 @@
-* contrast tab "utils.go" icon contrast -- internal/fileicons, light theme: the Go file icon reaches 2.58:1 on the editor tab background (needs 3:1); darken the light-theme Go icon colour
-scm contrast treeItem " -- internal/fileicons, light theme: file icons in the Changes list reach 1.86:1 (.json), 2.49:1 (.md) and 2.58:1 (.go) on the side bar (needs 3:1); darken the light-theme icon colours
-graph contrast treeItem " -- internal/fileicons, light theme: same file icon colours as the scm entry (1.86 to 2.58:1, needs 3:1)
-* padding toolbar "Log Filters" padding bottom -- internal/gitui log filter toolbar: content ends 1.5 px above the bottom edge (odd toolbar height); use a whole, even height token so the content centres on whole px
-* crisp popUpButton "Filter by Branch" bottom edge blur -- internal/gitui: same root cause as the Log Filters padding entry; the pop-up button ends on y 631.5 and its bottom edge blurs
-scm text-band treeItem " -- internal/gitui Changes list: rows with a status letter draw the cap band 1.37 to 1.87 px below the row centre; use one token.TextStyle for name and status and AlignItems center
-graph text-band treeItem " -- internal/gitui Changes list: same rows as the scm entry (cap band 1.37 to 1.87 px low)
-scm optical image "Incoming" ink centre x -- internal/gitui graph: the incoming-commit glyph sits 1.04 px left of its 14 px box centre; centre the glyph or use a symmetric icon
-graph optical image "Incoming" ink centre x -- internal/gitui graph: same glyph as the scm entry (1.01 to 1.04 px left)
-* crisp group " -- internal/gitui graph branch labels: pills start or end on fractional x (195.97, 896.44) because they follow fractional text widths; size the label text with token.TextStyle.WholeText
-search text-band textField "Search" cap band centre y -- internal/search query field: input text cap band sits 1.16 px above the field centre
-search align toggleButton "Match Whole Word" right edge -- internal/search: the in-field option toggles (20 px) miss the toolbar buttons below (22 px) by 1 px; give both rows the same inset and button size token
-search align toggleButton "Use Regular Expression" left edge -- internal/search: same toggle row as the Match Whole Word entry (1 px off the toolbar button below)
-search icon-set button "Toggle Replace" optical size -- internal/search: the replace chevron ink is 8.5 px against 12.9 px for the other side-bar icons; use a chevron icon with a matching optical size
-search optical treeItem " -- internal/search result rows: the line-number column sits 1.0 px below the row centre at scale 1
-search contrast tab "Text" text contrast -- internal/design action.Chip: the inactive scope chip label (token Text.Secondary, 12 px) renders at 3.13:1 dark and 4.08:1 light at scale 1 because thin stems never reach full colour; the same chip passes at scale 2 in TestGalleryRedlines
 settings align listItem "GitHub Issues" bottom edge -- internal/prefs: the categories list and the settings list are separate columns with different row heights; the 1.6 px near miss is not a shared edge
 settings padding group "Detect Indentation" padding left -- internal/prefs: the checkbox setting row insets its content 10 px where the other setting rows use 12 px (token.PadPanel)
 settings text-band tab "index.ts" cap band centre y -- internal/workspace tab bar: the tab title cap band is 1.5 px below the tab centre in this light-theme state

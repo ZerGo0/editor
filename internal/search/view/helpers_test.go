@@ -117,7 +117,12 @@ func newFixture(t *testing.T, tree map[string]string) *fixture {
 		f.confirms = append(f.confirms, message)
 		done(f.approve)
 	}
-	f.tt = ui.NewTester(f.view.View, 360, 640)
+	f.tt = ui.NewTester(func(c *ui.Context) {
+		ui.Column(c).Fill().Children(func() {
+			ui.Row(c).FillWidth().Children(func() { f.view.TitleActions(c) })
+			f.view.View(c)
+		})
+	}, 360, 640)
 	return f
 }
 

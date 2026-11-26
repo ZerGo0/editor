@@ -61,6 +61,8 @@ func (v *View) listKeys(c *ui.Context) {
 		v.toggle(r.key)
 	case r.canDismiss() && (c.Shortcut(0, ui.KeyDelete) || c.Shortcut(0, ui.KeyBackspace)):
 		v.dismiss(r)
+	case v.showsReplace(r) && c.Shortcut(ui.Cmd|ui.Shift, ui.Key1):
+		v.replaceRow(r)
 	}
 }
 
@@ -168,23 +170,19 @@ func (v *View) rowActions(r row) func(c *ui.Context) {
 	if v.scope != ScopeText {
 		return nil
 	}
-	replace := v.st.ShowReplace && (r.kind == rowMatch || r.kind == rowFile)
+	replace := v.showsReplace(r)
 	dismiss := r.canDismiss()
 	if !replace && !dismiss {
 		return nil
 	}
 	return func(c *ui.Context) {
 		if replace {
-			if action.IconButton(c, icons.Replace, "Replace", action.IconOptions{Disabled: !v.canReplace(), ID: "replace-" + r.key}).Clicked() {
-				if r.kind == rowMatch {
-					v.replaceMatch(r.file, r.match)
-				} else {
-					v.replaceFile(r.file)
-				}
+			if action.IconButton(c, icons.Replace, "Replace", action.IconOptions{Disabled: !v.canReplace(), Keys: keysReplace, ID: "replace-" + r.key}).Clicked() {
+				v.replaceRow(r)
 			}
 		}
 		if dismiss {
-			if action.IconButton(c, icons.Close, "Dismiss", action.IconOptions{ID: "dismiss-" + r.key}).Clicked() {
+			if action.IconButton(c, icons.Close, "Dismiss", action.IconOptions{Keys: keysDismiss, ID: "dismiss-" + r.key}).Clicked() {
 				v.dismiss(r)
 			}
 		}

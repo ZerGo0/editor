@@ -29,7 +29,7 @@ func parseScope(name string) Scope {
 			return Scope(i)
 		}
 	}
-	return ScopeAll
+	return ScopeText
 }
 
 const (

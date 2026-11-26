@@ -73,7 +73,7 @@ type View struct {
 }
 
 func New(env Env) *View {
-	v := &View{env: env, h: env.Host, collapsed: map[string]bool{}, selected: -1, historyPos: -1, rowsDirty: true}
+	v := &View{env: env, h: env.Host, scope: ScopeText, collapsed: map[string]bool{}, selected: -1, historyPos: -1, rowsDirty: true}
 	v.confirm = v.defaultConfirm
 	v.list.Key = func(i int) any { return v.rowKey(i) }
 	v.list.Header = func(i int) bool { return i >= 0 && i < len(v.rows) && v.rows[i].kind == rowHeader }

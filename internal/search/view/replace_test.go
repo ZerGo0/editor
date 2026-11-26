@@ -142,9 +142,10 @@ func TestReplacePreviewAndDisabledStates(t *testing.T) {
 	}
 	g := newFixture(t, map[string]string{"a.txt": "x"})
 	g.replaceSetup("needle", "pin")
-	if a, ok := g.tt.Access("Replace All"); !ok || !a.Disabled {
-		t.Errorf("Replace All without results should be disabled: %+v %v", a, ok)
+	if err := g.tt.Click("Replace All"); err != nil {
+		t.Fatal(err)
 	}
+	g.settle()
 	g.view.ReplaceAll()
 	if len(g.confirms) != 0 {
 		t.Error("asked to replace nothing")

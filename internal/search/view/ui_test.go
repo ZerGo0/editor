@@ -1,6 +1,7 @@
 package searchview
 
 import (
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -95,16 +96,17 @@ func TestSelectionStaysOnItemWhenResultsChange(t *testing.T) {
 	}
 }
 
-func TestScopeChipShowsCount(t *testing.T) {
+func TestScopeMenuListsTextAndGit(t *testing.T) {
 	f := newFixture(t, map[string]string{"a.go": "needle\nneedle\n"})
 	f.search(ScopeText, "needle")
-	if !f.tt.HasText("2") {
-		t.Errorf("count missing from the Text chip: %q", f.tt.Texts())
+	if !f.tt.HasText("2 results in 1 file") {
+		t.Errorf("count missing from the message line: %q", f.tt.Texts())
 	}
-	if err := f.tt.Click("Files"); err != nil {
-		t.Fatal(err)
+	if f.view.scope != ScopeText {
+		t.Fatalf("the Search view opens in Text: %v", f.view.scope)
 	}
-	if f.view.scope != ScopeFiles {
-		t.Fatalf("chip click: %v", f.view.scope)
+	f.view.setScope(ScopeActions)
+	if got := f.view.scopeChoicesNow(); !slices.Equal(got, []Scope{ScopeText, ScopeGit, ScopeActions}) {
+		t.Fatalf("scope choices %v", got)
 	}
 }

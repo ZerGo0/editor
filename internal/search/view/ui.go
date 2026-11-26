@@ -1,6 +1,7 @@
 package searchview
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/design"
@@ -22,16 +23,13 @@ const (
 	truncatedNotice   = "The result set only contains a subset of all matches. Be more specific in your search to narrow down the results."
 )
 
-var scopeKeys = [scopeCount]ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6}
-
 func (v *View) View(c *ui.Context) {
 	v.tick(c)
 	if v.rowsDirty {
 		v.rebuild()
 	}
 	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-		v.chips(c)
-		v.fieldBlock(c)
+		v.widget(c)
 		v.statusRow(c)
 		v.resultList(c)
 	})
@@ -87,43 +85,6 @@ func (v *View) captureSelection() {
 	v.selectedKey = ""
 }
 
-func (v *View) chips(c *ui.Context) {
-	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapControl.Px(), token.PadRow.Px()).Gap(token.GapTight.Px()).Wrap().
-		Role(ui.RoleTabList).Label("Search scope").Children(func() {
-		for s := ScopeAll; s < scopeCount; s++ {
-			count := ""
-			if n := v.scopeCount(s); n > 0 {
-				count = formatCount(n)
-			}
-			chip := action.Chip(c, s.String(), action.ChipOptions{Active: s == v.scope, Count: count, Keys: scopeShortcut(s), ID: "scope-" + s.String()})
-			if chip.Clicked() {
-				v.switchScope(s)
-				v.field.Focus()
-			}
-		}
-	})
-}
-
-func scopeShortcut(s Scope) string {
-	return "⌘" + itoa(int(s)+1)
-}
-
-func (v *View) scopeCount(s Scope) int {
-	if strings.TrimSpace(v.st.Query) == "" {
-		return 0
-	}
-	if s != v.scope && v.scope != ScopeAll {
-		return 0
-	}
-	switch s {
-	case ScopeText:
-		return v.text.total
-	case ScopeAll:
-		return 0
-	}
-	return v.sections[s].total
-}
-
 func (v *View) placeholder() string {
 	switch v.scope {
 	case ScopeFiles:
@@ -143,30 +104,60 @@ func (v *View) placeholder() string {
 	return "Search everywhere"
 }
 
-func (v *View) fieldInset() float32 {
-	return token.PadRow.Px() + token.IconButtonSize.Px() + token.GapTight.Px()
+const (
+	keysReplace    = "⇧⌘1"
+	keysReplaceAll = "⌥⌘↩"
+	keysDismiss    = "⌫"
+)
+
+// TECHDEBT: field.TextArea draws its first line 1 px too high in the 26 px box; move this nudge into internal/design/field when that package centres multi-line text.
+func inputTextNudge(in ui.Element) ui.Element {
+	return in.Padding(token.PadInputY.Px()+token.BorderWidth.Px(), token.PadInputX.Px(), token.PadInputY.Px()-token.BorderWidth.Px())
 }
 
-func (v *View) fieldBlock(c *ui.Context) {
+func (v *View) toggleEdgeInset() float32 {
+	return token.PadRow.Px() + token.PadInputEnd.Px() + token.BorderWidth.Px()
+}
+
+func (v *View) fieldInset() float32 {
+	return token.GapInline.Px() + token.IconButtonSize.Px() + token.GapTight.Px()
+}
+
+func (v *View) widget(c *ui.Context) {
 	text := v.scope == ScopeText
-	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), token.PadRow.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Start).Children(func() {
+	left := token.PadRow
+	if text {
+		left = token.GapInline
+	}
+	ui.Row(c).FillWidth().Padding(token.GapControl.Px(), token.PadRow.Px(), token.GapInline.Px(), left.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Center).Children(func() {
 		if text {
 			chevron := icons.ChevronRight
 			if v.st.ShowReplace {
 				chevron = icons.ChevronDown
 			}
-			if action.IconButton(c, chevron, "Toggle Replace", action.IconOptions{ID: "toggle-replace"}).Margin(token.GapTight.Px(), 0, 0, 0).Clicked() {
+			if action.IconButton(c, chevron, "Toggle Replace", action.IconOptions{ID: "toggle-replace"}).Clicked() {
 				v.st.ShowReplace = !v.st.ShowReplace
 			}
 		}
-		v.searchBox(c)
+		ui.Column(c).Grow(1).MinWidth(0).Gap(token.GapInline.Px()).Children(func() {
+			v.searchBox(c)
+			if text && v.st.ShowReplace {
+				v.replaceBox(c)
+			}
+		})
 	})
-	if text && v.st.ShowReplace {
-		v.replaceRow(c)
+	if text {
+		v.detailsToggle(c)
+		if v.st.ShowFilters {
+			v.filterFields(c)
+		}
 	}
-	if text && v.st.ShowFilters {
-		v.filterFields(c)
-	}
+}
+
+func (v *View) detailsToggle(c *ui.Context) {
+	ui.Row(c).FillWidth().Padding(0, v.toggleEdgeInset(), 0, token.PadRow.Px()).Justify(ui.End).Children(func() {
+		action.ToggleIconButton(c, icons.More, "Toggle Search Details", &v.st.ShowFilters, action.IconOptions{ID: "toggle-filters"})
+	})
 }
 
 func (v *View) searchBox(c *ui.Context) {
@@ -182,7 +173,7 @@ func (v *View) searchBox(c *ui.Context) {
 		}
 	}
 	ui.Column(c.Key("search-field")).Grow(1).MinWidth(0).Children(func() {
-		in := field.TextArea(c, labelSearch, &v.st.Query, o).Bind(&v.field).OnTextKey(v.fieldKey)
+		in := inputTextNudge(field.TextArea(c, labelSearch, &v.st.Query, o)).Bind(&v.field).OnTextKey(v.fieldKey)
 		if v.pendingNewline {
 			v.pendingNewline = false
 			from, to := in.TextSelection()
@@ -197,51 +188,63 @@ func (v *View) searchBox(c *ui.Context) {
 	}
 }
 
-func (v *View) replaceRow(c *ui.Context) {
-	ui.Row(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), v.fieldInset()).Gap(token.GapTight.Px()).AlignItems(ui.Start).Children(func() {
-		ui.Column(c.Key("replace-field")).Grow(1).MinWidth(0).Children(func() {
-			o := field.AreaOptions{Placeholder: labelReplace, MaxLines: maxFieldLines, Toggles: []field.Toggle{
-				{Icon: icons.PreserveCase, Label: "Preserve Case", Keys: "⌥⌘P", On: &v.st.PreserveCase},
-			}}
-			in := field.TextArea(c, labelReplace, &v.st.Replace, o).Bind(&v.replaceField).OnTextKey(v.replaceKey)
-			if v.pendingReplaceNewline {
-				v.pendingReplaceNewline = false
-				from, to := in.TextSelection()
-				in.ReplaceText(from, to, "\n")
-			}
-		})
-		if action.IconButton(c, icons.ReplaceAll, "Replace All", action.IconOptions{Disabled: !v.canReplace()}).Margin(token.GapTight.Px(), 0, 0, 0).Clicked() {
-			v.ReplaceAll()
+func (v *View) replaceBox(c *ui.Context) {
+	replaceAll := false
+	o := field.AreaOptions{Placeholder: labelReplace, MaxLines: maxFieldLines, Toggles: []field.Toggle{
+		{Icon: icons.PreserveCase, Label: "Preserve Case", Keys: "⌥⌘P", On: &v.st.PreserveCase},
+		// TECHDEBT: Replace All is a one-shot toggle because field.Toggle has no plain action; add a trailing action to internal/design/field and use it here.
+		{Icon: icons.ReplaceAll, Label: "Replace All", Keys: keysReplaceAll, On: &replaceAll},
+	}}
+	ui.Column(c.Key("replace-field")).Children(func() {
+		in := inputTextNudge(field.TextArea(c, labelReplace, &v.st.Replace, o)).Bind(&v.replaceField).OnTextKey(v.replaceKey)
+		if v.pendingReplaceNewline {
+			v.pendingReplaceNewline = false
+			from, to := in.TextSelection()
+			in.ReplaceText(from, to, "\n")
 		}
 	})
+	if replaceAll && v.canReplace() {
+		v.ReplaceAll()
+	}
 }
 
 func (v *View) filterFields(c *ui.Context) {
 	changed := false
+	onlyOpen, useExcludes := v.st.OnlyOpen, !v.st.NoExcludes
 	ui.Column(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapControl.Px(), v.fieldInset()).Gap(token.GapInline.Px()).Children(func() {
 		design.Text(c, labelFilesInclude, token.TextCaption)
-		include := field.TextInput(c, labelFilesInclude, &v.st.Include, field.InputOptions{Placeholder: "e.g. src/**/*.go, ./internal", ID: "include"}).Bind(&v.includeField)
+		include := field.TextInput(c, labelFilesInclude, &v.st.Include, field.InputOptions{Placeholder: "e.g. src/**/*.go, ./internal", ID: "include", Toggles: []field.Toggle{
+			{Icon: icons.File, Label: "Search Only in Open Editors", On: &onlyOpen},
+		}}).Bind(&v.includeField)
 		changed = include.Changed() || changed
-		changed = action.Checkbox(c, "Search only in open editors", &v.st.OnlyOpen, action.ChoiceOptions{}).Changed() || changed
 		design.Text(c, labelFilesExclude, token.TextCaption)
-		changed = field.TextInput(c, labelFilesExclude, &v.st.Exclude, field.InputOptions{Placeholder: "e.g. **/*.test.go, dist", ID: "exclude"}).Changed() || changed
-		use := !v.st.NoExcludes
-		if action.Checkbox(c, "Use exclude settings and ignore files", &use, action.ChoiceOptions{}).Changed() {
-			v.st.NoExcludes = !use
-			changed = true
-		}
+		exclude := field.TextInput(c, labelFilesExclude, &v.st.Exclude, field.InputOptions{Placeholder: "e.g. **/*.test.go, dist", ID: "exclude", Toggles: []field.Toggle{
+			{Icon: icons.Settings, Label: "Use Exclude Settings and Ignore Files", On: &useExcludes},
+		}})
+		changed = exclude.Changed() || changed
 	})
+	if onlyOpen != v.st.OnlyOpen || useExcludes == v.st.NoExcludes {
+		v.st.OnlyOpen, v.st.NoExcludes = onlyOpen, !useExcludes
+		changed = true
+	}
 	if changed {
 		v.searchSoon(textDelay)
 	}
 }
 
+func (v *View) statusShown() bool {
+	if v.busy() || v.text.searching && v.scope != ScopeAll {
+		return true
+	}
+	return v.scope == ScopeText && v.text.err == "" && strings.TrimSpace(v.st.Query) != "" && v.text.matcher != nil
+}
+
 func (v *View) statusRow(c *ui.Context) {
-	ui.Row(c).FillWidth().MinHeight(token.ToolbarHeight.Px()).Padding(0, token.PadRow.Px(), 0, token.PadView.Px()).Gap(token.GapInline.Px()).AlignItems(ui.Center).Children(func() {
-		v.statusMessage(c)
-		design.Spacer(c)
-		v.headerActions(c)
-	})
+	if v.statusShown() {
+		ui.Row(c).FillWidth().Padding(token.GapInline.Px(), v.toggleEdgeInset(), token.GapInline.Px(), v.fieldInset()).Gap(token.GapInline.Px()).AlignItems(ui.Center).Children(func() {
+			v.statusMessage(c)
+		})
+	}
 	if v.scope == ScopeText && v.text.truncated && !v.text.searching {
 		ui.Column(c).FillWidth().Padding(0, token.PadRow.Px(), token.GapInline.Px(), token.PadRow.Px()).Children(func() {
 			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: truncatedNotice})
@@ -253,14 +256,14 @@ func (v *View) statusMessage(c *ui.Context) {
 	switch {
 	case v.text.searching && v.scope != ScopeAll:
 		feedback.Spinner(c, "Searching").Shrink(0)
-		design.Text(c, "Searching…", token.TextLabel).SingleLine()
+		design.Text(c, "Searching…", token.TextLabel).SingleLine().Grow(1).MinWidth(0)
 		if action.Button(c, "Cancel", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "cancel-search"}).Clicked() {
 			v.CancelSearch()
 		}
 	case v.busy():
 		feedback.Spinner(c, "Loading").Shrink(0)
-	case v.scope == ScopeText && v.text.err == "" && strings.TrimSpace(v.st.Query) != "" && v.text.matcher != nil:
-		design.Text(c, v.statusSummary(), token.TextLabel).SingleLine().Role(ui.RoleStatus)
+	default:
+		design.Text(c, v.statusSummary(), token.TextLabel).Wrap().Grow(1).MinWidth(0).Role(ui.RoleStatus)
 	}
 }
 
@@ -271,8 +274,11 @@ func (v *View) statusSummary() string {
 	return v.summary()
 }
 
-func (v *View) headerActions(c *ui.Context) {
+var scopeChoices = []Scope{ScopeText, ScopeGit}
+
+func (v *View) TitleActions(c *ui.Context) {
 	hasQuery := strings.TrimSpace(v.st.Query) != ""
+	v.scopeMenu(c)
 	if action.IconButton(c, icons.Refresh, "Refresh", action.IconOptions{Disabled: !hasQuery, ID: "refresh"}).Clicked() {
 		v.Refresh()
 	}
@@ -298,9 +304,6 @@ func (v *View) headerActions(c *ui.Context) {
 			v.st.ListView = !v.st.ListView
 			v.rowsDirty = true
 		}
-		if action.IconButton(c, icons.More, "Toggle Search Details", action.IconOptions{Active: v.st.ShowFilters, ID: "toggle-filters"}).Clicked() {
-			v.st.ShowFilters = !v.st.ShowFilters
-		}
 	case ScopeSymbols:
 		label, svg := "Group by File", icons.TreeView
 		if v.st.SymbolsTree {
@@ -311,6 +314,24 @@ func (v *View) headerActions(c *ui.Context) {
 			v.rowsDirty = true
 		}
 	}
+}
+
+func (v *View) scopeChoicesNow() []Scope {
+	if slices.Contains(scopeChoices, v.scope) {
+		return scopeChoices
+	}
+	return append(slices.Clone(scopeChoices), v.scope)
+}
+
+func (v *View) scopeMenu(c *ui.Context) {
+	action.MenuIconButton(c, icons.Filter, "Search Scope", action.IconOptions{ID: "scope"}, func(m *ui.Menu) {
+		for _, s := range v.scopeChoicesNow() {
+			if m.Item(s.String()).Radio(s == v.scope).Chosen() {
+				v.switchScope(s)
+				v.field.Focus()
+			}
+		}
+	})
 }
 
 func (v *View) queryEdited() {
@@ -326,11 +347,6 @@ func (v *View) queryEdited() {
 	v.searchSoon(textDelay)
 }
 
-func (v *View) cycleScope(step int) {
-	next := (int(v.scope) + step + int(scopeCount)) % int(scopeCount)
-	v.switchScope(Scope(next))
-}
-
 const flagMods = ui.Alt | ui.Super
 
 func (v *View) fieldKey(k ui.TextKey) bool {
@@ -341,19 +357,12 @@ func (v *View) fieldKey(k ui.TextKey) bool {
 		return true
 	case k.Key == ui.KeyEnter && k.Mods == ui.Shift:
 		return !text
-	case k.Key == ui.KeyEnter && k.Mods == ui.Cmd:
+	case k.Key == ui.KeyEnter && (k.Mods == ui.Cmd || k.Mods == ui.Ctrl):
 		if text {
 			v.pendingNewline = true
 			return true
 		}
 		v.activateRow(v.selected, OpenOptions{Side: true, Focus: true})
-		return true
-	case k.Key == ui.KeyTab && (k.Mods == 0 || k.Mods == ui.Shift):
-		step := 1
-		if k.Mods == ui.Shift {
-			step = -1
-		}
-		v.cycleScope(step)
 		return true
 	case k.Key == ui.KeyEscape && k.Mods == 0:
 		v.escape()
@@ -370,14 +379,6 @@ func (v *View) fieldKey(k ui.TextKey) bool {
 }
 
 func (v *View) flagKey(k ui.TextKey) bool {
-	if k.Mods == ui.Cmd {
-		for s, key := range scopeKeys {
-			if k.Key == key {
-				v.switchScope(Scope(s))
-				return true
-			}
-		}
-	}
 	if v.scope != ScopeText || k.Mods != flagMods {
 		return false
 	}
@@ -402,7 +403,7 @@ func (v *View) replaceKey(k ui.TextKey) bool {
 	case k.Key == ui.KeyEnter && k.Mods == 0:
 		v.ReplaceAll()
 		return true
-	case k.Key == ui.KeyEnter && k.Mods == ui.Cmd:
+	case k.Key == ui.KeyEnter && (k.Mods == ui.Cmd || k.Mods == ui.Ctrl):
 		v.pendingReplaceNewline = true
 		return true
 	case k.Key == ui.KeyEscape && k.Mods == 0:
@@ -488,5 +489,8 @@ func (v *View) windowKeys(c *ui.Context) {
 	}
 	if v.list.Handle.FocusWithin(c) && c.Shortcut(0, ui.KeyEscape) {
 		v.escape()
+	}
+	if v.scope == ScopeText && v.st.ShowReplace && c.Shortcut(flagMods, ui.KeyEnter) && v.canReplace() {
+		v.ReplaceAll()
 	}
 }

@@ -51,13 +51,9 @@ func (v *View) rowMenu(c *ui.Context, m *ui.Menu, r row) {
 			v.dismiss(r)
 		}
 	}
-	if v.scope == ScopeText && v.st.ShowReplace && (r.kind == rowMatch || r.kind == rowFile) {
+	if v.showsReplace(r) {
 		if m.Item("Replace").Disabled(!v.canReplace()).Chosen() {
-			if r.kind == rowMatch {
-				v.replaceMatch(r.file, r.match)
-			} else {
-				v.replaceFile(r.file)
-			}
+			v.replaceRow(r)
 		}
 	}
 	if v.env.Reveal != nil && path != "" {
