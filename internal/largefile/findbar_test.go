@@ -2,6 +2,7 @@ package largefile
 
 import (
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -71,7 +72,8 @@ func TestFindBarMultilineQuery(t *testing.T) {
 
 func waitFound(t *testing.T, tt *ui.Tester, s *State) {
 	t.Helper()
-	for range 200 {
+	deadline := time.Now().Add(indexWait)
+	for time.Now().Before(deadline) {
 		tt.Frame()
 		s.find.mu.Lock()
 		pending := s.find.result != nil
@@ -79,6 +81,7 @@ func waitFound(t *testing.T, tt *ui.Tester, s *State) {
 		if !pending && s.find.status == "" {
 			return
 		}
+		time.Sleep(indexPoll)
 	}
 	t.Fatal("search did not finish")
 }
