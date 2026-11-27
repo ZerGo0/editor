@@ -188,7 +188,7 @@ func demoViewSteps() []viewStep {
 			if err := q.Command("Show Source Control", viewMenu, "Source Control"); err != nil {
 				return err
 			}
-			row, err := q.waitChangedRow()
+			row, err := q.waitChangedRow(isDemoChangedFile)
 			if err != nil {
 				return err
 			}

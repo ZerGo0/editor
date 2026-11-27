@@ -47,6 +47,23 @@ func TestParseFrames(t *testing.T) {
 	}
 }
 
+const repaintSample = `2026/11/26 11:00:00 mygo: frame 41 took 3.2 ms: build 1.1, layout 0.9, paint 0.8, present 0.2 (gpu), other 0.2
+2026/11/26 11:00:01 mygo: frame 41 took 0.8 ms: build 0.0 (painted again), layout 0.0, paint 0.2, present 0.6 (gpu), other 0.0
+`
+
+func TestBuiltFramesSkipRepaints(t *testing.T) {
+	frames := ParseFrames(repaintSample)
+	if len(frames) != 2 || frames[0].Repaint || !frames[1].Repaint {
+		t.Fatalf("frames = %+v", frames)
+	}
+	if built := Built(frames); len(built) != 1 || built[0].Repaint {
+		t.Fatalf("built = %+v", built)
+	}
+	if got, all := CountBuiltFrames(repaintSample), CountFrames(repaintSample); got != 1 || all != 2 {
+		t.Fatalf("built %d of %d", got, all)
+	}
+}
+
 func TestIdleFlag(t *testing.T) {
 	if flags := IdleFlag("typing", OwnerWorkspace, 0, time.Second); len(flags) != 0 {
 		t.Fatalf("flags = %v", flags)

@@ -13,27 +13,19 @@ import (
 )
 
 const (
-	budgetTypeChar      = 50 * time.Millisecond
-	budgetQuickOpen     = 100 * time.Millisecond
-	budgetQuickQuery    = 100 * time.Millisecond
-	budgetTabSwitch     = 100 * time.Millisecond
-	budgetToggleSidebar = 100 * time.Millisecond
-	budgetExpandFolder  = 100 * time.Millisecond
-	budgetOpenSCM       = 500 * time.Millisecond
-	budgetOpenGraph     = 800 * time.Millisecond
-	budgetOpenDiffStack = 800 * time.Millisecond
-	budgetFirstFrame    = 200 * time.Millisecond
-	perfEnv             = "EDITOR_E2E_PERF"
-	perfSkipReason      = "latency budgets need a quiet machine and windows that show: set EDITOR_E2E_PERF=1 to run them"
+	perfEnv        = "EDITOR_E2E_PERF"
+	perfSkipReason = "latency budgets need a quiet machine and windows that show: set EDITOR_E2E_PERF=1 to run them"
 
-	latencySamples    = 20
-	slowSamples       = 8
+	latencySamples    = 10
+	slowSamples       = 5
+	perfConcurrency   = 8
 	burstQuietShort   = 60 * time.Millisecond
 	burstQuietAsync   = 300 * time.Millisecond
 	burstMax          = 1500 * time.Millisecond
 	burstPoll         = time.Millisecond
 	blinkFramesPerSec = 2
 	typedChar         = "x"
+	saveKey           = "Cmd+S"
 	quickQuery        = "utils"
 	toggleSidebarName = "Toggle Primary Side Bar"
 	rulePendingFrame  = "no-frame-after-input"
@@ -42,12 +34,14 @@ const (
 	tabSwitchesNarrow = 12
 	tabSwitchesWide   = 3
 	maxTabSwitchFrame = 4
+	tabSwitchQuiet    = 100 * time.Millisecond
 	nextEditorMenu    = "Next Editor"
 	tabShownSlack     = 1.0
 	editorTabsLabel   = "Editor Tabs"
 	changedRowPoll    = 50 * time.Millisecond
 	demoChangedFile   = "file00.go"
 	findRowScroll     = 20
+	scrollStep        = 600
 )
 
 type Burst struct {
@@ -64,7 +58,7 @@ func closeEditorAfterFirstRun(q *QAApp, _ DemoProject, i int) {
 	}
 }
 
-func (q *QAApp) Burst(quiet time.Duration, do func()) Burst {
+func (q *QAApp) Burst(quiet, maxWait time.Duration, do func()) Burst {
 	q.t.Helper()
 	offset := q.outputLen()
 	start := time.Now()
@@ -73,7 +67,7 @@ func (q *QAApp) Burst(quiet time.Duration, do func()) Burst {
 	seen := 0
 	continuous := true
 	for {
-		if n := qa.CountFrames(q.outputFrom(offset)); n > seen {
+		if n := qa.CountBuiltFrames(q.outputFrom(offset)); n > seen {
 			seen = n
 			last = time.Now()
 			if first.IsZero() {
@@ -84,12 +78,12 @@ func (q *QAApp) Burst(quiet time.Duration, do func()) Burst {
 			continuous = false
 			break
 		}
-		if time.Since(start) >= burstMax {
+		if time.Since(start) >= maxWait {
 			break
 		}
 		time.Sleep(burstPoll)
 	}
-	b := Burst{Frames: qa.ParseFrames(q.outputFrom(offset)), Continuous: continuous && !last.IsZero()}
+	b := Burst{Frames: qa.Built(qa.ParseFrames(q.outputFrom(offset))), Continuous: continuous && !last.IsZero()}
 	if !first.IsZero() {
 		b.First, b.Settled = first.Sub(start), last.Sub(start)
 	}
@@ -97,26 +91,47 @@ func (q *QAApp) Burst(quiet time.Duration, do func()) Burst {
 }
 
 type latencyAction struct {
-	Name        string
-	Owner       string
-	Budget      time.Duration
-	Samples     int
-	Quiet       time.Duration
-	IdleFrames  int
-	Options     func(d DemoProject) QAOptions
-	Prepare     func(q *QAApp, d DemoProject) error
-	Reset       func(q *QAApp, d DemoProject, i int)
-	Do          func(q *QAApp, d DemoProject, i int)
-	EditorFocus bool
+	Name       string
+	Owner      string
+	Samples    int
+	Quiet      time.Duration
+	IdleFrames int
+	Options    func(d DemoProject) QAOptions
+	Prepare    func(q *QAApp, d DemoProject) error
+	Reset      func(q *QAApp, d DemoProject, i int)
+	Do         func(q *QAApp, d DemoProject, i int)
+	MaxWait    time.Duration
+	Timeout    time.Duration
+	Cold       bool
+	Fixture    string
+	Project    func(t *testing.T) DemoProject
 }
 
-func focusCodeEditor(q *QAApp) error {
-	editor, err := q.TryWait(isCodeEditor, navTimeout)
+const largeFileEditorLabel = "Large file editor"
+
+func isTextEditor(n qa.Node) bool {
+	return isCodeEditor(n) || n.Role == "textField" && n.Label == largeFileEditorLabel
+}
+
+func focusCodeEditor(q *QAApp) (qa.Node, error) {
+	editor, err := q.TryWait(isTextEditor, q.waitFor())
 	if err != nil {
-		return fmt.Errorf("code editor: %w", err)
+		return editor, fmt.Errorf("code editor: %w", err)
 	}
 	q.FocusNode(editor)
-	return nil
+	return editor, nil
+}
+
+func allTabsOptions(d DemoProject) QAOptions {
+	o := defaultLatencyOptions(d)
+	o.Tabs = d.TabFiles
+	return o
+}
+
+func bigFileOptions(d DemoProject) QAOptions {
+	o := defaultLatencyOptions(d)
+	o.Tabs = []string{d.BigFile}
+	return o
 }
 
 func defaultLatencyOptions(d DemoProject) QAOptions {
@@ -141,104 +156,21 @@ func clickLabel(q *QAApp, role, label string) error {
 
 func latencyActions() []latencyAction {
 	return []latencyAction{
-		{
-			Name: "type a character in a 5k-line file", Owner: qa.OwnerWorkspace, Budget: budgetTypeChar, Samples: latencySamples, Quiet: burstQuietShort, IdleFrames: blinkFramesPerSec, EditorFocus: true,
-			Options: func(d DemoProject) QAOptions {
-				o := defaultLatencyOptions(d)
-				o.Tabs = []string{d.BigFile}
-				return o
-			},
-			Prepare: func(q *QAApp, d DemoProject) error { return focusCodeEditor(q) },
-			Do:      func(q *QAApp, d DemoProject, i int) { q.Send(TextEvent(typedChar)) },
-		},
-		{
-			Name: "open Go to File", Owner: qa.OwnerSearch, Budget: budgetQuickOpen, Samples: latencySamples, Quiet: burstQuietShort,
+		typeCharAction(bigFileOptions).with("type a character in a 5k-line file", latencySamples, burstQuietShort),
+		scrollAction(bigFileOptions, "", "").with("scroll the 5k-line file", latencySamples, burstQuietShort),
+		latencyAction{
+			Owner: qa.OwnerSearch, IdleFrames: blinkFramesPerSec,
 			Reset: func(q *QAApp, d DemoProject, i int) { q.Escape() },
-			Do:    func(q *QAApp, d DemoProject, i int) { menuOrFail(q, goMenu, "Go to File...") },
-		},
-		{
-			Name: "type a query in Go to File", Owner: qa.OwnerSearch, Budget: budgetQuickQuery, Samples: latencySamples, Quiet: burstQuietShort,
-			Prepare: func(q *QAApp, d DemoProject) error { return q.TryMenu(goMenu, "Go to File...") },
-			Reset: func(q *QAApp, d DemoProject, i int) {
-				q.Send(KeyEvent("Cmd+A"))
-				q.Send(KeyEvent("Backspace"))
-				q.Settle()
-			},
-			Do: func(q *QAApp, d DemoProject, i int) { q.Send(TextEvent(quickQuery)) },
-		},
-		{
-			Name: "switch tab", Owner: qa.OwnerWorkspace, Budget: budgetTabSwitch, Samples: latencySamples, Quiet: burstQuietShort,
-			Options: func(d DemoProject) QAOptions {
-				o := defaultLatencyOptions(d)
-				o.Tabs = d.TabFiles
-				return o
-			},
-			Do: func(q *QAApp, d DemoProject, i int) { menuNow(q, viewMenu, nextEditorMenu) },
-		},
-		{
-			Name: "toggle sidebar", Owner: qa.OwnerWorkspace, Budget: budgetToggleSidebar, Samples: latencySamples, Quiet: burstQuietShort,
-			Do: func(q *QAApp, d DemoProject, i int) {
-				n, err := q.TryWait(hasRoleLabel("button", toggleSidebarName), navTimeout)
-				if err != nil {
-					q.t.Fatalf("toggle sidebar button: %v", err)
-				}
-				q.Send(ClickEvent(n.Bounds.CenterX(), n.Bounds.CenterY()))
-			},
-		},
-		{
-			Name: "expand a 2000-entry folder", Owner: qa.OwnerWorkspace, Budget: budgetExpandFolder, Samples: latencySamples, Quiet: burstQuietShort,
-			Prepare: func(q *QAApp, d DemoProject) error {
-				files, err := q.TryWait(func(n qa.Node) bool { return n.Role == "tree" }, navTimeout)
-				if err != nil {
-					return err
-				}
-				q.Send(map[string]any{"type": "wheel", "x": files.Bounds.CenterX(), "y": files.Bounds.CenterY(), "dy": -scrollToTop})
-				q.Settle()
-				return nil
-			},
-			Reset: func(q *QAApp, d DemoProject, i int) {
-				if n, ok := q.Snapshot().Find(hasRoleLabel("treeItem", demoChangelogDir)); ok {
-					q.Act(q.Win, n.ID, "collapse", "")
-					q.Settle()
-				}
-			},
-			Do: func(q *QAApp, d DemoProject, i int) {
-				n, ok := q.Snapshot().Find(hasRoleLabel("treeItem", demoChangelogDir))
-				if !ok {
-					q.t.Fatalf("folder %s not in the tree", demoChangelogDir)
-				}
-				q.Act(q.Win, n.ID, "expand", "")
-			},
-		},
-		{
-			Name: "open Source Control with 500+ changes", Owner: qa.OwnerGit, Budget: budgetOpenSCM, Samples: slowSamples, Quiet: burstQuietAsync,
-			Reset: func(q *QAApp, d DemoProject, i int) {
-				menuOrFail(q, viewMenu, "Explorer")
-				q.Settle()
-			},
-			Do: func(q *QAApp, d DemoProject, i int) { menuOrFail(q, viewMenu, "Source Control") },
-		},
-		{
-			Name: "open the stacked Staged Changes diff (210 files)", Owner: qa.OwnerGit, Budget: budgetOpenDiffStack, Samples: slowSamples, Quiet: burstQuietAsync,
-			Prepare: func(q *QAApp, d DemoProject) error {
-				menuOrFail(q, viewMenu, "Source Control")
-				_, err := q.TryWait(hasLabel("Commit Message"), navTimeout)
-				return err
-			},
-			Reset: closeEditorAfterFirstRun,
-			Do: func(q *QAApp, d DemoProject, i int) {
-				row, err := q.waitChangedRow()
-				if err != nil {
-					q.t.Fatal(err)
-				}
-				q.ClickNode(row)
-			},
-		},
-		{
-			Name: "open the Graph (2100 commits)", Owner: qa.OwnerGit, Budget: budgetOpenGraph, Samples: slowSamples, Quiet: burstQuietAsync,
-			Reset: closeEditorAfterFirstRun,
-			Do:    func(q *QAApp, d DemoProject, i int) { menuOrFail(q, gitMenu, "Show Log") },
-		},
+			Do:    func(q *QAApp, d DemoProject, i int) { menuNow(q, goMenu, "Go to File...") },
+		}.with("open Go to File", latencySamples, burstQuietShort),
+		quickQueryAction(goToFileMenu, quickQuery).with("type a query in Go to File", latencySamples, burstQuietShort),
+		switchTabAction(allTabsOptions).with("switch tab", latencySamples, burstQuietShort),
+		toggleSidebarAction().with("toggle sidebar", latencySamples, burstQuietShort),
+		expandFolderAction(demoChangelogDir).with("expand a 2000-entry folder", latencySamples, burstQuietShort),
+		openSourceControlAction().with("open Source Control with 500+ changes", slowSamples, burstQuietAsync),
+		stackedDiffAction(func(q *QAApp) (qa.Node, error) { return q.waitChangedRow(isDemoChangedFile) }).with("open the stacked Staged Changes diff (210 files)", slowSamples, burstQuietAsync),
+		openGraphAction().with("open the Graph (2100 commits)", slowSamples, burstQuietAsync),
+		saveAction(bigFileOptions).with("save the 5k-line file", slowSamples, burstQuietAsync).isolated(),
 	}
 }
 
@@ -273,11 +205,9 @@ func TestTabSwitchSettles(t *testing.T) {
 			o.Width, o.Tabs = c.width, demo.TabFiles
 			q := LaunchQA(t, demo.Root, o)
 			for i := range c.switches {
-				offset := q.outputLen()
-				menuNow(q, viewMenu, nextEditorMenu)
+				frames := len(q.Burst(tabSwitchQuiet, idleWatchWindow, func() { menuNow(q, viewMenu, nextEditorMenu) }).Frames)
 				tab, shown := activeTabShown(q.Snapshot())
-				time.Sleep(idleWatchWindow)
-				if frames := qa.CountFrames(q.outputFrom(offset)); o.FrameStats && frames > maxTabSwitchFrame {
+				if o.FrameStats && frames > maxTabSwitchFrame {
 					t.Errorf("switch %d: %d frames in %s, want at most %d", i, frames, idleWatchWindow, maxTabSwitchFrame)
 				}
 				if !shown {
@@ -294,85 +224,40 @@ func TestInputLatencyBudget(t *testing.T) {
 	if !perfRun() {
 		t.Skip(perfSkipReason)
 	}
-	demo := NewDemoProject(t)
-	var report strings.Builder
-	fmt.Fprintf(&report, "%-42s %-44s %-44s %-12s %s\n", "action", "input to last frame", "input to first frame", "frames", "slowest frame / idle frames")
-	var flags []qa.Flag
-	for _, action := range latencyActions() {
-		t.Run(strings.ReplaceAll(action.Name, " ", "-"), func(t *testing.T) {
-			opts := defaultLatencyOptions(demo)
-			if action.Options != nil {
-				opts = action.Options(demo)
-			}
-			q := LaunchQA(t, demo.Root, opts)
-			if action.Prepare != nil {
-				if err := action.Prepare(q, demo); err != nil {
-					t.Fatalf("prepare: %v", err)
-				}
-			}
-			var settled, first []time.Duration
-			var frameCounts []int
-			var slowest qa.Frame
-			for i := range action.Samples + 1 {
-				if action.Reset != nil {
-					action.Reset(q, demo, i)
-				}
-				b := q.Burst(action.Quiet, func() { action.Do(q, demo, i) })
-				if i == 0 {
-					continue
-				}
-				if len(b.Frames) == 0 {
-					flags = append(flags, qa.Flag{Rule: rulePendingFrame, View: action.Name, Owner: action.Owner, Role: "action", Label: action.Name, Measured: "no frame drawn after the input", Expected: "the input draws a frame", Fix: "check that the action reaches the UI"})
-					continue
-				}
-				if b.Continuous {
-					flags = append(flags, qa.Flag{Rule: ruleFrameStorm, View: action.Name, Owner: action.Owner, Role: "action", Label: action.Name, Measured: fmt.Sprintf("%d frames in %s after one input, still drawing", len(b.Frames), burstMax), Expected: "the input settles within a few frames (no continuous redraw)", Fix: "find the view that requests a frame every frame (scroll-into-view retry, After loop, Animate) and make it converge"})
-				}
-				settled, first = append(settled, b.Settled), append(first, b.First)
-				frameCounts = append(frameCounts, len(b.Frames))
-				if s := qa.SlowestFrame(b.Frames); s.Total > slowest.Total {
-					slowest = s
-				}
-			}
-			if len(frameCounts) == 0 {
-				return
-			}
-			stats, firstStats := qa.Summarize(settled), qa.Summarize(first)
-			if !action.EditorFocus {
-				q.Settle()
-			}
-			idle := q.FramesWhileIdle()
-			fmt.Fprintf(&report, "%-42s %-44s %-44s %-12d %s / %d\n", action.Name, stats, firstStats, frameCounts[len(frameCounts)/2], slowest.Total.Round(time.Microsecond*100), idle)
-			flags = append(flags, qa.OverBudget(action.Name, action.Owner, stats, action.Budget)...)
-			flags = append(flags, qa.OverBudget(action.Name+" (first frame)", action.Owner, firstStats, budgetFirstFrame)...)
-			flags = append(flags, qa.IdleFlag(action.Name, action.Owner, max(idle-action.IdleFrames, 0), idleWatchWindow)...)
-			q.Report("latency-"+strings.ReplaceAll(action.Name, " ", "-"), stats.String()+"\n"+firstStats.String())
-		})
-	}
-	t.Logf("\n%s", report.String())
-	if dir := artifactDir(); dir != "" {
-		writeReport(t, "latency", report.String())
-	}
-	if len(flags) > 0 {
-		t.Errorf("%d flags:\n%s", len(qa.Dedupe(flags)), qa.Format(qa.Dedupe(flags)))
-	}
+	t.Parallel()
+	stressPrepare(t)
+	run := newLatencyRun(NewDemoProject(t))
+	slots := make(chan struct{}, perfConcurrency)
+	t.Run("scenarios", func(t *testing.T) {
+		for i, action := range append(stressActions(), latencyActions()...) {
+			t.Run(strings.ReplaceAll(action.Name, " ", "-"), func(t *testing.T) {
+				t.Parallel()
+				slots <- struct{}{}
+				defer func() { <-slots }()
+				run.action(t, i, action)
+			})
+		}
+	})
+	run.finish(t)
 }
 
-func firstChangedRow(tree *qa.Tree) (qa.Node, bool) {
+func isDemoChangedFile(label string) bool { return label == demoChangedFile }
+
+func firstChangedRow(tree *qa.Tree, match func(label string) bool) (qa.Node, bool) {
 	list, ok := tree.Find(hasRoleLabel("list", "Changes"))
 	if !ok {
 		return qa.Node{}, false
 	}
 	return tree.Find(func(n qa.Node) bool {
-		return n.Parent == list.ID && n.Role == "listItem" && n.Label == demoChangedFile && list.Bounds.Contains(n.Bounds, 0)
+		return n.Parent == list.ID && n.Role == "listItem" && match(n.Label) && list.Bounds.Contains(n.Bounds, 0)
 	})
 }
 
-func (q *QAApp) waitChangedRow() (qa.Node, error) {
-	deadline := time.Now().Add(navTimeout)
+func (q *QAApp) waitChangedRow(match func(label string) bool) (qa.Node, error) {
+	deadline := time.Now().Add(q.waitFor())
 	for time.Now().Before(deadline) {
 		tree := q.Snapshot()
-		if n, ok := firstChangedRow(tree); ok {
+		if n, ok := firstChangedRow(tree, match); ok {
 			return n, nil
 		}
 		if list, ok := tree.Find(hasRoleLabel("list", "Changes")); ok {
@@ -380,5 +265,5 @@ func (q *QAApp) waitChangedRow() (qa.Node, error) {
 		}
 		time.Sleep(changedRowPoll)
 	}
-	return qa.Node{}, fmt.Errorf("no changed file row in Source Control within %s", navTimeout)
+	return qa.Node{}, fmt.Errorf("no changed file row in Source Control within %s", q.waitFor())
 }

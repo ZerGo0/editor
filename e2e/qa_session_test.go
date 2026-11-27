@@ -55,6 +55,8 @@ type QAOptions struct {
 	ActiveTab    int
 	Settings     map[string]any
 	FrameStats   bool
+	QuietTimeout time.Duration
+	WaitTimeout  time.Duration
 }
 
 type QAApp struct {
@@ -62,6 +64,7 @@ type QAApp struct {
 	Win  int
 	Root string
 	Opts QAOptions
+	Temp string
 	t    *testing.T
 }
 
@@ -121,8 +124,10 @@ func writeJSON(t *testing.T, path string, v any) {
 func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 	t.Helper()
 	env := []string{frameStatsEnv + "="}
+	var temp string
 	if o.FrameStats {
-		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1"}
+		temp = t.TempDir()
+		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1", tempDirEnv + "=" + temp}
 	}
 	app := LaunchEnv(t, seedUserData(t, root, o), env, root)
 	var win int
@@ -135,8 +140,11 @@ func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 		}
 		return false
 	})
-	q := &QAApp{App: app, Win: win, Root: root, Opts: o, t: t}
+	q := &QAApp{App: app, Win: win, Root: root, Opts: o, Temp: temp, t: t}
 	q.Settle()
+	if o.FrameStats {
+		q.WaitCPUQuiet()
+	}
 	return q
 }
 
@@ -185,14 +193,6 @@ func (q *QAApp) Measure(do func()) Sample {
 		sum += f.Total
 	}
 	return Sample{Elapsed: elapsed, Settled: settled, Frames: frames, FrameSum: sum}
-}
-
-func (q *QAApp) FramesWhileIdle() int {
-	q.t.Helper()
-	q.Settle()
-	offset := len(q.Output())
-	time.Sleep(idleWatchWindow)
-	return qa.CountFrames(q.Output()[offset:])
 }
 
 func (q *QAApp) outputFrom(offset int) string {

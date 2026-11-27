@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	percentile95 = 0.95
-	percentile50 = 0.5
-	frameMarker  = "mygo: frame "
-	RuleBudget   = "latency-budget"
-	RuleIdle     = "idle-frames"
+	percentile95       = 0.95
+	percentile50       = 0.5
+	frameMarker        = "mygo: frame "
+	frameRepaintMarker = "(painted again)"
+	RuleBudget         = "latency-budget"
+	RuleIdle           = "idle-frames"
 )
 
 type Stats struct {
@@ -57,6 +58,7 @@ func OverBudget(action, owner string, s Stats, budget time.Duration) []Flag {
 }
 
 type Frame struct {
+	Repaint bool
 	Number  int
 	Total   time.Duration
 	Build   time.Duration
@@ -78,7 +80,7 @@ func ParseFrames(output string) []Frame {
 			continue
 		}
 		num, _ := strconv.Atoi(m[1])
-		frames = append(frames, Frame{Number: num, Total: ms(m[2]), Build: ms(m[3]), Layout: ms(m[4]), Paint: ms(m[5]), Present: ms(m[6])})
+		frames = append(frames, Frame{Repaint: strings.Contains(line, frameRepaintMarker), Number: num, Total: ms(m[2]), Build: ms(m[3]), Layout: ms(m[4]), Paint: ms(m[5]), Present: ms(m[6])})
 	}
 	return frames
 }
@@ -92,6 +94,14 @@ func ms(s string) time.Duration {
 }
 
 func CountFrames(output string) int { return strings.Count(output, frameMarker) }
+
+func CountBuiltFrames(output string) int {
+	return CountFrames(output) - strings.Count(output, frameRepaintMarker)
+}
+
+func Built(frames []Frame) []Frame {
+	return slices.DeleteFunc(slices.Clone(frames), func(f Frame) bool { return f.Repaint })
+}
 
 func SlowestFrame(frames []Frame) Frame {
 	var slowest Frame
