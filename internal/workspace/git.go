@@ -118,10 +118,17 @@ func (w *Workspace) gitFrame() {
 }
 
 func (w *Workspace) applyDiffBase(tab *layout.Tab) {
-	if w.git == nil || tab.Editor == nil {
+	if w.git == nil {
 		return
 	}
-	if base := w.git.Base(tab.Path); tab.Editor.DiffBase != base {
+	base := w.git.Base(tab.Path)
+	if tab.Editor == nil {
+		return
+	}
+	if base == nil {
+		base = tab.Editor.Buffer
+	}
+	if tab.Editor.DiffBase != base {
 		tab.Editor.DiffBase = base
 	}
 }
