@@ -5,6 +5,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -17,13 +18,13 @@ const (
 
 func Controls(c *ui.Context, e *Engine) {
 	ignore := Session.Whitespace != git.WhitespaceNone
-	if action.Checkbox(c, whitespaceLabel, &ignore, action.ChoiceOptions{ID: "diff-whitespace"}).Changed() {
+	if action.ToggleIconButton(c, icons.Whitespace, whitespaceLabel, &ignore, action.IconOptions{ID: "diff-whitespace"}).Changed() {
 		Session.Whitespace = git.WhitespaceNone
 		if ignore {
 			Session.Whitespace = ignoreMode
 		}
 	}
-	action.Checkbox(c, movesToggle, &Session.ShowMoves, action.ChoiceOptions{ID: "diff-show-moves"})
+	action.ToggleIconButton(c, icons.MovedCode, movesToggle, &Session.ShowMoves, action.IconOptions{ID: "diff-show-moves"})
 	if e != nil && e.Busy() {
 		feedback.Spinner(c, busyLabel)
 	}
