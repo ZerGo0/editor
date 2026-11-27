@@ -75,6 +75,7 @@ Module path: `github.com/ZerGo0/editor`
     - A GitHub mock for the E2E harness: a local fake of the GitHub API that the app uses in place of github.com, with fixtures for issues (many labels, long titles, milestones), notifications and pull requests (reviews, checks, comments). The GitHub views then get the same E2E, overflow and redline coverage as the other views.
     - Each stress test records the app's CPU time and peak resident memory (from the app process), idle CPU after the work, responsiveness (time from input to the settled frame), disk bytes read and written by the app process (macOS proc_pid_rusage), and the disk space that the app's own data takes (user data, local history, shelf, caches, temp files). The results go to a JSON report next to the E2E artifacts, compared against budgets in the test, so that regressions show and we can act on them.
     - Lower the base CPU and memory use. The app uses about 120 MB when idle and 100 to 300 MB in normal use. Profile idle and typical sessions (heap and CPU), remove the largest costs, and lower the budgets to the new numbers.
+    - Search causes CPU spikes: while a search runs, and when you scroll the search results, the results editor view and similar views. Profile these paths and remove the spikes.
 
 Later: an optional structural diff mode that compares syntax trees (like difftastic), so formatting-only changes do not show as changes.
 
