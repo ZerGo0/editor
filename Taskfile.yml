@@ -51,6 +51,13 @@ tasks:
     cmds:
       - go test ./...
 
+  preview:
+    desc: Capture the README preview into docs/preview.png
+    env:
+      EDITOR_PREVIEW_OUT: "{{.ROOT_DIR}}/docs/preview.png"
+    cmds:
+      - go test -tags e2e -count=1 -run TestReadmePreview ./e2e/
+
   test:e2e:
     desc: Run the end-to-end tests against a built app
     cmds:

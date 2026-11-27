@@ -13,7 +13,7 @@ import (
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const zoomFactor = 1.2
+const ZoomFactor = 1.2
 
 var (
 	lineNumberModes = map[string]editor.LineNumbers{
@@ -29,7 +29,7 @@ var (
 )
 
 func (w *Workspace) zoom() float32 {
-	return float32(math.Pow(zoomFactor, float64(w.settings.Int(settings.ZoomLevel))))
+	return float32(math.Pow(ZoomFactor, float64(w.settings.Int(settings.ZoomLevel))))
 }
 
 func (w *Workspace) configure(st *editor.State, path string) {

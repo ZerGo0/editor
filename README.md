@@ -30,6 +30,7 @@ The [Taskfile](Taskfile.yml) lists the common commands:
 task dev       # run with live reload
 task check     # vet, format check and unit tests
 task test:e2e  # end-to-end tests against a built app
+task preview   # capture docs/preview.png again
 ```
 
 Read [AGENTS.md](AGENTS.md) and [docs/design.md](docs/design.md) before you change the UI.

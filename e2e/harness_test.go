@@ -364,25 +364,27 @@ func (a *App) Menu(window int, path ...string) {
 	a.Idle(window)
 }
 
+func (a *App) Capture() ([]byte, error) {
+	res, err := a.Call("capture", nil)
+	if err != nil {
+		return nil, err
+	}
+	var shot struct {
+		PNG string `json:"png"`
+	}
+	if err := json.Unmarshal(res, &shot); err != nil {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(shot.PNG)
+}
+
 func (a *App) Screenshot(name string) string {
 	a.t.Helper()
 	dir := os.Getenv(artifactsEnv)
 	if dir == "" {
 		return ""
 	}
-	res, err := a.Call("capture", nil)
-	if err != nil {
-		a.t.Logf("capture: %v", err)
-		return ""
-	}
-	var shot struct {
-		PNG string `json:"png"`
-	}
-	if err := json.Unmarshal(res, &shot); err != nil {
-		a.t.Logf("capture: %v", err)
-		return ""
-	}
-	data, err := base64.StdEncoding.DecodeString(shot.PNG)
+	data, err := a.Capture()
 	if err != nil {
 		a.t.Logf("capture: %v", err)
 		return ""
