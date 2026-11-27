@@ -34,6 +34,9 @@ func ToastHost(c *ui.Context) ui.Element {
 func toast(c *ui.Context, p *token.Palette, t ui.Toast) {
 	parts := ui.ToastBase(c, t)
 	tone := ToneOf(t.Type)
+	firstLine := token.IconButtonSize.Px()
+	iconInset := (firstLine - token.IconSize.Px()) / 2
+	textInset := (firstLine - token.TextBody.LineHeight()) / 2
 	root := parts.Root.Width(token.ToastWidth.Px()).Radius(token.RadiusCard.Px()).Background(p.Layer.Widget).
 		Border(token.BorderWidth.Px(), p.Border.Widget).Clip()
 	token.ElevationDialog.Apply(root, p)
@@ -42,8 +45,8 @@ func toast(c *ui.Context, p *token.Palette, t ui.Toast) {
 			ui.Row(c).FillWidth().Padding(token.PadNoticeY.Px(), token.PadInputY.Px(), token.PadNoticeY.Px(), token.PadNoticeX.Px()).
 				Gap(token.GapControl.Px()).AlignItems(ui.Start).Children(func() {
 				ui.Icon(c, ToneIcon(tone)).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Tone(tone)).Shrink(0).
-					Margin(token.PadInputEnd.Px(), 0, 0, 0).AccessHidden(true)
-				ui.Column(c).Grow(1).MinWidth(0).Gap(token.GapTight.Px()).Children(func() {
+					Margin(iconInset, 0, 0, 0).AccessHidden(true)
+				ui.Column(c).Grow(1).MinWidth(0).Margin(textInset, 0, 0, 0).Gap(token.GapTight.Px()).Children(func() {
 					token.TextBody.Apply(ui.Text(c, t.Title)).TextColor(p.Text.Primary).Wrap()
 					if t.Description != "" {
 						token.TextLabel.Apply(ui.Text(c, t.Description)).TextColor(p.Text.Secondary).Wrap().Selectable()

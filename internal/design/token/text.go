@@ -41,6 +41,8 @@ func (t TextStyle) Px() float32 { return t.size }
 
 func (t TextStyle) Weight() int { return t.weight }
 
+func (t TextStyle) LineHeight() float32 { return t.line }
+
 func (t TextStyle) Muted() bool { return t.muted }
 
 func (t TextStyle) Format(s string) string {
