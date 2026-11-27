@@ -1,8 +1,6 @@
 package workspace
 
 import (
-	"math"
-
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -37,10 +35,9 @@ func (w *Workspace) titleBar(c *ui.Context) {
 	left, right := bar.Left+token.PadRow.Px(), bar.Right+token.PadRow.Px()
 	row := ui.Row(c).Height(token.TitleBarHeight.Px()).Shrink(0).FillWidth().AlignItems(ui.Center).Padding(token.BorderWidth.Px(), right, 0, left).
 		Background(p.Layer.TitleBar).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).DragWindow()
-	side, centre := w.titleColumns(c, row.Bounds().W-left-right-max(left-right, 0))
 	row.Children(func() {
-		ui.Box(c).Width(side).Shrink(0)
-		ui.Row(c).Width(centre).Shrink(1).MinWidth(0).AlignItems(ui.Center).
+		ui.Box(c).Grow(1).Basis(0)
+		ui.Row(c).Width(token.CommandCenterWidth.Px()).MaxWidthPercent(halfPercent).Shrink(1).MinWidth(0).AlignItems(ui.Center).
 			Gap(token.GapInline.Px()).Children(func() {
 			chrome.NavButton(c, icons.ArrowLeft, navigateBackID, func(m *ui.Menu) { w.historyMenu(m, true) })
 			chrome.NavButton(c, icons.ArrowRight, navigateFwdID, func(m *ui.Menu) { w.historyMenu(m, false) })
@@ -56,19 +53,7 @@ func (w *Workspace) titleBar(c *ui.Context) {
 }
 
 type titleState struct {
-	text, file   string
-	side, centre float32
-}
-
-func (w *Workspace) titleColumns(c *ui.Context, free float32) (side, centre float32) {
-	free = max(free, 0)
-	centre = min(float32(math.Floor(float64(free/2))), token.CommandCenterWidth.Px())
-	side = float32(math.Floor(float64((free - centre) / 2)))
-	if side != w.title.side || centre != w.title.centre {
-		w.title.side, w.title.centre = side, centre
-		c.Invalidate()
-	}
-	return side, centre
+	text, file string
 }
 
 func (w *Workspace) syncTitle() {
