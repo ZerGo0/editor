@@ -3,6 +3,7 @@ package workspace
 import (
 	"log"
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/ZerGo0/editor/internal/applog"
@@ -14,7 +15,10 @@ import (
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const bracketMargin = 200
+const (
+	bracketMargin   = 200
+	bracketMaxBytes = 2 << 20
+)
 
 type bracketState struct {
 	scans map[string]*bracketScan
@@ -47,7 +51,7 @@ func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
 	st := tab.Editor
 	buf := st.Buffer
 	lang := buf.Language()
-	if !w.settings.Bool(settings.BracketColors) || !bracketcolor.Supports(lang) {
+	if !w.settings.Bool(settings.BracketColors) || !bracketcolor.Supports(lang) || buf.Len() > bracketMaxBytes {
 		if _, ok := w.brackets.views[st]; ok {
 			st.SetReplacements(nil)
 			delete(w.brackets.views, st)
@@ -107,24 +111,26 @@ func (w *Workspace) startBracketScan(scan *bracketScan, buf *editor.Buffer, lang
 	scan.running = true
 	applog.Go(func() {
 		bs, err := bracketcolor.Scan(w.ctx, snap, lang)
-		w.update(func() {
+		w.updateQuietly(func() bool {
 			scan.running = false
-			w.bracketsScanned(scan, snap.Version(), lang, bs, err)
+			return w.bracketsScanned(scan, snap.Version(), lang, bs, err)
 		})
 	})
 }
 
-func (w *Workspace) bracketsScanned(scan *bracketScan, version uint64, lang *editor.Language, bs []bracketcolor.Bracket, err error) {
+func (w *Workspace) bracketsScanned(scan *bracketScan, version uint64, lang *editor.Language, bs []bracketcolor.Bracket, err error) bool {
 	if err != nil {
 		if w.ctx.Err() == nil {
 			log.Printf("bracket colors: %v", err)
 		}
-		return
+		return false
 	}
 	if bs == nil {
 		bs = []bracketcolor.Bracket{}
 	}
+	changed := !slices.Equal(scan.brackets, bs)
 	scan.version, scan.lang, scan.brackets = version, lang, bs
+	return changed
 }
 
 func (w *Workspace) dropUnusedBrackets(open map[string]bool) {

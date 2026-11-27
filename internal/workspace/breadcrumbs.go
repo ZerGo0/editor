@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
@@ -156,7 +157,11 @@ func (w *Workspace) symbolAt(tab *layout.Tab) string {
 			if syms == nil {
 				syms = []symbols.Symbol{}
 			}
-			w.update(func() { e.running, e.version, e.syms = false, version, syms })
+			w.updateQuietly(func() bool {
+				changed := !slices.Equal(e.syms, syms)
+				e.running, e.version, e.syms = false, version, syms
+				return changed
+			})
 		})
 	}
 	line := st.CursorPos().Line

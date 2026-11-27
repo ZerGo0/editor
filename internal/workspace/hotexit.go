@@ -136,7 +136,12 @@ func (w *Workspace) syncBackups() {
 			b.timer.Reset(backupDelay)
 			continue
 		}
-		b.timer = time.AfterFunc(backupDelay, func() { w.update(func() { w.backupDoc(path) }) })
+		b.timer = time.AfterFunc(backupDelay, func() {
+			w.updateQuietly(func() bool {
+				w.backupDoc(path)
+				return false
+			})
+		})
 	}
 }
 
@@ -164,7 +169,10 @@ func (w *Workspace) backupDoc(path string) {
 	seq, store, meta := w.hot.seq, w.hot.store, w.backupMeta(d)
 	applog.Go(func() {
 		err := store.Write(seq, meta, snap, int64(snap.Len()))
-		w.update(func() { w.backupWritten(path, v, err) })
+		w.updateQuietly(func() bool {
+			w.backupWritten(path, v, err)
+			return false
+		})
 	})
 }
 

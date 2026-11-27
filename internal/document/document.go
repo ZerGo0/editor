@@ -33,7 +33,7 @@ const (
 	defaultPerm        = 0o644
 )
 
-var EditLimit int64 = 512 << 20
+var EditLimit int64 = HighlightLimit
 
 type stamp struct {
 	size    int64

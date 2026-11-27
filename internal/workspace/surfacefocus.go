@@ -7,11 +7,9 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const framesToSettleFocus = 3
-
 type focusReturn struct {
 	held   bool
-	closed int
+	closed bool
 	part   part
 	tab    *layout.Tab
 	last   part
@@ -37,24 +35,25 @@ func (w *Workspace) holdFocus() {
 	if !b.held {
 		b.held, b.part, b.tab = true, b.last, b.lastIn
 	}
-	b.closed = 0
+	b.closed = false
+}
+
+func (w *Workspace) focusClaimed() bool {
+	return w.focusTab != nil || w.focus.want != partNone || w.inPart()
 }
 
 func (w *Workspace) releaseFocus(c *ui.Context) {
-	if !w.back.held || w.surfaceOpen() {
-		return
-	}
-	w.back.closed++
-	c.Invalidate()
-}
-
-func (w *Workspace) returnFocus(c *ui.Context) {
 	b := &w.back
-	if !b.held || b.closed < framesToSettleFocus {
+	if !b.held || w.surfaceOpen() {
 		return
 	}
-	b.held = false
-	if w.focusTab != nil || w.focus.want != partNone || w.inPart() {
+	if !w.focusClaimed() && !b.closed {
+		b.closed = true
+		c.Invalidate()
+		return
+	}
+	b.held, b.closed = false, false
+	if w.focusClaimed() {
 		return
 	}
 	c.Invalidate()

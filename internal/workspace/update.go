@@ -26,6 +26,22 @@ func (w *Workspace) update(fn func()) {
 	}
 }
 
+func (w *Workspace) updateQuietly(fn func() (visible bool)) {
+	q := &w.updates
+	q.mu.Lock()
+	win := q.win
+	q.mu.Unlock()
+	if win == nil {
+		w.update(func() { fn() })
+		return
+	}
+	mygo.RunOnMain(w.guarded(func() {
+		if fn() {
+			win.Invalidate()
+		}
+	}))
+}
+
 func (w *Workspace) attachUpdates(win *mygo.Window) {
 	q := &w.updates
 	q.mu.Lock()

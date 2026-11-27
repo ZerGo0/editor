@@ -45,6 +45,7 @@ func (w *Workspace) content(c *ui.Context, g *layout.Group, tab *layout.Tab) {
 	e := w.ensureEditor(tab)
 	switch {
 	case e.loading:
+		w.applyDiffBase(tab)
 		if wait := token.SpinnerDelay - time.Since(e.since); wait > 0 {
 			c.After(wait)
 			return

@@ -25,6 +25,7 @@ type Visitor interface {
 type Scanner struct {
 	Root     string
 	Visitors []Visitor
+	MaxFiles int
 	mu       sync.Mutex
 	mtimes   map[string]time.Time
 }
@@ -34,6 +35,9 @@ func (s *Scanner) Scan(ctx context.Context, rels []string) {
 	defer s.mu.Unlock()
 	if s.mtimes == nil {
 		s.mtimes = map[string]time.Time{}
+	}
+	if s.MaxFiles > 0 && len(rels) > s.MaxFiles {
+		rels = rels[:s.MaxFiles]
 	}
 	seen := make(map[string]bool, len(rels))
 	for _, rel := range rels {

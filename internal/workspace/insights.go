@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
@@ -192,10 +193,12 @@ func (w *Workspace) updateProblems() {
 			if items == nil {
 				items = []problems.Problem{}
 			}
-			w.update(func() {
+			w.updateQuietly(func() bool {
+				changed := !slices.Equal(e.items, items)
 				e.running, e.version, e.items = false, version, items
 				w.insights.problemsGen++
 				w.applyDiagnostics(path)
+				return changed
 			})
 		})
 	}

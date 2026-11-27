@@ -32,6 +32,7 @@ const (
 	showFindWindowID   = "search.showFindWindow"
 	reindexDelay       = time.Second
 	maxRecentFiles     = 50
+	maxScannedFiles    = 10000
 	doubleShiftWindow  = 400 * time.Millisecond
 	beforeReplaceLabel = "Before Replace"
 )
@@ -55,7 +56,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 	w.search.files = &files.Index{Root: w.Root}
 	syms := symbols.NewIndex()
 	w.search.symbols = syms
-	w.search.scanner = &files.Scanner{Root: w.Root, Visitors: []files.Visitor{everywhere.SymbolVisitor{Index: syms}, w.insights.todos}}
+	w.search.scanner = &files.Scanner{Root: w.Root, MaxFiles: maxScannedFiles, Visitors: []files.Visitor{everywhere.SymbolVisitor{Index: syms}, w.insights.todos}}
 	engine := everywhere.New(&everywhere.Env{
 		Root:    w.Root,
 		Files:   w.search.files,
@@ -113,18 +114,28 @@ func (w *Workspace) reindex() {
 		if err := w.search.files.Refresh(ctx, excluded); err != nil {
 			return
 		}
-		w.update(w.search.dialog.IndexChanged)
+		w.updateQuietly(w.indexChanged)
 		paths, _ := w.search.files.Paths()
 		w.search.scanner.Scan(ctx, paths)
-		w.update(w.search.dialog.IndexChanged)
+		w.updateQuietly(w.indexChanged)
 	})
+}
+
+func (w *Workspace) indexChanged() bool {
+	w.search.dialog.IndexChanged()
+	return w.search.dialog.IsOpen()
 }
 
 func (w *Workspace) scheduleReindex() {
 	if w.search.timer != nil {
 		w.search.timer.Stop()
 	}
-	w.search.timer = time.AfterFunc(reindexDelay, func() { w.update(w.reindex) })
+	w.search.timer = time.AfterFunc(reindexDelay, func() {
+		w.updateQuietly(func() bool {
+			w.reindex()
+			return false
+		})
+	})
 }
 
 func (w *Workspace) touchRecent(p string) {

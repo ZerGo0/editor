@@ -29,7 +29,6 @@ func (w *Workspace) view(c *ui.Context) {
 	w.codeTheme = p.CodeTheme()
 	root := c.Root().TabStop(false).FocusRing(false).Role(ui.RoleNone).ObserveInput(w.observeInput)
 	w.keys.rootFocus = root.Focused()
-	w.returnFocus(c)
 	if w.active.ActiveTab() == nil && !root.FocusWithin() {
 		root.Focus()
 	}
