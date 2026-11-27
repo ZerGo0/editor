@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	applyProfile()
 	options := e2eOptions()
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
