@@ -17,6 +17,7 @@ const (
 type AreaOptions struct {
 	Placeholder string
 	Error       string
+	Icon        *ui.SVG
 	MinLines    int
 	MaxLines    int
 	Toggles     []Toggle
@@ -37,7 +38,7 @@ func TextArea(c *ui.Context, label string, value *string, o AreaOptions) ui.Elem
 	if hi < lo {
 		hi = max(lo, defaultMaxLines)
 	}
-	f := frame{label: label, error: o.Error, toggles: o.Toggles, actions: o.Actions, disabled: o.Disabled}
+	f := frame{label: label, error: o.Error, leading: o.Icon, toggles: o.Toggles, actions: o.Actions, disabled: o.Disabled}
 	in := f.build(c, p, true, func() ui.Element {
 		in := ui.TextAreaBase(c.Key(keyOf(o.ID, label)), value).ReadOnly(o.ReadOnly).Lines(lo, hi)
 		dropSwallowed(in, value)

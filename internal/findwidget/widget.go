@@ -26,7 +26,15 @@ var (
 	wholeWord = field.Toggle{Icon: icons.WholeWord, Label: "Match Whole Word", Keys: "⌥⌘W"}
 	useRegexp = field.Toggle{Icon: icons.Regex, Label: "Use Regular Expression", Keys: "⌥⌘R"}
 	keepCase  = field.Toggle{Icon: icons.PreserveCase, Label: "Preserve Case", Keys: "⌥⌘P"}
+
+	toggleKeys = map[string]ui.Key{
+		matchCase.Label: ui.KeyC, wholeWord.Label: ui.KeyW, useRegexp.Label: ui.KeyR, keepCase.Label: ui.KeyP, FindInSelection.Label: ui.KeyL,
+	}
 )
+
+var ToggleMods = ui.Alt | ui.Cmd
+
+func ToggleKey(label string) ui.Key { return toggleKeys[label] }
 
 func Toggles(caseOn, wordOn, regexOn *bool) []field.Toggle {
 	toggles := []field.Toggle{matchCase, wholeWord, useRegexp}
@@ -69,14 +77,11 @@ func build(c *ui.Context, bar ui.Element, f *editor.FindBar, st *editor.State) {
 }
 
 func toggleShortcuts(bar ui.Element, f *editor.FindBar) {
-	for _, t := range []struct {
-		key ui.Key
-		on  *bool
-	}{
-		{ui.KeyC, f.CaseSensitive()}, {ui.KeyW, f.WholeWord()}, {ui.KeyR, f.Regexp()}, {ui.KeyL, f.InSelection()},
-	} {
-		if bar.Shortcut(ui.Alt|ui.Cmd, t.key) {
-			*t.on = !*t.on
+	toggles := Toggles(f.CaseSensitive(), f.WholeWord(), f.Regexp())
+	toggles = append(toggles, field.Toggle{Label: FindInSelection.Label, On: f.InSelection()})
+	for _, t := range toggles {
+		if bar.Shortcut(ToggleMods, ToggleKey(t.Label)) {
+			*t.On = !*t.On
 		}
 	}
 }

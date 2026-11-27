@@ -95,7 +95,7 @@ func (d *Dialog) View(c *ui.Context) {
 	d.showBusy = d.progress.visible(c, d.busy())
 	label := d.label()
 	opts := picker.DialogOptions{Label: label, ID: dialogID, Layout: &d.st.Layout, WindowKeys: d.env.WindowKeys,
-		Shortcuts: []picker.Shortcut{{Mods: ui.Cmd | ui.Shift, Key: ui.Key1, Run: d.replaceSelected}}}
+		Shortcuts: append([]picker.Shortcut{{Mods: ui.Cmd | ui.Shift, Key: ui.Key1, Run: d.replaceSelected}}, d.toggleShortcuts()...)}
 	if picker.Dialog(c, opts, func() { d.body(c, label) }) && !d.confirm {
 		d.Close()
 		return
