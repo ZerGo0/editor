@@ -170,13 +170,13 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 		v.request(f, o)
 	}
 	if !f.ready {
-		ui.Column(c).FillWidth().MinHeight(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+		ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
 		return
 	}
 	if f.state == nil || f.mode != diffmode.Session.Whitespace && e.Patch != nil {
 		if v.builds >= buildsPerFrame {
 			c.Invalidate()
-			ui.Column(c).FillWidth().MinHeight(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+			ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
 			return
 		}
 		if f.engine != nil {
@@ -189,7 +189,7 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	d, eng := f.state, f.engine
 	eng.Refresh()
 	if e.Patch == nil && !eng.Ready() {
-		ui.Column(c).FillWidth().MinHeight(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+		ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
 		return
 	}
 	if len(d.Hunks()) == 0 && !d.Comparing() {

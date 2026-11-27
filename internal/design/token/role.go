@@ -29,7 +29,6 @@ var (
 	PadStatusItemX  = Space6
 	PadTabX         = Space12
 	PadEmpty        = Space24
-	PadLoading      = Space12
 	IndentStep      = Space8
 	OffsetPopover   = Space2
 	OffsetQuickOpen = Space4
@@ -55,10 +54,11 @@ var (
 )
 
 var (
-	IconSize      = Size{16}
-	IconSizeSmall = Size{14}
-	IconSizeGlyph = Size{12}
-	IconSizeLarge = Size{32}
+	IconSize         = Size{16}
+	IconSizeSmall    = Size{14}
+	IconSizeGlyph    = Size{12}
+	IconSizeLarge    = Size{32}
+	SpinnerSizeLarge = Size{24}
 )
 
 var (

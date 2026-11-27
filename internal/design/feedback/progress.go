@@ -21,12 +21,3 @@ func Spinner(c *ui.Context, label string) ui.Element {
 	p := token.Of(c)
 	return ui.Spinner(c).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Text.Secondary).Label(label)
 }
-
-func Loading(c *ui.Context, text string) ui.Element {
-	p := token.Of(c)
-	return ui.Row(c).FillWidth().Padding(token.PadLoading.Px(), token.PadView.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).
-		Role(ui.RoleStatus).Busy(true).Label(text).Children(func() {
-		Spinner(c, text)
-		token.TextLabel.Apply(ui.Text(c, text)).TextColor(p.Text.Secondary).AccessHidden(true)
-	})
-}

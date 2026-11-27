@@ -69,7 +69,7 @@ func Centered(c *ui.Context, body func()) ui.Element {
 }
 
 func Loading(c *ui.Context, label string) ui.Element {
-	return Centered(c, func() { feedback.Loading(c, label) })
+	return Centered(c, func() { feedback.LoadingPane(c, label) })
 }
 
 func Failed(c *ui.Context, title string, err error, retry func()) ui.Element {
