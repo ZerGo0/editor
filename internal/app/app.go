@@ -24,11 +24,14 @@ const (
 	projectHeight    = 820
 	projectMinWidth  = 640
 	projectMinHeight = 400
+
+	transparentOpacity = 0
 )
 
 type Options struct {
 	Hidden             bool
 	ShowUnfocused      bool
+	Transparent        bool
 	DiscardOnClose     bool
 	NoBackups          bool
 	NoMenuAccelerators bool
@@ -164,6 +167,11 @@ func (a *App) raise(win *mygo.Window) {
 func (a *App) newWindow(o mygo.WindowOptions) *mygo.Window {
 	o.Hidden = a.options.Hidden
 	win := mygo.NewWindow(o)
+	if a.options.Transparent {
+		win.SetOpacity(transparentOpacity)
+		win.SetIgnoreMouseEvents(true)
+		win.SetHasShadow(false)
+	}
 	if a.options.ShowUnfocused {
 		win.ShowInactive()
 	}

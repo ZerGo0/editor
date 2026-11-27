@@ -127,7 +127,7 @@ func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 	var temp string
 	if o.FrameStats {
 		temp = t.TempDir()
-		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1", tempDirEnv + "=" + temp}
+		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1", transparentEnv + "=1", tempDirEnv + "=" + temp}
 	}
 	app := LaunchEnv(t, seedUserData(t, root, o), env, root)
 	var win int

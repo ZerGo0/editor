@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	userDataEnv  = "EDITOR_E2E_USER_DATA"
-	pickedEnv    = "EDITOR_E2E_PICKED_PATHS"
-	editLimitEnv = "EDITOR_E2E_EDIT_LIMIT"
-	unfocusedEnv = "EDITOR_E2E_SHOW_UNFOCUSED"
-	logsDirName  = "logs"
+	userDataEnv    = "EDITOR_E2E_USER_DATA"
+	pickedEnv      = "EDITOR_E2E_PICKED_PATHS"
+	editLimitEnv   = "EDITOR_E2E_EDIT_LIMIT"
+	unfocusedEnv   = "EDITOR_E2E_SHOW_UNFOCUSED"
+	transparentEnv = "EDITOR_E2E_TRANSPARENT"
+	logsDirName    = "logs"
 )
 
 func e2eOptions() app.Options {
@@ -31,5 +32,5 @@ func e2eOptions() app.Options {
 		document.EditLimit = n
 	}
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
-	return app.Options{Hidden: true, ShowUnfocused: os.Getenv(unfocusedEnv) != "", DiscardOnClose: true, NoBackups: dir == "", NoMenuAccelerators: true, PickedPaths: filepath.SplitList(os.Getenv(pickedEnv))}
+	return app.Options{Hidden: true, ShowUnfocused: os.Getenv(unfocusedEnv) != "", Transparent: os.Getenv(transparentEnv) != "", DiscardOnClose: true, NoBackups: dir == "", NoMenuAccelerators: true, PickedPaths: filepath.SplitList(os.Getenv(pickedEnv))}
 }
