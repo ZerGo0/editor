@@ -15,7 +15,6 @@ const (
 	searchActivityCommand = "workbench.action.findInFiles"
 	activityLabel         = "Activity Bar"
 	manageLabel           = "Manage"
-	viewActionsSuffix     = " Actions"
 )
 
 func (w *Workspace) visibleViews() []toolView {
@@ -80,7 +79,7 @@ func (w *Workspace) activityBar(c *ui.Context, v *toolView, showActions bool) {
 		}
 		ui.Box(c).Grow(1)
 		if v != nil && v.actions != nil {
-			actions := ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(v.title + viewActionsSuffix)
+			actions := action.Toolbar(c, v.title)
 			if !showActions {
 				actions.Opacity(token.OpacityHidden.Value())
 			}

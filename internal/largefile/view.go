@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/ZerGo0/editor/internal/design"
+	"github.com/ZerGo0/editor/internal/design/scrollbar"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -46,7 +47,7 @@ type State struct {
 	notice   string
 	dragging bool
 	focused  bool
-	bar      barDrag
+	bar      scrollbar.Drag
 	barStyle ui.ScrollbarStyle
 	lineH    float32
 	charW    float32
@@ -56,11 +57,6 @@ type State struct {
 	shapes   map[string]*shaped
 	frame    frame
 	find     finder
-}
-
-type barDrag struct {
-	active bool
-	grab   float32
 }
 
 type shaped struct {
@@ -236,8 +232,8 @@ func (s *State) paint(p *ui.Painter, r ui.Rect, t *token.Palette) {
 	p.Clip(ui.Rect{X: r.X + fr.gutterW, Y: r.Y, W: max(0, r.W-fr.gutterW), H: r.H}, 0, func() {
 		for i, ln := range fr.lines {
 			y := r.Y + float32(i)*s.lineH
-			if a < b {
-				s.paintSelection(p, ln, x0, y, a, b, t.Text.Selection)
+			if r, ok := s.selectionRect(ln, x0, y, a, b); a < b && ok {
+				p.Fill(r, t.Text.Selection, 0)
 			}
 			ty := y + (s.lineH-ln.shape.h)/2
 			p.TextLayout(ln.shape.layout, x0, ty, t.Text.Primary)
@@ -273,26 +269,24 @@ func (s *State) paint(p *ui.Painter, r ui.Rect, t *token.Palette) {
 	bar, _ := s.scrollbar()
 	bar.Box.X, bar.Box.Y = r.X, r.Y
 	if bar.Scrolls() {
-		p.Scrollbar(bar, ui.ScrollbarState{Dragging: s.bar.active})
+		p.Scrollbar(bar, ui.ScrollbarState{Dragging: s.bar.Active})
 	}
 }
 
-func (s *State) paintSelection(p *ui.Painter, ln viewLine, x0, y float32, a, b int64, color ui.Color) {
+func (s *State) selectionRect(ln viewLine, x0, y float32, a, b int64) (ui.Rect, bool) {
 	end := ln.end
 	if end < ln.start {
 		end = ln.start + int64(ln.shape.disp.shown())
 	}
 	if b <= ln.start || a > end || (ln.hasNext() && a >= ln.next) {
-		return
+		return ui.Rect{}, false
 	}
 	x1 := ln.shape.x(int(max(a, ln.start) - ln.start))
 	x2 := ln.shape.x(int(min(b, end) - ln.start))
 	if b > end && ln.hasNext() {
 		x2 += s.charW * newlineMarkRatio
 	}
-	if x2 > x1 {
-		p.Fill(ui.Rect{X: x0 + x1, Y: y, W: x2 - x1, H: s.lineH}, color, 0)
-	}
+	return ui.Rect{X: x0 + x1, Y: y, W: x2 - x1, H: s.lineH}, x2 > x1
 }
 
 func (s *State) paintCompose(p *ui.Painter, x, y float32, t *token.Palette) {

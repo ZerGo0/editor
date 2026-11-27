@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/backup"
+	"github.com/ZerGo0/editor/internal/testutil"
 
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/egoist/mygo"
@@ -30,7 +31,7 @@ func openRecentHarness(t *testing.T) (*Workspace, *ui.Tester, *[]string, *[]open
 	env.OpenFolder = func(_ *mygo.Window, root string, replace bool) { opened = append(opened, openedFolder{root, replace}) }
 	env.ForgetFolder = func(root string) { folders = slices.DeleteFunc(folders, func(f string) bool { return f == root }) }
 	w := newTestWorkspace(t, folders[0], env, session.Project{})
-	writeFiles(t, w.Root, map[string]string{"notes.txt": "notes\n"})
+	testutil.WriteFiles(t, w.Root, map[string]string{"notes.txt": "notes\n"})
 	w.search.recent = []string{filepath.Join(w.Root, "notes.txt")}
 	tt := ui.NewTester(w.View, 1200, 800)
 	tt.Frame()
@@ -107,7 +108,7 @@ func TestOpenRecentShowsRecentFilesFromEveryProject(t *testing.T) {
 	env := newTestEnv(t)
 	root := t.TempDir()
 	other := filepath.Join(t.TempDir(), "elsewhere.go")
-	writeFiles(t, root, map[string]string{"mine.go": "package a\n"})
+	testutil.WriteFiles(t, root, map[string]string{"mine.go": "package a\n"})
 	global := []string{other, filepath.Join(root, "mine.go")}
 	var touched, forgot []string
 	env.RecentFiles = func() []string { return global }

@@ -304,7 +304,7 @@ Engine v1 (own Go):
 
 Engine v2 (only if v1 is too slow on your targets):
 
-- In-memory trigram index built lazily (idea from codesearch). Query → trigram set (for literals) or regexp-to-trigram query → candidate file IDs → verify with the v1 scan. Update per file when the watcher reports a change.
+- In-memory trigram index built lazily (idea from codesearch). Query -> trigram set (for literals) or regexp-to-trigram query -> candidate file IDs -> verify with the v1 scan. Update per file when the watcher reports a change.
 - Or bundle `rg`.
 
 Files of 1 GB and more: the Text tab skips them by default (with a "skipped N large files" notice). In-file find is the editor's job (find bar on the rope).

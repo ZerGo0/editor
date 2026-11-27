@@ -3,7 +3,6 @@ package workspace
 import (
 	"slices"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/ZerGo0/editor/internal/layout"
@@ -123,21 +122,17 @@ func wordRange(line string, col int) (start, end int) {
 	start, end = col, col
 	for start > 0 {
 		r, size := utf8.DecodeLastRuneInString(line[:start])
-		if !isWordRune(r) {
+		if !references.IsWordRune(r) {
 			break
 		}
 		start -= size
 	}
 	for end < len(line) {
 		r, size := utf8.DecodeRuneInString(line[end:])
-		if !isWordRune(r) {
+		if !references.IsWordRune(r) {
 			break
 		}
 		end += size
 	}
 	return start, end
-}
-
-func isWordRune(r rune) bool {
-	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }

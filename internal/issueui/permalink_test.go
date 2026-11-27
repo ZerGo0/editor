@@ -4,25 +4,13 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui/editor"
 )
-
-func rawGit(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
 
 func gitTestEnv(t *testing.T) {
 	t.Helper()
@@ -38,17 +26,6 @@ func gitTestEnv(t *testing.T) {
 	}
 }
 
-func writeFile(t *testing.T, dir, rel, content string) {
-	t.Helper()
-	path := filepath.Join(dir, rel)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func newPushedRepo(t *testing.T) (string, Local, string) {
 	t.Helper()
 	gitTestEnv(t)
@@ -56,19 +33,19 @@ func newPushedRepo(t *testing.T) (string, Local, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rawGit(t, dir, "init", "--quiet", "-b", "main")
-	writeFile(t, dir, "src/a.go", "one\ntwo\nthree\n")
-	writeFile(t, dir, "dir with space/#x.go", "x\n")
-	rawGit(t, dir, "add", ".")
-	rawGit(t, dir, "commit", "--quiet", "-m", "first")
-	rawGit(t, dir, "remote", "add", "origin", "https://github.com/octo/repo.git")
-	rawGit(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
-	rawGit(t, dir, "branch", "--set-upstream-to=origin/main", "main")
+	testutil.RunGit(t, dir, "init", "--quiet", "-b", "main")
+	testutil.WriteFile(t, filepath.Join(dir, "src/a.go"), "one\ntwo\nthree\n")
+	testutil.WriteFile(t, filepath.Join(dir, "dir with space/#x.go"), "x\n")
+	testutil.RunGit(t, dir, "add", ".")
+	testutil.RunGit(t, dir, "commit", "--quiet", "-m", "first")
+	testutil.RunGit(t, dir, "remote", "add", "origin", "https://github.com/octo/repo.git")
+	testutil.RunGit(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testutil.RunGit(t, dir, "branch", "--set-upstream-to=origin/main", "main")
 	repo, err := git.Open(context.Background(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return dir, cliLocal{repo}, rawGit(t, dir, "rev-parse", "HEAD")
+	return dir, cliLocal{repo}, testutil.RunGit(t, dir, "rev-parse", "HEAD")
 }
 
 func TestPermalinkWithRealGit(t *testing.T) {
@@ -101,8 +78,8 @@ func TestPermalinkWithRealGit(t *testing.T) {
 func TestPermalinkRefusesUnsafeStates(t *testing.T) {
 	dir, local, _ := newPushedRepo(t)
 	ctx := context.Background()
-	writeFile(t, dir, "src/a.go", "changed\n")
-	writeFile(t, dir, "new.go", "new\n")
+	testutil.WriteFile(t, filepath.Join(dir, "src/a.go"), "changed\n")
+	testutil.WriteFile(t, filepath.Join(dir, "new.go"), "new\n")
 	if _, err := buildPermalink(ctx, local, filepath.Join(dir, "src/a.go"), 0, 0); err != errPermalinkModified {
 		t.Errorf("modified file: %v", err)
 	}
@@ -115,8 +92,8 @@ func TestPermalinkRefusesUnsafeStates(t *testing.T) {
 	if _, err := buildPermalink(ctx, local, filepath.Join(filepath.Dir(dir), "elsewhere.go"), 0, 0); err != errPermalinkOutside {
 		t.Errorf("outside file: %v", err)
 	}
-	rawGit(t, dir, "checkout", "--quiet", "--", "src/a.go")
-	rawGit(t, dir, "commit", "--quiet", "--allow-empty", "-m", "local only")
+	testutil.RunGit(t, dir, "checkout", "--quiet", "--", "src/a.go")
+	testutil.RunGit(t, dir, "commit", "--quiet", "--allow-empty", "-m", "local only")
 	if _, err := buildPermalink(ctx, local, filepath.Join(dir, "src/a.go"), 0, 0); err != errPermalinkUnpushed {
 		t.Errorf("unpushed commit: %v", err)
 	}

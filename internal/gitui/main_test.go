@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -20,46 +20,13 @@ import (
 const drainTimeout = 5 * time.Second
 
 func TestMain(m *testing.M) {
-	home, err := os.MkdirTemp("", "gitui-home")
+	cleanup, err := testutil.IsolateGit("gitui-home")
 	if err != nil {
 		os.Exit(1)
 	}
-	env := map[string]string{
-		"HOME":                home,
-		"XDG_CONFIG_HOME":     home,
-		"GIT_CONFIG_GLOBAL":   os.DevNull,
-		"GIT_CONFIG_NOSYSTEM": "1",
-		"GIT_AUTHOR_NAME":     "Ada Lovelace",
-		"GIT_AUTHOR_EMAIL":    "ada@example.com",
-		"GIT_COMMITTER_NAME":  "Ada Lovelace",
-		"GIT_COMMITTER_EMAIL": "ada@example.com",
-		"GIT_CONFIG_COUNT":    "3",
-		"GIT_CONFIG_KEY_0":    "init.defaultBranch",
-		"GIT_CONFIG_VALUE_0":  "main",
-		"GIT_CONFIG_KEY_1":    "protocol.file.allow",
-		"GIT_CONFIG_VALUE_1":  "always",
-		"GIT_CONFIG_KEY_2":    "commit.gpgsign",
-		"GIT_CONFIG_VALUE_2":  "false",
-	}
-	for k, v := range env {
-		if err := os.Setenv(k, v); err != nil {
-			os.Exit(1)
-		}
-	}
 	code := m.Run()
-	_ = os.RemoveAll(home)
+	cleanup()
 	os.Exit(code)
-}
-
-func rawGit(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
 }
 
 func tempDir(t testing.TB) string {
@@ -74,25 +41,14 @@ func tempDir(t testing.TB) string {
 func newTempRepo(t testing.TB) string {
 	t.Helper()
 	dir := tempDir(t)
-	rawGit(t, dir, "init", "--quiet")
+	testutil.RunGit(t, dir, "init", "--quiet")
 	return dir
-}
-
-func writeFile(t testing.TB, dir, rel, content string) {
-	t.Helper()
-	p := filepath.Join(dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func commitAll(t testing.TB, dir, msg string) {
 	t.Helper()
-	rawGit(t, dir, "add", "-A")
-	rawGit(t, dir, "commit", "--quiet", "-m", msg)
+	testutil.RunGit(t, dir, "add", "-A")
+	testutil.RunGit(t, dir, "commit", "--quiet", "-m", msg)
 }
 
 type fakeHost struct {

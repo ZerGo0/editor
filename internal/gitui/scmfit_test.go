@@ -8,6 +8,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -44,18 +45,8 @@ func fitGraph(t *testing.T, width int) *ui.Tester {
 	return tt
 }
 
-func naturalWidth(t *testing.T, text string) float32 {
-	t.Helper()
-	var w float32
-	probe := ui.NewTester(func(c *ui.Context) {
-		w, _ = c.MeasureText(0, ui.Span{Text: text, Size: token.TextBody.Px()})
-	}, sideWidth, sideHeightPx)
-	probe.Frame()
-	return w
-}
-
 func TestGraphSubjectKeepsItsShareInNarrowSideBars(t *testing.T) {
-	natural := naturalWidth(t, fitSubject)
+	natural := testutil.NaturalTextWidth(sideWidth, sideHeightPx, fitSubject)
 	for _, width := range []int{sideWidth, tightSideWidth} {
 		tt := fitGraph(t, width)
 		subject, ok := tt.AccessByRole(ui.RoleText, fitSubject)
@@ -95,7 +86,7 @@ func TestGraphShowsTheCurrentBranchAsAnIconPill(t *testing.T) {
 func TestGraphKeepsAShortSubjectBesideItsAuthor(t *testing.T) {
 	tt := fitGraph(t, sideWidth)
 	author, ok := tt.AccessByRole(ui.RoleText, "Ada")
-	if natural := naturalWidth(t, "First change"); !ok || author.Bounds.W <= 0 || author.Bounds.X < natural {
+	if natural := testutil.NaturalTextWidth(sideWidth, sideHeightPx, "First change"); !ok || author.Bounds.W <= 0 || author.Bounds.X < natural {
 		t.Errorf("author = %+v, want it shown after the %.0f px subject", author.Bounds, natural)
 	}
 }

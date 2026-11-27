@@ -3,6 +3,7 @@ package pane
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
@@ -23,7 +24,7 @@ func ViewTitle(c *ui.Context, title string, o TitleOptions) ui.Element {
 		token.TextCaption.Apply(ui.Text(c, strings.ToUpper(title))).TextColor(p.Text.Primary).SingleLine().
 			Grow(1).MinWidth(0).Role(ui.RoleHeading).Level(1).Label(title)
 		if o.Actions != nil {
-			actions := ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(title + " Actions")
+			actions := action.Toolbar(c, title)
 			if !show {
 				actions.Opacity(token.OpacityHidden.Value())
 			}

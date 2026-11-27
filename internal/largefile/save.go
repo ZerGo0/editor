@@ -18,7 +18,7 @@ const (
 
 var (
 	ErrNoSpace = errors.New("not enough free disk space")
-	freeSpace  = diskFree
+	freeSpace  = fsutil.FreeBytes
 )
 
 func (d *Doc) Save(ctx context.Context, progress func(done, total int64)) error {

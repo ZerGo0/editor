@@ -189,9 +189,6 @@ func TestRebaseInteractiveValidation(t *testing.T) {
 
 func TestShellQuoteAndTodoText(t *testing.T) {
 	t.Parallel()
-	if got := shellQuote("it's here"); got != "'it'\\''s here'" {
-		t.Fatalf("got %s", got)
-	}
 	dir := t.TempDir()
 	todo, err := buildTodo(dir, []TodoItem{
 		{Action: ActionReword, OID: "a1", Subject: "multi\nline"},

@@ -88,13 +88,7 @@ func (w *Workspace) overlay() func(path string) (string, bool) {
 			snaps[p] = buf.Snapshot()
 		}
 	}
-	return func(p string) (string, bool) {
-		s, ok := snaps[p]
-		if !ok {
-			return "", false
-		}
-		return s.String(), true
-	}
+	return textsearch.SnapshotOverlay(snaps)
 }
 
 func (w *Workspace) projectFiles(ctx context.Context, useIndex bool, exclude []string) []string {

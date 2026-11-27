@@ -25,13 +25,7 @@ type stashState struct {
 }
 
 type stashListState struct {
-	open     bool
-	loading  bool
-	err      error
-	gen      int
-	items    []git.Stash
-	list     ui.ListState
-	selected int
+	listState[git.Stash]
 }
 
 func (g *Git) openStash() {
@@ -79,24 +73,19 @@ func (g *Git) openStashes() {
 	if !g.ready() {
 		return
 	}
-	g.stashes = stashListState{open: true, selected: -1}
+	g.stashes = stashListState{listState: openList[git.Stash]()}
 	g.loadStashes()
 }
 
 func (g *Git) loadStashes() {
 	s := &g.stashes
 	s.gen++
-	gen, r := s.gen, g.repo
-	s.loading, s.err = true, nil
+	gen, r := s.begin(), g.repo
 	applog.Go(func() {
 		items, err := r.Stashes(g.ctx)
 		g.post(func() {
-			if gen != s.gen {
-				return
-			}
-			s.loading, s.err, s.items = false, err, items
-			if s.selected >= len(items) || (s.selected < 0 && len(items) > 0) {
-				s.selected = min(max(s.selected, 0), len(items)-1)
+			if s.apply(gen, items, err) {
+				s.clampSelection()
 			}
 		})
 	})
@@ -167,7 +156,7 @@ func (g *Git) showStash(st git.Stash) {
 	if st.Index < 0 {
 		return
 	}
-	g.openPatchTab("git-stash:"+st.OID, "Stash: "+firstLineOf(st.Message), func(ctx context.Context, r repo) ([]patchItem, error) {
+	g.openPatchTab("git-stash:"+st.OID, "Stash: "+git.FirstLine(st.Message), func(ctx context.Context, r repo) ([]patchItem, error) {
 		fds, err := r.StashShow(ctx, st.Index)
 		if err != nil {
 			return nil, err

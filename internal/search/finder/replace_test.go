@@ -38,6 +38,13 @@ func (f *fixture) openReplace(seed string) {
 	f.settle()
 }
 
+func (f *fixture) openReplaceWith(seed, with string) {
+	f.t.Helper()
+	f.openReplace(seed)
+	f.dialog.st.With = with
+	f.settle()
+}
+
 func (f *fixture) has(role ui.Role, name string) bool {
 	_, ok := f.tt.AccessByRole(role, name)
 	return ok
@@ -96,9 +103,7 @@ func TestReplaceInFilesOpensTheTextTabWithTheFocusedReplaceField(t *testing.T) {
 
 func TestMatchRowsShowTheReplacementAndRowActions(t *testing.T) {
 	f := newFixture(t, replaceProject)
-	f.openReplace("needle")
-	f.dialog.st.With = "pin"
-	f.settle()
+	f.openReplaceWith("needle", "pin")
 	if !f.tt.HasText("pin") {
 		t.Fatal("the match row shows no replacement")
 	}
@@ -141,9 +146,7 @@ func TestReplaceAllAsksForConfirmationThenEditsFilesAndBuffers(t *testing.T) {
 	f := newFixture(t, replaceProject)
 	open := f.path("a.txt")
 	f.host.buffers[open] = newBuffer(open, "needle one\nneedle two\n")
-	f.openReplace("needle")
-	f.dialog.st.With = "pin"
-	f.settle()
+	f.openReplaceWith("needle", "pin")
 	f.clickLast(ui.RoleButton, replaceAllLabel)
 	if !f.dialog.confirm {
 		t.Fatal("Replace All did not ask for a confirmation")
@@ -175,9 +178,7 @@ func TestReplaceAllAsksForConfirmationThenEditsFilesAndBuffers(t *testing.T) {
 
 func TestReplaceSelectedMatchOnly(t *testing.T) {
 	f := newFixture(t, replaceProject)
-	f.openReplace("needle")
-	f.dialog.st.With = "pin"
-	f.settle()
+	f.openReplaceWith("needle", "pin")
 	f.clickLast(ui.RoleButton, replaceLabel)
 	if got, _ := os.ReadFile(f.path("a.txt")); string(got) != "pin one\nneedle two\n" {
 		t.Fatalf("a.txt = %q; want only the first match replaced", got)
@@ -189,9 +190,7 @@ func TestReplaceSelectedMatchOnly(t *testing.T) {
 
 func TestReplaceAllInFileLeavesOtherFilesAlone(t *testing.T) {
 	f := newFixture(t, replaceProject)
-	f.openReplace("needle")
-	f.dialog.st.With = "pin"
-	f.settle()
+	f.openReplaceWith("needle", "pin")
 	f.clickLast(ui.RoleButton, replaceFileLabel)
 	if got, _ := os.ReadFile(f.path("a.txt")); string(got) != "pin one\npin two\n" {
 		t.Fatalf("a.txt = %q; want both matches replaced", got)

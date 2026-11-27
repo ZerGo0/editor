@@ -149,7 +149,7 @@ func (t *scan) inString(i int) int {
 func letterAt(line string, i int) int {
 	c := line[i]
 	if c < utf8.RuneSelf {
-		if c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+		if isASCIILetter(c) {
 			return 1
 		}
 		return 0
@@ -162,22 +162,9 @@ func letterAt(line string, i int) int {
 }
 
 func (s *spec) identEnd(line string, i int) int {
-	for i < len(line) {
-		c := line[i]
-		if c < utf8.RuneSelf {
-			if !isDigit(c) && letterAt(line, i) == 0 && strings.IndexByte(s.identChars, c) < 0 {
-				break
-			}
-			i++
-			continue
-		}
-		r, n := utf8.DecodeRuneInString(line[i:])
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			break
-		}
-		i += n
-	}
-	return i
+	return identRunEnd(line, i, func(c byte) bool {
+		return isDigit(c) || isASCIILetter(c) || strings.IndexByte(s.identChars, c) >= 0
+	})
 }
 
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }

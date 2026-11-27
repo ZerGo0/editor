@@ -16,7 +16,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ZerGo0/editor/internal/fsutil"
@@ -140,7 +139,7 @@ func Open(dir string, limits Limits) (*Store, error) {
 		limits:  limits.withDefaults(),
 		indexes: map[string]*index{},
 		now:     time.Now,
-		free:    freeBytes,
+		free:    fsutil.FreeBytes,
 	}
 	for _, sub := range []string{blobsDir, indexDir} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), dirPerm); err != nil {
@@ -149,14 +148,6 @@ func Open(dir string, limits Limits) (*Store, error) {
 	}
 	_ = s.Prune()
 	return s, nil
-}
-
-func freeBytes(dir string) (uint64, error) {
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dir, &st); err != nil {
-		return 0, err
-	}
-	return uint64(st.Bavail) * uint64(st.Bsize), nil
 }
 
 func hashOf(b []byte) string {

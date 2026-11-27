@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func TestGIFFrameCount(t *testing.T) {
 	dir := t.TempDir()
 	for _, frames := range []int{1, 2, 5} {
 		path := writeGIF(t, dir, "a.gif", frames)
-		data := mustRead(t, path)
+		data := testutil.ReadFile(t, path)
 		if got := gifFrameCount(data); got != frames {
 			t.Errorf("gifFrameCount of %d frames = %d", frames, got)
 		}
@@ -23,7 +25,7 @@ func TestGIFFrameCount(t *testing.T) {
 }
 
 func TestGIFFrameCountSurvivesTruncation(t *testing.T) {
-	data := mustRead(t, writeGIF(t, t.TempDir(), "a.gif", 3))
+	data := testutil.ReadFile(t, writeGIF(t, t.TempDir(), "a.gif", 3))
 	for cut := 0; cut < len(data); cut += 7 {
 		gifFrameCount(data[:cut])
 	}

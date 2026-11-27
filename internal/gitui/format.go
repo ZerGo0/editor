@@ -128,8 +128,3 @@ func appendIgnore(existing, rel string) string {
 	}
 	return existing + entry + "\n"
 }
-
-func firstLineOf(s string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-	return line
-}

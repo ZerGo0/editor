@@ -93,13 +93,6 @@ func (r *textRun) root() string {
 	return r.env.Host.RootDir()
 }
 
-func (r *textRun) relPath(p string) string {
-	if rel, err := filepath.Rel(r.root(), p); err == nil && filepath.IsLocal(rel) {
-		return filepath.ToSlash(rel)
-	}
-	return p
-}
-
 func patternMessage(err error) string {
 	var pe *textsearch.PatternError
 	if errors.As(err, &pe) {
@@ -135,16 +128,6 @@ func (r *textRun) overlay() map[string]editor.Snapshot {
 	return out
 }
 
-func overlayFunc(snaps map[string]editor.Snapshot) func(string) (string, bool) {
-	return func(p string) (string, bool) {
-		s, ok := snaps[p]
-		if !ok {
-			return "", false
-		}
-		return s.String(), true
-	}
-}
-
 func (r *textRun) start(req textRequest) {
 	r.stop()
 	if strings.TrimSpace(req.Pattern) == "" {
@@ -166,8 +149,7 @@ func (r *textRun) start(req textRequest) {
 	gen := r.currentGen()
 	r.matcher, r.pattern = m, req.Pattern
 	r.searching, r.fresh, r.err = true, true, ""
-	snaps := r.overlay()
-	opts := textsearch.Options{Root: r.root(), Overlay: overlayFunc(snaps), Limit: limit}
+	opts := textsearch.Options{Root: r.root(), Overlay: textsearch.SnapshotOverlay(r.overlay()), Limit: limit}
 	source := r.fileSource(m, req)
 	applog.Go(func() {
 		opts.Files = source(ctx)
@@ -250,7 +232,7 @@ func (r *textRun) flush(gen int) {
 	r.replaceIfFresh()
 	slices.SortFunc(batch, func(a, b textsearch.FileResult) int { return strings.Compare(a.Path, b.Path) })
 	for _, fr := range batch {
-		r.files = append(r.files, NewFileNode(fr.Path, r.relPath(fr.Path), fr.Matches))
+		r.files = append(r.files, NewFileNode(fr.Path, relTo(r.root(), fr.Path), fr.Matches))
 		r.total += len(fr.Matches)
 	}
 	r.version++

@@ -138,10 +138,7 @@ func Defaults(preset string) []Binding {
 	var out []Binding
 	var taken []Chord
 	for _, e := range jetBrainsDefaults[preset] {
-		b, err := newBinding(e)
-		if err != nil {
-			panic("keymap: default " + e.Key + ": " + err.Error())
-		}
+		b := mustBinding(e)
 		out, taken = append(out, b), append(taken, b.Chord)
 	}
 	for _, e := range table {
@@ -157,11 +154,15 @@ func Defaults(preset string) []Binding {
 		}
 	}
 	for _, e := range appDefaults[preset] {
-		b, err := newBinding(e)
-		if err != nil {
-			panic("keymap: default " + e.Key + ": " + err.Error())
-		}
-		out = append(out, b)
+		out = append(out, mustBinding(e))
 	}
 	return out
+}
+
+func mustBinding(e Entry) Binding {
+	b, err := newBinding(e)
+	if err != nil {
+		panic("keymap: default " + e.Key + ": " + err.Error())
+	}
+	return b
 }

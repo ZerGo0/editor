@@ -29,9 +29,7 @@ func IconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions) ui.Ele
 	if o.Tone != token.ToneNeutral {
 		color = p.Tone(o.Tone)
 	}
-	b.Background(bg).Children(func() {
-		ui.Icon(c, icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(color)
-	})
+	b.Background(bg).Children(func() { glyph(c, icon, color) })
 	return b
 }
 
@@ -53,10 +51,12 @@ func ToggleIconButton(c *ui.Context, icon *ui.SVG, label string, on *bool, o Ico
 	default:
 		b.Background(p.Fill(b.Hovered(), b.Pressed())).Border(token.BorderWidth.Px(), ui.Transparent)
 	}
-	b.Children(func() {
-		ui.Icon(c, icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(color)
-	})
+	b.Children(func() { glyph(c, icon, color) })
 	return b
+}
+
+func glyph(c *ui.Context, icon *ui.SVG, color ui.Color) ui.Element {
+	return ui.Icon(c, icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(color)
 }
 
 func keepFocus(b ui.Element, o IconOptions) {

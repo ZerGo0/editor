@@ -5,13 +5,14 @@ import (
 
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 )
 
 func newGuardBed(t *testing.T) (*Workspace, *ui.Tester) {
 	t.Helper()
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.txt": "a\n"})
+	testutil.WriteFiles(t, root, map[string]string{"a.txt": "a\n"})
 	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
 	return w, ui.NewTester(w.View, testWideW, testViewH)
 }

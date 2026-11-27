@@ -29,14 +29,8 @@ const (
 var errShelfName = errors.New("Enter a name for the shelved changes.")
 
 type shelfState struct {
-	open     bool
-	loading  bool
-	err      error
-	gen      int
-	items    []git.ShelfEntry
-	list     ui.ListState
-	selected int
-	remove   bool
+	listState[git.ShelfEntry]
+	remove bool
 }
 
 type errShelfFull struct {
@@ -126,24 +120,19 @@ func (g *Git) openShelf() {
 	if !g.ready() {
 		return
 	}
-	g.shelf = shelfState{open: true, selected: -1, remove: true}
+	g.shelf = shelfState{listState: openList[git.ShelfEntry](), remove: true}
 	g.loadShelf()
 }
 
 func (g *Git) loadShelf() {
 	s := &g.shelf
 	s.gen++
-	gen, r := s.gen, g.repo
-	s.loading, s.err = true, nil
+	gen, r := s.begin(), g.repo
 	applog.Go(func() {
 		items, err := r.ShelfList()
 		g.post(func() {
-			if gen != s.gen {
-				return
-			}
-			s.loading, s.err, s.items = false, err, items
-			if s.selected >= len(items) || (s.selected < 0 && len(items) > 0) {
-				s.selected = min(max(s.selected, 0), len(items)-1)
+			if s.apply(gen, items, err) {
+				s.clampSelection()
 			}
 		})
 	})

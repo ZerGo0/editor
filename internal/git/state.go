@@ -99,7 +99,7 @@ func (r *Repo) State(ctx context.Context) (RepoState, error) {
 			return RepoState{}, err
 		}
 		if ok {
-			return RepoState{Kind: probe.kind, Head: firstLine(head)}, nil
+			return RepoState{Kind: probe.kind, Head: FirstLine(head)}, nil
 		}
 	}
 	if todo, ok, err := r.gitFile(sequencerTodo); err != nil {

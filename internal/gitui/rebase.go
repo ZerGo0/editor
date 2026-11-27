@@ -155,7 +155,7 @@ func (g *Git) todoList(c *ui.Context) {
 
 func (s *rebaseState) subject(i int) string {
 	if msg, ok := s.messages[s.items[i].OID]; ok && s.actions[i] == string(git.ActionReword) {
-		return firstLineOf(msg)
+		return git.FirstLine(msg)
 	}
 	return s.items[i].Subject
 }

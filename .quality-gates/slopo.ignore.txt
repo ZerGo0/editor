@@ -1,0 +1,136 @@
+# SlopO duplicate clusters reviewed and kept. One hash per line; the comment above a hash gives the reason.
+
+# Two standalone generator programs (go run ./gen); each needs its own main and there is no shared package to own it.
+7db5bd8edc1c
+
+# One-line RWMutex-guarded counters on two unrelated index types; a shared helper would couple the packages for one line.
+e42ac85f4580
+
+# Constructors of two unrelated stores (keymap and settings); each store owns its own Load.
+863fc50bf15e
+
+# Byte-class predicates with different character sets per tool (Go-style identifiers, TS/JS identifiers, TODO words, ASCII letters); one shared predicate would change what each tokenizer accepts.
+5b1874ec9fab
+
+# redline.Rect uses float32 geometry with a fixed tolerance; e2e/qa.Rect is a separate float64 type with a tolerance argument. The two packages share no geometry type.
+6ec2189bbc00
+
+# One-expression closures that bind icons.FileIcon to different row types in multidiff and gitui; a helper would only wrap one call.
+56d3e7fca0bf
+
+# One-expression closures that bind icons.FileIcon to different row types in multidiff and gitui; a helper would only wrap one call.
+abb8d71f063a
+
+# Fixture data for a three-way merge conflict; the three versions differ by design.
+d3ffeecdb190
+
+# Layout recipes with different padding (view body versus hover card stack); merging them needs a parameter for every difference.
+d3397a3e97e1
+
+# The two completion callbacks differ: recordThen marks the path stale after a failure, the label path returns early. Merging changes behavior.
+c5557843c6d5
+
+# Light and dark palettes are two data tables of the same struct; their values differ by design.
+725891d60577
+
+# Image pane closes a *ui.VideoPlayer and media pane closes a mediaPlayer interface; the panes share no player type.
+70007fe869f2
+
+# Test key helpers pump a different number of frames (two in the peek bed, one in the find widget harness) because each widget needs its own settle count.
+0563012c6e18
+
+# Mirrored horizontal and vertical line drawing on the redline canvas; one axis-generic loop would be harder to read.
+c4d2ff7e6443
+
+# Mirrored horizontal and vertical dimension ticks on the redline canvas; one axis-generic helper would be harder to read.
+2a9c58edbf84
+
+# Mirrored column and row ink projections; one axis-generic helper would be harder to read.
+99bb3849ab55
+
+# checkPath and checkLocation reject different prefixes (absolute path versus option-like text); they are separate security checks that must stay explicit.
+2027f08c24c2
+
+# Test views that render a split button with different options; the options are the data under test.
+ececf0479b52
+
+# Dark and light syntax palettes are two data tables of the same struct.
+d1792d05bcd5
+
+# Per-language regular expression rule tables; they are data, and the languages differ.
+c3aab3125561
+
+# Forward and backward chunked search are mirrored scans with different loop bounds.
+b6b349e8dace
+
+# Test views that render the navigation buttons with different surroundings.
+5ac5428a092e
+
+# Each filter test asserts a different mode and different output lines on one fixture.
+48a21cad1de7
+
+# e2e.Node and qa.Node are separate types in two test suites; each predicate builder matches its own type.
+3842e3cd5d8a
+
+# Unpin and toggle-pin guards differ in the pinned state they set; a shared helper would need a callback for one line.
+32b20029f725
+
+# Staged and Unstaged filter on different status columns; each is a one-line filter.
+40360888a5ca
+
+# Layout tests cover different insertion scenarios with different setups and assertions.
+fcad811a4441
+
+# The two when-expression tests assert different contracts (evaluation only, evaluation plus unknown keys).
+b93654e98444
+
+# newRealGit drives a real repository and newFakeGit drives a recording fake with its own init hook; the dependency sets differ.
+a2670ba09da1
+
+# Forward and reverse frontier steps of one bidirectional diff; they differ in comparisons and meeting test.
+5f3ed72fa02b
+
+# Accepting and rejecting tables for command arguments; merging them adds an expected-error column and weakens each failure message.
+e26ef43ee57d
+
+# Plain-key and Cmd-key switch tables map different keys to different actions.
+880768b77110
+
+# Block comment ends for Go and ECMAScript share blockCommentEnd; the remaining wrappers set different scanner state.
+d487b1b954f1
+
+# Undo and Redo are the public entry points over the shared travel helper; each is one line.
+b6cad389e047
+
+# The two preset tests are pure binding tables over the shared checkPreset helper.
+5fa7b902848a
+
+# The two move-detection tests build different scenarios and assert different results.
+162fc8083859
+
+# prui and issueui test predicates read different state structs (hs.p.side.search vs hs.i.side.search); a shared helper would need a getter per package and is longer than the one-line predicate.
+c1ba8f9aa126
+
+# The two Env literals wire different Backend types and different extra hooks (Checkout, Confirm, CopyText in prui; Copy in issueui). The shared part, LocalOpener, is already in ghshared; a generic Env base would hold four wiring lines and tie both packages together.
+0007b4e2fbf6
+
+# Harness.start builds a different type per package (NewWith returns *PRs or *Issues); the shared waiting logic is already ghtest.Start, and what is left is the typed constructor call.
+8ef222f8dfd6
+
+# Both fakes record a call and return a comment, but they fill different recorded fields (body in prui, commented in issueui) for a different backend method (AddComment vs AddIssueComment). Moving them to one place would force one fake backend for two unrelated interfaces.
+827a4b60712d
+
+# AssignableUsers fakes implement different Backend interfaces and different gating (issueui blocks on a gate channel in record, prui does not); one shared fake would need both backends.
+472fd74dbb52
+
+# TestDetailAddComment and TestPostComment drive different apps (PR timeline events vs issue comment list and counter) through package-local fakes; the shared steps are already ghtest.MustClick and MustHaveText.
+974bdbd64be0
+
+# Same as the add comment test: the failure tests assert package-specific state (draft and error text vs draft and comment count) on package-local fakes.
+05e0e5ee110e
+
+# One-line gitui button wrappers, one per button style, and ghshared.SmallButton, which returns the element for its callers to style; folding them would move the options literal and the disabled check into each of about 40 call sites.
+ba92542c25a3
+
+# Git.post and viewer State.publish drop updates after close, but read a plain bool owned by the UI goroutine and an atomic.Bool set from other goroutines; a shared helper would need a closure for the flag and is as long as either body.
+180c24b4957e

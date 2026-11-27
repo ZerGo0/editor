@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -60,7 +61,7 @@ func TestParseThemeExpandsPatterns(t *testing.T) {
 		}
 	}
 	for _, want := range []string{".eslintrc", ".eslintrc.json", "eslint.config.mjs", ".tsup", "tsup", "x"} {
-		if !contains(names, want) {
+		if !slices.Contains(names, want) {
 			t.Errorf("pattern names lack %q", want)
 		}
 	}
@@ -71,15 +72,6 @@ func TestParseThemeRejectsUnknownPattern(t *testing.T) {
 	if _, err := parseTheme(sources); err == nil || !strings.Contains(err.Error(), "Mystery") {
 		t.Errorf("err = %v, want unknown pattern error", err)
 	}
-}
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }
 
 func themeSources(fileEntries, folderEntries, languageEntries string) map[string][]byte {

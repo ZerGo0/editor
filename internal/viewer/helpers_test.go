@@ -158,15 +158,6 @@ func writeGIF(t *testing.T, dir, name string, frames int) string {
 	return writeFile(t, dir, name, buf.Bytes())
 }
 
-func mustRead(t *testing.T, path string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return data
-}
-
 func removeFile(path string) error { return os.Remove(path) }
 
 func writeFile(t *testing.T, dir, name string, data []byte) string {

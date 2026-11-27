@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func writeFile(t *testing.T, name string, data []byte, perm os.FileMode) string {
@@ -14,15 +16,6 @@ func writeFile(t *testing.T, name string, data []byte, perm os.FileMode) string 
 		t.Fatal(err)
 	}
 	return p
-}
-
-func readFile(t *testing.T, p string) string {
-	t.Helper()
-	b, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
 }
 
 func TestOpenText(t *testing.T) {
@@ -102,7 +95,7 @@ func TestOpenInvalidUTF8(t *testing.T) {
 	if err := d.Save(); err == nil {
 		t.Fatal("save should fail")
 	}
-	if readFile(t, p) != "ok \xff\xfe bad" {
+	if testutil.ReadText(t, p) != "ok \xff\xfe bad" {
 		t.Fatal("file changed")
 	}
 }
@@ -126,7 +119,7 @@ func TestSaveWritesEdits(t *testing.T) {
 	if err := d.Save(); err != nil {
 		t.Fatal(err)
 	}
-	if readFile(t, p) != "changed" || d.Modified() || d.ChangedOnDisk() {
+	if testutil.ReadText(t, p) != "changed" || d.Modified() || d.ChangedOnDisk() {
 		t.Fatal("save state wrong")
 	}
 }
@@ -138,7 +131,7 @@ func TestSaveKeepsCRLF(t *testing.T) {
 	if err := d.Save(); err != nil {
 		t.Fatal(err)
 	}
-	if got := readFile(t, p); got != content {
+	if got := testutil.ReadText(t, p); got != content {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -175,7 +168,7 @@ func TestSaveMissingFileUsesDefaultPerm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if readFile(t, p) != "x" || info.Mode().Perm() != defaultPerm {
+	if testutil.ReadText(t, p) != "x" || info.Mode().Perm() != defaultPerm {
 		t.Fatalf("mode %v", info.Mode().Perm())
 	}
 }
@@ -205,8 +198,8 @@ func TestSaveThroughSymlink(t *testing.T) {
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("link replaced by regular file")
 	}
-	if readFile(t, target) != "new" {
-		t.Fatalf("target %q", readFile(t, target))
+	if testutil.ReadText(t, target) != "new" {
+		t.Fatalf("target %q", testutil.ReadText(t, target))
 	}
 	if got, _ := os.Readlink(link); got != target {
 		t.Fatalf("link points to %q", got)

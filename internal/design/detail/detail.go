@@ -3,6 +3,7 @@ package detail
 import (
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -34,7 +35,7 @@ func Header(c *ui.Context, o HeaderOptions) ui.Element {
 				token.TextHeading.Apply(ui.Text(c, "#"+strconv.Itoa(o.Number))).TextColor(p.Text.Secondary).SingleLine().Shrink(0)
 			}
 			if o.Actions != nil {
-				ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(o.Title + " Actions").Children(func() { o.Actions(c) })
+				action.Toolbar(c, o.Title).Children(func() { o.Actions(c) })
 			}
 		})
 		if o.Meta != nil {
@@ -65,6 +66,14 @@ func Page(c *ui.Context, body func()) ui.Element {
 
 func Centered(c *ui.Context, body func()) ui.Element {
 	return ui.Column(c).Grow(1).FillWidth().Center().Children(body)
+}
+
+func Loading(c *ui.Context, label string) ui.Element {
+	return Centered(c, func() { feedback.Loading(c, label) })
+}
+
+func Failed(c *ui.Context, title string, err error, retry func()) ui.Element {
+	return Centered(c, func() { feedback.Error(c, title, err, retry) })
 }
 
 type CardOptions struct {

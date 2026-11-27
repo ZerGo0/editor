@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/gitui"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
@@ -50,7 +51,7 @@ func (w *Workspace) applyGitSettings() {
 
 func (w *Workspace) gitSideView(c *ui.Context) {
 	if w.git == nil {
-		loading(c)
+		detail.Loading(c, loadingLabel)
 		return
 	}
 	w.git.SideView(c)
@@ -81,7 +82,7 @@ func (w *Workspace) OpenViewWith(id, title string, view func(c *ui.Context), pre
 
 func (w *Workspace) gitLogPanel(c *ui.Context) {
 	if w.git == nil {
-		loading(c)
+		detail.Loading(c, loadingLabel)
 		return
 	}
 	w.git.LogPanel(c)

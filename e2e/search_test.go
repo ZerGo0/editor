@@ -32,6 +32,14 @@ func waitQuickOpen(app *App, win int, title string) {
 	app.WaitNode(win, title+" quick open", RoleLabel("dialog", title))
 }
 
+func waitQuickInputClosed(app *App, win int, title string) {
+	app.t.Helper()
+	app.Eventually("quick input closed", func() bool {
+		_, open := app.Find(win, RoleLabel("dialog", title))
+		return !open
+	})
+}
+
 func waitTab(app *App, win int, name string, selected bool) {
 	app.t.Helper()
 	app.WaitNode(win, name+" tab", func(n Node) bool { return n.Role == "tab" && n.Label == name && n.Has("checked") == selected })

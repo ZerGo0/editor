@@ -5,7 +5,6 @@ package e2e
 import (
 	"fmt"
 	"image"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -133,19 +132,7 @@ func TestViewRedlines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		stale := allow.Stale()
-		if len(stale) == 0 {
-			return
-		}
-		if os.Getenv(redlineUpdateEnv) == "" {
-			t.Errorf("e2e/%s has entries that match no finding; remove them with %s=1:\n%s", redlineAllowFile, redlineUpdateEnv, strings.Join(stale, "\n"))
-			return
-		}
-		if err := allow.Prune(); err != nil {
-			t.Error(err)
-		}
-	})
+	t.Cleanup(func() { allow.Settle(t, redlineUpdateEnv) })
 	for _, theme := range []string{themeDark, themeLight} {
 		t.Run(theme, func(t *testing.T) {
 			t.Parallel()

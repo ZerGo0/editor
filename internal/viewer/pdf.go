@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/host"
@@ -128,7 +129,7 @@ func (p *pdfPane) body(c *ui.Context) {
 	case p.unavailable != nil:
 		message(c, "PDF preview is not available", p.unavailable.Error()+". "+pdfUnavailableMsg, "", nil)
 	case p.err != nil:
-		errorView(c, "Cannot show this PDF", p.err, p.start)
+		detail.Failed(c, "Cannot show this PDF", p.err, p.start)
 	default:
 		view := p.web.show(c).Grow(1).FillWidth().Label(pdfLabel).Bind(&p.s.focus)
 		if p.loading {

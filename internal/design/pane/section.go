@@ -3,6 +3,7 @@ package pane
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -43,7 +44,7 @@ func Header(c *ui.Context, title string, open *bool, o SectionOptions) ui.Elemen
 			*open = !*open
 		}
 		if o.Actions != nil {
-			actions := ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(title + " Actions")
+			actions := action.Toolbar(c, title)
 			if !show {
 				actions.Opacity(token.OpacityHidden.Value())
 			}

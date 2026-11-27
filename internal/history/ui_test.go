@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -112,13 +113,6 @@ func newEnv(t *testing.T) *env {
 	return e
 }
 
-func (e *env) write(text string) {
-	e.t.Helper()
-	if err := os.WriteFile(e.path, []byte(text), 0o644); err != nil {
-		e.t.Fatal(err)
-	}
-}
-
 func (e *env) show() {
 	e.t.Helper()
 	e.ui.ShowHistory(e.path)
@@ -179,9 +173,13 @@ func (e *env) seed(texts ...string) {
 
 func TestEmptyState(t *testing.T) {
 	e := newEnv(t)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	e.show()
-	e.waitFor("empty text", func() bool { return e.tt.HasText("No history yet") && e.tt.HasText(emptyMessage) })
+	e.waitFor("empty text", e.showsEmptyHistory)
+}
+
+func (e *env) showsEmptyHistory() bool {
+	return e.tt.HasText("No history yet") && e.tt.HasText(emptyMessage)
 }
 
 func TestLoadingShowsSpinner(t *testing.T) {
@@ -195,7 +193,7 @@ func TestLoadingShowsSpinner(t *testing.T) {
 func TestListsVersionsAndEnablesActions(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText, "middle\n")
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	e.show()
 	e.waitReady()
 	for _, name := range []string{revertLabel, "Copy", "Put Label..."} {
@@ -211,7 +209,7 @@ func TestListsVersionsAndEnablesActions(t *testing.T) {
 func TestSelectingOlderVersionLoadsIt(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText, "middle\n")
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	e.show()
 	e.waitReady()
 	if err := e.tt.Click("just now  9 B"); err != nil {
@@ -223,7 +221,7 @@ func TestSelectingOlderVersionLoadsIt(t *testing.T) {
 func TestRevertWritesFileAtomically(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	e.show()
 	e.waitReady()
 	if err := e.tt.Click(revertLabel); err != nil {
@@ -257,7 +255,7 @@ func TestRevertWritesOpenBufferSoUndoWorks(t *testing.T) {
 func TestRevertCancelledChangesNothing(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	asked := make(chan struct{}, 1)
 	e.ui.confirm = func(*mygo.Window, string, time.Time) bool { asked <- struct{}{}; return false }
 	e.show()
@@ -279,7 +277,7 @@ func TestRevertCancelledChangesNothing(t *testing.T) {
 func TestCopyUsesVersionText(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	var copied string
 	e.ui.copyText = func(s string) { copied = s }
 	e.show()
@@ -294,7 +292,7 @@ func TestCopyUsesVersionText(t *testing.T) {
 
 func TestPutLabelRecordsCurrentText(t *testing.T) {
 	e := newEnv(t)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	if !e.ui.Run(ActionPutLabel) || e.host.submit == nil {
 		t.Fatal("no prompt")
 	}
@@ -373,7 +371,7 @@ func TestErrorStateOffersRetry(t *testing.T) {
 	if err := e.tt.Click("Retry"); err != nil {
 		t.Fatal(err)
 	}
-	e.waitFor("empty after retry", func() bool { return e.tt.HasText("No history yet") && e.tt.HasText(emptyMessage) })
+	e.waitFor("empty after retry", e.showsEmptyHistory)
 }
 
 func TestMissingFileShowsDeleted(t *testing.T) {
@@ -424,7 +422,7 @@ func TestRenamedMovesHistoryAndPage(t *testing.T) {
 func TestNoUnnamedButtons(t *testing.T) {
 	e := newEnv(t)
 	e.seed(oldText)
-	e.write(currentText)
+	testutil.WriteFile(e.t, e.path, currentText)
 	e.show()
 	e.waitReady()
 	for _, a := range e.tt.AccessAll() {

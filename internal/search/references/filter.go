@@ -29,25 +29,25 @@ func memberAccess(line string, start int) (op int, ok bool) {
 			return op, !strings.HasSuffix(head, ".")
 		case "::":
 			r, _ := utf8.DecodeLastRuneInString(head)
-			return op, isWordRune(r) || r == '>'
+			return op, IsWordRune(r) || r == '>'
 		}
 		return op, true
 	}
 	return 0, false
 }
 
-func isWordRune(r rune) bool {
+func IsWordRune(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 func wholeWord(line string, start, end int) bool {
 	if start > 0 {
-		if r, _ := utf8.DecodeLastRuneInString(line[:start]); isWordRune(r) {
+		if r, _ := utf8.DecodeLastRuneInString(line[:start]); IsWordRune(r) {
 			return false
 		}
 	}
 	if end < len(line) {
-		if r, _ := utf8.DecodeRuneInString(line[end:]); isWordRune(r) {
+		if r, _ := utf8.DecodeRuneInString(line[end:]); IsWordRune(r) {
 			return false
 		}
 	}

@@ -9,7 +9,9 @@ import (
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/scrollbar"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/viewer/hexdump"
 	"github.com/egoist/mygo/ui"
@@ -31,10 +33,7 @@ type shapedText struct {
 	w, h   float32
 }
 
-type barDrag struct {
-	active bool
-	grab   float32
-}
+type hexRowPos struct{ hexX, asciiX, y float32 }
 
 type hexPane struct {
 	s        *State
@@ -58,7 +57,7 @@ type hexPane struct {
 	charW    float32
 	wheelY   float32
 	dragging bool
-	bar      barDrag
+	bar      scrollbar.Drag
 	barStyle ui.ScrollbarStyle
 	shapes   map[string]*shapedText
 }
@@ -167,9 +166,9 @@ func (p *hexPane) controls(c *ui.Context) {
 func (p *hexPane) body(c *ui.Context) {
 	switch {
 	case p.err != nil:
-		errorView(c, "Cannot read this file", p.err, p.load)
+		detail.Failed(c, "Cannot read this file", p.err, p.load)
 	case p.src == nil:
-		loadingView(c, "Reading file")
+		detail.Loading(c, "Reading file")
 	default:
 		p.banner(c)
 		if p.size == 0 {
@@ -281,8 +280,8 @@ func (p *hexPane) paint(pnt *ui.Painter, r ui.Rect, t *token.Palette) {
 			page, pageErr = p.src.Page(idx)
 			pageIdx = idx
 		}
-		if hasSel {
-			p.paintSelection(pnt, t, start, end, selA, selB, hexX, asciiX, y)
+		if first, last, ok := rowSelection(start, end, selA, selB); hasSel && ok {
+			p.paintSelection(pnt, t.Text.Selection, first, last, hexRowPos{hexX: hexX, asciiX: asciiX, y: y})
 		}
 		p.drawText(pnt, hexdump.FormatOffset(start, p.layout.Digits), x0, y, t.Text.Muted)
 		switch {
@@ -298,7 +297,7 @@ func (p *hexPane) paint(pnt *ui.Painter, r ui.Rect, t *token.Palette) {
 	bar := p.scrollbar()
 	bar.Box.X, bar.Box.Y = r.X, r.Y
 	if bar.Scrolls() {
-		pnt.Scrollbar(bar, ui.ScrollbarState{Dragging: p.bar.active})
+		pnt.Scrollbar(bar, ui.ScrollbarState{Dragging: p.bar.Active})
 	}
 }
 
@@ -307,16 +306,16 @@ func (p *hexPane) drawText(pnt *ui.Painter, text string, x, y float32, color ui.
 	pnt.TextLayout(sh.layout, x, y+(p.lineH-sh.h)/2, color)
 }
 
-func (p *hexPane) paintSelection(pnt *ui.Painter, t *token.Palette, start, end, selA, selB int64, hexX, asciiX, y float32) {
+func rowSelection(start, end, selA, selB int64) (first, last int, ok bool) {
 	from, to := max(selA, start), min(selB, end)
-	if from >= to {
-		return
-	}
-	first, last := int(from-start), int(to-start-1)
-	hexStart := hexX + float32(hexdump.HexColumn(first))*p.charW
-	hexEnd := hexX + float32(hexdump.HexColumn(last)+2)*p.charW
-	pnt.Fill(ui.Rect{X: hexStart, Y: y, W: hexEnd - hexStart, H: p.lineH}, t.Text.Selection, 0)
-	pnt.Fill(ui.Rect{X: asciiX + float32(first)*p.charW, Y: y, W: float32(last-first+1) * p.charW, H: p.lineH}, t.Text.Selection, 0)
+	return int(from - start), int(to - start - 1), from < to
+}
+
+func (p *hexPane) paintSelection(pnt *ui.Painter, color ui.Color, first, last int, pos hexRowPos) {
+	hexStart := pos.hexX + float32(hexdump.HexColumn(first))*p.charW
+	hexEnd := pos.hexX + float32(hexdump.HexColumn(last)+2)*p.charW
+	pnt.Fill(ui.Rect{X: hexStart, Y: pos.y, W: hexEnd - hexStart, H: p.lineH}, color, 0)
+	pnt.Fill(ui.Rect{X: pos.asciiX + float32(first)*p.charW, Y: pos.y, W: float32(last-first+1) * p.charW, H: p.lineH}, color, 0)
 }
 
 func (p *hexPane) scrollbar() ui.Scrollbar {
@@ -346,8 +345,8 @@ func (p *hexPane) input(ev ui.InputEvent) bool {
 	case ui.InputPointerMove:
 		return p.pointerMove(ev)
 	case ui.InputPointerUp:
-		held := p.dragging || p.bar.active
-		p.dragging, p.bar.active = false, false
+		held := p.dragging || p.bar.Active
+		p.dragging, p.bar.Active = false, false
 		return held
 	case ui.InputScroll:
 		p.wheelY += ev.DY
@@ -469,11 +468,8 @@ func (p *hexPane) pointerDown(ev ui.InputEvent) bool {
 	p.s.focus.Focus()
 	if ev.X >= p.viewW-p.barStyle.TrackWidth {
 		if bar := p.scrollbar(); bar.Scrolls() {
-			start, length := bar.Thumb()
-			p.bar = barDrag{active: true, grab: ev.Y - start}
-			if ev.Y < start || ev.Y >= start+length {
-				p.bar.grab = length / 2
-				p.scrollToBar(bar.OffsetAt(ev.Y - p.bar.grab))
+			if offset, jumped := p.bar.Press(bar, ev.Y); jumped {
+				p.scrollToBar(offset)
 			}
 			return true
 		}
@@ -492,8 +488,8 @@ func (p *hexPane) pointerDown(ev ui.InputEvent) bool {
 
 func (p *hexPane) pointerMove(ev ui.InputEvent) bool {
 	switch {
-	case p.bar.active:
-		p.scrollToBar(p.scrollbar().OffsetAt(ev.Y - p.bar.grab))
+	case p.bar.Active:
+		p.scrollToBar(p.bar.Offset(p.scrollbar(), ev.Y))
 	case p.dragging && ev.Button == pointerPrimary:
 		if off, ok := p.byteAt(ev.X, ev.Y); ok {
 			p.caret = off

@@ -23,6 +23,12 @@ const (
 	DropAfter
 )
 
+type tabRenderer struct {
+	p     *token.Palette
+	o     TabStripOptions
+	state *stripState
+}
+
 type stripState struct {
 	scroll ui.ScrollState
 	middle int
@@ -68,13 +74,14 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 		Padding(token.TabStripInset.Px(), 0, 0, token.GapInline.Px()).AlignItems(ui.Center)
 	shown := ui.Local(strip, "shown", func() int { return noTab })
 	state := ui.Local(strip, "state", func() stripState { return stripState{middle: noTab} })
+	tr := tabRenderer{p: p, o: o, state: state}
 	strip.Children(func() {
 		ui.ScrollHorizontal(c).TrackScroll(&state.scroll).HandleInput(state.wheel).Shrink(1).MinWidth(0).FillHeight().Children(func() {
 			parts := ui.TabsBase(c, selected, len(tabs))
 			parts.List.FillHeight().AlignItems(ui.Center).Gap(token.GapTight.Px()).Label(o.Label).Children(func() {
 				for i, t := range tabs {
 					tab := parts.Tab(i)
-					tabItem(c, p, tab, i == *selected, i, t, o, state)
+					tr.item(c, tab, i == *selected, i, t)
 					if i == *selected && *shown != i {
 						tab.ScrollIntoView()
 					}
@@ -98,8 +105,7 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 			o.OnEmptyDoubleClick()
 		}
 		if o.Actions != nil {
-			ui.Row(c).FillHeight().Padding(0, token.GapInline.Px()).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).
-				Role(ui.RoleToolbar).Label(o.Label + " Actions").Children(func() { o.Actions(c) })
+			action.Toolbar(c, o.Label).FillHeight().Padding(0, token.GapInline.Px()).Children(func() { o.Actions(c) })
 		}
 	})
 	return strip
@@ -123,7 +129,8 @@ func (s *stripState) wheel(ev ui.InputEvent) bool {
 	return true
 }
 
-func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int, t Tab, o TabStripOptions, s *stripState) {
+func (r tabRenderer) item(c *ui.Context, tab ui.Element, active bool, i int, t Tab) {
+	p, o, s := r.p, r.o, r.state
 	hovered := tab.Hovered()
 	fg := p.Tab.InactiveText
 	switch {
@@ -172,7 +179,7 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 		if t.Description != "" {
 			token.TextLabel.Apply(ui.Text(c, t.Description)).TextColor(p.Text.Secondary).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
 		}
-		tabEnd(c, p, active, hovered, i, t, o)
+		r.end(c, active, hovered, i, t)
 	})
 	if b, ok := tab.PressedButton(); ok && b == middleButton {
 		s.middle = i
@@ -188,7 +195,8 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 	}
 }
 
-func tabEnd(c *ui.Context, p *token.Palette, active, hovered bool, i int, t Tab, o TabStripOptions) {
+func (r tabRenderer) end(c *ui.Context, active, hovered bool, i int, t Tab) {
+	p, o := r.p, r.o
 	slot := ui.Box(c).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Center().Shrink(0)
 	slot.Children(func() {
 		pointed := hovered || slot.Hovered()

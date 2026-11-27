@@ -47,14 +47,19 @@ func Over(fg, bg ui.Color) ui.Color {
 
 func luminance(c ui.Color) float64 {
 	c = c.SRGB()
-	channel := func(v uint8) float64 {
-		s := float64(v) / channelMax
-		if s <= linearThreshold {
-			return s / linearDivisor
-		}
-		return math.Pow((s+gammaOffset)/gammaDivisor, gamma)
+	return Luminance(c.R, c.G, c.B)
+}
+
+func Luminance(r, g, b uint8) float64 {
+	return luminanceRed*linearChannel(r) + luminanceGreen*linearChannel(g) + luminanceBlue*linearChannel(b)
+}
+
+func linearChannel(v uint8) float64 {
+	s := float64(v) / channelMax
+	if s <= linearThreshold {
+		return s / linearDivisor
 	}
-	return luminanceRed*channel(c.R) + luminanceGreen*channel(c.G) + luminanceBlue*channel(c.B)
+	return math.Pow((s+gammaOffset)/gammaDivisor, gamma)
 }
 
 func ensure(fg ui.Color, want float64, bgs ...ui.Color) ui.Color {

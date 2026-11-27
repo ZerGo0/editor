@@ -1,11 +1,13 @@
 package gitui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -34,9 +36,9 @@ func openLongDiff(t *testing.T) (*diffTab, *ui.Tester) {
 		t.Skip("git is not installed")
 	}
 	dir := newTempRepo(t)
-	writeFile(t, dir, codePath, longText("before"))
+	testutil.WriteFile(t, filepath.Join(dir, codePath), longText("before"))
 	commitAll(t, dir, "init")
-	writeFile(t, dir, codePath, longText("after"))
+	testutil.WriteFile(t, filepath.Join(dir, codePath), longText("after"))
 	useSession(t, diffmode.Options{})
 	g, h := newRealGit(t, dir)
 	g.openDiff(diffWorkTree, codePath)

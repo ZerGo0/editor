@@ -57,17 +57,14 @@ func (d *Dialog) replaceSelected() {
 	}
 }
 
-func (d *Dialog) replaceMatch(f *FileNode, i int) {
-	if d.canReplace() {
-		d.moved = true
-		d.apply([]replaceTarget{{file: f, accept: acceptSet(f.Matches[i : i+1])}})
-	}
-}
+func (d *Dialog) replaceMatch(f *FileNode, i int) { d.replaceIn(f, f.Matches[i:i+1]) }
 
-func (d *Dialog) replaceFile(f *FileNode) {
+func (d *Dialog) replaceFile(f *FileNode) { d.replaceIn(f, f.Matches) }
+
+func (d *Dialog) replaceIn(f *FileNode, matches []textsearch.Match) {
 	if d.canReplace() {
 		d.moved = true
-		d.apply([]replaceTarget{{file: f, accept: acceptSet(f.Matches)}})
+		d.apply([]replaceTarget{{file: f, accept: acceptSet(matches)}})
 	}
 }
 

@@ -8,11 +8,12 @@ import (
 
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func TestFileOutsideTheRootKeepsItsTabAcrossSessionAndHotExit(t *testing.T) {
 	root, outside := t.TempDir(), t.TempDir()
-	writeFiles(t, outside, map[string]string{"loose.txt": "disk\n"})
+	testutil.WriteFiles(t, outside, map[string]string{"loose.txt": "disk\n"})
 	p := filepath.Join(outside, "loose.txt")
 	env := newTestEnv(t)
 	w := newTestWorkspace(t, root, env, session.Project{})
@@ -37,7 +38,7 @@ func TestFileOutsideTheRootKeepsItsTabAcrossSessionAndHotExit(t *testing.T) {
 	if !w2.save([]*document.Document{d}) {
 		t.Fatal("save failed")
 	}
-	if got := readFile(t, p); got != "edited\n" {
+	if got := testutil.ReadText(t, p); got != "edited\n" {
 		t.Fatalf("saved %q", got)
 	}
 	if w2.rel(p) != p {
@@ -47,7 +48,7 @@ func TestFileOutsideTheRootKeepsItsTabAcrossSessionAndHotExit(t *testing.T) {
 
 func TestRecentFileOutsideTheRootSurvivesARestartUntilItIsDeleted(t *testing.T) {
 	root, outside := t.TempDir(), t.TempDir()
-	writeFiles(t, outside, map[string]string{"loose.txt": "disk\n", "gone.txt": "disk\n"})
+	testutil.WriteFiles(t, outside, map[string]string{"loose.txt": "disk\n", "gone.txt": "disk\n"})
 	loose, gone := filepath.Join(outside, "loose.txt"), filepath.Join(outside, "gone.txt")
 	env := newTestEnv(t)
 	w := newTestWorkspace(t, root, env, session.Project{})

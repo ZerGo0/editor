@@ -6,6 +6,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -68,7 +69,7 @@ func TestTitleKeepsItsShareOfTheRow(t *testing.T) {
 		if share := title.W / float32(width); share < TitleShare-shareSlack {
 			t.Errorf("%d px: the title takes %.0f%% of the row, want at least %.0f%%", width, share*100, TitleShare*100)
 		}
-		if natural := naturalWidth(tt, longTitle); title.W >= natural {
+		if natural := testutil.NaturalTextWidth(sideWidth, testHeight, longTitle); title.W >= natural {
 			t.Errorf("%d px: the title is %.0f px wide, want it cut below its natural %.0f px", width, title.W, natural)
 		}
 		if tt.HasText("#128 · 3 days ago") {
@@ -102,13 +103,4 @@ func TestPillsShrinkToIconsBeforeTheyAreDropped(t *testing.T) {
 	if _, title, ok := drawn(tt, titlePrefix); !ok || title.W/float32(sideWidth) < TitleShare-shareSlack {
 		t.Errorf("%d px: the title is too short next to the icon pills", sideWidth)
 	}
-}
-
-func naturalWidth(tt *ui.Tester, text string) float32 {
-	var w float32
-	probe := ui.NewTester(func(c *ui.Context) {
-		w, _ = c.MeasureText(0, ui.Span{Text: text, Size: token.TextBody.Px()})
-	}, sideWidth, testHeight)
-	probe.Frame()
-	return w
 }

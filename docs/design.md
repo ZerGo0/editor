@@ -302,7 +302,7 @@ The annotated PNG shows:
 | `optical` | Icon ink centre off the box centre, or a row icon off the row centre | More than 0.5 px, and more than 1 device px |
 | `text-band` | Cap band (cap top to baseline) off the centre of a box with its own background | More than 0.5 px, and more than 1 device px |
 | `crisp` | A fill or border edge on a part pixel that blurs | Edge off the device grid with a blended pixel |
-| `icon-set` | Monochrome icons in one group with a different optical size or stroke weight | Size ×/÷ 1.5, stroke ±0.5 px |
+| `icon-set` | Monochrome icons in one group with a different optical size or stroke weight | Size multiplied or divided by 1.5, stroke +/-0.5 px |
 | `contrast` | Real-pixel contrast of text and icons against their background, also hovered, pressed and selected | 4.5:1 text, 3:1 icons |
 
 Each finding in the report names the element (role, label, bounds), the area of the view it is in, the rule, the measured value, the expected value, a fix with a token, the likely component, an allow key and a crop PNG.

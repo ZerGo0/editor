@@ -96,6 +96,26 @@ func (l *Allowlist) Stale() []string {
 	return out
 }
 
+type reporter interface {
+	Helper()
+	Error(args ...any)
+}
+
+func (l *Allowlist) Settle(t reporter, updateEnv string) {
+	t.Helper()
+	stale := l.Stale()
+	if len(stale) == 0 {
+		return
+	}
+	if os.Getenv(updateEnv) == "" {
+		t.Error(fmt.Sprintf("%s has entries that match no finding; remove them with %s=1:\n%s", l.Path, updateEnv, strings.Join(stale, "\n")))
+		return
+	}
+	if err := l.Prune(); err != nil {
+		t.Error(err)
+	}
+}
+
 func (l *Allowlist) Prune() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()

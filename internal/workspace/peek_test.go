@@ -9,6 +9,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/ZerGo0/editor/internal/workspace/symbolnav"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -35,7 +36,7 @@ type peekBed struct {
 func newPeekBed(t *testing.T, files map[string]string) *peekBed {
 	t.Helper()
 	root := t.TempDir()
-	writeFiles(t, root, files)
+	testutil.WriteFiles(t, root, files)
 	env := newTestEnv(t)
 	b := &peekBed{root: root}
 	for _, act := range symbolnav.Actions {
@@ -112,6 +113,14 @@ func (b *peekBed) rows() []string {
 		}
 	}
 	return out
+}
+
+func newPeekedBed(t *testing.T) (*peekBed, *editor.State) {
+	t.Helper()
+	b := newPeekBed(t, map[string]string{"defs.go": defsSource, "other.go": otherSource, "use.go": useSource})
+	st := b.open(t, "use.go", editor.Pos{Line: 2, Col: useCol})
+	b.peekOn(t, ui.Alt, ui.KeyF12, "documented here")
+	return b, st
 }
 
 func (b *peekBed) peekOn(t *testing.T, mods ui.Modifiers, key ui.Key, preview string) {
@@ -197,9 +206,7 @@ func TestAltF12PeeksTheDefinitionsAndEnterOpensOne(t *testing.T) {
 }
 
 func TestEscapeClosesThePeekAndFocusesTheEditor(t *testing.T) {
-	b := newPeekBed(t, map[string]string{"defs.go": defsSource, "other.go": otherSource, "use.go": useSource})
-	st := b.open(t, "use.go", editor.Pos{Line: 2, Col: useCol})
-	b.peekOn(t, ui.Alt, ui.KeyF12, "documented here")
+	b, st := newPeekedBed(t)
 	if st.Focused() {
 		t.Fatal("the editor kept the focus under the peek")
 	}
@@ -211,9 +218,7 @@ func TestEscapeClosesThePeekAndFocusesTheEditor(t *testing.T) {
 }
 
 func TestEscapeInTheEditorClosesThePeek(t *testing.T) {
-	b := newPeekBed(t, map[string]string{"defs.go": defsSource, "other.go": otherSource, "use.go": useSource})
-	st := b.open(t, "use.go", editor.Pos{Line: 2, Col: useCol})
-	b.peekOn(t, ui.Alt, ui.KeyF12, "documented here")
+	b, st := newPeekedBed(t)
 	b.w.focusTab = b.w.active.ActiveTab()
 	b.tt.Frame()
 	b.tt.Frame()
@@ -358,9 +363,7 @@ func (b *peekBed) bounds(name string) ui.Rect {
 }
 
 func TestPeekSitsUnderTheCursorLineAcrossTheEditor(t *testing.T) {
-	b := newPeekBed(t, map[string]string{"defs.go": defsSource, "other.go": otherSource, "use.go": useSource})
-	st := b.open(t, "use.go", editor.Pos{Line: 2, Col: useCol})
-	b.peekOn(t, ui.Alt, ui.KeyF12, "documented here")
+	b, st := newPeekedBed(t)
 	b.tt.Frame()
 	area, panel, preview, results := b.bounds("Code editor"), b.bounds("Peek"), b.bounds(peekPreview), b.bounds(peekResults)
 	lineBottom := area.Y + float32(st.LineTop(3)-st.ScrollY())

@@ -9,6 +9,14 @@ import (
 	"testing"
 )
 
+func waitTreeItemGone(app *App, win int, label string) {
+	app.t.Helper()
+	app.Eventually(label+" hidden", func() bool {
+		_, ok := app.Find(win, RoleLabel("treeItem", label))
+		return !ok
+	})
+}
+
 func openProject(t *testing.T, files map[string]string) (*App, int, string) {
 	t.Helper()
 	return openProjectEnv(t, files, nil)

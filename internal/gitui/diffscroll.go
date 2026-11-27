@@ -1,6 +1,7 @@
 package gitui
 
 import (
+	"github.com/ZerGo0/editor/internal/design/scrollbar"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -9,9 +10,8 @@ import (
 const percentWhole float32 = 100
 
 type diffBar struct {
-	bar    ui.Scrollbar
-	active bool
-	grab   float32
+	bar ui.Scrollbar
+	scrollbar.Drag
 }
 
 func oldPaneWidth(total, splitPercent float32) float32 {
@@ -55,8 +55,8 @@ func (t *diffTab) paintOldBar(p *ui.Painter, r ui.Rect, style ui.ScrollbarStyle,
 		return
 	}
 	p.ScrollbarTrack(bar)
-	if hovered || t.bar.active {
-		p.ScrollbarThumb(bar, ui.ScrollbarState{Dragging: t.bar.active})
+	if hovered || t.bar.Active {
+		p.ScrollbarThumb(bar, ui.ScrollbarState{Dragging: t.bar.Active})
 	}
 }
 
@@ -72,10 +72,10 @@ func (t *diffTab) localBar() (ui.Scrollbar, bool) {
 func (t *diffTab) hitOldBar(x, y float32, _ ui.Rect) bool {
 	bar, ok := t.localBar()
 	if !ok {
-		return t.bar.active
+		return t.bar.Active
 	}
 	track := bar.Style.TrackWidth
-	return t.bar.active || x >= bar.Box.W-track && x <= bar.Box.W && y >= 0 && y <= bar.Box.H
+	return t.bar.Active || x >= bar.Box.W-track && x <= bar.Box.W && y >= 0 && y <= bar.Box.H
 }
 
 func (t *diffTab) inputOldBar(ev ui.InputEvent) bool {
@@ -85,28 +85,19 @@ func (t *diffTab) inputOldBar(ev ui.InputEvent) bool {
 	}
 	switch ev.Kind {
 	case ui.InputPointerDown:
-		start, length := bar.Thumb()
-		t.bar.active = true
-		if ev.Y >= start && ev.Y <= start+length {
-			t.bar.grab = ev.Y - start
-		} else {
-			t.bar.grab = length / 2
-			t.dragOldBar(bar, ev.Y)
+		if offset, jumped := t.bar.Press(bar, ev.Y); jumped {
+			t.state.SetScrollY(float64(offset))
 		}
 		return true
 	case ui.InputPointerMove:
-		if t.bar.active {
-			t.dragOldBar(bar, ev.Y)
+		if t.bar.Active {
+			t.state.SetScrollY(float64(t.bar.Offset(bar, ev.Y)))
 			return true
 		}
 	case ui.InputPointerUp:
-		held := t.bar.active
-		t.bar.active = false
+		held := t.bar.Active
+		t.bar.Active = false
 		return held
 	}
 	return false
-}
-
-func (t *diffTab) dragOldBar(bar ui.Scrollbar, y float32) {
-	t.state.SetScrollY(float64(bar.OffsetAt(y - t.bar.grab)))
 }

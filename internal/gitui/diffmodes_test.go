@@ -2,10 +2,12 @@ package gitui
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 )
 
@@ -45,9 +47,9 @@ func TestIgnoreWhitespacesHidesIndentationChange(t *testing.T) {
 		t.Skip("git is not installed")
 	}
 	dir := newTempRepo(t)
-	writeFile(t, dir, codePath, tabbedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), tabbedCode)
 	commitAll(t, dir, "init")
-	writeFile(t, dir, codePath, editedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), editedCode)
 	useSession(t, diffmode.Options{Whitespace: git.WhitespaceIgnore})
 	g, h := newRealGit(t, dir)
 	g.openDiff(diffWorkTree, codePath)
@@ -80,9 +82,9 @@ func TestIgnoreWhitespacesOnlyIndentation(t *testing.T) {
 		t.Skip("git is not installed")
 	}
 	dir := newTempRepo(t)
-	writeFile(t, dir, codePath, tabbedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), tabbedCode)
 	commitAll(t, dir, "init")
-	writeFile(t, dir, codePath, spacedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), spacedCode)
 	useSession(t, diffmode.Options{Whitespace: git.WhitespaceIgnore})
 	g, h := newRealGit(t, dir)
 	g.openDiff(diffWorkTree, codePath)
@@ -103,9 +105,9 @@ func TestPatchTabFiltersWhitespace(t *testing.T) {
 		t.Skip("git is not installed")
 	}
 	dir := newTempRepo(t)
-	writeFile(t, dir, codePath, tabbedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), tabbedCode)
 	commitAll(t, dir, "init")
-	writeFile(t, dir, codePath, spacedCode)
+	testutil.WriteFile(t, filepath.Join(dir, codePath), spacedCode)
 	useSession(t, diffmode.Options{})
 	g, h := newRealGit(t, dir)
 	g.openPatchTab("test-patch", "Patch", func(ctx context.Context, r repo) ([]patchItem, error) {

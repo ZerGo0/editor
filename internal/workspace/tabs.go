@@ -102,7 +102,7 @@ func (w *Workspace) removeTabs(g *layout.Group, tabs []*layout.Tab) {
 }
 
 func unpinned(tabs []*layout.Tab, keep func(t *layout.Tab) bool) []*layout.Tab {
-	return slices.DeleteFunc(slices.Clone(tabs), func(t *layout.Tab) bool { return t.Pinned || keep(t) })
+	return slices.DeleteFunc(slices.Clone(tabs), func(t *layout.Tab) bool { return t.Pinned || keep != nil && keep(t) })
 }
 
 func (w *Workspace) closeOthers(g *layout.Group, keep *layout.Tab) {
@@ -110,7 +110,7 @@ func (w *Workspace) closeOthers(g *layout.Group, keep *layout.Tab) {
 }
 
 func (w *Workspace) closeToRight(g *layout.Group, from *layout.Tab) {
-	w.requestClose(g, unpinned(g.Tabs[g.Index(from)+1:], func(*layout.Tab) bool { return false }))
+	w.requestClose(g, unpinned(g.Tabs[g.Index(from)+1:], nil))
 }
 
 func (w *Workspace) closeSaved(g *layout.Group) {
@@ -121,7 +121,7 @@ func (w *Workspace) closeSaved(g *layout.Group) {
 }
 
 func (w *Workspace) closeAll(g *layout.Group) {
-	w.requestClose(g, unpinned(g.Tabs, func(*layout.Tab) bool { return false }))
+	w.requestClose(g, unpinned(g.Tabs, nil))
 }
 
 func (w *Workspace) UnpinActive() {

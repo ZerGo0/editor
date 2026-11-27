@@ -35,9 +35,18 @@ func TestDefaultsBindGitActionKeys(t *testing.T) {
 	}
 }
 
+func checkPreset(t *testing.T, preset string, want map[string]string) {
+	t.Helper()
+	k := keymap.New(keymap.Defaults(preset), nil)
+	for key, command := range want {
+		if got := lookup(t, k, key); got != command {
+			t.Errorf("%s runs %q, want %q", key, got, command)
+		}
+	}
+}
+
 func TestMacPresetMatchesVSCode(t *testing.T) {
-	k := keymap.New(keymap.Defaults(keymap.PresetVSCode), nil)
-	for key, want := range map[string]string{
+	checkPreset(t, keymap.PresetVSCode, map[string]string{
 		"ctrl+g":            "workbench.action.gotoLine",
 		"cmd+f":             "actions.find",
 		"cmd+alt+f":         "editor.action.startFindReplaceAction",
@@ -85,32 +94,22 @@ func TestMacPresetMatchesVSCode(t *testing.T) {
 		"cmd+0":             "",
 		"cmd+numpad_add":    "workbench.action.zoomIn",
 		"cmd+numpad0":       "workbench.action.zoomReset",
-	} {
-		if got := lookup(t, k, key); got != want {
-			t.Errorf("%s runs %q, want %q", key, got, want)
-		}
-	}
+	})
 }
 
 func TestMacPresetMovesEditorsBetweenGroupsLikeVSCode(t *testing.T) {
-	k := keymap.New(keymap.Defaults(keymap.PresetVSCode), nil)
-	for key, want := range map[string]string{
+	checkPreset(t, keymap.PresetVSCode, map[string]string{
 		"ctrl+cmd+right":        "workbench.action.moveEditorToNextGroup",
 		"ctrl+cmd+left":         "workbench.action.moveEditorToPreviousGroup",
 		"ctrl+cmd+1":            "workbench.action.moveEditorToFirstGroup",
 		"ctrl+cmd+9":            "workbench.action.moveEditorToLastGroup",
 		"cmd+k shift+cmd+left":  "workbench.action.moveEditorLeftInGroup",
 		"cmd+k shift+cmd+right": "workbench.action.moveEditorRightInGroup",
-	} {
-		if got := lookup(t, k, key); got != want {
-			t.Errorf("%s runs %q, want %q", key, got, want)
-		}
-	}
+	})
 }
 
 func TestWindowsPresetMatchesVSCode(t *testing.T) {
-	k := keymap.New(keymap.Defaults(keymap.PresetVSCodeWindows), nil)
-	for key, want := range map[string]string{
+	checkPreset(t, keymap.PresetVSCodeWindows, map[string]string{
 		"ctrl+h":       "editor.action.startFindReplaceAction",
 		"ctrl+p":       "workbench.action.quickOpen",
 		"ctrl+shift+p": "workbench.action.showCommands",
@@ -123,11 +122,7 @@ func TestWindowsPresetMatchesVSCode(t *testing.T) {
 		"f3":           "editor.action.nextMatchFindAction",
 		"ctrl+shift+h": "workbench.action.replaceInFiles",
 		"cmd+p":        "",
-	} {
-		if got := lookup(t, k, key); got != want {
-			t.Errorf("%s runs %q, want %q", key, got, want)
-		}
-	}
+	})
 }
 
 func TestSearchKeysWorkInBothKeymaps(t *testing.T) {

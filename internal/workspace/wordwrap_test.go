@@ -8,6 +8,7 @@ import (
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -34,7 +35,7 @@ func newWrapWorkspace(t *testing.T, set map[string]any) *Workspace {
 	var w *Workspace
 	env.Commands.Add(&command.Command{ID: toggleWordWrapID, Title: "Toggle Word Wrap", Run: func(*mygo.Window) { w.RunEditor(editor.ToggleSoftWrap) }})
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{wrapFile: wrapText, otherWrapFile: wrapText})
+	testutil.WriteFiles(t, root, map[string]string{wrapFile: wrapText, otherWrapFile: wrapText})
 	w = newTestWorkspace(t, root, env, session.Project{})
 	return w
 }

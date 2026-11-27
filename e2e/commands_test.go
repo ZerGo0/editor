@@ -7,14 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-)
 
-func writeFile(t *testing.T, path, text string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
+	"github.com/ZerGo0/editor/internal/testutil"
+)
 
 func TestCommandPaletteRunsCommand(t *testing.T) {
 	t.Parallel()
@@ -89,7 +84,7 @@ func TestChordOpensKeyboardShortcuts(t *testing.T) {
 func TestUserKeybindingRunsCommand(t *testing.T) {
 	t.Parallel()
 	userData := t.TempDir()
-	writeFile(t, filepath.Join(userData, "keybindings.json"), "// mine\n[{\"key\": \"cmd+e\", \"command\": \"workbench.action.closeAllEditors\"}]\n")
+	testutil.WriteFile(t, filepath.Join(userData, "keybindings.json"), "// mine\n[{\"key\": \"cmd+e\", \"command\": \"workbench.action.closeAllEditors\"}]\n")
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))
@@ -106,11 +101,8 @@ func TestSettingsFileReloadsLive(t *testing.T) {
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))
 	app.WaitNode(win, "skip.log row", RoleLabel("treeItem", "skip.log"))
-	writeFile(t, filepath.Join(userData, "settings.json"), "{\n  // hide logs\n  \"files.exclude\": [\"*.log\"],\n}\n")
-	app.Eventually("skip.log hidden", func() bool {
-		_, ok := app.Find(win, RoleLabel("treeItem", "skip.log"))
-		return !ok
-	})
+	testutil.WriteFile(t, filepath.Join(userData, "settings.json"), "{\n  // hide logs\n  \"files.exclude\": [\"*.log\"],\n}\n")
+	waitTreeItemGone(app, win, "skip.log")
 }
 
 func TestSettingsSwitchWritesFile(t *testing.T) {

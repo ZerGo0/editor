@@ -7,6 +7,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -26,7 +27,7 @@ func TestZoomLevelScalesLikeVSCode(t *testing.T) {
 
 func TestDiffSideMatchesEditorConfiguration(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{
+	testutil.WriteFiles(t, root, map[string]string{
 		".editorconfig": "root = true\n[*.go]\nindent_style = tab\ntab_width = 8\n",
 		"a.go":          "package a",
 	})

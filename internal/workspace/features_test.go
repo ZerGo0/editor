@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,29 +13,16 @@ import (
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
 const (
-	testFilePerm = 0o644
-	testViewW    = 400
-	testViewH    = 600
-	testWideW    = 1000
+	testViewW = 400
+	testViewH = 600
+	testWideW = 1000
 )
-
-func writeFiles(t *testing.T, root string, files map[string]string) {
-	t.Helper()
-	for name, data := range files {
-		p := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), dirPerm); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(data), testFilePerm); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 
 func newTestEnv(t *testing.T) *Env {
 	t.Helper()
@@ -66,15 +52,6 @@ func openTab(t *testing.T, w *Workspace, p string) (*layout.Tab, *docEntry) {
 		t.Fatalf("open %s: %v", p, e.err)
 	}
 	return tab, e
-}
-
-func readFile(t *testing.T, p string) string {
-	t.Helper()
-	data, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
 }
 
 func TestNewUntitledNumbersTabs(t *testing.T) {
@@ -118,14 +95,14 @@ func TestFinishSaveAsTurnsUntitledIntoFile(t *testing.T) {
 	if !w.finishSaveAs(d, target) {
 		t.Fatal("save as failed")
 	}
-	if tab.Path != target || d.Modified() || readFile(t, target) != "hello" {
+	if tab.Path != target || d.Modified() || testutil.ReadText(t, target) != "hello" {
 		t.Fatalf("tab %s modified %v", tab.Path, d.Modified())
 	}
 }
 
 func TestHotExitRestoresUnsavedText(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.txt": "disk\n"})
+	testutil.WriteFiles(t, root, map[string]string{"a.txt": "disk\n"})
 	env := newTestEnv(t)
 	w := newTestWorkspace(t, root, env, session.Project{})
 	p := filepath.Join(root, "a.txt")
@@ -138,7 +115,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 		t.Fatal("hot exit asks to save backed-up documents")
 	}
 	snap := w.Snapshot()
-	writeFiles(t, root, map[string]string{"a.txt": "changed on disk\n"})
+	testutil.WriteFiles(t, root, map[string]string{"a.txt": "changed on disk\n"})
 
 	w2 := newTestWorkspace(t, root, env, snap)
 	for path, want := range map[string]string{p: "edited\n", untitled: "draft text"} {
@@ -164,7 +141,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 
 func TestHotExitOffAsksToSave(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.txt": "disk"})
+	testutil.WriteFiles(t, root, map[string]string{"a.txt": "disk"})
 	env := newTestEnv(t)
 	if err := env.Settings.Set(settings.HotExit, settings.HotExitOff); err != nil {
 		t.Fatal(err)
@@ -198,7 +175,7 @@ func TestHotExitModeDecidesWhichClosesAsk(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%s reason %d", tc.mode, tc.reason), func(t *testing.T) {
 			root := t.TempDir()
-			writeFiles(t, root, map[string]string{"a.txt": "disk"})
+			testutil.WriteFiles(t, root, map[string]string{"a.txt": "disk"})
 			env := newTestEnv(t)
 			if err := env.Settings.Set(settings.HotExit, tc.mode); err != nil {
 				t.Fatal(err)
@@ -224,7 +201,7 @@ func TestHotExitModeDecidesWhichClosesAsk(t *testing.T) {
 
 func TestEditorConfigOverridesSettings(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{
+	testutil.WriteFiles(t, root, map[string]string{
 		".editorconfig": "root = true\n[*.go]\nindent_style = tab\ntab_width = 8\nmax_line_length = 100\ninsert_final_newline = true\nend_of_line = crlf\n",
 		"a.go":          "package a",
 		"b.txt":         "text",
@@ -240,7 +217,7 @@ func TestEditorConfigOverridesSettings(t *testing.T) {
 	if !w.save([]*document.Document{e.doc}) {
 		t.Fatal("save failed")
 	}
-	if got := readFile(t, filepath.Join(root, "a.go")); got != "package b\r\n" {
+	if got := testutil.ReadText(t, filepath.Join(root, "a.go")); got != "package b\r\n" {
 		t.Fatalf("saved %q", got)
 	}
 	other, _ := openTab(t, w, filepath.Join(root, "b.txt"))
@@ -252,7 +229,7 @@ func TestEditorConfigOverridesSettings(t *testing.T) {
 
 func TestFolderSettingsOverrideUserSettings(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{
+	testutil.WriteFiles(t, root, map[string]string{
 		".editor/settings.json": `{"files.exclude": ["*.log"], "window.zoomLevel": 3}`,
 	})
 	env := newTestEnv(t)
@@ -270,7 +247,7 @@ func TestFolderSettingsOverrideUserSettings(t *testing.T) {
 
 func TestBracketColorsFollowSetting(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.go": "f(a[b{c}])"})
+	testutil.WriteFiles(t, root, map[string]string{"a.go": "f(a[b{c}])"})
 	env := newTestEnv(t)
 	w := newTestWorkspace(t, root, env, session.Project{})
 	tab, _ := openTab(t, w, filepath.Join(root, "a.go"))

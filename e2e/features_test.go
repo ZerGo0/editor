@@ -22,6 +22,10 @@ func clickAt(app *App, win int, x, y float64) {
 	app.Idle(win)
 }
 
+func hasUnsavedAlpha(n Node) bool {
+	return n.Role == "textField" && strings.Contains(n.Value, "unsaved alpha")
+}
+
 func tabModified(name string) func(Node) bool {
 	return func(n Node) bool {
 		return n.Role == "tab" && n.Label == name && strings.Contains(n.Description, modifiedState)
@@ -98,9 +102,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 			win = again.WaitWindow("a.txt - " + filepath.Base(root))
 			again.Idle(win)
 			again.WaitNode(win, "restored a.txt tab", tabModified("a.txt"))
-			again.WaitNode(win, "restored text", func(n Node) bool {
-				return n.Role == "textField" && strings.Contains(n.Value, "unsaved alpha")
-			})
+			again.WaitNode(win, "restored text", hasUnsavedAlpha)
 		})
 	}
 }
@@ -124,10 +126,7 @@ func TestFolderSettingsOverrideUserSetting(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.WaitNode(win, "keep.tmp row", RoleLabel("treeItem", "keep.tmp"))
-	app.Eventually("skip.log hidden", func() bool {
-		_, ok := app.Find(win, RoleLabel("treeItem", "skip.log"))
-		return !ok
-	})
+	waitTreeItemGone(app, win, "skip.log")
 }
 
 func TestClosingFirstTabKeepsOthers(t *testing.T) {

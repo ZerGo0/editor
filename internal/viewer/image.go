@@ -8,6 +8,7 @@ import (
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -190,11 +191,11 @@ func (p *imagePane) body(c *ui.Context) {
 	case p.big != nil:
 		message(c, "This image is too large to show", p.big.Error(), "Open in Preview", p.s.openInPreview)
 	case p.err != nil:
-		errorView(c, "Cannot show this image", p.err, p.load)
+		detail.Failed(c, "Cannot show this image", p.err, p.load)
 	case p.empty:
 		message(c, "Nothing to preview", "Add SVG markup to the file to see it here.", "", nil)
 	case p.pic == nil:
-		loadingView(c, "Loading image")
+		detail.Loading(c, "Loading image")
 	default:
 		p.canvas(c)
 	}

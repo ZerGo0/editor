@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/insights"
@@ -89,7 +90,7 @@ func (w *Workspace) githubStatusItems(c *ui.Context) {
 
 func (w *Workspace) githubView(c *ui.Context) {
 	if w.prs == nil || w.issues == nil {
-		loading(c)
+		detail.Loading(c, loadingLabel)
 		return
 	}
 	if w.prs.StateView(c) {

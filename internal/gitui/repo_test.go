@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -28,11 +29,11 @@ func TestHunkPatchStagesOneHunk(t *testing.T) {
 		lines[i] = "line " + strconv.Itoa(i)
 	}
 	old := strings.Join(lines, "\n") + "\n"
-	writeFile(t, dir, "f.txt", old)
+	testutil.WriteFile(t, filepath.Join(dir, "f.txt"), old)
 	commitAll(t, dir, "init")
 	lines[1], lines[17] = "first", "second"
 	next := strings.Join(lines, "\n") + "\n"
-	writeFile(t, dir, "f.txt", next)
+	testutil.WriteFile(t, filepath.Join(dir, "f.txt"), next)
 	d := &editor.DiffState{Old: editor.NewBuffer(old), New: editor.NewBuffer(next)}
 	hunks := d.Hunks()
 	if len(hunks) != 2 {
@@ -60,9 +61,9 @@ func TestHunkPatchStagesOneHunk(t *testing.T) {
 
 func TestCLIExtras(t *testing.T) {
 	dir := newTempRepo(t)
-	writeFile(t, dir, "a.txt", "a\n")
+	testutil.WriteFile(t, filepath.Join(dir, "a.txt"), "a\n")
 	commitAll(t, dir, "one")
-	writeFile(t, dir, "b.txt", "b\n")
+	testutil.WriteFile(t, filepath.Join(dir, "b.txt"), "b\n")
 	commitAll(t, dir, "two")
 	r := openTemp(t, dir)
 	ctx := context.Background()
@@ -80,7 +81,7 @@ func TestCLIExtras(t *testing.T) {
 		t.Fatal("bad tag name accepted")
 	}
 	remote := tempDir(t)
-	rawGit(t, remote, "init", "--quiet", "--bare")
+	testutil.RunGit(t, remote, "init", "--quiet", "--bare")
 	if err := r.AddRemote(ctx, "origin", remote); err != nil {
 		t.Fatal(err)
 	}
@@ -96,12 +97,12 @@ func TestCLIExtras(t *testing.T) {
 	if err := r.RemoveRemote(ctx, "up"); err != nil {
 		t.Fatal(err)
 	}
-	head := rawGit(t, dir, "rev-parse", "HEAD")
+	head := testutil.RunGit(t, dir, "rev-parse", "HEAD")
 	names, err := r.BranchesContaining(ctx, head)
 	if err != nil || len(names) != 1 || names[0] != "main" {
 		t.Fatalf("containing = %v, %v", names, err)
 	}
-	writeFile(t, dir, "a.txt", "changed\n")
+	testutil.WriteFile(t, filepath.Join(dir, "a.txt"), "changed\n")
 	if err := os.Remove(filepath.Join(dir, "b.txt")); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestCLIExtras(t *testing.T) {
 	if err != nil || len(files) != 2 {
 		t.Fatalf("changed = %+v, %v", files, err)
 	}
-	root := rawGit(t, dir, "rev-list", "--max-parents=0", "HEAD")
+	root := testutil.RunGit(t, dir, "rev-list", "--max-parents=0", "HEAD")
 	fds, err := diffOfCommit(ctx, r, git.Commit{OID: root})
 	if err != nil || len(fds) != 1 || !fds[0].IsNew() {
 		t.Fatalf("root diff = %+v, %v", fds, err)
@@ -140,16 +141,16 @@ func TestShelfDirIsPerRepo(t *testing.T) {
 
 func TestDiffTexts(t *testing.T) {
 	dir := newTempRepo(t)
-	writeFile(t, dir, "a.txt", "old\n")
+	testutil.WriteFile(t, filepath.Join(dir, "a.txt"), "old\n")
 	commitAll(t, dir, "init")
-	writeFile(t, dir, "a.txt", "new\n")
+	testutil.WriteFile(t, filepath.Join(dir, "a.txt"), "new\n")
 	r := openTemp(t, dir)
 	abs := filepath.Join(dir, "a.txt")
 	o, n, err := loadDiffTexts(context.Background(), r, diffSource{kind: diffHead, path: "a.txt"}, abs, true)
 	if err != nil || o != "old\n" || n != "new\n" {
 		t.Fatalf("texts = %q %q %v", o, n, err)
 	}
-	writeFile(t, dir, "bin", "a\x00b")
+	testutil.WriteFile(t, filepath.Join(dir, "bin"), "a\x00b")
 	if _, _, err := loadDiffTexts(context.Background(), r, diffSource{kind: diffUntracked, path: "bin"}, filepath.Join(dir, "bin"), true); err != errBinary {
 		t.Fatalf("binary err = %v", err)
 	}

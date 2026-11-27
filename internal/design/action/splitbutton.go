@@ -35,32 +35,25 @@ func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
 	if o.Wide {
 		group.FillWidth()
 	}
-	base, fg, border := variantColors(p, o.Variant, false, false)
+	colors := variantColors(p, o.Variant, false, false)
 	separator := p.Control.ButtonBorder
 	if o.Variant == Primary {
 		separator = p.Accent.Text.Alpha(token.OpacitySeparator.Value())
 	}
-	group.Background(base).Border(token.BorderWidth.Px(), border).Children(func() {
+	group.Background(colors.bg).Border(token.BorderWidth.Px(), colors.border).Children(func() {
 		button = ui.ButtonBase(c.Key("action")).Grow(1).Padding(0, token.PadButtonX.Px()).Gap(token.GapInline.Px()).Center().
 			Radius(token.RadiusControl.Px(), 0, 0, token.RadiusControl.Px()).Label(label).FocusRingOffset(-token.BorderWidth.Px())
 		if tip := tooltipText(label, o.Tooltip, o.Keys); tip != label {
 			Tooltip(c, button, tip)
 		}
 		segment(p, o.Variant, button)
-		button.Children(func() {
-			if o.Icon != nil {
-				ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
-			}
-			token.TextBody.WholeText(c, label).TextColor(fg).SingleLine()
-		})
+		button.Children(func() { buttonContent(c, o.Icon, label, colors.fg) })
 		ui.Box(c).Width(token.BorderWidth.Px()).Height(token.IconSize.Px()).AlignSelf(ui.Center).Background(separator).Shrink(0)
 		arrow := ui.ButtonBase(c.Key("menu")).Width(token.SplitArrowWidth.Px()).Center().Shrink(0).
 			Radius(0, token.RadiusControl.Px(), token.RadiusControl.Px(), 0).Label(menuLabel).FocusRingOffset(-token.BorderWidth.Px())
 		Tooltip(c, arrow, menuLabel)
 		segment(p, o.Variant, arrow)
-		arrow.Children(func() {
-			ui.Icon(c, icons.ChevronDown).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg)
-		})
+		arrow.Children(func() { glyph(c, icons.ChevronDown, colors.fg) })
 		if o.Menu != nil {
 			PopoverMenu(c, arrow, o.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd})
 		}
@@ -73,6 +66,5 @@ func segment(p *token.Palette, v Variant, b ui.Element) {
 	if !hovered && !pressed {
 		return
 	}
-	bg, _, _ := variantColors(p, v, hovered, pressed)
-	b.Background(bg)
+	b.Background(variantColors(p, v, hovered, pressed).bg)
 }

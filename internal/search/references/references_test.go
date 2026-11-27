@@ -2,9 +2,10 @@ package references
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 const (
@@ -13,20 +14,6 @@ const (
 	tsUse  = "export const x = Foo();\n"
 	tsOnly = "const onlyHere = 1;\n"
 )
-
-func fixture(t *testing.T, files map[string]string) (string, []string) {
-	t.Helper()
-	root := t.TempDir()
-	var paths []string
-	for name, data := range files {
-		p := filepath.Join(root, name)
-		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		paths = append(paths, p)
-	}
-	return root, paths
-}
 
 func lineCols(res Result, path string) [][2]int {
 	var out [][2]int
@@ -42,7 +29,7 @@ func lineCols(res Result, path string) [][2]int {
 }
 
 func TestFindSkipsCommentsStringsAndPartialWords(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": goDecl, "b.go": goUse, "c.ts": tsUse})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": goDecl, "b.go": goUse, "c.ts": tsUse})
 	a, b := filepath.Join(root, "a.go"), filepath.Join(root, "b.go")
 	q := Query{Word: "Foo", Root: root, Current: a, Files: paths, Language: "Go", Sites: []Site{{Path: a, Line: 3, Col: 5}}}
 	res, err := Find(context.Background(), q)
@@ -63,7 +50,7 @@ func TestFindSkipsCommentsStringsAndPartialWords(t *testing.T) {
 }
 
 func TestFindPutsTheCurrentFileAndTheDefinitionFirst(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": goDecl, "b.go": goUse})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": goDecl, "b.go": goUse})
 	a, b := filepath.Join(root, "a.go"), filepath.Join(root, "b.go")
 	q := Query{Word: "Foo", Root: root, Current: b, Files: paths, Language: "Go", Sites: []Site{{Path: a, Line: 3, Col: 5}}}
 	res, err := Find(context.Background(), q)
@@ -83,7 +70,7 @@ func TestFindPutsTheCurrentFileAndTheDefinitionFirst(t *testing.T) {
 }
 
 func TestFindFallsBackToOtherLanguagesWhenTheFamilyHasNoMatch(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": "package a\n", "c.ts": tsUse, "d.ts": tsOnly})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": "package a\n", "c.ts": tsUse, "d.ts": tsOnly})
 	q := Query{Word: "Foo", Root: root, Current: filepath.Join(root, "a.go"), Files: paths, Language: "Go"}
 	res, err := Find(context.Background(), q)
 	if err != nil {
@@ -95,7 +82,7 @@ func TestFindFallsBackToOtherLanguagesWhenTheFamilyHasNoMatch(t *testing.T) {
 }
 
 func TestFindSearchesTheScriptFamilyTogether(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.ts": "export function Foo() {}\n", "b.tsx": "const a = <Foo />;\n", "c.js": "Foo();\n", "d.go": goDecl})
+	root, paths := testutil.TempProject(t, map[string]string{"a.ts": "export function Foo() {}\n", "b.tsx": "const a = <Foo />;\n", "c.js": "Foo();\n", "d.go": goDecl})
 	a := filepath.Join(root, "a.ts")
 	q := Query{Word: "Foo", Root: root, Current: a, Files: paths, Language: "TypeScript", Sites: []Site{{Path: a, Line: 0, Col: 16}}}
 	res, err := Find(context.Background(), q)
@@ -108,7 +95,7 @@ func TestFindSearchesTheScriptFamilyTogether(t *testing.T) {
 }
 
 func TestFindReadsOpenBuffersBeforeTheDisk(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": "package a\n"})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": "package a\n"})
 	a := paths[0]
 	q := Query{Word: "Foo", Root: root, Current: a, Files: paths, Language: "Go", Overlay: func(p string) (string, bool) { return "package a\n\nvar _ = Foo\n", p == a }}
 	res, err := Find(context.Background(), q)
@@ -118,7 +105,7 @@ func TestFindReadsOpenBuffersBeforeTheDisk(t *testing.T) {
 }
 
 func TestFindStopsWhenCancelled(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": goDecl})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": goDecl})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := Find(ctx, Query{Word: "Foo", Root: root, Files: paths, Language: "Go"}); err == nil {
@@ -127,7 +114,7 @@ func TestFindStopsWhenCancelled(t *testing.T) {
 }
 
 func TestLocateKeepsOnlyTheSites(t *testing.T) {
-	root, _ := fixture(t, map[string]string{"a.go": goDecl})
+	root, _ := testutil.TempProject(t, map[string]string{"a.go": goDecl})
 	a := filepath.Join(root, "a.go")
 	res, err := Locate(context.Background(), Query{Word: "Foo", Root: root, Current: a, Sites: []Site{{Path: a, Line: 3, Col: 5}}})
 	if err != nil {
@@ -143,7 +130,7 @@ func TestFindCapsTheMatches(t *testing.T) {
 	for range MaxMatches + 10 {
 		body += "Foo()\n"
 	}
-	root, paths := fixture(t, map[string]string{"a.go": "package a\n\n" + body})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": "package a\n\n" + body})
 	res, err := Find(context.Background(), Query{Word: "Foo", Root: root, Files: paths, Language: "Go"})
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +157,7 @@ const (
 )
 
 func TestFindPrefersMembersWhenTheNameFollowsAMemberOperator(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": memberSource})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": memberSource})
 	a := filepath.Join(root, "a.go")
 	q := Query{Word: "size", Root: root, Current: a, Files: paths, Language: "Go", Member: true, Sites: []Site{{Path: a, Line: 2, Col: 5}}}
 	res, err := Find(context.Background(), q)
@@ -185,7 +172,7 @@ func TestFindPrefersMembersWhenTheNameFollowsAMemberOperator(t *testing.T) {
 }
 
 func TestFindPrefersFreeNamesWhenTheNameFollowsNoMemberOperator(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": memberSource})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": memberSource})
 	a := filepath.Join(root, "a.go")
 	q := Query{Word: "size", Root: root, Current: a, Files: paths, Language: "Go", Sites: []Site{{Path: a, Line: 2, Col: 5}}}
 	res, err := Find(context.Background(), q)
@@ -200,7 +187,7 @@ func TestFindPrefersFreeNamesWhenTheNameFollowsNoMemberOperator(t *testing.T) {
 }
 
 func TestFindKeepsTheOtherGroupWhenThePreferredGroupIsEmpty(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": freeOnly, "b.go": memberOnly})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": freeOnly, "b.go": memberOnly})
 	a := filepath.Join(root, "a.go")
 	member, err := Find(context.Background(), Query{Word: "size", Root: root, Current: a, Files: paths, Language: "Go", Member: true, Sites: []Site{{Path: a, Line: 0, Col: 0}}})
 	if err != nil || member.Total != 1 || member.Files[0].Path != filepath.Join(root, "b.go") {
@@ -245,7 +232,7 @@ func TestPreferMemberSites(t *testing.T) {
 }
 
 func TestFindLimitsANameWithoutADefinitionToTheCurrentFile(t *testing.T) {
-	root, paths := fixture(t, map[string]string{"a.go": "package a\n\nfunc f() {\n\tcount := 1\n\t_ = count\n}\n", "b.go": "package b\n\nvar _ = count\n"})
+	root, paths := testutil.TempProject(t, map[string]string{"a.go": "package a\n\nfunc f() {\n\tcount := 1\n\t_ = count\n}\n", "b.go": "package b\n\nvar _ = count\n"})
 	a, b := filepath.Join(root, "a.go"), filepath.Join(root, "b.go")
 	res, err := Find(context.Background(), Query{Word: "count", Root: root, Current: a, Files: paths, Language: "Go"})
 	if err != nil || len(res.Files) != 1 || res.Files[0].Path != a || res.Total != 2 {

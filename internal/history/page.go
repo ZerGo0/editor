@@ -11,6 +11,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/pane"
@@ -170,29 +171,17 @@ func (u *UI) pageView(c *ui.Context, p *page) {
 	ui.Column(c).Fill().Background(pal.Layer.Editor).Children(func() {
 		switch {
 		case p.err != nil:
-			u.failure(c, "Cannot load history", p.err, func() { u.reload(p) })
+			detail.Failed(c, "Cannot load history", p.err, func() { u.reload(p) })
 		case p.loading && len(p.versions) == 0:
-			u.busy(c, "Loading history...")
+			detail.Loading(c, "Loading history...")
 		case len(p.versions) == 0:
-			u.centered(c, func() {
+			detail.Centered(c, func() {
 				feedback.Empty(c, feedback.EmptyOptions{Icon: icons.History, Title: "No history yet", Message: emptyMessage})
 			})
 		default:
 			ui.Split(c, &p.split, func() { u.versionList(c, p) }, func() { u.detail(c, p) }).SplitReset(listWidth).Fill()
 		}
 	})
-}
-
-func (u *UI) centered(c *ui.Context, body func()) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(body)
-}
-
-func (u *UI) busy(c *ui.Context, text string) {
-	u.centered(c, func() { feedback.Loading(c, text) })
-}
-
-func (u *UI) failure(c *ui.Context, title string, err error, retry func()) {
-	u.centered(c, func() { feedback.Error(c, title, err, retry) })
 }
 
 func (u *UI) versionList(c *ui.Context, p *page) {
@@ -221,16 +210,16 @@ func (u *UI) detail(c *ui.Context, p *page) {
 		u.toolbar(c, p)
 		switch {
 		case p.diffErr != nil:
-			u.failure(c, "Cannot read this version", p.diffErr, func() { p.wantHash = "" })
+			detail.Failed(c, "Cannot read this version", p.diffErr, func() { p.wantHash = "" })
 		case p.diff != nil:
 			u.h.ConfigureDiff(p.diff, p.path)
 			editor.DiffView(c, p.diff).Grow(1).FillWidth()
 		case p.selected < 0:
-			u.centered(c, func() {
+			detail.Centered(c, func() {
 				feedback.Empty(c, feedback.EmptyOptions{Title: "Select a version", Message: selectMessage})
 			})
 		default:
-			u.busy(c, "Loading version...")
+			detail.Loading(c, "Loading version...")
 		}
 	})
 }

@@ -402,33 +402,27 @@ func (d *Doc) breakGroup() {
 }
 
 func (d *Doc) Undo() (start, end int64, ok bool) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	n := len(d.undo)
-	if n == 0 || d.closed {
-		return 0, 0, false
-	}
-	s := d.undo[n-1]
-	d.undo = d.undo[:n-1]
-	d.redo = append(d.redo, step{t: d.cur, before: s.before, after: s.after})
-	d.cur = s.t
-	d.lastKind = editOther
-	return s.before.lo, s.before.hi, true
+	return d.travel(&d.undo, &d.redo, func(s step) span { return s.before })
 }
 
 func (d *Doc) Redo() (start, end int64, ok bool) {
+	return d.travel(&d.redo, &d.undo, func(s step) span { return s.after })
+}
+
+func (d *Doc) travel(from, to *[]step, changed func(step) span) (start, end int64, ok bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	n := len(d.redo)
+	n := len(*from)
 	if n == 0 || d.closed {
 		return 0, 0, false
 	}
-	s := d.redo[n-1]
-	d.redo = d.redo[:n-1]
-	d.undo = append(d.undo, step{t: d.cur, before: s.before, after: s.after})
+	s := (*from)[n-1]
+	*from = (*from)[:n-1]
+	*to = append(*to, step{t: d.cur, before: s.before, after: s.after})
 	d.cur = s.t
 	d.lastKind = editOther
-	return s.after.lo, s.after.hi, true
+	sp := changed(s)
+	return sp.lo, sp.hi, true
 }
 
 type snapshot struct {

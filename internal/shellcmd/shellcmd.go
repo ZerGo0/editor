@@ -81,9 +81,9 @@ func checkOwned(path string) error {
 }
 
 func script(executable string) string {
-	return fmt.Sprintf("#!/bin/sh\n%s\nnohup %s \"$@\" >/dev/null 2>&1 &\n", marker, quote(executable))
+	return fmt.Sprintf("#!/bin/sh\n%s\nnohup %s \"$@\" >/dev/null 2>&1 &\n", marker, Quote(executable))
 }
 
-func quote(s string) string {
+func Quote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

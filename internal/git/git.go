@@ -70,7 +70,7 @@ func (e *Error) Error() string {
 	if len(e.Args) > 0 {
 		name += " " + e.Args[0]
 	}
-	msg := firstLine(e.Stderr)
+	msg := FirstLine(e.Stderr)
 	if msg == "" {
 		return fmt.Sprintf("%s: exit status %d", name, e.ExitCode)
 	}
@@ -248,7 +248,7 @@ func argName(args []string) string {
 	return args[0]
 }
 
-func firstLine(s string) string {
+func FirstLine(s string) string {
 	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
 	return strings.TrimSpace(line)
 }

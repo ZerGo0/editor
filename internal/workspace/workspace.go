@@ -110,7 +110,7 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 		sidebarHidden: saved.SidebarHidden,
 	}
 	w.settings = settings.LoadFolder(w.folderSettingsPath(), env.Settings)
-	w.folderStamp, _ = statFile(w.folderSettingsPath())
+	w.folderStamp = stampOrZero(w.folderSettingsPath())
 	if saved.SidebarWidth > 0 {
 		w.sidebarWidth = saved.SidebarWidth
 	}

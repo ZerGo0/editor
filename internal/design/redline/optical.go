@@ -6,6 +6,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/ZerGo0/editor/internal/design/token"
 )
 
 const (
@@ -253,26 +255,9 @@ func (a *analysis) flagContrast(m Measure, need float64) {
 		Unit: UnitRatio, Fix: "use a stronger token.Of(c) text or icon role for this background", Area: a.boxes[m.Box].Rect})
 }
 
-func luminance(c color.RGBA) float64 {
-	const (
-		rWeight, gWeight, bWeight = 0.2126, 0.7152, 0.0722
-		linearLimit, linearDiv    = 0.04045, 12.92
-		gammaOffset, gammaDiv     = 0.055, 1.055
-		gamma                     = 2.4
-	)
-	lin := func(v uint8) float64 {
-		f := float64(v) / channelMax
-		if f <= linearLimit {
-			return f / linearDiv
-		}
-		return math.Pow((f+gammaOffset)/gammaDiv, gamma)
-	}
-	return rWeight*lin(c.R) + gWeight*lin(c.G) + bWeight*lin(c.B)
-}
-
 func contrast(a, b color.RGBA) float64 {
 	const flare = 0.05
-	la, lb := luminance(a), luminance(b)
+	la, lb := token.Luminance(a.R, a.G, a.B), token.Luminance(b.R, b.G, b.B)
 	if la < lb {
 		la, lb = lb, la
 	}

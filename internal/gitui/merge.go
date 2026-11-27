@@ -238,36 +238,38 @@ func (t *mergeTool) pane(c *ui.Context, title string, st *editor.State) {
 }
 
 func (t *mergeTool) arrows(c *ui.Context, st *editor.State, side mergeSide, icon *ui.SVG, choice mergeChoice) {
-	ranges := t.model.ranges(side)
-	inset := (token.ControlHeight.Px() - token.IconButtonSize.Px()) / half
 	ui.Column(c.Key(side)).Width(token.ControlHeight.Px()).FillHeight().Shrink(0).Children(func() {
 		ui.Box(c).Height(token.HeaderHeight.Px()).Shrink(0)
-		ui.Box(c).Grow(1).FillWidth().Clip().Children(func() {
-			for _, i := range t.model.changes() {
-				r := ranges[i]
-				if r.end == r.start && t.model.chunks[i].Kind != git.ChunkConflict {
-					continue
-				}
-				y := float32(st.LineTop(r.start) - st.ScrollY())
-				if y < 0 {
-					continue
-				}
-				label := fmt.Sprintf("Accept change %d from %s", i+1, sideLabel(side))
-				b := action.IconButton(c, icon, label, action.IconOptions{}).Absolute().Top(y).Left(inset)
-				if b.Clicked() {
-					idx := i
-					t.current = idx
-					t.act(func() { t.model.choose(idx, choice) })
-				}
-				b.ContextMenu(func(m *ui.Menu) {
-					idx := i
-					if m.Item("Ignore Change").Chosen() {
-						t.act(func() { t.model.choose(idx, choiceNone) })
-					}
-				})
+		ui.Box(c).Grow(1).FillWidth().Clip().Children(func() { t.arrowButtons(c, st, side, icon, choice) })
+	})
+}
+
+func (t *mergeTool) arrowButtons(c *ui.Context, st *editor.State, side mergeSide, icon *ui.SVG, choice mergeChoice) {
+	ranges := t.model.ranges(side)
+	inset := (token.ControlHeight.Px() - token.IconButtonSize.Px()) / half
+	for _, i := range t.model.changes() {
+		r := ranges[i]
+		if r.end == r.start && t.model.chunks[i].Kind != git.ChunkConflict {
+			continue
+		}
+		y := float32(st.LineTop(r.start) - st.ScrollY())
+		if y < 0 {
+			continue
+		}
+		label := fmt.Sprintf("Accept change %d from %s", i+1, sideLabel(side))
+		b := action.IconButton(c, icon, label, action.IconOptions{}).Absolute().Top(y).Left(inset)
+		if b.Clicked() {
+			idx := i
+			t.current = idx
+			t.act(func() { t.model.choose(idx, choice) })
+		}
+		b.ContextMenu(func(m *ui.Menu) {
+			idx := i
+			if m.Item("Ignore Change").Chosen() {
+				t.act(func() { t.model.choose(idx, choiceNone) })
 			}
 		})
-	})
+	}
 }
 
 func sideLabel(side mergeSide) string {

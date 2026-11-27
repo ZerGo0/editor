@@ -15,13 +15,7 @@ import (
 )
 
 type submoduleState struct {
-	open     bool
-	loading  bool
-	err      error
-	gen      int
-	items    []git.Submodule
-	list     ui.ListState
-	selected int
+	listState[git.Submodule]
 }
 
 func submoduleStatus(code byte) string {
@@ -40,23 +34,17 @@ func (g *Git) openSubmodules() {
 	if !g.ready() {
 		return
 	}
-	g.submodules = submoduleState{open: true, selected: -1}
+	g.submodules = submoduleState{listState: openList[git.Submodule]()}
 	g.loadSubmodules()
 }
 
 func (g *Git) loadSubmodules() {
 	s := &g.submodules
 	s.gen++
-	gen, r := s.gen, g.repo
-	s.loading, s.err = true, nil
+	gen, r := s.begin(), g.repo
 	applog.Go(func() {
 		items, err := r.Submodules(g.ctx)
-		g.post(func() {
-			if gen != s.gen {
-				return
-			}
-			s.loading, s.err, s.items = false, err, items
-		})
+		g.post(func() { s.apply(gen, items, err) })
 	})
 }
 

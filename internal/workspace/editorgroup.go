@@ -3,6 +3,7 @@ package workspace
 import (
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/largefile"
@@ -48,7 +49,7 @@ func (w *Workspace) content(c *ui.Context, g *layout.Group, tab *layout.Tab) {
 			c.After(wait)
 			return
 		}
-		loading(c)
+		detail.Loading(c, loadingLabel)
 	case e.err != nil:
 		placeholder(c, "Cannot open this file", e.err.Error())
 	case e.kind.ReplacesEditor():
@@ -85,14 +86,6 @@ func (w *Workspace) focusContent(c *ui.Context, g *layout.Group, tab *layout.Tab
 	}
 }
 
-func loading(c *ui.Context) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(func() {
-		feedback.Loading(c, loadingLabel)
-	})
-}
-
-func placeholder(c *ui.Context, title, detail string) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(func() {
-		feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: detail})
-	})
+func placeholder(c *ui.Context, title, message string) {
+	detail.Centered(c, func() { feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: message}) })
 }

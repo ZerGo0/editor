@@ -86,20 +86,19 @@ type ecmaScan struct {
 }
 
 func (e *ecma) Tokenize(line string, state uint64, tokens []editor.Token) ([]editor.Token, uint64) {
-	s := e.scan(line, state, tokens, false)
-	s.run()
+	s, _ := e.scan(line, state, tokens, false)
 	return s.toks, s.state()
 }
 
 func (e *ecma) expr(line string, state uint64, tokens []editor.Token) ([]editor.Token, int, uint64, bool) {
-	s := e.scan(line, state, tokens, true)
-	end := s.run()
+	s, end := e.scan(line, state, tokens, true)
 	return s.toks, end, s.state(), s.stopped
 }
 
-func (e *ecma) scan(line string, state uint64, tokens []editor.Token, stop bool) *ecmaScan {
-	return &ecmaScan{ecma: e, writer: newWriter(tokens), line: line, stack: state & ecmaStackMask,
+func (e *ecma) scan(line string, state uint64, tokens []editor.Token, stop bool) (*ecmaScan, int) {
+	s := &ecmaScan{ecma: e, writer: newWriter(tokens), line: line, stack: state & ecmaStackMask,
 		comment: state&ecmaCommentBit != 0, pv: int(state >> ecmaPrevShift & ecmaPrevMask), stopAt: stop}
+	return s, s.run()
 }
 
 func (s *ecmaScan) state() uint64 {
@@ -206,13 +205,9 @@ func (s *ecmaScan) run() int {
 }
 
 func (s *ecmaScan) blockComment(i int) int {
-	end := strings.Index(s.line[i:], "*/")
-	if end < 0 {
-		s.comment = true
-		return s.emit(len(s.line), editor.TokenComment)
-	}
-	s.comment = false
-	return s.emit(i+end+2, editor.TokenComment)
+	end, closed := blockCommentEnd(s.line, i)
+	s.comment = !closed
+	return s.emit(end, editor.TokenComment)
 }
 
 func isIdentStartByte(c byte) bool {
@@ -232,38 +227,7 @@ func isIdentPartByte(c byte) bool { return isIdentStartByte(c) || isDigit(c) }
 
 func (s *ecmaScan) identEnd(i int) int { return scanIdent(s.line, i) }
 
-func scanIdent(line string, i int) int {
-	for i < len(line) {
-		c := line[i]
-		if c < utf8.RuneSelf {
-			if !isIdentPartByte(c) {
-				break
-			}
-			i++
-			continue
-		}
-		r, n := utf8.DecodeRuneInString(line[i:])
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			break
-		}
-		i += n
-	}
-	return i
-}
-
-func (s *ecmaScan) nextByte(i int) (byte, byte) {
-	line := s.line
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
-		i++
-	}
-	if i >= len(line) {
-		return 0, 0
-	}
-	if i+1 < len(line) {
-		return line[i], line[i+1]
-	}
-	return line[i], 0
-}
+func scanIdent(line string, i int) int { return identRunEnd(line, i, isIdentPartByte) }
 
 func (s *ecmaScan) code(i int) int {
 	line := s.line
@@ -419,190 +383,6 @@ func (s *ecmaScan) template(i int) int {
 		}
 	}
 	return s.emit(len(line), editor.TokenString)
-}
-
-func (s *ecmaScan) word(i int) int {
-	line := s.line
-	start := i
-	if line[i] == '#' {
-		i++
-	}
-	end := s.identEnd(i)
-	w := line[start:end]
-	nx, nx2 := s.nextByte(end)
-	if s.prevDot {
-		s.prevDot = false
-		kind := editor.TokenProperty
-		switch {
-		case s.inType():
-			kind = editor.TokenType
-		case nx == '(' || nx == '<' && s.genericCall(end):
-			kind = editor.TokenFunction
-		}
-		s.pv, s.last, s.prevWord = pvValue, 'i', ""
-		return s.emit(end, kind)
-	}
-	if line[start] == '#' {
-		kind := editor.TokenProperty
-		if nx == '(' {
-			kind = editor.TokenFunction
-		}
-		s.pv, s.last, s.prevWord = pvValue, 'i', ""
-		return s.emit(end, kind)
-	}
-	prev := s.prevWord
-	kind, pv, last := s.classify(w, prev, nx, nx2, end)
-	s.pv, s.last, s.prevWord = pv, last, w
-	return s.emit(end, kind)
-}
-
-func (s *ecmaScan) classify(w, prev string, nx, nx2 byte, end int) (editor.TokenKind, int, byte) {
-	top := s.top()
-	if s.inType() {
-		switch {
-		case (nx == ':' || nx == '?' && nx2 == ':') && (top == entTParen):
-			return editor.TokenVariable, pvValue, 'i'
-		case ecmaConstants[w]:
-			return editor.TokenConstant, pvValue, 0
-		case prev == "typeof":
-			return editor.TokenVariable, pvValue, 'i'
-		case ecmaTypeKeywords[w]:
-			pv := pvOperand
-			if w == "extends" && top == entAlias {
-				pv = pvOperand
-			}
-			return editor.TokenKeyword, pv, 0
-		}
-		return editor.TokenType, pvValue, 'i'
-	}
-	isKey := (nx == ':' && nx2 != ':' || nx == '?' && nx2 == ':') && w != "default"
-	if isKey && top != entTernary && top != entCase {
-		switch top {
-		case entObj, entTBrace, entBlock:
-			return editor.TokenProperty, pvValue, 'i'
-		case entParen, entTParen:
-			return editor.TokenVariable, pvValue, 'i'
-		}
-	}
-	if ecmaRunes[w] && (nx == '(' || nx == '.' || nx == '<') {
-		return editor.TokenKeyword, pvValue, 'i'
-	}
-	if ecmaConstants[w] {
-		return editor.TokenConstant, pvValue, 0
-	}
-	hard := ecmaHardKeywords[w]
-	if !hard && ecmaSoftKeywords[w] && s.softKeyword(w, nx) {
-		hard = true
-	}
-	if hard {
-		return editor.TokenKeyword, s.keywordEffects(w, nx), 0
-	}
-	switch prev {
-	case "class", "interface", "enum", "namespace", "module", "type", "new", "instanceof", "extends", "implements":
-		if prev == "type" && s.decl != "type" {
-			break
-		}
-		return editor.TokenType, pvValue, 'i'
-	case "function":
-		return editor.TokenFunction, pvValue, 'i'
-	}
-	switch {
-	case nx == '(':
-		return editor.TokenFunction, pvValue, 'i'
-	case nx == '<' && s.genericCall(end):
-		return editor.TokenFunction, pvValue, 'i'
-	case nx == '=' && nx2 != '=' && nx2 != '>' && arrowAhead.MatchString(s.afterEquals(end)):
-		return editor.TokenFunction, pvValue, 'i'
-	case ecmaGlobals[w]:
-		return editor.TokenType, pvValue, 'i'
-	}
-	return identKind(w), pvValue, 'i'
-}
-
-func identKind(w string) editor.TokenKind {
-	r, _ := utf8.DecodeRuneInString(strings.TrimLeft(w, "#$"))
-	if !unicode.IsUpper(r) {
-		return editor.TokenVariable
-	}
-	if len(w) > 1 && w == strings.ToUpper(w) {
-		return editor.TokenConstant
-	}
-	return editor.TokenType
-}
-
-func (s *ecmaScan) afterEquals(end int) string {
-	rest := s.line[end:]
-	if k := strings.IndexByte(rest, '='); k >= 0 {
-		return rest[k+1:]
-	}
-	return ""
-}
-
-func (s *ecmaScan) softKeyword(w string, nx byte) bool {
-	switch {
-	case nx == '{' || nx == '[' || nx == '*' || nx == '"' || nx == '\'' || nx == '`' || isIdentStartByte(nx):
-	case nx == '(' && w == "async":
-	default:
-		return false
-	}
-	return true
-}
-
-func (s *ecmaScan) keywordEffects(w string, nx byte) int {
-	switch {
-	case w == "export":
-		if nx == '{' || nx == '*' {
-			s.decl = w
-		}
-	case ecmaDeclKw[w]:
-		if w != "type" || isIdentStartByte(nx) {
-			s.decl = w
-		}
-	case w == "extends" || w == "implements":
-		if (s.decl == "class" || s.decl == "interface") && s.top() != entRet {
-			s.push(entRet)
-		}
-	case (w == "as" || w == "satisfies") && s.decl != "import" && s.decl != "export":
-		s.push(entAs)
-	case w == "case":
-		s.push(entCase)
-	}
-	switch {
-	case w == "this" || w == "super":
-		return pvValue
-	case ecmaStatementKw[w]:
-		return pvStatement
-	}
-	return pvOperand
-}
-
-func (s *ecmaScan) genericCall(lt int) bool {
-	line := s.line
-	i := strings.IndexByte(line[lt:], '<')
-	if i < 0 {
-		return false
-	}
-	i += lt
-	depth := 0
-	for j := i; j < len(line) && j < i+genericLookahead; j++ {
-		switch c := line[j]; c {
-		case '<':
-			depth++
-		case '>':
-			depth--
-			if depth == 0 {
-				k := j + 1
-				return k < len(line) && (line[k] == '(' || line[k] == '`')
-			}
-		case ';':
-			return false
-		case '|', '&':
-			if j+1 < len(line) && line[j+1] == c {
-				return false
-			}
-		}
-	}
-	return false
 }
 
 func (s *ecmaScan) punct(end int, pv int, last byte) int {
@@ -803,100 +583,4 @@ func (s *ecmaScan) lessThan(i int, c1 byte) int {
 		return s.punct(i+1, pvOperand, 0)
 	}
 	return s.op(i+opLen(line[i:]), pvOperand)
-}
-
-func (s *ecmaScan) jsxName(i int) int {
-	line := s.line
-	j := i
-	for j < len(line) && (isIdentPartByte(line[j]) || line[j] == '.' || line[j] == ':' || line[j] == '-') {
-		j++
-	}
-	return j
-}
-
-func (s *ecmaScan) jsxOpen(i int) bool {
-	line := s.line
-	end := s.jsxName(i + 1)
-	rest := strings.TrimLeft(line[end:], " \t")
-	if end > i+1 && (strings.HasPrefix(rest, ",") || strings.HasPrefix(rest, "extends ")) {
-		return false
-	}
-	s.punct(i+1, pvOperand, 0)
-	s.jsxTagName(i+1, end)
-	s.push(entJSXTag)
-	return true
-}
-
-func (s *ecmaScan) jsxTagName(from, end int) {
-	if end == from {
-		return
-	}
-	kind := editor.TokenTag
-	if c := s.line[from]; c >= 'A' && c <= 'Z' || strings.IndexByte(s.line[from:end], '.') >= 0 {
-		kind = editor.TokenType
-	}
-	s.tok(end, kind, pvValue, 0)
-}
-
-func (s *ecmaScan) jsxTag(i int) int {
-	line := s.line
-	c := line[i]
-	switch {
-	case c == ' ' || c == '\t' || c == '\r':
-		return s.emit(i+1, editor.TokenText)
-	case c == '>':
-		s.pop()
-		s.push(entJSXChild)
-		return s.punct(i+1, pvValue, 0)
-	case c == '/' && i+1 < len(line) && line[i+1] == '>':
-		s.pop()
-		return s.punct(i+2, pvValue, 0)
-	case c == '{':
-		s.push(entInterp)
-		return s.punct(i+1, pvOperand, 0)
-	case c == '"' || c == '\'':
-		j := strings.IndexByte(line[i+1:], c)
-		if j < 0 {
-			return s.tok(len(line), editor.TokenString, pvValue, 0)
-		}
-		return s.tok(i+j+2, editor.TokenString, pvValue, 0)
-	case c == '=':
-		return s.op(i+1, pvOperand)
-	case isIdentStartByte(c):
-		return s.tok(s.jsxName(i), editor.TokenAttribute, pvValue, 0)
-	}
-	return s.emit(i+1, editor.TokenText)
-}
-
-func (s *ecmaScan) jsxChild(i int) int {
-	line := s.line
-	c := line[i]
-	switch {
-	case c == '{':
-		s.push(entInterp)
-		return s.punct(i+1, pvOperand, 0)
-	case c == '<' && i+1 < len(line) && line[i+1] == '/':
-		s.punct(i+2, pvOperand, 0)
-		end := s.jsxName(i + 2)
-		s.jsxTagName(i+2, end)
-		j := end
-		for j < len(line) && line[j] == ' ' {
-			j++
-		}
-		s.emit(j, editor.TokenText)
-		s.pop()
-		if j < len(line) && line[j] == '>' {
-			return s.punct(j+1, pvValue, 0)
-		}
-		return j
-	case c == '<' && i+1 < len(line) && (isIdentStartByte(line[i+1]) || line[i+1] == '>'):
-		if s.jsxOpen(i) {
-			return s.pos
-		}
-	}
-	j := i + 1
-	for j < len(line) && line[j] != '{' && line[j] != '<' {
-		j++
-	}
-	return s.emit(j, editor.TokenText)
 }

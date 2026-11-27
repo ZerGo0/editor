@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -155,7 +156,7 @@ func sniff(h []byte) Kind {
 	case bytes.HasPrefix(h, []byte("RIFF")) && len(h) >= riffTagOffset+riffTagLen:
 		return riffKinds[string(h[riffTagOffset:riffTagOffset+riffTagLen])]
 	case bytes.HasPrefix(h, []byte("FORM")) && len(h) >= riffTagOffset+riffTagLen:
-		if contains(formKinds, string(h[riffTagOffset:riffTagOffset+riffTagLen])) {
+		if slices.Contains(formKinds, string(h[riffTagOffset:riffTagOffset+riffTagLen])) {
 			return Audio
 		}
 	case isBMP(h):
@@ -164,21 +165,12 @@ func sniff(h []byte) Kind {
 		return Image
 	case isBox(h, "ftyp"):
 		return sniffBrand(h)
-	case len(h) >= boxTypeOffset+boxFieldLen && contains(movieBoxTypes, string(h[boxTypeOffset:boxTypeOffset+boxFieldLen])):
+	case len(h) >= boxTypeOffset+boxFieldLen && slices.Contains(movieBoxTypes, string(h[boxTypeOffset:boxTypeOffset+boxFieldLen])):
 		return Video
 	case isMP3Frame(h):
 		return Audio
 	}
 	return None
-}
-
-func contains(list []string, s string) bool {
-	for _, item := range list {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }
 
 func isBox(h []byte, kind string) bool {
@@ -188,9 +180,9 @@ func isBox(h []byte, kind string) bool {
 func sniffBrand(h []byte) Kind {
 	brand := string(h[boxBrandOffset : boxBrandOffset+boxFieldLen])
 	switch {
-	case contains(imageBrands, brand):
+	case slices.Contains(imageBrands, brand):
 		return Image
-	case contains(audioBrands, brand):
+	case slices.Contains(audioBrands, brand):
 		return Audio
 	}
 	return Video

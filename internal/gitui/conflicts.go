@@ -17,52 +17,38 @@ import (
 )
 
 type conflictsState struct {
-	open     bool
-	loading  bool
-	err      error
-	gen      int
-	items    []git.ConflictFile
-	list     ui.ListState
-	selected int
-	auto     bool
+	listState[git.ConflictFile]
+	auto bool
 }
 
-func (g *Git) openConflicts() {
-	if !g.ready() {
-		return
-	}
-	g.conflicts = conflictsState{open: true, selected: -1}
-	g.loadConflicts()
-}
+func (g *Git) openConflicts() { g.showConflicts(false) }
 
 func (g *Git) loadConflicts() {
 	s := &g.conflicts
 	s.gen++
-	gen, r := s.gen, g.repo
-	s.loading, s.err = true, nil
+	gen, r := s.begin(), g.repo
 	applog.Go(func() {
 		items, err := r.Conflicts(g.ctx)
 		g.post(func() {
-			if gen != s.gen {
+			if !s.apply(gen, items, err) {
 				return
 			}
-			s.loading, s.err, s.items = false, err, items
 			if s.auto && err == nil && len(items) == 0 {
 				s.open = false
 			}
 			s.auto = false
-			if s.selected >= len(items) || (s.selected < 0 && len(items) > 0) {
-				s.selected = min(max(s.selected, 0), len(items)-1)
-			}
+			s.clampSelection()
 		})
 	})
 }
 
-func (g *Git) openConflictsIfAny() {
+func (g *Git) openConflictsIfAny() { g.showConflicts(true) }
+
+func (g *Git) showConflicts(auto bool) {
 	if !g.ready() {
 		return
 	}
-	g.conflicts = conflictsState{open: true, selected: -1, auto: true}
+	g.conflicts = conflictsState{listState: openList[git.ConflictFile](), auto: auto}
 	g.loadConflicts()
 }
 
@@ -100,10 +86,10 @@ func (g *Git) conflictsDialog(c *ui.Context) {
 		busy := g.busy != ""
 		ui.Row(c).FillWidth().Gap(token.GapControl.Px()).Wrap().Children(func() {
 			if button(c, "Accept Yours", !ok || busy) {
-				g.acceptConflict(f.Path, true)
+				g.acceptSide(f.Path, true, true)
 			}
 			if button(c, "Accept Theirs", !ok || busy) {
-				g.acceptConflict(f.Path, false)
+				g.acceptSide(f.Path, false, true)
 			}
 			if button(c, "Resolve Simple Conflicts", len(s.items) == 0 || busy) {
 				g.resolveSimple(s.items)
@@ -154,13 +140,6 @@ func (s *conflictsState) selectedFile() (git.ConflictFile, bool) {
 		return git.ConflictFile{}, false
 	}
 	return s.items[s.selected], true
-}
-
-func (g *Git) acceptConflict(rel string, ours bool) {
-	g.doSimple("Resolve", func(ctx context.Context, r repo) error { return r.AcceptSide(ctx, rel, ours) }, func() {
-		g.reloadBuffers([]string{rel})
-		g.loadConflicts()
-	})
 }
 
 func (g *Git) resolveSimple(files []git.ConflictFile) {

@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -51,6 +53,14 @@ func statFile(path string) (fileStamp, error) {
 		return fileStamp{}, err
 	}
 	return fileStamp{mod: info.ModTime(), size: info.Size()}, nil
+}
+
+func stampOrZero(path string) fileStamp {
+	stamp, err := statFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("stat %s: %v", path, err)
+	}
+	return stamp
 }
 
 func loadFile(path string, asText bool) (*document.Document, viewer.Kind, fileStamp, error) {

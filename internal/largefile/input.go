@@ -37,8 +37,8 @@ func (s *State) input(ev ui.InputEvent) bool {
 	case ui.InputPointerMove:
 		return s.pointerMove(ev)
 	case ui.InputPointerUp:
-		held := s.dragging || s.bar.active
-		s.dragging, s.bar.active = false, false
+		held := s.dragging || s.bar.Active
+		s.dragging, s.bar.Active = false, false
 		return held
 	case ui.InputScroll:
 		s.wheel(ev.DX, ev.DY)
@@ -387,12 +387,8 @@ func (s *State) pointerDown(ev ui.InputEvent) bool {
 	s.notice = ""
 	if ev.X >= s.viewW-s.barStyle.TrackWidth {
 		if bar, lines := s.scrollbar(); bar.Scrolls() {
-			start, length := bar.Thumb()
-			s.bar.active = true
-			s.bar.grab = ev.Y - start
-			if ev.Y < start || ev.Y >= start+length {
-				s.bar.grab = length / 2
-				s.scrollToBar(bar.OffsetAt(ev.Y-s.bar.grab), lines)
+			if offset, jumped := s.bar.Press(bar, ev.Y); jumped {
+				s.scrollToBar(offset, lines)
 			}
 			return true
 		}
@@ -410,9 +406,9 @@ func (s *State) pointerDown(ev ui.InputEvent) bool {
 
 func (s *State) pointerMove(ev ui.InputEvent) bool {
 	switch {
-	case s.bar.active:
+	case s.bar.Active:
 		bar, lines := s.scrollbar()
-		s.scrollToBar(bar.OffsetAt(ev.Y-s.bar.grab), lines)
+		s.scrollToBar(s.bar.Offset(bar, ev.Y), lines)
 	case s.dragging && ev.Button == 0:
 		s.Caret = s.hit(ev.X, ev.Y)
 	default:

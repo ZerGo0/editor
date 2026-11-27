@@ -82,26 +82,11 @@ func (s *goScan) push(k uint64) { s.stack = (s.stack<<goEntryBits | k) & (1<<goS
 func (s *goScan) pop() { s.stack >>= goEntryBits }
 
 func (s *goScan) blockComment(i int) int {
-	end := strings.Index(s.line[i:], "*/")
-	if end < 0 {
-		return s.emit(len(s.line), editor.TokenComment)
+	end, closed := blockCommentEnd(s.line, i)
+	if closed {
+		s.mode = goModeCode
 	}
-	s.mode = goModeCode
-	return s.emit(i+end+2, editor.TokenComment)
-}
-
-func (s *goScan) nextByte(i int) (byte, byte) {
-	line := s.line
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
-		i++
-	}
-	if i >= len(line) {
-		return 0, 0
-	}
-	if i+1 < len(line) {
-		return line[i], line[i+1]
-	}
-	return line[i], 0
+	return s.emit(end, editor.TokenComment)
 }
 
 func (s *goScan) simple(end int, kind editor.TokenKind) int {
@@ -469,7 +454,7 @@ func (s *goScan) word(i int) int {
 	line := s.line
 	end := scanIdent(line, i)
 	w := line[i:end]
-	nx, nx2 := s.nextByte(end)
+	nx, nx2 := nextBytes(s.line, end)
 	prev, prevDot := s.prevWord, s.prevDot
 	s.prevWord, s.prevDot = w, false
 	top := s.top()

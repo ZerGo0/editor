@@ -39,7 +39,7 @@ func (w *Workspace) folderSettingsChanged(dirs []string) {
 	}
 	old := w.folderStamp
 	applog.Go(func() {
-		stamp, _ := statFile(p)
+		stamp := stampOrZero(p)
 		if stamp.same(old) {
 			return
 		}

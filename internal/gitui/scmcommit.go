@@ -341,7 +341,7 @@ func (g *Git) messageHistoryMenu(m *ui.Menu) {
 		return
 	}
 	for _, msg := range g.commit.history {
-		if m.Item(firstLineOf(msg)).Chosen() {
+		if m.Item(git.FirstLine(msg)).Chosen() {
 			g.commit.message = msg
 			g.focusCommit()
 		}

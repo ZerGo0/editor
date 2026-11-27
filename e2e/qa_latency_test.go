@@ -57,6 +57,13 @@ type Burst struct {
 	Continuous bool
 }
 
+func closeEditorAfterFirstRun(q *QAApp, _ DemoProject, i int) {
+	if i > 0 {
+		menuOrFail(q, "File", "Close Editor")
+		q.Settle()
+	}
+}
+
 func (q *QAApp) Burst(quiet time.Duration, do func()) Burst {
 	q.t.Helper()
 	offset := q.outputLen()
@@ -218,12 +225,7 @@ func latencyActions() []latencyAction {
 				_, err := q.TryWait(hasLabel("Commit Message"), navTimeout)
 				return err
 			},
-			Reset: func(q *QAApp, d DemoProject, i int) {
-				if i > 0 {
-					menuOrFail(q, "File", "Close Editor")
-					q.Settle()
-				}
-			},
+			Reset: closeEditorAfterFirstRun,
 			Do: func(q *QAApp, d DemoProject, i int) {
 				row, err := q.waitChangedRow()
 				if err != nil {
@@ -234,13 +236,8 @@ func latencyActions() []latencyAction {
 		},
 		{
 			Name: "open the Graph (2100 commits)", Owner: qa.OwnerGit, Budget: budgetOpenGraph, Samples: slowSamples, Quiet: burstQuietAsync,
-			Reset: func(q *QAApp, d DemoProject, i int) {
-				if i > 0 {
-					menuOrFail(q, "File", "Close Editor")
-					q.Settle()
-				}
-			},
-			Do: func(q *QAApp, d DemoProject, i int) { menuOrFail(q, gitMenu, "Show Log") },
+			Reset: closeEditorAfterFirstRun,
+			Do:    func(q *QAApp, d DemoProject, i int) { menuOrFail(q, gitMenu, "Show Log") },
 		},
 	}
 }

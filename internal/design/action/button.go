@@ -31,36 +31,40 @@ func Button(c *ui.Context, label string, o ButtonOptions) ui.Element {
 	}
 	b := ui.ButtonBase(c.Key(keyOf(o.ID, label))).Height(height).Padding(0, padX).Gap(token.GapInline.Px()).
 		Radius(token.RadiusControl.Px()).Center().Shrink(0).Label(label).Disabled(o.Disabled).FocusRingOffset(token.FocusRingOffsetOuter.Px())
-	bg, fg, border := variantColors(p, o.Variant, b.Hovered(), b.Pressed())
-	b.Background(bg).Border(token.BorderWidth.Px(), border)
+	colors := variantColors(p, o.Variant, b.Hovered(), b.Pressed())
+	b.Background(colors.bg).Border(token.BorderWidth.Px(), colors.border)
 	if tip := tooltipText(label, o.Tooltip, o.Keys); tip != label {
 		Tooltip(c, b, tip)
 	}
-	b.Children(func() {
-		if o.Icon != nil {
-			ui.Icon(c, o.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg).Shrink(0)
-		}
-		token.TextBody.WholeText(c, label).TextColor(fg).SingleLine()
-	})
+	b.Children(func() { buttonContent(c, o.Icon, label, colors.fg) })
 	return b
 }
 
-func variantColors(p *token.Palette, v Variant, hovered, pressed bool) (bg, fg, border ui.Color) {
+func buttonContent(c *ui.Context, icon *ui.SVG, label string, fg ui.Color) {
+	if icon != nil {
+		glyph(c, icon, fg).Shrink(0)
+	}
+	token.TextBody.WholeText(c, label).TextColor(fg).SingleLine()
+}
+
+type buttonColors struct{ bg, fg, border ui.Color }
+
+func variantColors(p *token.Palette, v Variant, hovered, pressed bool) buttonColors {
 	switch v {
 	case Primary:
-		bg = p.Accent.Base
+		bg := p.Accent.Base
 		if hovered || pressed {
 			bg = p.Accent.Hover
 		}
-		return bg, p.Accent.Text, p.Control.ButtonBorder
+		return buttonColors{bg, p.Accent.Text, p.Control.ButtonBorder}
 	case Ghost:
-		return p.Fill(hovered, pressed), p.Text.Primary, ui.Transparent
+		return buttonColors{p.Fill(hovered, pressed), p.Text.Primary, ui.Transparent}
 	}
-	bg = p.Control.Secondary
+	bg := p.Control.Secondary
 	if hovered || pressed {
 		bg = p.Control.SecondaryHover
 	}
-	return bg, p.Control.SecondaryText, p.Control.ButtonBorder
+	return buttonColors{bg, p.Control.SecondaryText, p.Control.ButtonBorder}
 }
 
 func tooltipText(label, tooltip, keys string) string {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/keymap"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -16,7 +17,7 @@ func TestFindKeysStepMatchesWhileTheFindInputHasFocus(t *testing.T) {
 	for _, cmd := range []editor.Command{editor.FindNext, editor.FindPrevious} {
 		w.env.Commands.Add(&command.Command{ID: keymap.EditorCommandID(cmd), Title: cmd.String(), Run: func(*mygo.Window) { w.RunEditor(cmd) }})
 	}
-	writeFiles(t, w.Root, map[string]string{"m.txt": "foo\nfoo\nfoo\nfoo\n"})
+	testutil.WriteFiles(t, w.Root, map[string]string{"m.txt": "foo\nfoo\nfoo\nfoo\n"})
 	tab, _ := openTab(t, w, filepath.Join(w.Root, "m.txt"))
 	w.focusTab = tab
 	tt.Frame()

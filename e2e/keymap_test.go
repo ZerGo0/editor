@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 const goToLineTitle = "Go to Line/Column"
@@ -18,6 +20,10 @@ func openInEditor(t *testing.T, app *App, win int, name string) Node {
 	return field
 }
 
+func isReplaceField(n Node) bool {
+	return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace")
+}
+
 func TestCtrlGOpensGoToLine(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
@@ -27,10 +33,7 @@ func TestCtrlGOpensGoToLine(t *testing.T) {
 	app.Type(win, "2")
 	app.Key(win, "Enter")
 	app.WaitNode(win, "caret on line 2", func(n Node) bool { return strings.HasPrefix(n.Label, "Ln 2, Col 1") })
-	app.Eventually("quick input closed", func() bool {
-		_, open := app.Find(win, RoleLabel("dialog", goToLineTitle))
-		return !open
-	})
+	waitQuickInputClosed(app, win, goToLineTitle)
 }
 
 func TestStatusBarPositionOpensGoToLineAndTypingStaysOutOfTheDocument(t *testing.T) {
@@ -41,10 +44,7 @@ func TestStatusBarPositionOpensGoToLineAndTypingStaysOutOfTheDocument(t *testing
 	app.WaitNode(win, "go to line", RoleLabel("dialog", goToLineTitle))
 	app.Type(win, "3")
 	app.Key(win, "Escape")
-	app.Eventually("quick input closed", func() bool {
-		_, open := app.Find(win, RoleLabel("dialog", goToLineTitle))
-		return !open
-	})
+	waitQuickInputClosed(app, win, goToLineTitle)
 	app.Eventually("document untouched", func() bool {
 		n, ok := app.Find(win, RoleLabel("textField", "Code editor"))
 		return ok && n.ID == field.ID && !strings.Contains(n.Value, "3")
@@ -56,7 +56,7 @@ func TestCmdAltFShowsReplace(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+Alt+F")
-	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
+	app.WaitNode(win, "replace field", isReplaceField)
 }
 
 func TestCmdShiftHAndCmdShiftROpenReplaceInFiles(t *testing.T) {
@@ -111,7 +111,7 @@ func TestCmdSlashCommentsLine(t *testing.T) {
 func launchWindowsKeymap(t *testing.T, files map[string]string) (*App, int) {
 	t.Helper()
 	userData := t.TempDir()
-	writeFile(t, filepath.Join(userData, "settings.json"), "{\"keyboard.keymap\": \"vscode-windows\"}\n")
+	testutil.WriteFile(t, filepath.Join(userData, "settings.json"), "{\"keyboard.keymap\": \"vscode-windows\"}\n")
 	root := Project(t, files)
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))
@@ -139,13 +139,13 @@ func TestWindowsKeymapCtrlHShowsReplace(t *testing.T) {
 	app, win := launchWindowsKeymap(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Ctrl+H")
-	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
+	app.WaitNode(win, "replace field", isReplaceField)
 }
 
 func TestBindingWithoutWhenRunsWithTheExplorerFocused(t *testing.T) {
 	t.Parallel()
 	userData := t.TempDir()
-	writeFile(t, filepath.Join(userData, "keybindings.json"), "[{\"key\": \"f9\", \"command\": \"workbench.action.findInFiles\"}]\n")
+	testutil.WriteFile(t, filepath.Join(userData, "keybindings.json"), "[{\"key\": \"f9\", \"command\": \"workbench.action.findInFiles\"}]\n")
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))

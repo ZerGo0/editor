@@ -198,6 +198,19 @@ func pushColumn(c *ui.Context, body func()) {
 		Border(token.BorderWidth.Px(), p.Border.Input).Children(body)
 }
 
+func (g *Git) startPush(opts git.PushOptions, done func()) {
+	g.do(op{
+		title:   "Push",
+		banner:  true,
+		network: true,
+		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
+			opts.Progress = progress
+			return git.OpResult{}, r.Push(ctx, opts)
+		},
+		done: func(git.OpResult) { done() },
+	})
+}
+
 func (g *Git) runPush(target string) {
 	s := &g.push
 	branch := g.currentBranch()
@@ -208,16 +221,7 @@ func (g *Git) runPush(target string) {
 	opts := git.PushOptions{Remote: s.remote, Branch: refspec, Force: s.force, Tags: s.tags, SetUpstream: s.newBranch && branch != ""}
 	run := func() {
 		s.open = false
-		g.do(op{
-			title:   "Push",
-			banner:  true,
-			network: true,
-			run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
-				opts.Progress = progress
-				return git.OpResult{}, r.Push(ctx, opts)
-			},
-			done: func(git.OpResult) { g.h.Notify("Pushed to " + opts.Remote + "/" + target) },
-		})
+		g.startPush(opts, func() { g.h.Notify("Pushed to " + opts.Remote + "/" + target) })
 	}
 	if !s.force {
 		run()

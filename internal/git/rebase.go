@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ZerGo0/editor/internal/shellcmd"
 )
 
 type TodoAction string
@@ -130,7 +132,7 @@ func (r *Repo) RebaseInteractive(ctx context.Context, onto string, items []TodoI
 		r.removeRebaseHelpers()
 		return OpResult{}, err
 	}
-	env := []string{sequenceEditorEnv + "cp " + shellQuote(todoPath)}
+	env := []string{sequenceEditorEnv + "cp " + shellcmd.Quote(todoPath)}
 	out, err := r.run(ctx, call{env: env}, "rebase", "--interactive", "--no-autosquash", onto)
 	res, err := r.finishOp(ctx, out, err)
 	if err != nil || !res.Stopped {
@@ -168,7 +170,7 @@ func buildTodo(dir string, items []TodoItem, messages map[string]string) (string
 			if err := os.WriteFile(path, []byte(msg), helperFileMode); err != nil {
 				return "", err
 			}
-			lines = append(lines, amendCommand+shellQuote(path))
+			lines = append(lines, amendCommand+shellcmd.Quote(path))
 			break
 		}
 		group = nil
@@ -183,10 +185,6 @@ func reworded(messages map[string]string, oid string) (string, bool) {
 
 func singleLine(s string) string {
 	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\n", " ")), " ")
-}
-
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func (r *Repo) removeRebaseHelpers() {

@@ -28,6 +28,12 @@ func writeForeign(t *testing.T, p string) {
 	}
 }
 
+func TestQuote(t *testing.T) {
+	if got := Quote("it's here"); got != "'it'\\''s here'" {
+		t.Fatalf("got %s", got)
+	}
+}
+
 func TestPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

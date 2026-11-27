@@ -28,18 +28,20 @@ func TestDirtyTabPaintsDot(t *testing.T) {
 	}
 }
 
-func TestPinnedDirtyTabPaintsDot(t *testing.T) {
-	clean := tabStripPixels([]Tab{{Label: "a.go", Pinned: true}, {Label: "b.go"}}, 1)
-	dirty := tabStripPixels([]Tab{{Label: "a.go", Pinned: true, Dirty: true}, {Label: "b.go"}}, 1)
-	if bytes.Equal(clean, dirty) {
-		t.Fatal("pinned dirty tab paints no dot")
-	}
+func paintsDifferently(a, b Tab) bool {
+	return !bytes.Equal(tabStripPixels([]Tab{a, {Label: "b.go"}}, 1), tabStripPixels([]Tab{b, {Label: "b.go"}}, 1))
 }
 
-func TestPinnedDirtyTabKeepsThePinBesideTheDot(t *testing.T) {
-	dirty := tabStripPixels([]Tab{{Label: "a.go", Dirty: true}, {Label: "b.go"}}, 1)
-	pinnedDirty := tabStripPixels([]Tab{{Label: "a.go", Pinned: true, Dirty: true}, {Label: "b.go"}}, 1)
-	if bytes.Equal(dirty, pinnedDirty) {
-		t.Fatal("pinned dirty tab paints the same as a dirty tab, so the pin is missing")
+func TestPinnedDirtyTabPaintsItsOwnMarks(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		plain, shown Tab
+	}{
+		{"dot", Tab{Label: "a.go", Pinned: true}, Tab{Label: "a.go", Pinned: true, Dirty: true}},
+		{"pin beside the dot", Tab{Label: "a.go", Dirty: true}, Tab{Label: "a.go", Pinned: true, Dirty: true}},
+	} {
+		if !paintsDifferently(tc.plain, tc.shown) {
+			t.Errorf("pinned dirty tab: the %s is not painted", tc.name)
+		}
 	}
 }

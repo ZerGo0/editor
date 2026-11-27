@@ -44,10 +44,10 @@ func (g *Git) changeMenu(c *ui.Context, m *ui.Menu, e changeEntry) {
 	if single && e.group == groupMerge {
 		path := rows[0].file.Path
 		if m.Item("Accept Yours").Disabled(busy).Chosen() {
-			g.acceptSide(path, true)
+			g.acceptSide(path, true, false)
 		}
 		if m.Item("Accept Theirs").Disabled(busy).Chosen() {
-			g.acceptSide(path, false)
+			g.acceptSide(path, false, false)
 		}
 	}
 	if len(merge)+len(changes) > 0 && m.Item("Stage Changes").Disabled(busy).Chosen() {
@@ -180,7 +180,11 @@ func appendIgnoreFile(file, rel string) error {
 	return nil
 }
 
-func (g *Git) acceptSide(rel string, ours bool) {
-	g.doSimple("Resolve", func(ctx context.Context, r repo) error { return r.AcceptSide(ctx, rel, ours) },
-		func() { g.reloadBuffers([]string{rel}) })
+func (g *Git) acceptSide(rel string, ours, reloadConflicts bool) {
+	g.doSimple("Resolve", func(ctx context.Context, r repo) error { return r.AcceptSide(ctx, rel, ours) }, func() {
+		g.reloadBuffers([]string{rel})
+		if reloadConflicts {
+			g.loadConflicts()
+		}
+	})
 }

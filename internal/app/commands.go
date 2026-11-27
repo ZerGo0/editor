@@ -32,11 +32,21 @@ const (
 )
 
 func (a *App) registerCommands() {
-	ws := a.inWorkspace
-	app := func(fn func()) func(*mygo.Window) { return func(*mygo.Window) { fn() } }
-	add := func(id, category, title string, run func(*mygo.Window)) {
-		a.commands.Add(&command.Command{ID: id, Category: category, Title: title, Run: run})
-	}
+	a.registerWorkbenchCommands()
+	a.registerEditorGroupCommands()
+	a.registerPanelCommands()
+	a.registerEditorCommands()
+	a.registerKeymapCommands()
+}
+
+func appAction(fn func()) func(*mygo.Window) { return func(*mygo.Window) { fn() } }
+
+func (a *App) addCommand(id, category, title string, run func(*mygo.Window)) {
+	a.commands.Add(&command.Command{ID: id, Category: category, Title: title, Run: run})
+}
+
+func (a *App) registerWorkbenchCommands() {
+	ws, app, add := a.inWorkspace, appAction, a.addCommand
 	add("workbench.action.showCommands", categoryView, "Show All Commands", ws((*workspace.Workspace).ShowCommands))
 	add("workbench.action.openSettings", categoryPreferences, "Open Settings (UI)", ws((*workspace.Workspace).OpenSettings))
 	add("workbench.action.openSettingsJson", categoryPreferences, "Open User Settings (JSON)", ws((*workspace.Workspace).OpenSettingsJSON))
@@ -70,6 +80,10 @@ func (a *App) registerCommands() {
 	add("workbench.action.focusSideBar", categoryView, "Focus into Primary Side Bar", ws((*workspace.Workspace).FocusSideBar))
 	add("workbench.action.editor.changeLanguageMode", categoryView, "Change Language Mode", ws((*workspace.Workspace).ChangeLanguage))
 	add("workbench.files.action.showActiveFileInExplorer", categoryExplorer, "Reveal Active File in Explorer View", ws((*workspace.Workspace).RevealInSidebar))
+}
+
+func (a *App) registerEditorGroupCommands() {
+	ws, add := a.inWorkspace, a.addCommand
 	for _, split := range []struct {
 		id, title string
 		side      layout.Direction
@@ -108,6 +122,10 @@ func (a *App) registerCommands() {
 	add("workbench.action.files.revealActiveFileInFinder", categoryFile, "Reveal Active File in Finder", ws((*workspace.Workspace).RevealActiveInFinder))
 	add("workbench.action.files.copyPathOfActiveFile", categoryFile, "Copy Path of Active File", ws(func(w *workspace.Workspace) { w.CopyActivePath(false) }))
 	add("workbench.action.files.copyRelativePathOfActiveFile", categoryFile, "Copy Relative Path of Active File", ws(func(w *workspace.Workspace) { w.CopyActivePath(true) }))
+}
+
+func (a *App) registerPanelCommands() {
+	ws, add := a.inWorkspace, a.addCommand
 	search := func(tab finder.Tab) func(*mygo.Window) {
 		return ws(func(w *workspace.Workspace) { w.OpenSearch(tab) })
 	}
@@ -147,6 +165,10 @@ func (a *App) registerCommands() {
 	for _, act := range issueui.Actions {
 		add(act.ID, act.Category, act.Title, ws(func(w *workspace.Workspace) { w.RunIssues(act.ID) }))
 	}
+}
+
+func (a *App) registerEditorCommands() {
+	ws, app, add := a.inWorkspace, appAction, a.addCommand
 	add("markdown.showPreview", categoryView, "Open Preview", ws((*workspace.Workspace).OpenPreview))
 	add("markdown.showPreviewToSide", categoryView, "Open Preview to the Side", ws((*workspace.Workspace).OpenPreviewToSide))
 	add("workbench.action.zoomIn", categoryView, "Zoom In", app(func() { a.zoom(1) }))
@@ -165,7 +187,6 @@ func (a *App) registerCommands() {
 		}
 		add(keymap.EditorCommandID(cmd), categoryEditor, humanize(cmd.String()), ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))
 	}
-	a.registerKeymapCommands()
 }
 
 func (a *App) zoom(step int) {

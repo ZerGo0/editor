@@ -7,6 +7,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -109,7 +110,7 @@ func explorerEntry(t *testing.T, w *Workspace) activityEntry {
 
 func TestExplorerBadgeCountsUnsavedFilesAndUntitled(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.txt": "a", "b.txt": "b"})
+	testutil.WriteFiles(t, root, map[string]string{"a.txt": "a", "b.txt": "b"})
 	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
 	if e := explorerEntry(t, w); e.item.Badge != 0 || e.item.BadgeTip != "" {
 		t.Fatalf("clean workspace shows badge %d %q", e.item.Badge, e.item.BadgeTip)

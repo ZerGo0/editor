@@ -21,13 +21,7 @@ import (
 const lockedReason = "locked"
 
 type worktreeState struct {
-	open      bool
-	loading   bool
-	err       error
-	gen       int
-	items     []git.Worktree
-	list      ui.ListState
-	selected  int
+	listState[git.Worktree]
 	adding    bool
 	path      string
 	branch    string
@@ -38,7 +32,7 @@ func (g *Git) openWorktrees() {
 	if !g.ready() {
 		return
 	}
-	g.worktrees = worktreeState{open: true, selected: -1}
+	g.worktrees = worktreeState{listState: openList[git.Worktree]()}
 	g.loadWorktrees()
 }
 
@@ -46,7 +40,7 @@ func (g *Git) openNewWorktree(branch string) {
 	if !g.ready() {
 		return
 	}
-	g.worktrees = worktreeState{open: true, selected: -1, adding: true, branch: branch}
+	g.worktrees = worktreeState{listState: openList[git.Worktree](), adding: true, branch: branch}
 	g.worktrees.path = g.suggestWorktreePath(branch)
 	g.loadWorktrees()
 }
@@ -67,16 +61,10 @@ func (g *Git) suggestWorktreePath(branch string) string {
 func (g *Git) loadWorktrees() {
 	s := &g.worktrees
 	s.gen++
-	gen, r := s.gen, g.repo
-	s.loading, s.err = true, nil
+	gen, r := s.begin(), g.repo
 	applog.Go(func() {
 		items, err := r.Worktrees(g.ctx)
-		g.post(func() {
-			if gen != s.gen {
-				return
-			}
-			s.loading, s.err, s.items = false, err, items
-		})
+		g.post(func() { s.apply(gen, items, err) })
 	})
 }
 

@@ -101,15 +101,7 @@ func (g *Git) update() {
 }
 
 func (g *Git) pushUpstream() {
-	g.do(op{
-		title:   "Push",
-		banner:  true,
-		network: true,
-		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
-			return git.OpResult{}, r.Push(ctx, git.PushOptions{Progress: progress})
-		},
-		done: func(git.OpResult) { g.h.Notify("Pushed " + g.headLabel()) },
-	})
+	g.startPush(git.PushOptions{}, func() { g.h.Notify("Pushed " + g.headLabel()) })
 }
 
 func (g *Git) pushOrOpen() {

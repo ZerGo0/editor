@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 const (
@@ -21,29 +22,18 @@ const (
 	commitSubject = "Add main func"
 )
 
-func runGit(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func gitProject(t *testing.T, files map[string]string) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
 	root := Project(t, files)
-	runGit(t, root, "init", "-q", "-b", "main")
-	runGit(t, root, "config", "user.name", "E2E")
-	runGit(t, root, "config", "user.email", "e2e@example.invalid")
-	runGit(t, root, "config", "commit.gpgsign", "false")
-	runGit(t, root, "add", ".")
-	runGit(t, root, "commit", "-q", "-m", "init")
+	testutil.RunGit(t, root, "init", "-q", "-b", "main")
+	testutil.RunGit(t, root, "config", "user.name", "E2E")
+	testutil.RunGit(t, root, "config", "user.email", "e2e@example.invalid")
+	testutil.RunGit(t, root, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, root, "add", ".")
+	testutil.RunGit(t, root, "commit", "-q", "-m", "init")
 	return root
 }
 
@@ -79,7 +69,7 @@ func TestSourceControlCommitsChange(t *testing.T) {
 	commit := app.WaitNode(win, "commit button", func(n Node) bool { return n.Role == "button" && n.Label == "Commit" && !n.Has("disabled") })
 	app.Click(win, commit, 1)
 	app.Eventually("commit in history", func() bool {
-		return runGit(t, root, "log", "-1", "--format=%s") == commitSubject
+		return testutil.RunGit(t, root, "log", "-1", "--format=%s") == commitSubject
 	})
 }
 

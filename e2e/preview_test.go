@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/ZerGo0/editor/internal/workspace"
 )
 
@@ -97,7 +98,7 @@ func previewProject(t *testing.T) string {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		writeFile(t, path, string(data))
+		testutil.WriteFile(t, path, string(data))
 	}
 	return root
 }
@@ -106,14 +107,14 @@ func previewCapture(t *testing.T, root, theme string) *image.NRGBA {
 	t.Helper()
 	userData := t.TempDir()
 	zoom := math.Pow(workspace.ZoomFactor, previewZoomLevel)
-	writeFile(t, filepath.Join(userData, "settings.json"), fmt.Sprintf(`{"workbench.colorTheme": %q, "window.zoomLevel": %d}`, theme, previewZoomLevel))
+	testutil.WriteFile(t, filepath.Join(userData, "settings.json"), fmt.Sprintf(`{"workbench.colorTheme": %q, "window.zoomLevel": %d}`, theme, previewZoomLevel))
 	state, err := json.Marshal(map[string]map[string]int{previewStateKeyPrefix + root: {
 		"width": int(math.Round(previewWidth * zoom)), "height": int(math.Round(previewHeight * zoom)),
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(userData, "window-state.json"), string(state))
+	testutil.WriteFile(t, filepath.Join(userData, "window-state.json"), string(state))
 	app := LaunchWith(t, userData, root, filepath.Join(root, previewOpenFile))
 	defer app.Quit()
 	win := app.WaitWindow(filepath.Base(root))

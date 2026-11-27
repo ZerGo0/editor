@@ -6,6 +6,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	dpane "github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -71,18 +72,10 @@ func joinInfo(parts ...string) string {
 	return strings.Join(kept, infoSeparator)
 }
 
-func message(c *ui.Context, title, detail, actionLabel string, onAction func()) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(func() {
-		feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: detail, Action: actionLabel, OnAction: onAction})
+func message(c *ui.Context, title, description, actionLabel string, onAction func()) {
+	detail.Centered(c, func() {
+		feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: description, Action: actionLabel, OnAction: onAction})
 	})
-}
-
-func loadingView(c *ui.Context, label string) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(func() { feedback.Loading(c, label) })
-}
-
-func errorView(c *ui.Context, title string, err error, retry func()) {
-	ui.Column(c).Grow(1).FillWidth().Center().Children(func() { feedback.Error(c, title, err, retry) })
 }
 
 var iconKeys = map[string]string{"Zoom In": "⌘=", "Zoom Out": "⌘-"}

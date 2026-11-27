@@ -7,7 +7,6 @@ import (
 	"os"
 	"slices"
 	"time"
-	"unicode"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
@@ -20,6 +19,7 @@ import (
 	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/search/files"
 	"github.com/ZerGo0/editor/internal/search/finder"
+	"github.com/ZerGo0/editor/internal/search/references"
 	"github.com/ZerGo0/editor/internal/search/symbols"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
@@ -304,13 +304,12 @@ func (w *Workspace) searchSeed() string {
 
 func wordAt(line string, col int) string {
 	runes := []rune(line)
-	isWord := func(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) }
 	at := len([]rune(line[:min(col, len(line))]))
 	start, end := at, at
-	for start > 0 && isWord(runes[start-1]) {
+	for start > 0 && references.IsWordRune(runes[start-1]) {
 		start--
 	}
-	for end < len(runes) && isWord(runes[end]) {
+	for end < len(runes) && references.IsWordRune(runes[end]) {
 		end++
 	}
 	return string(runes[start:end])

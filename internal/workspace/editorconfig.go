@@ -45,7 +45,7 @@ func resolveEditorConfig(paths []string) ([]editorConfigResult, map[string]fileS
 		results = append(results, editorConfigResult{path: p, settings: props.Settings(), err: err})
 		for _, f := range consulted {
 			if _, ok := files[f]; !ok {
-				files[f], _ = statFile(f)
+				files[f] = stampOrZero(f)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ func (w *Workspace) editorConfigChanged(dirs []string) {
 	}
 	applog.Go(func() {
 		for _, f := range watched {
-			if s, _ := statFile(f); !s.same(old[f]) {
+			if !stampOrZero(f).same(old[f]) {
 				w.update(w.refreshAllEditorConfig)
 				return
 			}

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func conflictRepo(t *testing.T) (*Repo, string) {
@@ -258,52 +260,43 @@ func TestStateFromFiles(t *testing.T) {
 	dir := t.TempDir()
 	repo := &Repo{Root: dir, GitDir: dir}
 	ctx := context.Background()
-	write := func(rel, content string) {
-		path := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("rebase-merge/interactive", "")
-	write("rebase-merge/head-name", "refs/heads/feature\n")
-	write("rebase-merge/onto", "abc123\n")
-	write("rebase-merge/done", "pick 1 a\npick 2 b\n")
-	write("rebase-merge/git-rebase-todo", "pick 3 c\n# comment\n\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/interactive"), "")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/head-name"), "refs/heads/feature\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/onto"), "abc123\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/done"), "pick 1 a\npick 2 b\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/git-rebase-todo"), "pick 3 c\n# comment\n\n")
 	st, err := repo.State(ctx)
 	want := RepoState{Kind: StateRebaseInteractive, Head: "feature", Onto: "abc123", Step: 2, Total: 3}
 	if err != nil || st != want {
 		t.Fatalf("got %+v %v want %+v", st, err, want)
 	}
-	write("rebase-merge/msgnum", "2\n")
-	write("rebase-merge/end", "5\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/msgnum"), "2\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/end"), "5\n")
 	if st, _ = repo.State(ctx); st.Step != 2 || st.Total != 5 {
 		t.Fatalf("msgnum/end: %+v", st)
 	}
-	write("rebase-merge/end", "oops\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-merge/end"), "oops\n")
 	if _, err = repo.State(ctx); err == nil {
 		t.Fatal("malformed counter must fail")
 	}
 	if err := os.RemoveAll(filepath.Join(dir, "rebase-merge")); err != nil {
 		t.Fatal(err)
 	}
-	write("rebase-apply/rebasing", "")
-	write("rebase-apply/next", "1\n")
-	write("rebase-apply/last", "4\n")
-	write("rebase-apply/head-name", "detached HEAD\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-apply/rebasing"), "")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-apply/next"), "1\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-apply/last"), "4\n")
+	testutil.WriteFile(t, filepath.Join(dir, "rebase-apply/head-name"), "detached HEAD\n")
 	if st, _ = repo.State(ctx); st.Kind != StateRebasing || st.Head != "" || st.Step != 1 || st.Total != 4 {
 		t.Fatalf("rebase-apply: %+v", st)
 	}
 	if err := os.RemoveAll(filepath.Join(dir, "rebase-apply")); err != nil {
 		t.Fatal(err)
 	}
-	write("sequencer/todo", "# c\nrevert abc subject\n")
+	testutil.WriteFile(t, filepath.Join(dir, "sequencer/todo"), "# c\nrevert abc subject\n")
 	if st, _ = repo.State(ctx); st.Kind != StateReverting {
 		t.Fatalf("sequencer revert: %+v", st)
 	}
-	write("sequencer/todo", "pick abc subject\n")
+	testutil.WriteFile(t, filepath.Join(dir, "sequencer/todo"), "pick abc subject\n")
 	if st, _ = repo.State(ctx); st.Kind != StateCherryPicking {
 		t.Fatalf("sequencer pick: %+v", st)
 	}

@@ -41,18 +41,6 @@ func TestDetectMovesFindsMovedBlock(t *testing.T) {
 	}
 }
 
-func TestDetectMovesIgnoresIndentation(t *testing.T) {
-	head, block, tail := numbered("head", 0, 6), numbered("moved", 0, 3), numbered("tail", 0, 20)
-	indented := make([]string, len(block))
-	for i, l := range block {
-		indented[i] = "\t\t" + l + "  "
-	}
-	got := detect(joinLines(head, block, tail), joinLines(head, tail, indented))
-	if len(got) != 1 || got[0].OldEnd-got[0].OldStart != 3 {
-		t.Fatalf("moves = %+v", got)
-	}
-}
-
 func TestDetectMovesRequiresEnoughText(t *testing.T) {
 	head, tail := numbered("head", 0, 6), numbered("tail", 0, 20)
 	short := []string{"a := 1", "b := 2"}
@@ -65,12 +53,28 @@ func TestDetectMovesRequiresEnoughText(t *testing.T) {
 	}
 }
 
-func TestDetectMovesSkipsBlankEdges(t *testing.T) {
-	head, block, tail := numbered("head", 0, 6), numbered("moved", 0, 3), numbered("tail", 0, 20)
-	withBlanks := append(append([]string{""}, block...), "")
-	got := detect(joinLines(head, withBlanks, tail), joinLines(head, tail, withBlanks))
-	if len(got) != 1 || got[0].OldEnd-got[0].OldStart != 3 {
-		t.Fatalf("moves = %+v", got)
+func TestDetectMovesIgnoresBlockVariations(t *testing.T) {
+	indent := func(block []string) []string {
+		out := make([]string, len(block))
+		for i, l := range block {
+			out[i] = "\t\t" + l + "  "
+		}
+		return out
+	}
+	blankEdges := func(block []string) []string { return append(append([]string{""}, block...), "") }
+	same := func(block []string) []string { return block }
+	for _, tc := range []struct {
+		name          string
+		before, after func([]string) []string
+	}{
+		{"indentation", same, indent},
+		{"blank edges", blankEdges, blankEdges},
+	} {
+		head, block, tail := numbered("head", 0, 6), numbered("moved", 0, 3), numbered("tail", 0, 20)
+		got := detect(joinLines(head, tc.before(block), tail), joinLines(head, tail, tc.after(block)))
+		if len(got) != 1 || got[0].OldEnd-got[0].OldStart != 3 {
+			t.Errorf("%s: moves = %+v", tc.name, got)
+		}
 	}
 }
 

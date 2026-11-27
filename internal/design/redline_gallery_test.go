@@ -92,21 +92,6 @@ func checkRedlines(t *testing.T, res redline.Result, allow *redline.Allowlist) {
 	}
 }
 
-func finishRedlineAllow(t *testing.T, allow *redline.Allowlist) {
-	t.Helper()
-	stale := allow.Stale()
-	if len(stale) == 0 {
-		return
-	}
-	if os.Getenv(redlineUpdateEnv) == "" {
-		t.Errorf("%s has entries that match no finding; remove them with %s=1:\n%s", redlineAllowPath, redlineUpdateEnv, strings.Join(stale, "\n"))
-		return
-	}
-	if err := allow.Prune(); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func analyzeTester(t *testing.T, tt *ui.Tester, name string, scale float64) redline.Result {
 	t.Helper()
 	return analyze(t, name, tt.Image(), testerBoxes(tt), true, scale)
@@ -203,7 +188,7 @@ func sweepFocusStates(t *testing.T, tt *ui.Tester, view string, allow *redline.A
 func TestGalleryRedlines(t *testing.T) {
 	useFakeCommands(t)
 	allow := loadRedlineAllow(t)
-	t.Cleanup(func() { finishRedlineAllow(t, allow) })
+	t.Cleanup(func() { allow.Settle(t, redlineUpdateEnv) })
 	for _, scale := range redlineScales {
 		for _, th := range redlineThemes {
 			t.Run(fmt.Sprintf("%s@%gx", th.name, scale), func(t *testing.T) {

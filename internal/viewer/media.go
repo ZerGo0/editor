@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -202,7 +203,7 @@ func (p *mediaPane) body(c *ui.Context) {
 	p.seq.Add(1)
 	if err := p.failure(); err != nil {
 		p.stopWatch()
-		errorView(c, "Cannot play this file", err, p.start)
+		detail.Failed(c, "Cannot play this file", err, p.start)
 		return
 	}
 	pl := p.player

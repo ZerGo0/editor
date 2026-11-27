@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -48,7 +49,7 @@ func TestCommandItemsListRecentlyUsedFirst(t *testing.T) {
 
 func TestForgetRecentRemovesFile(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.go": "a\n", "b.go": "b\n"})
+	testutil.WriteFiles(t, root, map[string]string{"a.go": "a\n", "b.go": "b\n"})
 	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
 	openTab(t, w, filepath.Join(root, "a.go"))
 	openTab(t, w, filepath.Join(root, "b.go"))

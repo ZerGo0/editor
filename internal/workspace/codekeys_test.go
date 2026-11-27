@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -33,7 +34,7 @@ func codeKeyHarness(t *testing.T, ids []string, entries []keymap.Entry) (*Worksp
 	}
 	env.Keys.Current = keymap.New(keymap.Defaults(keymap.PresetVSCode), entries)
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.go": "package a\n"})
+	testutil.WriteFiles(t, root, map[string]string{"a.go": "package a\n"})
 	w := newTestWorkspace(t, root, env, session.Project{})
 	tt := ui.NewTester(w.View, 1200, 800)
 	tt.Frame()

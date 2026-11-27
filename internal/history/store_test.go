@@ -114,12 +114,6 @@ func TestLowDisk(t *testing.T) {
 	}
 }
 
-func TestRealFreeBytes(t *testing.T) {
-	if _, err := freeBytes(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestReadRejectsBadHash(t *testing.T) {
 	s, _ := openTest(t, Limits{})
 	for _, h := range []string{"", "../../etc/passwd", strings.Repeat("z", hashHexLen)} {

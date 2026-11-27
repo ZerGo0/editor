@@ -2,10 +2,10 @@ package filetree
 
 import (
 	"context"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func TestParseIgnored(t *testing.T) {
@@ -46,15 +46,7 @@ func TestLoadIgnoredInRepo(t *testing.T) {
 		t.Fatalf("git init: %v %s", err, out)
 	}
 	files := map[string]string{".gitignore": "*.log\nbuild/\n", "a.log": "x", "build/out.txt": "x", "main.go": "x"}
-	for name, text := range files {
-		p := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	testutil.WriteFiles(t, root, files)
 	s, err := LoadIgnored(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)

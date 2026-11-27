@@ -74,9 +74,7 @@ func TestOpenFolderReplacingTheWindowKeepsUnsavedText(t *testing.T) {
 	win = app.WaitWindow("a.txt - " + filepath.Base(first))
 	app.Idle(win)
 	app.WaitNode(win, "restored a.txt tab", tabModified("a.txt"))
-	app.WaitNode(win, "restored text", func(n Node) bool {
-		return n.Role == "textField" && strings.Contains(n.Value, "unsaved alpha")
-	})
+	app.WaitNode(win, "restored text", hasUnsavedAlpha)
 }
 
 func TestOpenFolderDialogReplacesTheCurrentWindow(t *testing.T) {

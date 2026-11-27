@@ -3,11 +3,12 @@ package textsearch
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func mustCompile(t *testing.T, q Query) *Matcher {
@@ -94,23 +95,6 @@ func TestMatchCutting(t *testing.T) {
 	}
 }
 
-func writeFiles(t *testing.T, files map[string][]byte) (string, []string) {
-	t.Helper()
-	root := t.TempDir()
-	var paths []string
-	for name, data := range files {
-		p := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		paths = append(paths, p)
-	}
-	return root, paths
-}
-
 func run(t *testing.T, m *Matcher, o Options) ([]FileResult, Stats, error) {
 	t.Helper()
 	var rs []FileResult
@@ -120,7 +104,7 @@ func run(t *testing.T, m *Matcher, o Options) ([]FileResult, Stats, error) {
 }
 
 func TestSearchBasics(t *testing.T) {
-	root, paths := writeFiles(t, map[string][]byte{
+	root, paths := testutil.TempProject(t, map[string][]byte{
 		"a.go":        []byte("one\r\nTwo needle\r\nthree"),
 		"b.txt":       []byte("needle"),
 		"bin.dat":     []byte("needle\x00needle"),
@@ -148,7 +132,7 @@ func TestSearchBasics(t *testing.T) {
 }
 
 func TestSearchSizeSkip(t *testing.T) {
-	root, paths := writeFiles(t, map[string][]byte{"big.txt": []byte(strings.Repeat("needle\n", 100)), "small.txt": []byte("needle")})
+	root, paths := testutil.TempProject(t, map[string][]byte{"big.txt": []byte(strings.Repeat("needle\n", 100)), "small.txt": []byte("needle")})
 	rs, st, err := run(t, mustCompile(t, Query{Pattern: "needle"}), Options{Root: root, Files: paths, MaxFileSize: 100})
 	if err != nil || len(rs) != 1 || st.Skipped != 1 {
 		t.Fatalf("rs=%v st=%+v err=%v", rs, st, err)
@@ -156,7 +140,7 @@ func TestSearchSizeSkip(t *testing.T) {
 }
 
 func TestSearchOverlay(t *testing.T) {
-	root, paths := writeFiles(t, map[string][]byte{"a.txt": []byte("disk"), "b.txt": []byte("disk")})
+	root, paths := testutil.TempProject(t, map[string][]byte{"a.txt": []byte("disk"), "b.txt": []byte("disk")})
 	overlay := func(p string) (string, bool) {
 		if filepath.Base(p) == "a.txt" {
 			return "buffer text", true
@@ -178,7 +162,7 @@ func TestSearchLimit(t *testing.T) {
 	for _, n := range []string{"a", "b", "c", "d"} {
 		files[n+".txt"] = []byte(strings.Repeat("needle\n", 10))
 	}
-	root, paths := writeFiles(t, files)
+	root, paths := testutil.TempProject(t, files)
 	rs, st, err := run(t, mustCompile(t, Query{Pattern: "needle"}), Options{Root: root, Files: paths, Limit: 25, Workers: 2})
 	if err != nil || !st.Truncated {
 		t.Fatalf("st=%+v err=%v", st, err)
@@ -197,7 +181,7 @@ func TestSearchLimit(t *testing.T) {
 }
 
 func TestSearchCancel(t *testing.T) {
-	root, paths := writeFiles(t, map[string][]byte{"a.txt": []byte("needle")})
+	root, paths := testutil.TempProject(t, map[string][]byte{"a.txt": []byte("needle")})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := Search(ctx, mustCompile(t, Query{Pattern: "needle"}), Options{Root: root, Files: paths}, func(FileResult) {})

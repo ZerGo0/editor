@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 func TestParseGlobs(t *testing.T) {
@@ -73,7 +75,7 @@ func TestWantsWithRoot(t *testing.T) {
 }
 
 func TestWalkFiles(t *testing.T) {
-	root, _ := writeFiles(t, map[string][]byte{"a.go": nil, "node_modules/x.js": nil, ".git/config": nil, "sub/b.go": nil})
+	root, _ := testutil.TempProject(t, map[string][]byte{"a.go": nil, "node_modules/x.js": nil, ".git/config": nil, "sub/b.go": nil})
 	if err := os.Symlink(filepath.Join(root, "a.go"), filepath.Join(root, "link.go")); err != nil {
 		t.Fatal(err)
 	}

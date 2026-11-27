@@ -50,6 +50,35 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 	if m == nil {
 		return Stats{}, fmt.Errorf("textsearch: nil matcher")
 	}
+	o = o.withDefaults()
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results, counts := startScan(runCtx, m, o)
+	var st Stats
+	total := 0
+	for r := range results {
+		if st.Truncated {
+			continue
+		}
+		if room := o.Limit - total; len(r.Matches) > room {
+			r.Matches = r.Matches[:room]
+			st.Truncated = true
+			cancel()
+		}
+		if len(r.Matches) == 0 {
+			continue
+		}
+		total += len(r.Matches)
+		st.Matched++
+		emit(r)
+	}
+	st.Files = int(counts.scanned.Load())
+	st.Skipped = int(counts.skipped.Load())
+	return st, ctx.Err()
+}
+
+func (o Options) withDefaults() Options {
 	if o.MaxFileSize <= 0 {
 		o.MaxFileSize = DefaultMaxFileSize
 	}
@@ -59,13 +88,17 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 	if o.Workers <= 0 {
 		o.Workers = max(1, runtime.GOMAXPROCS(0)-1)
 	}
+	return o
+}
 
-	runCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+type scanCounts struct {
+	scanned, skipped atomic.Int64
+}
 
+func startScan(runCtx context.Context, m *Matcher, o Options) (<-chan FileResult, *scanCounts) {
 	paths := make(chan string)
 	results := make(chan FileResult)
-	var scanned, skipped atomic.Int64
+	counts := &scanCounts{}
 
 	applog.Go(func() {
 		defer close(paths)
@@ -92,10 +125,10 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 				}
 				text, ok := loadText(p, o)
 				if !ok {
-					skipped.Add(1)
+					counts.skipped.Add(1)
 					continue
 				}
-				scanned.Add(1)
+				counts.scanned.Add(1)
 				matches := scanText(runCtx, m, text, o.Limit+1)
 				if len(matches) == 0 {
 					continue
@@ -112,28 +145,7 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 		wg.Wait()
 		close(results)
 	})
-
-	var st Stats
-	total := 0
-	for r := range results {
-		if st.Truncated {
-			continue
-		}
-		if room := o.Limit - total; len(r.Matches) > room {
-			r.Matches = r.Matches[:room]
-			st.Truncated = true
-			cancel()
-		}
-		if len(r.Matches) == 0 {
-			continue
-		}
-		total += len(r.Matches)
-		st.Matched++
-		emit(r)
-	}
-	st.Files = int(scanned.Load())
-	st.Skipped = int(skipped.Load())
-	return st, ctx.Err()
+	return results, counts
 }
 
 func relPath(root, p string) string {

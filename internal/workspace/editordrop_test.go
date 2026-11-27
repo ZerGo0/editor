@@ -49,18 +49,7 @@ func TestDropPlaceAt(t *testing.T) {
 
 func newGroupsBed(t *testing.T) *mouseBed {
 	t.Helper()
-	b := newMouseBed(t, map[string]string{"a.txt": "a\n", "b.txt": "b\n", "c.txt": "c\n", "d.txt": "d\n"})
-	b.open("a.txt", "b.txt")
-	b.w.SplitEditor(layout.Right)
-	second := b.w.layout.Groups()[1]
-	second.Close(0)
-	b.w.openIn(second, filepath.Join(b.root, "c.txt"), false, true)
-	b.tt.Frame()
-	b.tt.Frame()
-	if got := strings.Join(b.groupTabs(), "|"); got != "a.txt,b.txt|c.txt" {
-		t.Fatalf("setup groups: %s", got)
-	}
-	return b
+	return splitOffC(t, map[string]string{"a.txt": "a\n", "b.txt": "b\n", "c.txt": "c\n", "d.txt": "d\n"}, []string{"a.txt", "b.txt"}, "a.txt,b.txt|c.txt")
 }
 
 func (b *mouseBed) dropOnTab(from, onto string, fraction float32) {

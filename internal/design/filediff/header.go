@@ -68,7 +68,7 @@ func Header(c *ui.Context, o HeaderOptions) ui.Element {
 					}
 				}
 				if o.Actions != nil {
-					ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(o.Path + " Actions").Children(func() { o.Actions(c) })
+					action.Toolbar(c, o.Path).Children(func() { o.Actions(c) })
 				}
 			})
 		})

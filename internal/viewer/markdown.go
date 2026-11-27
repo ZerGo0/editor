@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -95,9 +96,9 @@ func (p *markdownPane) info() string {
 func (p *markdownPane) body(c *ui.Context) {
 	switch {
 	case p.err != nil:
-		errorView(c, "Cannot read this file", p.err, p.load)
+		detail.Failed(c, "Cannot read this file", p.err, p.load)
 	case p.loading && p.source == "":
-		loadingView(c, "Loading Markdown")
+		detail.Loading(c, "Loading Markdown")
 	case strings.TrimSpace(p.source) == "":
 		message(c, "Nothing to preview", "Write some Markdown to see it here.", "", nil)
 	default:

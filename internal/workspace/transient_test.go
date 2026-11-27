@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -82,7 +83,7 @@ func newTransientBed(t *testing.T) *goToLineBed {
 	for i := 1; i <= goToLineLines; i++ {
 		fmt.Fprintf(&text, "line %d\n", i)
 	}
-	writeFiles(t, root, map[string]string{goToLineFile: text.String(), secondFile: "b\n"})
+	testutil.WriteFiles(t, root, map[string]string{goToLineFile: text.String(), secondFile: "b\n"})
 	bed.w = newTestWorkspace(t, root, env, session.Project{})
 	bed.tt = ui.NewTester(bed.w.View, testWideW, testViewH)
 	bed.tt.Frame()

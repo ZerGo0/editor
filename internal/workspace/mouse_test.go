@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -40,7 +41,7 @@ type mouseBed struct {
 func newMouseBed(t *testing.T, files map[string]string) *mouseBed {
 	t.Helper()
 	root := t.TempDir()
-	writeFiles(t, root, files)
+	testutil.WriteFiles(t, root, files)
 	env := newTestEnv(t)
 	b := &mouseBed{root: root}
 	env.Commands.Add(&command.Command{ID: navigateBackID, Title: "Go Back", Run: func(*mygo.Window) { b.w.NavigateBack() }})
@@ -243,15 +244,20 @@ func (b *mouseBed) groupTabs() []string {
 
 func newSplitBed(t *testing.T) *mouseBed {
 	t.Helper()
-	b := newMouseBed(t, map[string]string{"b.txt": "b\n", "c.txt": "c\n"})
-	b.open("b.txt")
+	return splitOffC(t, map[string]string{"b.txt": "b\n", "c.txt": "c\n"}, []string{"b.txt"}, "b.txt|c.txt")
+}
+
+func splitOffC(t *testing.T, files map[string]string, open []string, want string) *mouseBed {
+	t.Helper()
+	b := newMouseBed(t, files)
+	b.open(open...)
 	b.w.SplitEditor(layout.Right)
 	second := b.w.layout.Groups()[1]
 	second.Close(0)
 	b.w.openIn(second, filepath.Join(b.root, "c.txt"), false, true)
 	b.tt.Frame()
 	b.tt.Frame()
-	if got := strings.Join(b.groupTabs(), "|"); got != "b.txt|c.txt" {
+	if got := strings.Join(b.groupTabs(), "|"); got != want {
 		t.Fatalf("setup groups: %s", got)
 	}
 	return b

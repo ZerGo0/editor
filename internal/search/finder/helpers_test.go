@@ -2,7 +2,6 @@ package finder
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/ZerGo0/editor/internal/search/files"
 	"github.com/ZerGo0/editor/internal/search/symbols"
 	"github.com/ZerGo0/editor/internal/syntax"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -22,8 +22,6 @@ const (
 	testHeight    = 900
 	settleTries   = 400
 	settleWait    = 5 * time.Millisecond
-	testFilePerm  = 0o644
-	testDirPerm   = 0o755
 	queueCapacity = 4096
 )
 
@@ -91,15 +89,7 @@ type fixture struct {
 func newFixture(t *testing.T, project map[string]string) *fixture {
 	t.Helper()
 	root := t.TempDir()
-	for name, data := range project {
-		p := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), testDirPerm); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(data), testFilePerm); err != nil {
-			t.Fatal(err)
-		}
-	}
+	testutil.WriteFiles(t, root, project)
 	idx := &files.Index{Root: root}
 	if err := idx.Refresh(context.Background(), func(string) bool { return false }); err != nil {
 		t.Fatal(err)
@@ -226,13 +216,7 @@ func newBuffer(path, text string) *editor.Buffer {
 
 func (f *fixture) writeProjectFile(rel, data string) {
 	f.t.Helper()
-	p := f.path(rel)
-	if err := os.MkdirAll(filepath.Dir(p), testDirPerm); err != nil {
-		f.t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(data), testFilePerm); err != nil {
-		f.t.Fatal(err)
-	}
+	testutil.WriteFile(f.t, f.path(rel), data)
 }
 
 func (f *fixture) reindex() {

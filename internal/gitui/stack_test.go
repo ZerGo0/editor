@@ -1,12 +1,14 @@
 package gitui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/multidiff"
+	"github.com/ZerGo0/editor/internal/testutil"
 )
 
 const (
@@ -22,13 +24,13 @@ func stackRepo(t *testing.T, extra ...func(dir string)) (*Git, *fakeHost, string
 	}
 	dir := newTempRepo(t)
 	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
-		writeFile(t, dir, name, "one\ntwo\nthree\n")
+		testutil.WriteFile(t, filepath.Join(dir, name), "one\ntwo\nthree\n")
 	}
 	commitAll(t, dir, "init")
 	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
-		writeFile(t, dir, name, "one\nchanged "+name+"\nthree\n")
+		testutil.WriteFile(t, filepath.Join(dir, name), "one\nchanged "+name+"\nthree\n")
 	}
-	writeFile(t, dir, "new.txt", "fresh\n")
+	testutil.WriteFile(t, filepath.Join(dir, "new.txt"), "fresh\n")
 	for _, write := range extra {
 		write(dir)
 	}
@@ -90,10 +92,10 @@ func TestStageFromTheFileHeaderUpdatesTheStack(t *testing.T) {
 
 func TestCommitTabStacksTheFilesOfTheCommit(t *testing.T) {
 	g, h, dir := stackRepo(t)
-	rawGit(t, dir, "add", "-A")
-	rawGit(t, dir, "commit", "-q", "-m", "second")
-	oid := rawGit(t, dir, "rev-parse", "HEAD")
-	g.openDiffWith(commitSource(git.Commit{OID: oid, Parents: []string{rawGit(t, dir, "rev-parse", "HEAD~1")}}, git.ChangedFile{Path: "c.txt", Status: 'M'}), false, true)
+	testutil.RunGit(t, dir, "add", "-A")
+	testutil.RunGit(t, dir, "commit", "-q", "-m", "second")
+	oid := testutil.RunGit(t, dir, "rev-parse", "HEAD")
+	g.openDiffWith(commitSource(git.Commit{OID: oid, Parents: []string{testutil.RunGit(t, dir, "rev-parse", "HEAD~1")}}, git.ChangedFile{Path: "c.txt", Status: 'M'}), false, true)
 	tab := loadedTab(t, g, h, "git-commit:"+oid)
 	var files int
 	for _, e := range tab.view.Entries() {
@@ -113,7 +115,9 @@ func TestCommitTabStacksTheFilesOfTheCommit(t *testing.T) {
 }
 
 func TestLargeFilesWaitForLoadDiffInTheStack(t *testing.T) {
-	g, h, _ := stackRepo(t, func(dir string) { writeFile(t, dir, "big.txt", strings.Repeat("x", largeFileSize)) })
+	g, h, _ := stackRepo(t, func(dir string) {
+		testutil.WriteFile(t, filepath.Join(dir, "big.txt"), strings.Repeat("x", largeFileSize))
+	})
 	g.openDiffWith(diffSource{kind: diffWorkTree, path: "big.txt"}, false, true)
 	tab := loadedTab(t, g, h, changesTabID)
 	h.drain(t, func() bool { return len(tab.view.Entries()) == 5 })
