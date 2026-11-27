@@ -7,6 +7,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/app"
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/profiling"
 	"github.com/egoist/mygo"
 )
 
@@ -26,6 +27,7 @@ func setupLogs() {
 	dir, err := mygo.App.Path(mygo.PathLogs)
 	if err == nil {
 		err = applog.Setup(dir)
+		profiling.Listen(dir)
 	}
 	if err != nil {
 		log.Printf("logs: %v", err)

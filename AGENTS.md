@@ -15,3 +15,9 @@ Read [docs/design.md](docs/design.md) before you change UI, and load the `design
 - Time budgets on an idle machine: unit tests (`go test ./...`) under 8 s, full E2E suite under 60 s. Keep tests under them: no fixed sleeps (wait for an event or a node), no app launch per subtest unless the state must be fresh, build a fixture once and copy it.
 - Mark independent tests `t.Parallel()`. In `e2e`, pass per-app environment through `LaunchEnv`, never `t.Setenv`; `NewDemoProject` returns a private copy of a fixture that is built once.
 - Find the slowest tests: `go test -json ./... | jq -r 'select(.Test and .Action=="pass") | "\(.Elapsed)\t\(.Package)\t\(.Test)"' | sort -rn | head -20`, or add `-v` for timings. Use the same pipe in `e2e` with `-tags e2e -count=1`.
+
+## Diagnose the installed app
+
+- The installed app logs to `~/Library/Logs/Editor/` (`editor.log`, `crash.log`). The dev profile logs to `~/Library/Logs/Editor Dev/`.
+- To profile it while it runs: `pkill -USR1 -f /Applications/Editor.app/Contents/MacOS/Editor`. It writes `profiles/<time>/` in the logs folder: `goroutines.txt` and `heap.pb.gz` at once, `cpu.pb.gz` after 30 s. It keeps the last 5 captures.
+- Read them with `go tool pprof -top <file>`, or read `goroutines.txt` for a hang.
