@@ -193,6 +193,53 @@ func TestTreeFollowsTheTopFile(t *testing.T) {
 	}
 }
 
+func TestTreeCompactsSingleChildFolders(t *testing.T) {
+	t.Parallel()
+	const deep = "a/b/c/d/leaf.txt"
+	entries := []Entry{
+		{Key: deep, Path: deep, Status: token.GitModified, Adds: 1, Dels: 1, Fingerprint: "v1", Patch: patchFor(t, deep, 1)},
+		{Key: "a/b/c/e/other.txt", Path: "a/b/c/e/other.txt", Status: token.GitModified, Adds: 1, Dels: 1, Fingerprint: "v1", Patch: patchFor(t, "a/b/c/e/other.txt", 1)},
+		{Key: "top.txt", Path: "top.txt", Status: token.GitModified, Adds: 1, Dels: 1, Fingerprint: "v1", Patch: patchFor(t, "top.txt", 1)},
+	}
+	r := newRig(t, entries)
+	want := []treeRow{
+		{name: "a/b/c", path: "a/b/c", depth: 0, dir: true, entry: -1},
+		{name: "d", path: "a/b/c/d", depth: 1, dir: true, entry: -1},
+		{name: "leaf.txt", path: deep, depth: 2, entry: 0},
+		{name: "e", path: "a/b/c/e", depth: 1, dir: true, entry: -1},
+		{name: "other.txt", path: "a/b/c/e/other.txt", depth: 2, entry: 1},
+		{name: "top.txt", path: "top.txt", depth: 0, entry: 2},
+	}
+	if len(r.v.tree.rows) != len(want) {
+		t.Fatalf("tree rows = %+v", r.v.tree.rows)
+	}
+	for i, w := range want {
+		if r.v.tree.rows[i] != w {
+			t.Errorf("row %d = %+v, want %+v", i, r.v.tree.rows[i], w)
+		}
+	}
+	if _, ok := r.tt.AccessByRole(ui.RoleTreeItem, "a/b/c"); !ok {
+		t.Errorf("no compacted folder row: %v", r.tt.Texts())
+	}
+}
+
+func TestFileCardsAreSeparatedByAGap(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 2)
+	r := newRig(t, entries)
+	second, ok := r.tt.AccessByRole(ui.RoleGroup, entries[1].Path)
+	if !ok {
+		t.Fatalf("no header of the second file: %v", r.tt.Texts())
+	}
+	diff, ok := r.tt.AccessByRole(ui.RoleGroup, diffLabelPrefix+entries[0].Path)
+	if !ok {
+		t.Fatalf("no diff of the first file: %v", r.tt.Texts())
+	}
+	if gap := second.Bounds.Y - (diff.Bounds.Y + diff.Bounds.H); gap < token.GapGroup.Px() {
+		t.Errorf("gap %.1f between the diff and the next header", gap)
+	}
+}
+
 func TestOnlyFilesNearTheViewportBuildDiffs(t *testing.T) {
 	t.Parallel()
 	const files = 600

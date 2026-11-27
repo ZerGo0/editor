@@ -127,7 +127,7 @@ func (v *View) actions(c *ui.Context, e *Entry, o Options) {
 func (v *View) body(c *ui.Context, e *Entry, o Options) {
 	f := v.files[e.Key]
 	f.used = v.frame
-	ui.Column(c).FillWidth().Children(func() {
+	filediff.Body(c, func() {
 		switch {
 		case e.Binary || e.Note != "":
 			v.note(c, firstNonEmpty(e.Note, binaryNote))

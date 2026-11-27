@@ -19,7 +19,7 @@ func palettes() map[string]*Palette {
 
 func layers(p *Palette) map[string]ui.Color {
 	return map[string]ui.Color{
-		"sidebar": p.Layer.SideBar, "editor": p.Layer.Editor, "panel": p.Layer.Panel, "titlebar": p.Layer.TitleBar,
+		"sidebar": p.Layer.SideBar, "editor": p.Layer.Editor, "panel": p.Layer.Panel, "section header": p.Layer.SectionHeader, "titlebar": p.Layer.TitleBar,
 		"input": p.Layer.Input, "widget": p.Layer.Widget, "menu": p.Layer.Menu, "quickinput": p.Layer.QuickInput,
 		"tabbar": p.Layer.TabBar, "statusbar": p.Layer.StatusBar,
 	}

@@ -33,41 +33,47 @@ func Height() float32 { return token.HeaderHeight.Px() + 2*token.BorderWidth.Px(
 func Header(c *ui.Context, o HeaderOptions) ui.Element {
 	p := token.Of(c)
 	dir, name := path.Split(o.Path)
-	col := ui.Column(c.Key("file-header:" + o.Path)).FillWidth().Shrink(0).Background(p.Layer.Panel).Role(ui.RoleGroup).Label(o.Path)
-	col.Children(func() {
-		ui.Box(c).FillWidth().Height(token.BorderWidth.Px()).Shrink(0).Background(p.Border.Default).AccessHidden(true)
-		ui.Row(c).FillWidth().Height(token.HeaderHeight.Px()).Shrink(0).AlignItems(ui.Center).Padding(0, token.PadRow.Px()).Gap(token.GapRowIcon.Px()).Children(func() {
-			label := "Collapse " + o.Path
-			if !o.Open {
-				label = "Expand " + o.Path
-			}
-			if action.ExpandButton(c, label, o.Open, action.IconOptions{ID: "toggle"}).Clicked() && o.OnToggle != nil {
-				o.OnToggle()
-			}
-			badge.Decoration(c, o.Status)
-			ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Center).Gap(0).Tooltip(o.Path).Children(func() {
-				if o.OldPath != "" && o.OldPath != o.Path {
-					token.TextLabel.Apply(ui.Text(c, o.OldPath+" "+arrowText+" ")).TextColor(p.Text.Secondary).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+	bw := token.BorderWidth.Px()
+	gap, radius := float32(0), []float32{cardRadius, cardRadius, 0, 0}
+	if !o.Open {
+		gap, radius = CardGap, []float32{cardRadius}
+	}
+	slot := cardSlot(c.Key("file-header:"+o.Path), gap)
+	slot.Children(func() {
+		ui.Column(c).FillWidth().Background(p.Layer.SectionHeader).Role(ui.RoleGroup).Label(o.Path).
+			BorderWidth(bw).BorderColor(p.Border.Default).Radius(radius...).Children(func() {
+			ui.Row(c).FillWidth().Height(token.HeaderHeight.Px()).Shrink(0).AlignItems(ui.Center).Padding(0, token.PadRow.Px()).Gap(token.GapRowIcon.Px()).Children(func() {
+				label := "Collapse " + o.Path
+				if !o.Open {
+					label = "Expand " + o.Path
 				}
-				if dir != "" {
-					token.TextLabel.Apply(ui.Text(c, dir)).TextColor(p.Text.Secondary).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+				if action.ExpandButton(c, label, o.Open, action.IconOptions{ID: "toggle"}).Clicked() && o.OnToggle != nil {
+					o.OnToggle()
 				}
-				token.TextStrong.Apply(ui.Text(c, name)).TextColor(p.Text.Primary).SingleLine().Shrink(0)
+				badge.Decoration(c, o.Status)
+				ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Center).Gap(0).Tooltip(o.Path).Children(func() {
+					if o.OldPath != "" && o.OldPath != o.Path {
+						token.TextLabel.Apply(ui.Text(c, o.OldPath+" "+arrowText+" ")).TextColor(p.Text.Secondary).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+					}
+					if dir != "" {
+						token.TextLabel.Apply(ui.Text(c, dir)).TextColor(p.Text.Secondary).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
+					}
+					token.TextStrong.Apply(ui.Text(c, name)).TextColor(p.Text.Primary).SingleLine().Shrink(0)
+				})
+				Counts(c, o.Adds, o.Dels)
+				if o.OnViewed != nil {
+					viewed := o.Viewed
+					if action.Checkbox(c, "Viewed", &viewed, action.ChoiceOptions{ID: "viewed:" + o.Path}).Changed() {
+						o.OnViewed(viewed)
+					}
+				}
+				if o.Actions != nil {
+					ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(o.Path + " Actions").Children(func() { o.Actions(c) })
+				}
 			})
-			Counts(c, o.Adds, o.Dels)
-			if o.OnViewed != nil {
-				viewed := o.Viewed
-				if action.Checkbox(c, "Viewed", &viewed, action.ChoiceOptions{ID: "viewed:" + o.Path}).Changed() {
-					o.OnViewed(viewed)
-				}
-			}
-			if o.Actions != nil {
-				ui.Row(c).Gap(token.GapTight.Px()).AlignItems(ui.Center).Shrink(0).Role(ui.RoleToolbar).Label(o.Path + " Actions").Children(func() { o.Actions(c) })
-			}
 		})
-		ui.Box(c).FillWidth().Height(token.BorderWidth.Px()).Shrink(0).Background(p.Border.Default).AccessHidden(true)
 	})
-	return col
+	return slot
 }
 
 func Counts(c *ui.Context, adds, dels int) {

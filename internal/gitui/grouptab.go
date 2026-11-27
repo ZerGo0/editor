@@ -9,7 +9,9 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/design/filediff"
 	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -161,11 +163,14 @@ func (g *Git) commitSection(cm git.Commit, full bool) func(c *ui.Context) {
 		}
 	}
 	return func(c *ui.Context) {
-		g.commitInfo(c, cm, nil, nil)
-		ui.Row(c).Padding(token.Space0.Px(), token.PadView.Px()).Children(func() {
-			if button(c, "Show in Log", false) {
-				g.showCommit(cm.OID)
-			}
+		ui.Column(c).FillWidth().Padding(0, 0, filediff.CardGap, 0).Children(func() {
+			g.commitInfo(c, cm, nil, nil)
+			ui.Row(c).Padding(0, token.PadView.Px(), token.PadView.Px(), token.PadView.Px()).Children(func() {
+				if button(c, "Show in Log", false) {
+					g.showCommit(cm.OID)
+				}
+			})
+			pane.Separator(c, false)
 		})
 	}
 }

@@ -8,6 +8,7 @@ type ViewOptions struct {
 	Label  string
 	Empty  func(c *ui.Context)
 	Tree   bool
+	Guides bool
 	Height float32
 }
 
@@ -23,7 +24,7 @@ func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int)
 	width := ObserveWidth(c, l)
 	l.Rows(func(r ui.ListRow) {
 		it := item(r.Index)
-		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, Width: width, flat: o.Tree}, it)
+		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, Width: width, Guides: o.Guides, flat: o.Tree}, it)
 	})
 	if n == 0 && o.Empty != nil {
 		l.Children(func() { o.Empty(c) })

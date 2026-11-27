@@ -2,7 +2,6 @@ package gitui
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
@@ -123,8 +122,5 @@ func TestPatchTabFiltersWhitespace(t *testing.T) {
 	tt.Frame()
 	if !tt.HasText("Only whitespace changed") {
 		t.Fatalf("texts = %v", tt.Texts())
-	}
-	if !strings.Contains(strings.Join(tt.Texts(), " "), "Ignore whitespaces") {
-		t.Fatalf("mode not shown in %v", tt.Texts())
 	}
 }

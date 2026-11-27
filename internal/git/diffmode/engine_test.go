@@ -199,7 +199,7 @@ func TestMoveRowShowsAndJumps(t *testing.T) {
 		h.d.Annotations = h.e.Annotations(nil)
 		editor.DiffView(c, h.d).Grow(1).FillWidth()
 	}, 1000, 700)
-	for _, want := range []string{"Moved to line 21", "Moved from line 7", "Do not ignore", "Show Moved Code"} {
+	for _, want := range []string{"Moved to line 21", "Moved from line 7", "Ignore Whitespace", "Show Moved Code"} {
 		if !tt.HasText(want) {
 			t.Fatalf("missing %q in %v", want, tt.Texts())
 		}
@@ -214,17 +214,20 @@ func TestMoveRowShowsAndJumps(t *testing.T) {
 	h.until(func() bool { _, ok := h.d.SelectedLines(); return !ok })
 }
 
-func TestWhitespaceMenuChoosesMode(t *testing.T) {
+func TestWhitespaceToggleSwitchesMode(t *testing.T) {
 	h := newHarness(t, func(context.Context, string, string, git.WhitespaceMode) ([]byte, error) { return nil, nil })
 	h.e.SetSource(Source{Old: "a\n", New: "b\n"})
 	tt := ui.NewTester(func(c *ui.Context) { Controls(c, h.e) }, 600, 100)
 	if err := tt.Click("Ignore Whitespace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := tt.Click("Ignore whitespaces"); err != nil {
+	if Session.Whitespace != git.WhitespaceIgnore {
+		t.Fatalf("mode = %v", Session.Whitespace)
+	}
+	if err := tt.Click("Ignore Whitespace"); err != nil {
 		t.Fatal(err)
 	}
-	if Session.Whitespace != git.WhitespaceIgnore {
+	if Session.Whitespace != git.WhitespaceNone {
 		t.Fatalf("mode = %v", Session.Whitespace)
 	}
 }

@@ -256,5 +256,5 @@ func TestDiffTabShowsWhitespaceAndMoveControls(t *testing.T) {
 	if tab.engine == nil || !tab.engine.Ready() {
 		t.Fatal("the diff engine is not ready")
 	}
-	mustHaveText(t, tt, "Do not ignore", "Show Moved Code")
+	mustHaveText(t, tt, "Ignore Whitespace", "Show Moved Code")
 }

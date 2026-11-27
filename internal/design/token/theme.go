@@ -156,7 +156,7 @@ func (p *Palette) withAccent(a ui.Color) {
 
 func (p *Palette) enforceContrast() {
 	rows := []ui.Color{p.Layer.SideBar, p.Layer.Editor, Over(p.List.Hover, p.Layer.SideBar), Over(p.List.InactiveSelection, p.Layer.SideBar)}
-	surfaces := append([]ui.Color{p.Layer.Input, p.Layer.Widget, p.Layer.Menu, p.Layer.Panel, p.Layer.QuickInput}, rows...)
+	surfaces := append([]ui.Color{p.Layer.Input, p.Layer.Widget, p.Layer.Menu, p.Layer.Panel, p.Layer.SectionHeader, p.Layer.QuickInput}, rows...)
 	p.Text.Secondary = ensure(p.Text.Secondary, ContrastText, surfaces...)
 	p.Text.Link = ensure(p.Text.Link, ContrastText, rows...)
 	p.enforceSyntax()

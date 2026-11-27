@@ -26,17 +26,18 @@ type Palette struct {
 }
 
 type Layers struct {
-	TitleBar    ui.Color
-	ActivityBar ui.Color
-	SideBar     ui.Color
-	Editor      ui.Color
-	Panel       ui.Color
-	StatusBar   ui.Color
-	TabBar      ui.Color
-	Input       ui.Color
-	Menu        ui.Color
-	Widget      ui.Color
-	QuickInput  ui.Color
+	TitleBar      ui.Color
+	ActivityBar   ui.Color
+	SideBar       ui.Color
+	Editor        ui.Color
+	Panel         ui.Color
+	SectionHeader ui.Color
+	StatusBar     ui.Color
+	TabBar        ui.Color
+	Input         ui.Color
+	Menu          ui.Color
+	Widget        ui.Color
+	QuickInput    ui.Color
 }
 
 type Texts struct {

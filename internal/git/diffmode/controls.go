@@ -12,15 +12,18 @@ const (
 	whitespaceLabel = "Ignore Whitespace"
 	movesToggle     = "Show Moved Code"
 	busyLabel       = "Comparing"
+	ignoreMode      = git.WhitespaceIgnore
 )
 
 func Controls(c *ui.Context, e *Engine) {
-	options := make([]action.Option[git.WhitespaceMode], len(WhitespaceChoices))
-	for i, choice := range WhitespaceChoices {
-		options[i] = action.Option[git.WhitespaceMode]{Value: choice.Mode, Label: choice.Label}
+	ignore := Session.Whitespace != git.WhitespaceNone
+	if action.Checkbox(c, whitespaceLabel, &ignore, action.ChoiceOptions{ID: "diff-whitespace"}).Changed() {
+		Session.Whitespace = git.WhitespaceNone
+		if ignore {
+			Session.Whitespace = ignoreMode
+		}
 	}
-	action.Select(c, whitespaceLabel, &Session.Whitespace, options, action.SelectOptions{ID: "diff-whitespace"})
-	action.Checkbox(c, movesToggle, &Session.ShowMoves, action.ChoiceOptions{ID: "diff-show-moves"}).MinHeight(token.HitTargetMin.Px())
+	action.Checkbox(c, movesToggle, &Session.ShowMoves, action.ChoiceOptions{ID: "diff-show-moves"})
 	if e != nil && e.Busy() {
 		feedback.Spinner(c, busyLabel)
 	}

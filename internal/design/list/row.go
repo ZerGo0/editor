@@ -90,7 +90,7 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 		}
 		action.Tooltip(c, row, tip)
 	}
-	if s.tree && s.Guides && s.Depth > 0 {
+	if (s.tree || s.flat) && s.Guides && s.Depth > 0 {
 		guides(row, s.Depth, p.List.IndentGuide)
 	}
 	row.Children(func() {
