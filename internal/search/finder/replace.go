@@ -27,41 +27,68 @@ func acceptSet(matches []textsearch.Match) func(textsearch.Match) bool {
 	return func(m textsearch.Match) bool { return set[posOf(m)] }
 }
 
-func (r *ReplacePopup) canReplace() bool {
-	return r.st.ShowReplace && r.text.matcher != nil && r.text.err == "" && r.text.total > 0 && !r.replacing && !r.text.searching
+type replacementCache struct {
+	matcher  *textsearch.Matcher
+	with     string
+	preserve bool
+	repl     textsearch.Replacement
 }
 
-func (r *ReplacePopup) replacement() textsearch.Replacement {
-	return r.text.matcher.Replacement(r.st.With, r.st.PreserveCase)
+func (d *Dialog) replaceVisible() bool {
+	return d.tab == TabText && d.st.ShowReplace
 }
 
-func (r *ReplacePopup) replaceSelected() {
-	row, ok := r.current()
-	if !ok || !r.canReplace() {
+func (d *Dialog) canReplace() bool {
+	return d.replaceVisible() && d.text.matcher != nil && d.text.err == "" && d.text.total > 0 && !d.replacing && !d.text.searching
+}
+
+func (d *Dialog) replacement() textsearch.Replacement {
+	c := &d.replCache
+	if c.matcher != d.text.matcher || c.with != d.st.With || c.preserve != d.st.PreserveCase || c.matcher == nil {
+		*c = replacementCache{matcher: d.text.matcher, with: d.st.With, preserve: d.st.PreserveCase, repl: d.text.matcher.Replacement(d.st.With, d.st.PreserveCase)}
+	}
+	return c.repl
+}
+
+func (d *Dialog) replaceSelected() {
+	if e, ok := d.current(); ok && e.kind == kindMatch {
+		d.replaceMatch(e.file, e.match)
+	}
+}
+
+func (d *Dialog) replaceMatch(f *FileNode, i int) {
+	if d.canReplace() {
+		d.moved = true
+		d.apply([]replaceTarget{{file: f, accept: acceptSet(f.Matches[i : i+1])}})
+	}
+}
+
+func (d *Dialog) replaceFile(f *FileNode) {
+	if d.canReplace() {
+		d.moved = true
+		d.apply([]replaceTarget{{file: f, accept: acceptSet(f.Matches)}})
+	}
+}
+
+func (d *Dialog) askReplaceAll() {
+	d.confirm = d.canReplace()
+}
+
+func (d *Dialog) replaceAll() {
+	if !d.canReplace() {
 		return
 	}
-	accept := acceptSet(row.file.Matches)
-	if row.match >= 0 {
-		accept = acceptSet(row.file.Matches[row.match : row.match+1])
-	}
-	r.apply([]replaceTarget{{file: row.file, accept: accept}})
-}
-
-func (r *ReplacePopup) replaceAll() {
-	if !r.canReplace() {
-		return
-	}
-	targets := make([]replaceTarget, len(r.text.files))
-	for i, f := range r.text.files {
+	targets := make([]replaceTarget, len(d.text.files))
+	for i, f := range d.text.files {
 		targets[i] = replaceTarget{file: f, accept: acceptSet(f.Matches)}
 	}
-	r.apply(targets)
+	d.apply(targets)
 }
 
-func (r *ReplacePopup) apply(targets []replaceTarget) {
-	m, repl := r.text.matcher, r.replacement()
-	h := r.env.Host
-	r.replacing = true
+func (d *Dialog) apply(targets []replaceTarget) {
+	m, repl := d.text.matcher, d.replacement()
+	h := d.env.Host
+	d.replacing = true
 	var disk []replaceTarget
 	replaced, changed := 0, 0
 	for _, t := range targets {
@@ -86,7 +113,7 @@ func (r *ReplacePopup) apply(targets []replaceTarget) {
 		var errs []error
 		for _, t := range disk {
 			path := t.file.Path
-			n, err := textsearch.ReplaceFile(path, m, repl, t.accept, 0, func() { r.beforeWrite(path) })
+			n, err := textsearch.ReplaceFile(path, m, repl, t.accept, 0, func() { d.beforeWrite(path) })
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -96,25 +123,25 @@ func (r *ReplacePopup) apply(targets []replaceTarget) {
 				changed++
 			}
 		}
-		h.Update(func() { r.replaceDone(replaced, changed, errors.Join(errs...)) })
+		h.Update(func() { d.replaceDone(replaced, changed, errors.Join(errs...)) })
 	}()
 }
 
-func (r *ReplacePopup) beforeWrite(path string) {
-	if r.env.BeforeWrite != nil {
-		r.env.BeforeWrite(path)
+func (d *Dialog) beforeWrite(path string) {
+	if d.env.BeforeWrite != nil {
+		d.env.BeforeWrite(path)
 	}
 }
 
-func (r *ReplacePopup) replaceDone(replaced, files int, err error) {
-	r.replacing = false
+func (d *Dialog) replaceDone(replaced, files int, err error) {
+	d.replacing = false
 	if err != nil {
-		r.env.Host.ShowError("Cannot replace in every file", err)
+		d.env.Host.ShowError("Cannot replace in every file", err)
 	}
 	if replaced > 0 {
-		r.env.Host.Notify(fmt.Sprintf("Replaced %s in %s", plural(replaced, "occurrence"), plural(files, "file")))
+		d.env.Host.Notify(fmt.Sprintf("Replaced %s in %s", plural(replaced, "occurrence"), plural(files, "file")))
 	}
-	if r.open {
-		r.refresh()
+	if d.open {
+		d.refresh()
 	}
 }

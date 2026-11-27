@@ -29,11 +29,13 @@ type ResultsState struct {
 	list     ui.ListState
 	scroll   bool
 	rows     []Row
+	height   float32
 }
 
 type ResultsOptions struct {
 	Label string
 	Rows  int
+	Fill  bool
 	Empty func(c *ui.Context)
 }
 
@@ -100,7 +102,13 @@ func Results(c *ui.Context, s *ResultsState, rows []Row, o ResultsOptions) int {
 	if n <= 0 {
 		n = token.SearchPopupRows
 	}
-	l := ui.List(c, &s.list, len(rows)).FillWidth().Height(token.RowHeight.Px() * float32(n)).Shrink(0).Label(o.Label).Background(ui.Transparent)
+	l := ui.List(c, &s.list, len(rows)).FillWidth().Label(o.Label).Background(ui.Transparent)
+	if o.Fill {
+		l.Grow(1).Basis(0).Shrink(1).MinHeight(token.PaneMinHeight.Px())
+	} else {
+		l.Height(token.RowHeight.Px() * float32(n)).Shrink(0)
+	}
+	s.height = l.Bounds().H
 	l.Rows(func(r ui.ListRow) {
 		row := rows[r.Index]
 		if row.Kind == RowHeader {

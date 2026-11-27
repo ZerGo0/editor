@@ -121,7 +121,7 @@ func (q *QAApp) searchDialog(name string, menu ...string) error {
 	return err
 }
 
-var modalSteps = map[string]bool{"quickinput": true, "search-all": true, "search-text": true, "replace-in-files": true}
+var modalSteps = map[string]bool{"quickinput": true, "search-all": true, "search-text": true, "search-text-replace": true}
 
 type viewStep struct {
 	Name  string
@@ -159,7 +159,7 @@ func demoViewSteps() []viewStep {
 		{"search-text", func(q *QAApp, d DemoProject) error {
 			return q.searchDialog("Find in Files", goMenu, "Find in Files")
 		}},
-		{"replace-in-files", func(q *QAApp, d DemoProject) error {
+		{"search-text-replace", func(q *QAApp, d DemoProject) error {
 			return q.searchDialog("Replace in Files", goMenu, "Replace in Files")
 		}},
 		{"scm", func(q *QAApp, d DemoProject) error {

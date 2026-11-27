@@ -39,7 +39,6 @@ type searchState struct {
 	scanner     *files.Scanner
 	dialog      *finder.Dialog
 	recentFiles *finder.RecentFiles
-	replace     *finder.ReplacePopup
 	find        *finder.FindWindow
 	recent      []string
 	timer       *time.Timer
@@ -76,13 +75,11 @@ func (w *Workspace) initSearch(saved session.Project) {
 	w.search.engine = engine
 	w.search.dialog = finder.NewDialog(env)
 	w.search.recentFiles = finder.NewRecentFiles(env)
-	w.search.replace = finder.NewReplacePopup(env)
 	w.search.find = finder.NewFindWindow(env)
 	if len(saved.Search) > 0 {
 		var st finder.State
 		if err := json.Unmarshal(saved.Search, &st); err == nil {
 			w.search.dialog.Restore(st)
-			w.search.replace.Restore(st.Replace)
 		}
 	}
 	w.addPanel(toolView{id: FindPanel, title: "Find", command: showFindWindowID, icon: icons.Search, view: w.search.find.View, badge: w.search.find.Count, actions: w.search.find.Actions})
@@ -90,7 +87,6 @@ func (w *Workspace) initSearch(saved session.Project) {
 
 func (w *Workspace) snapshotSearch(p *session.Project) {
 	st := w.search.dialog.Snapshot()
-	st.Replace = w.search.replace.Snapshot()
 	data, err := json.Marshal(st)
 	if err != nil {
 		log.Printf("save search state: %v", err)
@@ -181,11 +177,14 @@ func (w *Workspace) closeSearchPopups() {
 	w.palette.Close()
 	w.search.dialog.Close()
 	w.search.recentFiles.Close()
-	w.search.replace.Close()
+}
+
+func (w *Workspace) searchTextShown() bool {
+	return w.search.dialog.IsOpen() && w.search.dialog.Tab() == finder.TabText
 }
 
 func (w *Workspace) searchOpen() bool {
-	return w.search.dialog.IsOpen() || w.search.recentFiles.IsOpen() || w.search.replace.IsOpen()
+	return w.search.dialog.IsOpen() || w.search.recentFiles.IsOpen()
 }
 
 func (w *Workspace) ShowCommands() {
@@ -206,7 +205,7 @@ func (w *Workspace) FindInFiles() {
 
 func (w *Workspace) ReplaceInFiles() {
 	w.closeSearchPopups()
-	w.search.replace.Open(w.searchSeed())
+	w.search.dialog.OpenReplace(w.searchSeed())
 }
 
 func (w *Workspace) ShowRecentFiles() {

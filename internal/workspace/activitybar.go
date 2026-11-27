@@ -11,32 +11,69 @@ import (
 )
 
 const (
-	activityLabel     = "Activity Bar"
-	manageLabel       = "Manage"
-	viewActionsSuffix = " Actions"
+	searchActivityLabel   = "Search"
+	searchActivityCommand = "workbench.action.findInFiles"
+	activityLabel         = "Activity Bar"
+	manageLabel           = "Manage"
+	viewActionsSuffix     = " Actions"
 )
 
 func (w *Workspace) visibleViews() []toolView {
 	return slices.DeleteFunc(slices.Clone(w.tools.sideViews), func(v toolView) bool { return w.tools.hiddenViews[v.id] })
 }
 
-func (w *Workspace) activityBar(c *ui.Context, v *toolView, showActions bool) {
+type activityEntry struct {
+	item chrome.Activity
+	view string
+}
+
+func (w *Workspace) activityEntries() (entries []activityEntry, selected int) {
 	views := w.visibleViews()
-	items := make([]chrome.Activity, len(views))
-	for i, v := range views {
-		items[i] = chrome.Activity{Icon: v.icon, Label: v.title, Keys: w.keyLabel(v.command)}
+	searching := w.searchTextShown()
+	for _, v := range views {
+		item := chrome.Activity{Icon: v.icon, Label: v.title, Keys: w.keyLabel(v.command)}
 		if v.badge != nil {
-			items[i].Badge = v.badge()
+			item.Badge = v.badge()
+		}
+		if v.id == w.tools.side && !searching {
+			selected = len(entries)
+		}
+		entries = append(entries, activityEntry{item: item, view: v.id})
+		if v.id == ExplorerView {
+			entries = append(entries, w.searchEntry())
 		}
 	}
-	selected := slices.IndexFunc(views, func(v toolView) bool { return v.id == w.tools.side })
+	if !slices.ContainsFunc(entries, func(e activityEntry) bool { return e.view == "" }) {
+		entries = slices.Insert(entries, 0, w.searchEntry())
+		selected++
+	}
+	if searching {
+		selected = slices.IndexFunc(entries, func(e activityEntry) bool { return e.view == "" })
+	}
+	return entries, selected
+}
+
+func (w *Workspace) searchEntry() activityEntry {
+	return activityEntry{item: chrome.Activity{Icon: icons.Search, Label: searchActivityLabel, Keys: w.keyLabel(searchActivityCommand)}}
+}
+
+func (w *Workspace) activityBar(c *ui.Context, v *toolView, showActions bool) {
+	entries, selected := w.activityEntries()
+	items := make([]chrome.Activity, len(entries))
+	for i, e := range entries {
+		items[i] = e.item
+	}
 	row := ui.Row(c).FillWidth().Shrink(0).AlignItems(ui.Center).Padding(0, token.PadRow.Px(), 0, 0).
 		BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(token.Of(c).Border.Section)
 	row.Children(func() {
 		bar := chrome.ActivityBar(c, activityLabel, &selected, items).Shrink(1).MinWidth(0)
 		w.takeFocus(partSide, bar)
-		if bar.Changed() && selected >= 0 && selected < len(views) {
-			w.ShowSideView(views[selected].id)
+		if bar.Changed() && selected >= 0 && selected < len(entries) {
+			if entries[selected].view == "" {
+				w.ShowSearch()
+			} else {
+				w.ShowSideView(entries[selected].view)
+			}
 		}
 		ui.Box(c).Grow(1)
 		if v != nil && v.actions != nil {

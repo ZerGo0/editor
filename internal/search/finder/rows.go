@@ -1,11 +1,14 @@
 package finder
 
 import (
+	"strconv"
+
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -39,7 +42,7 @@ func (d *Dialog) row(e entry) picker.Row {
 	case kindMore:
 		return picker.Row{Kind: picker.RowMore, Title: e.label}
 	case kindFile:
-		it := list.Item{Label: e.label, Matches: e.positions, Description: e.detail, Leading: fileIcon(e.label)}
+		it := list.Item{Label: e.label, Matches: e.positions, Aside: e.detail, Tooltip: relTo(d.env.Host.RootDir(), e.path), Leading: fileIcon(e.label)}
 		if e.recent && d.tab == TabFiles {
 			path := e.path
 			it.Actions = func(c *ui.Context) {
@@ -54,13 +57,54 @@ func (d *Dialog) row(e entry) picker.Row {
 	case kindAction:
 		return picker.Row{Item: list.Item{Label: e.label, Matches: e.positions}, Keys: e.keys}
 	case kindMatch:
-		m := e.file.Matches[e.match]
-		return picker.Row{Item: list.Item{Label: e.label, Description: e.detail,
-			Rich: func(s list.Style) []ui.Span { return matchSpans(d.pal, s, m, "", false) }}}
+		return picker.Row{Item: d.matchItem(e)}
 	case kindLine:
 		return picker.Row{Item: list.Item{Label: e.label, Icon: icons.ArrowRight}}
 	}
 	return picker.Row{Item: list.Item{Label: e.label, Description: e.detail}}
+}
+
+func (d *Dialog) labelMatches(entries []entry) {
+	var paths []string
+	for _, e := range entries {
+		if e.kind == kindMatch {
+			paths = append(paths, e.path)
+		}
+	}
+	qualified := tablabel.Qualify(paths)
+	for i, e := range entries {
+		if e.kind != kindMatch {
+			continue
+		}
+		name := e.file.Name
+		if q, ok := qualified[e.path]; ok {
+			name = q
+		}
+		entries[i].detail = name + " " + strconv.Itoa(e.file.Matches[e.match].Start.Line+1)
+	}
+}
+
+func (d *Dialog) matchItem(e entry) list.Item {
+	file, i := e.file, e.match
+	m := file.Matches[i]
+	it := list.Item{Label: e.label, Aside: e.detail, Tooltip: file.Rel, Rich: func(s list.Style) []ui.Span {
+		if d.replaceVisible() && d.text.matcher != nil {
+			return matchSpans(d.pal, s, m, d.replacement().Expand(m.Matched, m.Groups), true)
+		}
+		return matchSpans(d.pal, s, m, "", false)
+	}}
+	it.Actions = func(c *ui.Context) {
+		if !d.replaceVisible() {
+			return
+		}
+		if action.IconButton(c, icons.Replace, replaceLabel, action.IconOptions{Keys: replaceKeys, Disabled: !d.canReplace()}).Clicked() {
+			d.replaceMatch(file, i)
+		}
+		if action.IconButton(c, icons.ReplaceAll, replaceFileLabel, action.IconOptions{Disabled: !d.canReplace()}).Clicked() {
+			d.replaceFile(file)
+		}
+	}
+	return it
 }
 
 func (d *Dialog) forget(path string) {

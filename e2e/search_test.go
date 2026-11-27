@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,8 @@ const (
 	replaceInFilesTitle   = "Replace in Files"
 	commandCenterLabel    = "Search Everywhere"
 	matchRowLabel         = "line 6: // needle here"
-	replaceRowLabel       = "// needle here line 6"
+	activitySearchLabel   = "Search"
+	centerTolerance       = 1.0
 )
 
 func waitQuickOpen(app *App, win int, title string) {
@@ -122,8 +124,10 @@ func TestReplaceAllEditsMatchesAfterConfirmation(t *testing.T) {
 	app, win, root := openProject(t, searchProject)
 	app.Menu(win, "Go", "Replace in Files")
 	waitQuickOpen(app, win, replaceInFilesTitle)
+	query := app.WaitNode(win, "query field", RoleLabel("textField", replaceInFilesTitle))
+	app.Act(win, query.ID, "focus", "")
 	app.Type(win, "needle")
-	app.WaitNode(win, "match row", Label(replaceRowLabel))
+	app.WaitNode(win, "match row", Label(matchRowLabel))
 	replace := app.WaitNode(win, "replace field", RoleLabel("textField", "Replace"))
 	app.Act(win, replace.ID, "focus", "")
 	app.Type(win, "pin")
@@ -146,12 +150,41 @@ func TestReplaceAllEditsMatchesAfterConfirmation(t *testing.T) {
 	})
 }
 
-func TestSearchViewIsGone(t *testing.T) {
+func windowBounds(tree []Node) Rect {
+	var win Rect
+	for _, n := range tree {
+		if n.Parent == "" && n.Bounds.Width*n.Bounds.Height > win.Width*win.Height {
+			win = n.Bounds
+		}
+	}
+	return win
+}
+
+func TestActivityBarSearchIconOpensTheCenteredDialog(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
-	if _, ok := app.Find(win, func(n Node) bool { return n.Label == "Search" && (n.Role == "tab" || n.Role == "button") }); ok {
-		t.Fatal("the activity bar still shows a Search view")
+	search := app.WaitNode(win, "Search activity", RoleLabel("tab", activitySearchLabel))
+	explorer := app.WaitNode(win, "Explorer activity", RoleLabel("tab", "Explorer"))
+	if search.Bounds.X <= explorer.Bounds.X {
+		t.Fatalf("Search at x %v is not after Explorer at x %v", search.Bounds.X, explorer.Bounds.X)
 	}
+	app.Click(win, search, 1)
+	dialog := app.WaitNode(win, "Find in Files dialog", RoleLabel("dialog", findInFilesTitle))
+	waitTab(app, win, "Text", true)
+	window := windowBounds(app.Tree(win))
+	if window.Width == 0 {
+		t.Fatal("no window bounds in the accessibility tree")
+	}
+	dx := dialog.Bounds.X + dialog.Bounds.Width/2 - (window.X + window.Width/2)
+	dy := dialog.Bounds.Y + dialog.Bounds.Height/2 - (window.Y + window.Height/2)
+	if math.Abs(dx) > centerTolerance || math.Abs(dy) > centerTolerance {
+		t.Fatalf("dialog %+v is off the centre of the window %+v by %v, %v", dialog.Bounds, window, dx, dy)
+	}
+}
+
+func TestShowSearchCommandOpensFindInFiles(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, searchProject)
 	app.Menu(win, "View", "Command Palette...")
 	waitQuickOpen(app, win, commandPaletteTitle)
 	app.Type(win, "Show Search")

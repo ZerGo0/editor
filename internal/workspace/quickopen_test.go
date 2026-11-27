@@ -81,12 +81,12 @@ func TestSearchEntryPointsOpenTheirTabs(t *testing.T) {
 		}
 	}
 	w.ReplaceInFiles()
-	if d.IsOpen() || !w.search.replace.IsOpen() {
-		t.Fatal("Replace in Files did not replace the dialog with its own popup")
+	if !d.IsOpen() || d.Tab() != finder.TabText || !d.Snapshot().ShowReplace {
+		t.Fatal("Replace in Files did not open the Text tab with the replace field")
 	}
 	w.ShowRecentFiles()
-	if w.search.replace.IsOpen() || !w.search.recentFiles.IsOpen() {
-		t.Fatal("Recent Files did not replace the Replace in Files popup")
+	if d.IsOpen() || !w.search.recentFiles.IsOpen() {
+		t.Fatal("Recent Files did not replace Search Everywhere")
 	}
 	w.OpenSearch(finder.TabAll)
 	if w.search.recentFiles.IsOpen() || !d.IsOpen() {

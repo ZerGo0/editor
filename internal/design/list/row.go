@@ -12,6 +12,7 @@ type Item struct {
 	Label         string
 	Matches       []int
 	Description   string
+	Aside         string
 	Icon          *ui.SVG
 	Leading       func(c *ui.Context)
 	Git           token.GitStatus
@@ -105,6 +106,7 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 				}
 			})
 		}
+		aside(c, p, it, active)
 		if it.Trailing != nil {
 			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { it.Trailing(c) })
 		}
@@ -211,6 +213,18 @@ func label(c *ui.Context, p *token.Palette, it Item, active, showDescription boo
 			token.TextLabel.Apply(ui.Text(c, it.Description)).TextColor(secondary).SingleLine().Shrink(descriptionShrink).MinWidth(0)
 		}
 	})
+}
+
+func aside(c *ui.Context, p *token.Palette, it Item, active bool) {
+	if it.Aside == "" {
+		return
+	}
+	color := p.Text.Secondary
+	if active {
+		color = p.List.ActiveSelectionSecondary
+	}
+	token.TextLabel.Apply(ui.Text(c, it.Aside)).TextColor(color).SingleLine().Shrink(1).MinWidth(0).MaxWidthPercent(token.AsideMaxPercent).
+		Margin(0, 0, 0, token.GapControl.Px())
 }
 
 func guides(row ui.Element, depth int, color ui.Color) {

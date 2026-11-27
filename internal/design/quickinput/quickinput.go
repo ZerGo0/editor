@@ -3,6 +3,7 @@ package quickinput
 import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
+	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -57,11 +58,16 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 	p := token.Of(c)
 	ui.Overlay(c, func() {
 		back := ui.Column(c.Key("quick-input:" + label)).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Modal()
+		bar, below := anchored(chrome.CommandCenterBounds(c), back.Bounds())
 		back.Children(func() {
-			panel := ui.Column(c).Margin(token.TitleBarHeight.Px()+token.OffsetQuickOpen.Px(), 0, 0, 0).
-				Width(token.QuickInputWidth.Px()).Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
+			panel := ui.Column(c).Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
 				Background(p.Layer.QuickInput).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).
 				ZIndex(token.LayerQuickInput.Z()).Role(ui.RoleDialog).Label(label)
+			if below {
+				panel.Absolute().Left(bar.x).Top(bar.y).Width(bar.w)
+			} else {
+				panel.Margin(token.TitleBarHeight.Px()+token.OffsetQuickOpen.Px(), 0, 0, 0).Width(token.QuickInputWidth.Px())
+			}
 			token.ElevationDialog.Apply(panel, p)
 			panel.Children(func() {
 				in := field.TextInput(c, label, &s.Query, field.InputOptions{Placeholder: o.Placeholder, AutoFocus: true})

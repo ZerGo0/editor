@@ -80,6 +80,7 @@ var (
 	DirtyDotSize    = Size{8}
 	TwistieWidth    = Size{16}
 	SashSize        = Size{4}
+	SashCorner      = Size{12}
 	ScrollbarSize   = Size{10}
 	ProgressHeight  = Size{2}
 )
@@ -92,7 +93,11 @@ var (
 	PopoverMaxWidth       = Size{320}
 	DialogWidth           = Size{440}
 	QuickInputWidth       = Size{600}
+	QuickInputMinWidth    = Size{320}
 	SearchPopupWidth      = Size{800}
+	SearchPopupHeight     = Size{480}
+	SearchPopupMinWidth   = Size{480}
+	SearchPopupMinHeight  = Size{320}
 	SearchPreviewHeight   = Size{220}
 	CommandCenterWidth    = Size{600}
 	CommandCenterMinWidth = Size{160}
@@ -103,10 +108,11 @@ var (
 	PillNameMaxWidth      = Size{100}
 )
 
+const AsideMaxPercent float32 = 40
+
 const (
-	QuickInputRows             = 20
-	SearchPopupRows            = 12
-	SearchPopupRowsWithPreview = 6
+	QuickInputRows  = 20
+	SearchPopupRows = 12
 )
 
 var (

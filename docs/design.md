@@ -231,8 +231,9 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 ### list
 
 - `View(c, &state, n, ViewOptions{Label, Empty}, func(i) Item)` and `Tree(c, &outline, roots, children, ViewOptions{}, func(k) Item)`.
-- `Item{Label, Matches, Description, Icon, Leading, Git, Count, Strike, Muted, Tooltip, Actions, Menu, OnClick, OnDoubleClick, Drop}`.
+- `Item{Label, Matches, Description, Aside, Icon, Leading, Git, Count, Strike, Muted, Tooltip, Actions, Menu, OnClick, OnDoubleClick, Drop}`.
 - `ViewOptions{Label, Empty, Tree, Height}`: `View` and `Tree` grow to fill the column; set `Height` for a fixed height (MyGo grows an element with `Grow` past a `Height` set on it).
+- `Aside` is a muted text at the right end of the row, at most `AsideMaxPercent` (40 %) of the row width, so the label keeps about 60 %.
 - Selection, focus outline, hover, indent guides (on hover and focus), twistie, highlight ranges, git decoration, count and drop target come for free. Actions show on hover and on the focused row.
 - `Spans(label, matches, color, highlight)` for match highlighting elsewhere.
 
@@ -261,14 +262,15 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 ### quickinput
 
-- `View(c, label, &State{}, []Item{...}, Options{Placeholder, Busy, Empty}) Result{Accepted, Closed}`: 600 px under the title bar; Up, Down, Enter, Escape and click outside.
+- `View(c, label, &State{}, []Item{...}, Options{Placeholder, Busy, Empty}) Result{Accepted, Closed}`: as wide as the command center bar (at least `QuickInputMinWidth`, centered on the bar) and directly below it, aligned to the bar's left and right edges; 600 px under the title bar when the bar is not shown. Up, Down, Enter, Escape and click outside.
 
 ### picker
 
-- `Dialog(c, DialogOptions{Label, ID}, body) closed`: a modal popup 800 px wide under the title bar (it shrinks with the window and keeps inside it); Escape and a click outside report `closed`. `Header(c, left, right)` lays out tabs on the left and header actions on the right.
+- `Dialog(c, DialogOptions{Label, ID, Layout, Shortcuts}, body) closed`: a modal popup centered in the window, 800 px wide (it shrinks with the window and keeps inside it); Escape and a click outside report `closed`. With a `*Layout{Width, Height, Preview}` it is resizable like JetBrains: drag an edge or corner (the dialog stays centered, so the dragged edge follows the pointer), from `SearchPopupMinWidth` x `SearchPopupMinHeight` up to the window minus `GapControl` on each side, on whole pixels. The caller saves the `Layout`; zero fields mean the defaults. `Header(c, left, right)` lays out tabs on the left and header actions on the right.
 - `Tabs(c, label, &selected, titles)`: popup tabs. `Query(c, label, &query, QueryOptions{Placeholder, Toggles, Actions, Error, Busy, Handle}) Keys`: the input; it reports Up, Down, Page Up, Page Down, Tab, Shift+Tab, Cmd+Enter, Enter and changes, so the focus stays in the input.
-- `Results(c, &ResultsState{}, []Row{...}, ResultsOptions{Label, Rows, Empty}) clicked`: rows of kind `RowItem` (a `list.Item` and key caps), `RowHeader` (a sticky section title) and `RowMore` (a muted "Show 12 more files" row). `ResultsState.Move` skips headers.
-- `Preview(c, *editor.State, PreviewOptions{Label, Message, Busy})`: a read-only code pane under the results; it shrinks first when the window is short.
+- `Results(c, &ResultsState{}, []Row{...}, ResultsOptions{Label, Rows, Fill, Empty}) clicked`: rows of kind `RowItem` (a `list.Item` and key caps), `RowHeader` (a sticky section title) and `RowMore` (a muted "Show 12 more files" row). `ResultsState.Move` skips headers.
+  `Fill` makes the list take the height that is left.
+- `Preview(c, *editor.State, PreviewOptions{Label, Title, Message, Busy, Layout, Results})`: a read-only code pane under the results with an optional path header (`Title`); it shrinks first when the window is short. With `Layout` and `Results` a splitter above it resizes it (`Layout.Preview`, whole pixels, at least `PaneMinHeight` for each side).
 
 ### design (root)
 

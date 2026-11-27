@@ -73,7 +73,6 @@ type fixture struct {
 	env      Env
 	dialog   *Dialog
 	recent   *RecentFiles
-	replace  *ReplacePopup
 	find     *FindWindow
 	tt       *ui.Tester
 	opened   []Location
@@ -145,11 +144,10 @@ func newFixture(t *testing.T, project map[string]string) *fixture {
 		},
 		BeforeWrite: func(path string) { f.written = append(f.written, path) },
 	}
-	f.dialog, f.recent, f.replace, f.find = NewDialog(f.env), NewRecentFiles(f.env), NewReplacePopup(f.env), NewFindWindow(f.env)
+	f.dialog, f.recent, f.find = NewDialog(f.env), NewRecentFiles(f.env), NewFindWindow(f.env)
 	f.tt = ui.NewTester(func(c *ui.Context) {
 		f.dialog.View(c)
 		f.recent.View(c)
-		f.replace.View(c)
 		f.find.View(c)
 	}, testWidth, testHeight)
 	return f
@@ -164,7 +162,7 @@ func (f *fixture) settle() {
 	for range settleTries {
 		ran := f.host.drain()
 		f.tt.Frame()
-		if !ran && len(f.host.queue) == 0 && !f.dialog.busy() && !f.replace.text.searching && !f.replace.replacing {
+		if !ran && len(f.host.queue) == 0 && !f.dialog.busy() {
 			return
 		}
 		time.Sleep(settleWait)

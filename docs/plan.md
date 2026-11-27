@@ -58,7 +58,7 @@ Module path: `github.com/ZerGo0/editor`
 
 1. App shell: window per project, file tree, tabs, preview tabs, splits, session restore, recent projects, `editor` shell command.
 2. Commands: registry, keymap, command palette, settings UI and JSON files.
-3. Search: a Search Everywhere popup (Double Shift) with the tabs All, Actions, Files and Text, a preview pane, filters and Open in Find Window (the Find panel tab). Replace in Files is its own popup with a replace row, a file mask, a scope and a preview. Recent Files (Cmd+E) lists recent files and tool windows. There is no Search sidebar view.
+3. Search: a Search Everywhere popup (Double Shift) with the tabs All, Actions, Files and Text, a preview pane, filters and Open in Find Window (the Find panel tab). Replace in Files is the Text tab with the replace field shown (Toggle Replace), a file mask and a scope; each match row has Replace and Replace All in File. The dialog is centered and resizable, and the activity bar has a Search icon that opens the Text tab. Recent Files (Cmd+E) lists recent files and tool windows. There is no Search sidebar view.
 4. Git phases 1 and 2.
 5. Git phases 3 and 4. Diffs use histogram with the indent heuristic, ignore-whitespace modes and moved-code detection.
 6. Git phases 5 and 6, local history.

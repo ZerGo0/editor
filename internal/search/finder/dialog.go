@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
+	"github.com/ZerGo0/editor/internal/search/textsearch"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -70,6 +71,10 @@ type Dialog struct {
 	types     []fileType
 	typesFor  int
 	pal       *token.Palette
+	confirm   bool
+	replacing bool
+	focusWith bool
+	replCache replacementCache
 }
 
 func NewDialog(env Env) *Dialog {
@@ -105,8 +110,13 @@ func (d *Dialog) Open(tab Tab, seed string) {
 	d.refresh()
 }
 
+func (d *Dialog) OpenReplace(seed string) {
+	d.Open(TabText, seed)
+	d.st.ShowReplace, d.selectAll, d.focusWith = true, false, true
+}
+
 func (d *Dialog) Close() {
-	d.open = false
+	d.open, d.confirm = false, false
 	d.stopSearch()
 	d.text.reset()
 	d.preview.clear()
@@ -167,7 +177,7 @@ func (d *Dialog) Changed() {
 
 func (d *Dialog) searchKey() string {
 	parts := []string{strconv.Itoa(int(d.tab)), d.st.Query, strconv.FormatBool(d.st.MatchCase), strconv.FormatBool(d.st.WholeWord),
-		strconv.FormatBool(d.st.Regex), strconv.FormatBool(d.st.NonProject), strings.Join(d.st.FileTypes, ",")}
+		strconv.FormatBool(d.st.Regex), strconv.FormatBool(d.st.NonProject), strings.Join(d.st.FileTypes, ","), d.st.Mask, d.st.Scope, d.st.Directory}
 	return strings.Join(parts, "\x00")
 }
 
@@ -206,8 +216,7 @@ func (d *Dialog) refresh() {
 		if d.tab == TabAll {
 			limit = allTextLimit
 		}
-		d.text.start(textRequest{Pattern: d.st.Query, MatchCase: d.st.MatchCase, WholeWord: d.st.WholeWord, Regex: d.st.Regex,
-			Include: d.activeGlobs(), NonProject: d.st.NonProject, Limit: limit})
+		d.startText(limit)
 	} else {
 		d.text.reset()
 	}
@@ -231,6 +240,27 @@ func (d *Dialog) refresh() {
 	}()
 }
 
+func (d *Dialog) startText(limit int) {
+	req := textRequest{Pattern: d.st.Query, MatchCase: d.st.MatchCase, WholeWord: d.st.WholeWord, Regex: d.st.Regex,
+		Include: d.activeGlobs(), NonProject: d.st.NonProject, Limit: limit}
+	if d.tab == TabText {
+		req.Include = append(req.Include, textsearch.ParseGlobs(d.st.Mask)...)
+		req.Directory = d.directory()
+		if d.st.Scope == ScopeDirectory && req.Directory == "" {
+			d.text.reset()
+			return
+		}
+	}
+	d.text.start(req)
+}
+
+func (d *Dialog) directory() string {
+	if d.st.Scope == ScopeDirectory {
+		return strings.TrimSpace(d.st.Directory)
+	}
+	return ""
+}
+
 func (d *Dialog) compose() {
 	d.shown = d.text.version
 	entries := d.quick
@@ -240,6 +270,7 @@ func (d *Dialog) compose() {
 	case TabAll:
 		entries = append(slices.Clone(d.quick), d.textEntries(allSectionLimit, groupText)...)
 	}
+	d.labelMatches(entries)
 	d.entries = entries
 	d.rows, d.rowEntry = d.rowsOf(entries)
 	if d.moved {
@@ -257,8 +288,7 @@ fill:
 			if len(out) == limit {
 				break fill
 			}
-			out = append(out, entry{kind: kindMatch, group: group, file: f, match: i, path: f.Path, label: lineLabel(m),
-				detail: f.Rel + lineColSeparator + strconv.Itoa(m.Start.Line+1)})
+			out = append(out, entry{kind: kindMatch, group: group, file: f, match: i, path: f.Path, label: lineLabel(m)})
 		}
 	}
 	extra := d.text.total - len(out)

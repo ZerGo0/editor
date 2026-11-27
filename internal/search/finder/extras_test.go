@@ -22,7 +22,7 @@ func TestPreviewToggleShowsSelectedMatch(t *testing.T) {
 	f.settle()
 	st := f.dialog.preview.st
 	if st == nil {
-		t.Fatalf("no preview editor: %q loading %v", f.dialog.preview.message, f.dialog.preview.loading)
+		t.Fatalf("no preview editor: %q loading %v", f.dialog.preview.message, f.dialog.preview.pending)
 	}
 	if got := st.SelectedText(); got != "needle here" {
 		t.Fatalf("preview selects %q; want the match", got)
@@ -215,5 +215,52 @@ func TestFindWindowGroupsByFileAndOpensMatch(t *testing.T) {
 	f.settle()
 	if f.find.Count() != 0 {
 		t.Fatal("Clear Results left results")
+	}
+}
+
+func TestTextRowsShowTheFileNameAndLineAtTheRight(t *testing.T) {
+	f := newFixture(t, demoProject)
+	f.open(TabText, "needle")
+	got := map[string]bool{}
+	for _, e := range f.dialog.entries {
+		got[e.detail] = true
+		if row := f.dialog.row(e); row.Item.Aside != e.detail || row.Item.Tooltip != e.file.Rel {
+			t.Errorf("row aside %q tooltip %q; want %q and the path %q", row.Item.Aside, row.Item.Tooltip, e.detail, e.file.Rel)
+		}
+	}
+	if !got["server.go 6"] || !got["readme.md 3"] || len(got) != 2 {
+		t.Fatalf("file labels %v; want server.go 6 and readme.md 3", got)
+	}
+}
+
+func TestTextRowsAddFoldersWhenFileNamesRepeat(t *testing.T) {
+	f := newFixture(t, map[string]string{
+		"ext/history/view.go": "// needle\n",
+		"ext/stream/view.go":  "// needle\n",
+		"ext/post/row.go":     "// needle\n",
+	})
+	f.open(TabText, "needle")
+	got := map[string]bool{}
+	for _, e := range f.dialog.entries {
+		got[e.detail] = true
+	}
+	for _, want := range []string{"history/view.go 1", "stream/view.go 1", "row.go 1"} {
+		if !got[want] {
+			t.Errorf("file labels %v lack %q", got, want)
+		}
+	}
+}
+
+func TestFilesRowsShowTheFolderAsAsideWithThePathAsTooltip(t *testing.T) {
+	f := newFixture(t, demoProject)
+	f.open(TabFiles, "server")
+	for _, e := range f.dialog.entries {
+		if e.kind != kindFile {
+			continue
+		}
+		row := f.dialog.row(e)
+		if row.Item.Description != "" || row.Item.Aside != e.detail || row.Item.Tooltip != relTo(f.host.root, e.path) {
+			t.Fatalf("file row %+v", row.Item)
+		}
 	}
 }

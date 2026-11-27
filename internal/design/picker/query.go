@@ -16,6 +16,7 @@ type QueryOptions struct {
 	Error       string
 	Busy        bool
 	Handle      *ui.Handle
+	NoAutoFocus bool
 }
 
 type Keys struct {
@@ -26,7 +27,7 @@ type Keys struct {
 
 func Query(c *ui.Context, label string, query *string, o QueryOptions) Keys {
 	in := field.TextInput(c, label, query, field.InputOptions{Placeholder: o.Placeholder, Icon: icons.Search, Toggles: o.Toggles,
-		Actions: o.Actions, Error: o.Error, AutoFocus: true, ID: queryID})
+		Actions: o.Actions, Error: o.Error, AutoFocus: !o.NoAutoFocus, ID: queryID})
 	if o.Handle != nil {
 		in.Bind(o.Handle)
 	}

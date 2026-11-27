@@ -1,11 +1,24 @@
 package chrome
 
 import (
+	"sync"
+
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
+
+var commandCenter = struct {
+	sync.Mutex
+	bounds map[ui.Services]ui.Rect
+}{bounds: map[ui.Services]ui.Rect{}}
+
+func CommandCenterBounds(c *ui.Context) ui.Rect {
+	commandCenter.Lock()
+	defer commandCenter.Unlock()
+	return commandCenter.bounds[c.Services()]
+}
 
 func CommandCenter(c *ui.Context, text, command string) ui.Element {
 	p := token.Of(c)
@@ -14,6 +27,9 @@ func CommandCenter(c *ui.Context, text, command string) ui.Element {
 		MinWidth(token.CommandCenterMinWidth.Px()).MaxWidth(token.CommandCenterWidth.Px()).Radius(token.RadiusPopover.Px()).
 		Padding(0, token.PadControlX.Px()).Gap(token.GapRowIcon.Px()).Center().Label(info.Title).
 		Border(token.BorderWidth.Px(), p.Bar.CommandCenterBorder)
+	commandCenter.Lock()
+	commandCenter.bounds[c.Services()] = b.Bounds()
+	commandCenter.Unlock()
 	action.Tooltip(c, b, action.Hint(info.Title, info.Keys))
 	bg := p.Bar.CommandCenter
 	if b.Hovered() || b.Pressed() {

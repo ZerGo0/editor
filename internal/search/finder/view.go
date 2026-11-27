@@ -45,6 +45,9 @@ func (d *Dialog) label() string {
 	case TabActions:
 		return labelActions
 	case TabText:
+		if d.st.ShowReplace {
+			return titleReplace
+		}
 		return labelText
 	case TabFiles:
 		q := strings.TrimLeft(d.st.Query, " ")
@@ -75,7 +78,7 @@ func (d *Dialog) queryError() string {
 }
 
 func (d *Dialog) busy() bool {
-	return d.loading || d.text.searching
+	return d.loading || d.text.searching || d.replacing
 }
 
 func (d *Dialog) View(c *ui.Context) {
@@ -90,9 +93,21 @@ func (d *Dialog) View(c *ui.Context) {
 		d.compose()
 	}
 	label := d.label()
-	if picker.Dialog(c, picker.DialogOptions{Label: label, ID: dialogID}, func() { d.body(c, label) }) {
+	opts := picker.DialogOptions{Label: label, ID: dialogID, Layout: &d.st.Layout,
+		Shortcuts: []picker.Shortcut{{Mods: ui.Cmd | ui.Shift, Key: ui.Key1, Run: d.replaceSelected}}}
+	if picker.Dialog(c, opts, func() { d.body(c, label) }) && !d.confirm {
 		d.Close()
+		return
 	}
+	d.confirmView(c)
+}
+
+func (d *Dialog) previewShown() bool {
+	return d.st.Preview && d.hasPreview()
+}
+
+func (d *Dialog) hasPreview() bool {
+	return d.tab == TabFiles || d.tab == TabText
 }
 
 func (d *Dialog) body(c *ui.Context, label string) {
@@ -105,8 +120,7 @@ func (d *Dialog) body(c *ui.Context, label string) {
 	if d.tab != TabText {
 		toggles = nil
 	}
-	keys := picker.Query(c, label, &d.st.Query, picker.QueryOptions{Placeholder: d.placeholder(), Toggles: toggles, Error: d.queryError(),
-		Busy: d.busy(), Handle: &d.field})
+	keys := d.queryRow(c, label, toggles)
 	if d.selectAll {
 		d.field.SelectAll()
 		d.selectAll = false
@@ -115,18 +129,17 @@ func (d *Dialog) body(c *ui.Context, label string) {
 	if !d.open {
 		return
 	}
-	rows := token.SearchPopupRows
-	if d.st.Preview {
-		rows = token.SearchPopupRowsWithPreview
+	if d.tab == TabText {
+		d.optionsRow(c)
 	}
-	if i := picker.Results(c, &d.results, d.rows, picker.ResultsOptions{Label: resultsLabel, Rows: rows, Empty: d.emptyState}); i >= 0 {
+	if i := picker.Results(c, &d.results, d.rows, picker.ResultsOptions{Label: resultsLabel, Fill: true, Empty: d.emptyState}); i >= 0 {
 		d.moved = true
 		d.results.Selected = i
 		d.accept(i, false)
 	}
-	if d.st.Preview && d.open {
+	if d.previewShown() && d.open {
 		d.syncPreview()
-		picker.Preview(c, d.preview.st, picker.PreviewOptions{Label: previewLabel, Message: d.preview.message, Busy: d.preview.loading})
+		d.preview.pane(c, &d.st.Layout, &d.results)
 	}
 }
 
@@ -180,7 +193,9 @@ func (d *Dialog) headerActions(c *ui.Context) {
 	if d.tab != TabActions {
 		action.MenuIconButton(c, icons.Filter, filterLabel, action.IconOptions{Active: len(d.st.FileTypes) > 0 || d.st.NonProject}, d.filterMenu)
 	}
-	action.ToggleIconButton(c, icons.Preview, previewLabel, &d.st.Preview, action.IconOptions{})
+	if d.hasPreview() {
+		action.ToggleIconButton(c, icons.Preview, previewLabel, &d.st.Preview, action.IconOptions{})
+	}
 	if action.IconButton(c, icons.TreeView, findWindowLabel, action.IconOptions{Disabled: !d.canOpenInFind()}).Clicked() {
 		d.openInFindWindow()
 	}

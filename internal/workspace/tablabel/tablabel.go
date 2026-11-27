@@ -28,6 +28,18 @@ func Describe(paths []string) map[string]string {
 	return out
 }
 
+func Qualify(paths []string) map[string]string {
+	out := map[string]string{}
+	for p, d := range Describe(paths) {
+		name := filepath.Base(p)
+		if d = strings.TrimPrefix(d, ellipsis); d != "" {
+			name = d + string(filepath.Separator) + name
+		}
+		out[p] = name
+	}
+	return out
+}
+
 func distinguish(paths []string) map[string]string {
 	parts := make([][]string, len(paths))
 	longest := 0
