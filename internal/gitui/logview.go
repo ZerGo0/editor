@@ -2,6 +2,7 @@ package gitui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -441,14 +442,18 @@ func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes
 			})
 		},
 		Content: func(c *ui.Context) {
-			s.rowContent(c, cm, s.columns(gw, len(refBadges(cm.Refs, remotes))), color, remotes)
+			s.rowContent(c, cm, gw, s.columns(gw, len(refBadges(cm.Refs, remotes))), color, remotes)
 		},
 		Menu: func(m *ui.Menu) { s.commitMenu(c, m, cm) },
 	}
 }
 
-func (s *logState) rowContent(c *ui.Context, cm git.Commit, cols logColumns, color ui.Color, remotes map[string]bool) {
-	ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapInline.Px()).AlignItems(ui.Center).Children(func() {
+func (s *logState) rowContent(c *ui.Context, cm git.Commit, gw float32, cols logColumns, color ui.Color, remotes map[string]bool) {
+	row := ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapInline.Px()).AlignItems(ui.Center)
+	if room := s.rowRoom(gw); s.listWidth > 0 && room > 0 {
+		row.MaxWidth(float32(math.Floor(float64(room))))
+	}
+	row.Children(func() {
 		token.TextBody.Apply(ui.Text(c, cm.Subject)).TextColor(color).SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
 		if cols.tags > 0 {
 			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { refTags(c, cm.Refs, remotes, cols.tags) })
