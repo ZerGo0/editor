@@ -131,6 +131,7 @@ func TestReplaceAllEditsMatchesAfterConfirmation(t *testing.T) {
 	replace := app.WaitNode(win, "replace field", RoleLabel("textField", "Replace"))
 	app.Act(win, replace.ID, "focus", "")
 	app.Type(win, "pin")
+	app.WaitNode(win, "typed replacement", func(n Node) bool { return n.Role == "textField" && n.Label == "Replace" && n.Value == "pin" })
 	buttons := func() []Node {
 		var out []Node
 		for _, n := range app.Tree(win) {
