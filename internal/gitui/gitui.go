@@ -8,6 +8,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/host"
+	"github.com/ZerGo0/editor/internal/multidiff"
 )
 
 type phase int
@@ -41,6 +42,7 @@ type Git struct {
 
 	commit     commitState
 	changes    changesState
+	viewed     *multidiff.Memory
 	graph      graphState
 	log        *logState
 	branches   branchesState

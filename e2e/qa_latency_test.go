@@ -21,6 +21,7 @@ const (
 	budgetExpandFolder  = 100 * time.Millisecond
 	budgetOpenSCM       = 500 * time.Millisecond
 	budgetOpenGraph     = 800 * time.Millisecond
+	budgetOpenDiffStack = 800 * time.Millisecond
 	budgetFirstFrame    = 200 * time.Millisecond
 	perfEnv             = "EDITOR_E2E_PERF"
 	perfSkipReason      = "latency budgets need a quiet machine: set EDITOR_E2E_PERF=1 to run them"
@@ -44,6 +45,9 @@ const (
 	nextEditorMenu    = "Next Editor"
 	tabShownSlack     = 1.0
 	editorTabsLabel   = "Editor Tabs"
+	changedRowPoll    = 50 * time.Millisecond
+	demoChangedFile   = "file00.go"
+	findRowScroll     = 20
 )
 
 type Burst struct {
@@ -208,6 +212,27 @@ func latencyActions() []latencyAction {
 			Do: func(q *QAApp, d DemoProject, i int) { menuOrFail(q, viewMenu, "Source Control") },
 		},
 		{
+			Name: "open the stacked Staged Changes diff (210 files)", Owner: qa.OwnerGit, Budget: budgetOpenDiffStack, Samples: slowSamples, Quiet: burstQuietAsync,
+			Prepare: func(q *QAApp, d DemoProject) error {
+				menuOrFail(q, viewMenu, "Source Control")
+				_, err := q.TryWait(hasLabel("Commit Message"), navTimeout)
+				return err
+			},
+			Reset: func(q *QAApp, d DemoProject, i int) {
+				if i > 0 {
+					menuOrFail(q, "File", "Close Editor")
+					q.Settle()
+				}
+			},
+			Do: func(q *QAApp, d DemoProject, i int) {
+				row, err := q.waitChangedRow()
+				if err != nil {
+					q.t.Fatal(err)
+				}
+				q.ClickNode(row)
+			},
+		},
+		{
 			Name: "open the Graph (2100 commits)", Owner: qa.OwnerGit, Budget: budgetOpenGraph, Samples: slowSamples, Quiet: burstQuietAsync,
 			Reset: func(q *QAApp, d DemoProject, i int) {
 				if i > 0 {
@@ -329,4 +354,29 @@ func TestInputLatencyBudget(t *testing.T) {
 	if len(flags) > 0 {
 		t.Errorf("%d flags:\n%s", len(qa.Dedupe(flags)), qa.Format(qa.Dedupe(flags)))
 	}
+}
+
+func firstChangedRow(tree *qa.Tree) (qa.Node, bool) {
+	list, ok := tree.Find(hasRoleLabel("list", "Changes"))
+	if !ok {
+		return qa.Node{}, false
+	}
+	return tree.Find(func(n qa.Node) bool {
+		return n.Parent == list.ID && n.Role == "listItem" && n.Label == demoChangedFile && list.Bounds.Contains(n.Bounds, 0)
+	})
+}
+
+func (q *QAApp) waitChangedRow() (qa.Node, error) {
+	deadline := time.Now().Add(navTimeout)
+	for time.Now().Before(deadline) {
+		tree := q.Snapshot()
+		if n, ok := firstChangedRow(tree); ok {
+			return n, nil
+		}
+		if list, ok := tree.Find(hasRoleLabel("list", "Changes")); ok {
+			q.Send(map[string]any{"type": "wheel", "x": list.Bounds.CenterX(), "y": list.Bounds.CenterY(), "dy": findRowScroll})
+		}
+		time.Sleep(changedRowPoll)
+	}
+	return qa.Node{}, fmt.Errorf("no changed file row in Source Control within %s", navTimeout)
 }

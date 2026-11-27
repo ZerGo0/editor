@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/github"
+	"github.com/ZerGo0/editor/internal/multidiff"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
 const (
 	diffPath   = "src/widget.go"
-	diffViewID = "pr/acme/widgets/12/diff/src/widget.go"
+	diffViewID = "pr/acme/widgets/12/diff"
 	headText   = "package w\n\nfunc A() {}\n"
 	baseText   = "package w\n\nfunc B() {}\n"
 )
@@ -40,16 +41,25 @@ func (hs *harness) openDiffTab(t *testing.T) (*prData, *diffTab, *ui.Tester) {
 	if n := len(hs.h.opened); hs.h.opened[n-1] != diffViewID {
 		t.Fatalf("opened %v", hs.h.opened)
 	}
-	tab := hs.p.diffs[diffViewID]
-	hs.h.pump(t, func() bool { return tab.ready || tab.err != nil })
-	return d, tab, viewTester(hs, diffViewID)
+	tab, tt := hs.awaitDiff(t, diffViewID, diffPath)
+	return d, tab, tt
 }
+
+func (hs *harness) awaitDiff(t *testing.T, id, path string) (*diffTab, *ui.Tester) {
+	t.Helper()
+	rt := hs.p.diffs[id]
+	tt := viewTester(hs, id)
+	hs.h.pump(t, func() bool { tt.Frame(); return rt.view.File(path).Settled() })
+	return rt.files[path], tt
+}
+
+func (hs *harness) diffError(id, path string) error { return hs.p.diffs[id].view.File(path).Err() }
 
 func TestDiffTabLoadsBothVersionsAndThreads(t *testing.T) {
 	hs := newHarness(t)
 	d, tab, tt := hs.openDiffTab(t)
-	if tab.err != nil {
-		t.Fatal(tab.err)
+	if err := hs.diffError(diffViewID, diffPath); err != nil {
+		t.Fatal(err)
 	}
 	if tab.state.Old.String() != baseText || tab.state.New.String() != headText {
 		t.Errorf("old %q new %q", tab.state.Old.String(), tab.state.New.String())
@@ -57,7 +67,7 @@ func TestDiffTabLoadsBothVersionsAndThreads(t *testing.T) {
 	if d.baseSHA != "basesha" {
 		t.Errorf("base sha %q", d.baseSHA)
 	}
-	if title := hs.h.titles[diffViewID]; title != "widget.go (#12)" {
+	if title := hs.h.titles[diffViewID]; title != "#12 Files Changed" {
 		t.Errorf("title %q", title)
 	}
 	mustHaveText(t, tt, diffPath, "+5", "-2", "Please rename this function", "carol", "Reply", "Resolve", "Resolved", "Show thread")
@@ -166,10 +176,11 @@ func TestDiffTabBinaryFile(t *testing.T) {
 	hs := newHarness(t)
 	hs.be.contents[testHeadKey()] = "a\x00b"
 	_, tab, tt := hs.openDiffTab(t)
-	if !errors.Is(tab.err, ErrBinaryFile) {
-		t.Fatalf("err %v", tab.err)
+	_ = tab
+	if err := hs.diffError(diffViewID, diffPath); !errors.As(err, new(multidiff.Note)) || err.Error() != ErrBinaryFile.Error() {
+		t.Fatalf("err %v", err)
 	}
-	mustHaveText(t, tt, "Cannot show "+diffPath)
+	mustHaveText(t, tt, ErrBinaryFile.Error())
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Retry"); ok {
 		t.Error("retry offered for a binary file")
 	}
@@ -180,16 +191,16 @@ func TestDiffTabErrorOffersRetry(t *testing.T) {
 	hs.be.errs["FileAt"] = errors.New("github: down")
 	hs.withDiffFixtures()
 	hs.be.contents = map[string]string{}
-	_, tab, tt := hs.openDiffTab(t)
-	if tab.err == nil {
+	_, _, tt := hs.openDiffTab(t)
+	if hs.diffError(diffViewID, diffPath) == nil {
 		t.Fatal("expected an error")
 	}
-	mustHaveText(t, tt, "Cannot show "+diffPath, "down", "Retry")
+	mustHaveText(t, tt, "Cannot load the diff of "+diffPath, "down", "Retry")
 	hs.be.clearErr("FileAt")
 	hs.be.contents[testHeadKey()] = headText
 	hs.be.contents["basesha:"+diffPath] = baseText
 	mustClick(t, tt, "Retry")
-	hs.h.pump(t, func() bool { return tab.ready })
+	hs.h.pump(t, func() bool { tt.Frame(); return hs.p.diffs[diffViewID].view.File(diffPath).State() != nil })
 }
 
 func TestDiffTabAddedAndRemovedFiles(t *testing.T) {
@@ -204,12 +215,21 @@ func TestDiffTabAddedAndRemovedFiles(t *testing.T) {
 	hs.be.contents["headsha:dst.txt"] = "same\n"
 	hs.be.contents["basesha:src.txt"] = "same\n"
 	d, _ := hs.openDetail(t)
+	hs.p.openDiff(d, d.files[0], diffSpec{mode: modePR})
+	rt := hs.p.diffs[diffViewID]
+	tt := viewTester(hs, diffViewID)
+	hs.h.pump(t, func() bool {
+		tt.Frame()
+		for _, f := range d.files {
+			if !rt.view.File(f.Path).Settled() {
+				return false
+			}
+		}
+		return true
+	})
 	for _, f := range d.files {
-		hs.p.openDiff(d, f, diffSpec{mode: modePR})
-		tab := hs.p.diffs[diffID(hs.p.repo, 12, f.Path)]
-		hs.h.pump(t, func() bool { return tab.ready || tab.err != nil })
-		if tab.err != nil {
-			t.Errorf("%s: %v", f.Path, tab.err)
+		if err := rt.view.File(f.Path).Err(); err != nil {
+			t.Errorf("%s: %v", f.Path, err)
 		}
 	}
 	if hs.be.called("MergeBase") != 1 {
@@ -221,8 +241,9 @@ func TestDiffLayoutAndChangeNavigation(t *testing.T) {
 	hs := newHarness(t)
 	_, tab, tt := hs.openDiffTab(t)
 	mustClick(t, tt, "Unified")
-	if tab.layout != layoutInline || tab.state.Layout != editor.DiffUnified {
-		t.Errorf("layout %d/%v", tab.layout, tab.state.Layout)
+	tt.Frame()
+	if tab.state.Layout != editor.DiffUnified {
+		t.Errorf("layout %v", tab.state.Layout)
 	}
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Next Change"); !ok {
 		t.Error("no change navigation")

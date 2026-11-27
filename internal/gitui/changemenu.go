@@ -37,7 +37,7 @@ func (g *Git) changeMenu(c *ui.Context, m *ui.Menu, e changeEntry) {
 		}
 	} else if e.kind == entryGroup && e.group != groupMerge {
 		if m.Item("Open Changes").Disabled(len(rows) == 0).Chosen() {
-			g.openGroupChanges(e.group, rows)
+			g.openGroupChanges(e.group)
 		}
 	}
 	m.Separator()

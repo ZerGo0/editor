@@ -240,14 +240,14 @@ func (g *Git) groupActions(c *ui.Context, e changeEntry) {
 		}
 	case groupStaged:
 		if iconButton(c, "Open Staged Changes", icons.Preview, len(e.rows) == 0) {
-			g.openGroupChanges(groupStaged, e.rows)
+			g.openGroupChanges(groupStaged)
 		}
 		if iconButton(c, "Unstage All Changes", icons.Minus, busy) {
 			g.unstage(rowPaths(e.rows)...)
 		}
 	default:
 		if iconButton(c, "Open Changes", icons.Preview, len(e.rows) == 0) {
-			g.openGroupChanges(groupChanges, e.rows)
+			g.openGroupChanges(groupChanges)
 		}
 		if iconButton(c, "Discard All Changes", icons.Undo, busy) {
 			g.rollback(e.rows)
@@ -262,31 +262,8 @@ func (g *Git) openFile(r changeRow) {
 	g.h.OpenAt(g.paths.abs(r.file.Path), -1, -1)
 }
 
-func (g *Git) openGroupChanges(gr group, rows []changeRow) {
-	var tracked []string
-	for _, r := range rows {
-		if !r.untracked() {
-			tracked = append(tracked, r.file.Path)
-		}
-	}
-	if len(tracked) == 0 {
-		g.h.Notify("These files are new and have no changes to compare.")
-		return
-	}
-	id, title := "git-changes:"+groupIDs[gr], groupTitles[gr]
-	g.openPatchTab(id, title, func(ctx context.Context, r repo) ([]patchItem, error) {
-		var fds []git.FileDiff
-		var err error
-		if gr == groupStaged {
-			fds, err = r.DiffStaged(ctx, tracked...)
-		} else {
-			fds, err = r.DiffWorkTree(ctx, tracked...)
-		}
-		if err != nil {
-			return nil, err
-		}
-		return fileDiffItems(fds), nil
-	})
+func (g *Git) openGroupChanges(gr group) {
+	g.openGroupAt(gr, "", false, true)
 }
 
 func (g *Git) stage(paths ...string) {

@@ -145,10 +145,10 @@ func TestPRStateLabelsAndIDs(t *testing.T) {
 		}
 	}
 	repo := github.Remote{Owner: "o", Name: "r"}
-	if detailID(repo, 3) != "pr/o/r/3" || diffID(repo, 3, "a/b.go") != "pr/o/r/3/diff/a/b.go" || detailTitle(3, "") != "#3" || shortSHA("0123456789") != "0123456" {
+	if detailID(repo, 3) != "pr/o/r/3" || reviewID(repo, 3, diffSpec{mode: modePR}, "") != "pr/o/r/3/diff" || detailTitle(3, "") != "#3" || shortSHA("0123456789") != "0123456" {
 		t.Error("ids")
 	}
-	if diffTabID(repo, 3, "x", diffSpec{mode: modeSince}) != "pr/o/r/3/since/x" {
+	if reviewID(repo, 3, diffSpec{mode: modeSince}, "x") != "pr/o/r/3/since" {
 		t.Error("diff tab id")
 	}
 	for in, want := range map[string]string{statusAdded: "A", statusRemoved: "D", statusRenamed: "R", statusModified: "M", "weird": "?"} {

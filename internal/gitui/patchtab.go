@@ -2,79 +2,94 @@ package gitui
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
-	"github.com/ZerGo0/editor/internal/design"
-	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/list"
-	"github.com/ZerGo0/editor/internal/design/token"
-	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/multidiff"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const patchSplit = 32
-
 type patchItem struct {
-	header bool
-	title  string
-	detail string
-	code   byte
-	src    *diffSource
-	patch  *editor.FilePatch
-	commit *git.Commit
-	note   string
+	header      bool
+	title       string
+	detail      string
+	code        byte
+	src         *diffSource
+	patch       *editor.FilePatch
+	commit      *git.Commit
+	note        string
+	binary      bool
+	adds        int
+	dels        int
+	counted     bool
+	size        int64
+	fingerprint string
+	row         *changeRow
+	full        bool
 }
 
-func (it patchItem) key(i int) any {
-	switch {
-	case it.src != nil:
-		return it.src.id()
-	case it.commit != nil:
-		return "c:" + it.commit.OID + ":" + it.title
-	}
-	return i
+type patchOpen struct {
+	reveal  string
+	preview bool
+	focus   bool
+	prepare func(t *patchTab)
 }
 
 type patchTab struct {
-	g        *Git
-	id       string
-	title    string
-	load     func(ctx context.Context, r repo) ([]patchItem, error)
-	items    []patchItem
-	loading  bool
-	err      error
-	gen      int
-	list     ui.ListState
-	selected int
-	split    float32
-	shown    int
-	state    *editor.DiffState
-	engine   *diffmode.Engine
-	shownWS  git.WhitespaceMode
-	layout   int
+	g       *Git
+	id      string
+	title   string
+	load    func(ctx context.Context, r repo) ([]patchItem, error)
+	prepare func()
+	items   []patchItem
+	loaded  bool
+	loading bool
+	err     error
+	gen     int
+	view    *multidiff.View
 }
 
 func (g *Git) openPatchTab(id, title string, load func(ctx context.Context, r repo) ([]patchItem, error)) {
+	g.openPatchTabWith(id, title, load, patchOpen{focus: true})
+}
+
+func (g *Git) openPatchTabWith(id, title string, load func(ctx context.Context, r repo) ([]patchItem, error), o patchOpen) {
 	if !g.ready() {
 		return
 	}
 	t, ok := g.patchTabs[id]
 	if !ok {
-		t = &patchTab{g: g, id: id, title: title, selected: -1, shown: -1, split: patchSplit}
+		t = &patchTab{g: g, id: id, title: title, view: multidiff.New()}
 		g.patchTabs[id] = t
 		g.patchOrder = append(g.patchOrder, id)
 		if len(g.patchOrder) > maxKeptTabs {
-			g.patchTabs[g.patchOrder[0]].dropState()
+			g.patchTabs[g.patchOrder[0]].view.Close()
 			delete(g.patchTabs, g.patchOrder[0])
 			g.patchOrder = g.patchOrder[1:]
 		}
 	}
 	t.load = load
+	if o.prepare != nil {
+		o.prepare(t)
+	}
+	if o.reveal != "" {
+		t.view.RevealPath(o.reveal)
+	}
 	t.reload()
-	g.h.OpenView(id, title, t.view)
+	g.openView(id, title, t.render, o.preview, o.focus)
+}
+
+func (g *Git) reloadGroupTabs() {
+	for _, t := range g.patchTabs {
+		if t.prepare != nil && t.loaded {
+			t.reload()
+		}
+	}
 }
 
 func (t *patchTab) reload() {
@@ -82,44 +97,171 @@ func (t *patchTab) reload() {
 	if !g.ready() {
 		return
 	}
+	if t.prepare != nil {
+		t.prepare()
+	}
 	t.gen++
-	gen, r := t.gen, g.repo
+	gen, r, load := t.gen, g.repo, t.load
 	t.loading, t.err = true, nil
 	go func() {
-		items, err := t.load(g.ctx, r)
+		items, err := load(g.ctx, r)
 		g.post(func() {
 			if gen != t.gen {
 				return
 			}
-			t.dropState()
-			t.loading, t.err, t.items, t.shown = false, err, items, -1
-			if t.selected >= len(items) || t.selected < 0 {
-				t.selected = firstItem(items)
+			t.loading, t.err, t.loaded = false, err, true
+			if err == nil {
+				t.items = items
+				t.view.SetEntries(t.entries(r))
 			}
 		})
 	}()
 }
 
-func (t *patchTab) dropState() {
-	if t.engine != nil {
-		t.engine.Close()
+func (t *patchTab) options() multidiff.Options {
+	g := t.g
+	if g.viewed == nil {
+		g.viewed = multidiff.NewMemory()
 	}
-	t.state, t.engine = nil, nil
+	return multidiff.Options{
+		Label: t.title,
+		Set:   t.id,
+		Ctx:   g.ctx,
+		Post:  g.post,
+		Configure: func(d *editor.DiffState, rel string) {
+			g.h.ConfigureDiff(d, g.paths.abs(rel))
+			g.diffOpts.apply(d)
+		},
+		Language: func(rel, text string) *editor.Language { return g.h.Language(g.paths.abs(rel), text) },
+		Viewed:   g.viewed,
+		OpenFile: func(rel string) { g.h.OpenAt(g.paths.abs(rel), -1, -1) },
+		Busy:     t.loading,
+		Toolbar: func(c *ui.Context) {
+			g.diffOptionsButton(c)
+			if iconButton(c, "Reload Changes", icons.Refresh, t.loading) {
+				t.reload()
+			}
+		},
+	}
 }
 
-func firstItem(items []patchItem) int {
-	for i, it := range items {
-		if !it.header {
-			return i
+func (t *patchTab) render(c *ui.Context) {
+	ui.Column(c).Fill().Children(func() {
+		switch {
+		case t.err != nil:
+			errorState(c, "Cannot load the changes", t.err, t.reload)
+		case !t.loaded:
+			loadingState(c, "Loading changes")
+		case len(t.items) == 0:
+			emptyState(c, "No changes", "")
+		default:
+			t.view.Render(c, t.options())
+		}
+	})
+}
+
+func (t *patchTab) entries(r repo) []multidiff.Entry {
+	g := t.g
+	entries := make([]multidiff.Entry, 0, len(t.items))
+	seen := map[string]int{}
+	for i := range t.items {
+		it := t.items[i]
+		var e multidiff.Entry
+		switch {
+		case it.header:
+			e.Section = func(c *ui.Context) {
+				list.Row(c, list.State{}, list.Item{Label: it.title, Strong: true, Description: it.detail, Icon: icons.Commit})
+			}
+		case it.commit != nil:
+			e.Section = g.commitSection(*it.commit, it.full)
+		default:
+			e = t.fileEntry(r, it)
+		}
+		e.Key = uniqueKey(seen, fmt.Sprintf("%d:%s", i, it.title))
+		if it.src != nil {
+			e.Key = uniqueKey(seen, it.src.id())
+		}
+		entries = append(entries, e)
+	}
+	return entries
+}
+
+func uniqueKey(seen map[string]int, key string) string {
+	seen[key]++
+	if n := seen[key]; n > 1 {
+		return fmt.Sprintf("%s#%d", key, n)
+	}
+	return key
+}
+
+func (t *patchTab) fileEntry(r repo, it patchItem) multidiff.Entry {
+	g := t.g
+	e := multidiff.Entry{
+		Path: it.title, OldPath: it.detail, Status: gitStatus(it.code), Adds: multidiff.CountUnknown, Dels: multidiff.CountUnknown,
+		Size: it.size, Fingerprint: it.fingerprint, Binary: it.binary, Note: it.note, Patch: it.patch,
+	}
+	if it.counted {
+		e.Adds, e.Dels = it.adds, it.dels
+	}
+	if it.src == nil {
+		return e
+	}
+	src := *it.src
+	abs := g.paths.abs(src.path)
+	ops := &hunkOps{g: g, src: src, reload: t.reload}
+	ops.live = func() bool { return src.usesWorkTree() && g.h.Buffer(abs) != nil }
+	if src.usesWorkTree() {
+		e.Live = func() *editor.Buffer { return g.h.Buffer(abs) }
+	}
+	e.Load = func(ctx context.Context, live bool) (string, string, error) {
+		oldText, newText, err := loadDiffTexts(ctx, r, src, abs, !live)
+		if err != nil {
+			return "", "", noteError(err)
+		}
+		return oldText, newText, nil
+	}
+	e.Setup = func(d *editor.DiffState, _ *diffmode.Engine) {
+		ops.d = d
+		d.RenderHunkActions = ops.render
+	}
+	e.Frame = func(d *editor.DiffState, eng *diffmode.Engine) { d.HunkActions = ops.enabled() && !eng.Filtered() }
+	e.Actions = func(c *ui.Context) { t.fileActions(c, it, src) }
+	return e
+}
+
+func noteError(err error) error {
+	if errors.Is(err, errBinary) || errors.Is(err, errTooLarge) {
+		return multidiff.Note(err.Error())
+	}
+	return err
+}
+
+func (t *patchTab) fileActions(c *ui.Context, it patchItem, src diffSource) {
+	g := t.g
+	busy := g.busy != ""
+	switch src.kind {
+	case diffWorkTree, diffUntracked:
+		if iconButton(c, "Stage Changes", icons.Plus, busy) {
+			g.stage(src.path)
+		}
+		if it.row != nil && iconButton(c, "Discard Changes", icons.Undo, busy) {
+			g.rollback([]changeRow{*it.row})
+		}
+	case diffStaged:
+		if iconButton(c, "Unstage Changes", icons.Minus, busy) {
+			g.unstage(src.path)
 		}
 	}
-	return -1
+	if iconButton(c, "Open Single File Diff", icons.Preview, false) {
+		g.openSingleDiff(src, false, true)
+	}
 }
 
 func fileDiffItems(fds []git.FileDiff) []patchItem {
 	items := make([]patchItem, 0, len(fds))
 	for _, fd := range fds {
-		it := patchItem{title: fd.Path(), code: 'M'}
+		it := patchItem{title: fd.Path(), code: 'M', binary: fd.Binary}
+		it.adds, it.dels, it.counted = diffCounts(fd), diffDels(fd), true
 		switch {
 		case fd.IsNew():
 			it.code = 'A'
@@ -129,7 +271,6 @@ func fileDiffItems(fds []git.FileDiff) []patchItem {
 			it.code, it.detail = 'R', fd.OldPath
 		}
 		if fd.Binary {
-			it.note = errBinary.Error()
 			items = append(items, it)
 			continue
 		}
@@ -145,117 +286,4 @@ func fileDiffItems(fds []git.FileDiff) []patchItem {
 		items = append(items, it)
 	}
 	return items
-}
-
-func (t *patchTab) view(c *ui.Context) {
-	ui.Column(c).Fill().Children(func() {
-		switch {
-		case t.err != nil:
-			errorState(c, "Cannot load the changes", t.err, t.reload)
-		case t.loading && t.items == nil:
-			loadingState(c, "Loading changes")
-		case len(t.items) == 0:
-			emptyState(c, "No changes", "")
-		default:
-			ui.SplitPercent(c, &t.split, func() { t.listView(c) }, func() { t.detailView(c) }).Fill()
-		}
-	})
-}
-
-func (t *patchTab) listView(c *ui.Context) {
-	items := t.items
-	t.list.Key = func(i int) any { return items[i].key(i) }
-	t.list.Label = func(i int) string { return items[i].title }
-	t.list.Header = func(i int) bool { return items[i].header }
-	t.list.Selected = &t.selected
-	list.View(c.Key("items"), &t.list, len(items), list.ViewOptions{Label: t.title}, func(i int) list.Item {
-		it := items[i]
-		switch {
-		case it.header:
-			return list.Item{Label: it.title, Strong: true, Description: it.detail, Icon: icons.Commit}
-		case it.commit != nil:
-			return list.Item{Label: it.title, Icon: icons.Commit, Description: shortHash(it.commit.OID)}
-		}
-		item := changedFileItem(it.title, it.code, func(preview, focus bool) {
-			if it.src != nil {
-				t.g.openDiffWith(*it.src, preview, focus)
-			}
-		})
-		item.Description = it.detail
-		item.OnClick = nil
-		return item
-	})
-}
-
-func (t *patchTab) detailView(c *ui.Context) {
-	if t.selected < 0 || t.selected >= len(t.items) {
-		emptyState(c, "Select a file", "Its diff shows here.")
-		return
-	}
-	it := t.items[t.selected]
-	switch {
-	case it.header:
-		emptyState(c, it.title, it.detail)
-	case it.note != "":
-		emptyState(c, it.note, "")
-	case it.commit != nil:
-		cm := *it.commit
-		ui.Scroll(c).Fill().Children(func() {
-			t.g.commitInfo(c, cm, nil, nil)
-			ui.Row(c).Padding(token.Space0.Px(), token.PadView.Px()).Children(func() {
-				if button(c, "Show in Log", false) {
-					t.g.showCommit(cm.OID)
-				}
-			})
-		})
-	case it.src != nil:
-		d := t.g.diffTabFor(*it.src)
-		if d.state == nil && !d.loading && d.err == nil {
-			d.load()
-		}
-		d.view(c)
-	case it.patch != nil:
-		t.patchView(c, it)
-	}
-}
-
-func (t *patchTab) patchView(c *ui.Context, it patchItem) {
-	mode := diffmode.Session.Whitespace
-	if t.shown != t.selected || t.state == nil || t.shownWS != mode {
-		t.dropState()
-		fp := diffmode.FilterPatch(*it.patch, mode)
-		d := &editor.DiffState{RenderFindBar: findwidget.Render}
-		d.SetPatch(fp)
-		abs := t.g.paths.abs(it.title)
-		if d.New != nil {
-			lang := t.g.h.Language(abs, d.New.String())
-			d.New.SetLanguage(lang)
-			if d.Old != nil {
-				d.Old.SetLanguage(lang)
-			}
-		}
-		t.engine = diffmode.NewEngine(t.g.ctx, d, t.g.post)
-		t.engine.LineNumber = diffmode.PatchLineNumbers(fp)
-		t.engine.Install(nil)
-		t.state, t.shown, t.shownWS = d, t.selected, mode
-	}
-	t.engine.Refresh()
-	t.state.Layout = editor.DiffLayout(t.layout)
-	t.state.Annotations = t.engine.Annotations(nil)
-	t.g.h.ConfigureDiff(t.state, t.g.paths.abs(it.title))
-	t.g.diffOpts.apply(t.state)
-	ui.Column(c).Fill().Children(func() {
-		toolbarRow(c, "Diff Toolbar", func() {
-			secondary(c, it.title).SingleLine().Shrink(1).MinWidth(0).TruncateStart()
-			design.Spacer(c)
-			action.Segmented(c, "Diff Layout", &t.layout, layoutNames, action.SegmentedOptions{})
-			diffModeControls(c, t.engine)
-			t.g.diffOptionsButton(c)
-		})
-		if len(t.state.Hunks()) == 0 && mode != git.WhitespaceNone {
-			emptyState(c, "Only whitespace changed", "Choose \"Do not ignore\" to see the changes.")
-			return
-		}
-		editor.DiffView(c.Key("patch"), t.state).Grow(1).FillWidth()
-	})
 }

@@ -170,6 +170,23 @@ func demoViewSteps() []viewStep {
 			_, err := q.TryWait(hasLabel("Commit Message"), navTimeout)
 			return err
 		}},
+		{"changes-diff", func(q *QAApp, d DemoProject) error {
+			q.Escape()
+			if err := q.Command("Show Source Control", viewMenu, "Source Control"); err != nil {
+				return err
+			}
+			row, err := q.waitChangedRow()
+			if err != nil {
+				return err
+			}
+			q.ClickNode(row)
+			if _, err = q.TryWait(hasRoleLabel("toggleButton", "Toggle File Tree"), navTimeout); err != nil {
+				return err
+			}
+			q.Send(map[string]any{"type": pointerMoveEvent, "x": 0, "y": 0})
+			q.Settle()
+			return nil
+		}},
 		{"graph", func(q *QAApp, d DemoProject) error {
 			if err := q.Command("Git: Show Log", gitMenu, "Show Log"); err != nil {
 				return err

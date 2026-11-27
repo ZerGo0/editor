@@ -400,14 +400,13 @@ func TestChangesSinceLastReview(t *testing.T) {
 	}
 	mustHaveText(t, tt, "Changes since your last review", "Compared with commit oldsha, the one you last reviewed.", "src/new.go")
 	mustClick(t, tt, "src/new.go")
-	id := "pr/acme/widgets/12/since/src/new.go"
+	id := "pr/acme/widgets/12/since"
 	if hs.h.opened[len(hs.h.opened)-1] != id {
 		t.Fatalf("opened %v", hs.h.opened)
 	}
-	tab := hs.p.diffs[id]
-	hs.h.pump(t, func() bool { return tab.ready || tab.err != nil })
-	if tab.err != nil || tab.state.New.String() != "package n\n" || hs.h.titles[id] != "new.go (#12, since review)" {
-		t.Errorf("%v %q", tab.err, hs.h.titles[id])
+	tab, _ := hs.awaitDiff(t, id, "src/new.go")
+	if err := hs.diffError(id, "src/new.go"); err != nil || tab.state.New.String() != "package n\n" || hs.h.titles[id] != "#12 Changes Since Review" {
+		t.Errorf("%v %q", err, hs.h.titles[id])
 	}
 	if hs.be.called("Compare") != 1 {
 		t.Error("compare not requested once")
@@ -501,10 +500,9 @@ func TestDiffCompareWithLocal(t *testing.T) {
 	_, _, tt := hs.openDiffAt(t, root)
 	mustClick(t, tt, "Compare with Local")
 	id := "pr/acme/widgets/12/local/src/widget.go"
-	tab := hs.p.diffs[id]
-	hs.h.pump(t, func() bool { return tab.ready || tab.err != nil })
-	if tab.err != nil || tab.state.New.String() != "package local\n" || tab.state.Old.String() != headText || hs.h.titles[id] != "widget.go (#12, local)" {
-		t.Errorf("%v new %q old %q title %q", tab.err, tab.state.New.String(), tab.state.Old.String(), hs.h.titles[id])
+	tab, _ := hs.awaitDiff(t, id, diffPath)
+	if err := hs.diffError(id, diffPath); err != nil || tab.state.New.String() != "package local\n" || tab.state.Old.String() != headText || hs.h.titles[id] != "widget.go (#12, local)" {
+		t.Errorf("%v new %q old %q title %q", hs.diffError(id, diffPath), tab.state.New.String(), tab.state.Old.String(), hs.h.titles[id])
 	}
 	lt := viewTester(hs, id)
 	if _, ok := lt.AccessByRole(ui.RoleButton, "Compare with Local"); ok {
@@ -524,12 +522,13 @@ func TestDiffStepFilesAndCloseEditors(t *testing.T) {
 	if a, ok := tt.AccessByRole(ui.RoleButton, "Previous File"); !ok || !a.Disabled {
 		t.Errorf("previous file on the first file: %+v", a)
 	}
-	mustClick(t, tt, "Next File")
-	if hs.h.opened[len(hs.h.opened)-1] != "pr/acme/widgets/12/diff/b.txt" {
-		t.Fatalf("opened %v", hs.h.opened)
+	if a, ok := tt.AccessByRole(ui.RoleButton, "Next File"); !ok || a.Disabled {
+		t.Errorf("next file on the first of two files: %+v", a)
 	}
+	mustClick(t, tt, "Next File")
+	tt.Frame()
 	hs.p.Run(ActionCloseEditors)
-	if len(hs.h.closed) != 2 || len(hs.p.diffs) != 0 {
+	if len(hs.h.closed) != 1 || len(hs.p.diffs) != 0 {
 		t.Errorf("closed %v diffs %d", hs.h.closed, len(hs.p.diffs))
 	}
 }
@@ -538,8 +537,9 @@ func TestDiffHideCommentsToggle(t *testing.T) {
 	hs := newHarness(t)
 	_, tab, tt := hs.openDiffTab(t)
 	mustClick(t, tt, "Hide Comments")
-	if !tab.hideComments || len(tab.state.Annotations) != 0 || tt.HasText("Please rename this function") {
-		t.Errorf("hidden %v annotations %d", tab.hideComments, len(tab.state.Annotations))
+	tt.Frame()
+	if hidden := hs.p.diffs[diffViewID].hideComments; !hidden || len(tab.state.Annotations) != 0 || tt.HasText("Please rename this function") {
+		t.Errorf("hidden %v annotations %d", hidden, len(tab.state.Annotations))
 	}
 }
 
@@ -584,9 +584,7 @@ func TestDiffThreadCommentOwnerActions(t *testing.T) {
 	hs.p.viewer = "me"
 	d := hs.p.details[prNumber]
 	hs.p.openDiff(d, d.files[0], diffSpec{mode: modePR})
-	tab := hs.p.diffs[diffViewID]
-	hs.h.pump(t, func() bool { return tab.ready })
-	tt := viewTester(hs, diffViewID)
+	_, tt := hs.awaitDiff(t, diffViewID, diffPath)
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Edit comment by carol"); ok {
 		t.Error("edit offered on another person's comment")
 	}

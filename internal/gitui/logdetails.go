@@ -100,7 +100,7 @@ func (s *logState) filesView(c *ui.Context, cm git.Commit) {
 		return it
 	})
 	if l.Submitted() && d.selected >= 0 && d.selected < len(files) {
-		s.g.openDiffSource(commitSource(cm, files[d.selected]))
+		s.g.openDiffWith(commitSource(cm, files[d.selected]), false, true)
 	}
 }
 

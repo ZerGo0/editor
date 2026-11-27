@@ -33,7 +33,9 @@ const (
 	partEditor      = "editor"
 )
 
-var focusAllow = []qa.Allow{}
+var focusAllow = []qa.Allow{
+	{Rule: qa.RuleFocusLost, View: "changes-diff", Reason: "internal/multidiff: the stacked list builds two rows past the viewport for Tab, so the stop after the last visible diff is an off-screen file header that the tree does not report as focused"},
+}
 
 func isCodeEditor(n qa.Node) bool {
 	return n.Role == "textField" && n.Has("multiline") && n.Label == "Code editor"

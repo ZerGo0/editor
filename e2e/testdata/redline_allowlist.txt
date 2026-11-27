@@ -9,3 +9,10 @@ search-text-replace align toggleButton "Match Whole Word" left edge -- internal/
 search-text-replace align toggleButton "Use Regular Expression" left edge -- internal/design field.TextArea: the Replace All button sits outside the replace box, so it is 3 px right of the query toggles (token.PadInputEnd 2 px plus the 1 px border)
 search-text-replace align toggleButton "Preserve Case" centre x -- internal/design field.TextArea: the Preserve Case toggle ends 3 px inside its box while the Scope select below ends on the box edge (+1.54 px centre offset)
 search-text text-band tooltip "  -- internal/design action.Tooltip: TextLabel text in a 24 px tooltip sits 1.5 px below the box centre at scale 1; the tooltip is the same on every row tooltip and every icon button
+* contrast insertion " -- internal/workspace ConfigureDiff theme: inserted-line text on the Diff.Inserted line tint measures 3.4 to 4.4:1 in the diff body drawn by MyGo editor.DiffView; the palette fix belongs in internal/design/token Diff roles
+* contrast deletion " -- internal/workspace ConfigureDiff theme: removed-line text on the Diff.Removed line tint measures 3.7 to 4.5:1 in the diff body drawn by MyGo editor.DiffView; the palette fix belongs in internal/design/token Diff roles
+* align listItem "mod0 -- internal/multidiff tree sidebar: its 22 px rows and the 22 px file headers of the stack are separate columns with different list tops (filter row 34 px), so 1 to 3 px near misses are not shared edges
+* align listItem "store" -- internal/multidiff tree sidebar: same as the mod rows
+* align listItem "file0 -- internal/multidiff tree sidebar: same as the mod rows, a file row of the tree against a row of the stack column that starts 34 px higher
+* text-band tab "Staged Changes" cap band centre y -- internal/design chrome.TabStrip: same 1.5 px baseline snap at scale 1 as the "index.ts" tab above
+* contrast button "Unstage Changes" icon contrast -- internal/icons Minus: a single 1.5 px stroke anti-aliases to 2.7:1 at scale 1 in the light theme although token Icon is 4.5:1 or better on token Layer.Panel; the Plus icon beside it passes

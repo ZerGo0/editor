@@ -2,10 +2,8 @@ package prui
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -13,15 +11,10 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/design"
-	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
-	"github.com/ZerGo0/editor/internal/design/detail"
-	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
-	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/github"
-	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -30,116 +23,12 @@ const (
 	modePR        = "pr"
 	modeSince     = "since"
 	modeLocal     = "local"
-	layoutInline  = 1
 	noPRInTabHint = "This pull request is not open, so comments cannot be added."
 )
 
 type diffSpec struct {
 	mode   string
 	oldRef string
-}
-
-type diffTab struct {
-	data         *prData
-	file         github.PRFile
-	spec         diffSpec
-	id           string
-	state        *editor.DiffState
-	engine       *diffmode.Engine
-	loading      bool
-	ready        bool
-	err          error
-	gen          int
-	layout       int
-	hideComments bool
-	expanded     map[string]bool
-	oldSHA       string
-}
-
-func diffTabID(repo github.Remote, number int, filePath string, spec diffSpec) string {
-	if spec.mode == modePR || spec.mode == "" {
-		return diffID(repo, number, filePath)
-	}
-	return fmt.Sprintf("%s/%s/%s", detailID(repo, number), spec.mode, filePath)
-}
-
-func diffTitle(number int, filePath string, spec diffSpec) string {
-	switch spec.mode {
-	case modeSince:
-		return fmt.Sprintf("%s (#%d, since review)", path.Base(filePath), number)
-	case modeLocal:
-		return fmt.Sprintf("%s (#%d, local)", path.Base(filePath), number)
-	}
-	return fmt.Sprintf("%s (#%d)", path.Base(filePath), number)
-}
-
-func (p *PRs) openDiff(d *prData, f github.PRFile, spec diffSpec) {
-	if spec.mode == "" {
-		spec.mode = modePR
-	}
-	id := diffTabID(p.repo, d.number, f.Path, spec)
-	t := p.diffs[id]
-	if t == nil {
-		t = &diffTab{data: d, file: f, spec: spec, id: id, expanded: map[string]bool{}}
-		p.diffs[id] = t
-	}
-	t.file = f
-	if !t.ready && !t.loading {
-		p.loadDiff(t)
-	}
-	p.h.OpenView(id, diffTitle(d.number, f.Path, spec), func(c *ui.Context) { p.diffView(c, t) })
-}
-
-func (p *PRs) closeReviewTabs() {
-	for id := range p.diffs {
-		p.h.CloseView(id)
-	}
-	for id := range p.logs {
-		p.h.CloseView(id)
-	}
-	clear(p.diffs)
-	clear(p.logs)
-}
-
-func (p *PRs) loadDiff(t *diffTab) {
-	t.gen++
-	gen := t.gen
-	t.loading, t.err = true, nil
-	d := t.data
-	src := fileSource{local: p.local, be: p.be, repo: p.repo, root: p.h.RootDir()}
-	pr, file, spec, baseSHA := d.pr, t.file, t.spec, d.baseSHA
-	go func() {
-		v, err := loadVersions(p.ctx, src, pr, file, spec, baseSHA)
-		p.post(func() {
-			if gen == t.gen {
-				p.applyDiff(t, v, err)
-			}
-		})
-	}()
-}
-
-func (p *PRs) applyDiff(t *diffTab, v fileVersions, err error) {
-	t.loading = false
-	if err != nil {
-		t.err = err
-		p.authFailure(err)
-		return
-	}
-	if t.spec.mode == modePR {
-		t.data.baseSHA = v.baseSHA
-	}
-	t.oldSHA = v.baseSHA
-	if t.engine != nil {
-		t.engine.Close()
-	}
-	t.state = &editor.DiffState{
-		LineSelection:  true,
-		OnGutterButton: func(r editor.DiffLineRange) { p.commentAt(t, r) },
-	}
-	t.engine = diffmode.NewEngine(p.ctx, t.state, p.post)
-	t.engine.Install(func(c *ui.Context, a editor.DiffAnnotation) { p.threadView(c, t, a) })
-	t.engine.SetSource(diffmode.Source{Old: v.old, New: v.new, Language: p.h.Language(t.file.Path, v.new)})
-	t.ready = true
 }
 
 func (t *diffTab) selectedCode(r editor.DiffLineRange) string {
@@ -374,22 +263,6 @@ func (p *PRs) applySuggestion(d *prData, th github.Thread, code string) {
 	})
 }
 
-func (p *PRs) diffFiles(t *diffTab) []github.PRFile {
-	if t.spec.mode == modeSince {
-		return t.data.since
-	}
-	return t.data.files
-}
-
-func (p *PRs) stepFile(t *diffTab, delta int) {
-	files := p.diffFiles(t)
-	i := slices.IndexFunc(files, func(f github.PRFile) bool { return f.Path == t.file.Path })
-	if i < 0 || i+delta < 0 || i+delta >= len(files) {
-		return
-	}
-	p.openDiff(t.data, files[i+delta], t.spec)
-}
-
 func (t *diffTab) lineRange() (int, int) {
 	if t.state == nil {
 		return 0, 0
@@ -439,92 +312,6 @@ func (p *PRs) linkMenu(c *ui.Context, m *ui.Menu, t *diffTab) {
 	if m.Item("Open in github.dev").Disabled(!ok).Chosen() {
 		openExternal(c, dev)
 	}
-}
-
-func (p *PRs) diffView(c *ui.Context, t *diffTab) {
-	if p.closed {
-		return
-	}
-	d := t.data
-	detail.Page(c, func() {
-		p.diffHeader(c, t)
-		switch {
-		case t.err != nil:
-			var retry func()
-			if !errors.Is(t.err, ErrBinaryFile) && !errors.Is(t.err, ErrFileTooLarge) {
-				retry = func() { p.loadDiff(t) }
-			}
-			detail.Centered(c, func() { feedback.Error(c, "Cannot show "+t.file.Path, t.err, retry) })
-		case !t.ready || !t.engine.Ready():
-			detail.Centered(c, func() { feedback.Loading(c, "Loading "+path.Base(t.file.Path)+"...") })
-		default:
-			st := t.state
-			st.Layout = editor.DiffSplit
-			if t.layout == layoutInline {
-				st.Layout = editor.DiffUnified
-			}
-			t.engine.Refresh()
-			var threads []editor.DiffAnnotation
-			if t.spec.mode == modePR && !t.hideComments {
-				threads = buildAnnotations(d.threads, t.file.Path, t.expanded, st.Old.LineCount(), st.New.LineCount())
-			}
-			st.Annotations = t.engine.Annotations(threads)
-			p.h.ConfigureDiff(st, filepath.Join(p.h.RootDir(), t.file.Path))
-			editor.DiffView(c, st).Grow(1).FillWidth().Label("Diff of " + t.file.Path)
-		}
-	})
-}
-
-func (p *PRs) diffHeader(c *ui.Context, t *diffTab) {
-	d := t.data
-	detail.Header(c, detail.HeaderOptions{
-		Title: t.file.Path,
-		Busy:  t.loading || d.loading,
-		Actions: func(c *ui.Context) {
-			smallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
-		},
-		Meta: func(c *ui.Context) {
-			pal := token.Of(c)
-			design.Text(c, "+"+strconv.Itoa(t.file.Additions), token.TextLabel).TextColor(pal.Tone(token.ToneSuccess)).Shrink(0)
-			design.Text(c, "-"+strconv.Itoa(t.file.Deletions), token.TextLabel).TextColor(pal.Tone(token.ToneError)).Shrink(0)
-			if n := len(threadsForPath(d.threads, t.file.Path)); n > 0 && t.spec.mode == modePR {
-				ui.Icon(c, icons.Comment).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(pal.Icon).Shrink(0).Label(fmt.Sprintf("%d threads", n))
-				mutedText(c, strconv.Itoa(n)).Shrink(0)
-			}
-		},
-		Toolbar: func(c *ui.Context) {
-			if t.ready {
-				p.diffControls(c, t)
-			}
-		},
-	})
-}
-
-func (p *PRs) diffControls(c *ui.Context, t *diffTab) {
-	d := t.data
-	st := t.state
-	if t.spec.mode == modePR && d.pr.NodeID != "" {
-		viewed := d.viewed[t.file.Path]
-		if action.Checkbox(c, "Viewed", &viewed, action.ChoiceOptions{ID: "viewed"}).Changed() {
-			p.setViewed(d, t.file.Path, viewed)
-		}
-	}
-	if t.spec.mode == modePR {
-		action.Checkbox(c, "Hide Comments", &t.hideComments, action.ChoiceOptions{ID: "hide-comments"})
-		smallButton(c, "Comment on File", !d.isOpen()).OnClick(func() { p.commentOnFile(t) })
-		smallButton(c, "Compare with Local", false).OnClick(func() { p.openDiff(d, t.file, diffSpec{mode: modeLocal}) })
-	}
-	action.MenuButton(c, "Link", action.ButtonOptions{Small: true, ID: "link"}, func(m *ui.Menu) { p.linkMenu(c, m, t) }).Label("Copy or open a link")
-	files := p.diffFiles(t)
-	i := slices.IndexFunc(files, func(f github.PRFile) bool { return f.Path == t.file.Path })
-	smallButton(c, "Previous File", i <= 0).OnClick(func() { p.stepFile(t, -1) })
-	smallButton(c, "Next File", i < 0 || i+1 >= len(files)).OnClick(func() { p.stepFile(t, 1) })
-	action.Segmented(c, "Diff layout", &t.layout, []string{"Split", "Unified"}, action.SegmentedOptions{})
-	diffmode.Controls(c, t.engine)
-	h, _ := st.CurrentHunk()
-	n := len(st.Hunks())
-	smallButton(c, "Previous Change", n == 0 || h <= 0).OnClick(func() { st.GoToHunk(h - 1) })
-	smallButton(c, "Next Change", n == 0 || h+1 >= n).OnClick(func() { st.GoToHunk(h + 1) })
 }
 
 func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {

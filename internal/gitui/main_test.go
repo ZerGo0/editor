@@ -172,6 +172,10 @@ func (h *fakeHost) settle() {
 	}
 }
 
+func (f *fakeRepo) DiffWorkTree(context.Context, ...string) ([]git.FileDiff, error) { return nil, nil }
+
+func (f *fakeRepo) DiffStaged(context.Context, ...string) ([]git.FileDiff, error) { return nil, nil }
+
 type fakeRepo struct {
 	repo
 	dir      string

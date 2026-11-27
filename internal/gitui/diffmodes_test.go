@@ -115,7 +115,7 @@ func TestPatchTabFiltersWhitespace(t *testing.T) {
 	})
 	tab := g.patchTabs["test-patch"]
 	h.drain(t, func() bool { return !tab.loading && len(tab.items) > 0 })
-	tt := newTester(g, tab.view)
+	tt := newTester(g, tab.render)
 	if !tt.HasText("Ignore Whitespace") || tt.HasText("Only whitespace changed") {
 		t.Fatalf("texts = %v", tt.Texts())
 	}

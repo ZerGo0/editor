@@ -388,7 +388,7 @@ func TestFileDiffItems(t *testing.T) {
 	fd := git.FileDiff{OldPath: "a.txt", NewPath: "a.txt", Hunks: []git.Hunk{{OldStart: 1, OldLines: 1, NewStart: 1, NewLines: 1,
 		Lines: []git.Line{{Kind: '-', Text: "x"}, {Kind: '+', Text: "y"}}}}}
 	items := fileDiffItems([]git.FileDiff{fd, {OldPath: "b.bin", NewPath: "b.bin", Binary: true}})
-	if len(items) != 2 || items[0].patch == nil || items[0].code != 'M' || items[1].note == "" {
+	if len(items) != 2 || items[0].patch == nil || items[0].code != 'M' || !items[1].binary {
 		t.Fatalf("items = %+v", items)
 	}
 }

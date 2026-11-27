@@ -260,6 +260,10 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 - `Empty(c, EmptyOptions{Icon, Title, Message, Action, OnAction, Link, OnLink})`, `Error(c, title, err, retry)`.
 - `Notice(c, NoticeOptions{Tone, Text, Action, OnAction, OnDismiss})`, `Toast(c, ToastOptions{Tone, Title, Message, Action, OnAction})`.
 
+### filediff
+
+- `Header(c, HeaderOptions{Path, OldPath, Status, Adds, Dels, Open, OnToggle, Viewed, OnViewed, Actions})`: the sticky header of one file in a stacked diff: chevron, status letter, dimmed folder and strong name, `+/-` counts, a Viewed checkbox and a toolbar of actions. `Counts` draws the two counts alone; `Height` is the header's total height.
+
 ### quickinput
 
 - `View(c, label, &State{}, []Item{...}, Options{Placeholder, Busy, Empty}) Result{Accepted, Closed}`: as wide as the command center bar (at least `QuickInputMinWidth`, centered on the bar) and directly below it, aligned to the bar's left and right edges; 600 px under the title bar when the bar is not shown. Up, Down, Enter, Escape and click outside.

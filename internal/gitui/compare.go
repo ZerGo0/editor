@@ -24,21 +24,6 @@ func (g *Git) showLog() {
 	g.wantsPanel = true
 }
 
-func (g *Git) openCommitTab(cm git.Commit) {
-	g.openPatchTab("git-commit:"+cm.OID, "Commit "+shortHash(cm.OID), func(ctx context.Context, r repo) ([]patchItem, error) {
-		files, err := r.CommitFiles(ctx, cm.OID)
-		if err != nil {
-			return nil, err
-		}
-		items := []patchItem{{title: cm.Subject, commit: &cm}}
-		for _, f := range files {
-			src := commitSource(cm, f)
-			items = append(items, patchItem{title: f.Path, detail: f.OrigPath, code: f.Status, src: &src})
-		}
-		return items, nil
-	})
-}
-
 func (g *Git) compareWithLocal(rev string) {
 	label := rev
 	if isHashLike(rev) {

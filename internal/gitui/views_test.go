@@ -140,7 +140,7 @@ func TestChangesTreeAndPreview(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.settle()
-	if _, ok := h.views[diffSource{kind: diffWorkTree, path: "src/app/main.go"}.id()]; !ok {
+	if _, ok := h.views["git-changes:changes"]; !ok {
 		t.Fatalf("diff not opened: %v", h.views)
 	}
 	if err := tt.Click("src/app"); err != nil {

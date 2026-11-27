@@ -61,9 +61,8 @@ func TestEveryControlHasAnAccessibleName(t *testing.T) {
 	requireNamedControls(t, "detail view", detail)
 
 	hs.p.openDiff(d, d.files[0], diffSpec{mode: modePR})
-	tab := hs.p.diffs[diffViewID]
-	hs.h.pump(t, func() bool { return tab.ready })
-	requireNamedControls(t, "diff view", viewTester(hs, diffViewID))
+	_, diffTester := hs.awaitDiff(t, diffViewID, diffPath)
+	requireNamedControls(t, "diff view", diffTester)
 
 	hs.p.openLogs(d, checkRow{Check: github.Check{Name: "build"}, JobID: 5})
 	hs.h.pump(t, func() bool { return hs.p.logs["pr/acme/widgets/12/log/5"].state != nil })

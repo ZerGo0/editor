@@ -174,10 +174,6 @@ func detailID(repo github.Remote, number int) string {
 	return fmt.Sprintf("%s/%s/%s/%d", detailIDPrefix, repo.Owner, repo.Name, number)
 }
 
-func diffID(repo github.Remote, number int, path string) string {
-	return fmt.Sprintf("%s/%s/%s", detailID(repo, number), diffIDSegment, path)
-}
-
 func detailTitle(number int, title string) string {
 	if title == "" {
 		return fmt.Sprintf("#%d", number)

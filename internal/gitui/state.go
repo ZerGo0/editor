@@ -121,6 +121,7 @@ func loadSnapshot(ctx context.Context, r repo) snapshot {
 func (g *Git) applySnapshot(s snapshot) {
 	old := g.snap.status
 	g.snap = s
+	g.reloadGroupTabs()
 	if s.status == nil || old == nil {
 		return
 	}

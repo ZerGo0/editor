@@ -9,8 +9,8 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/pane"
-	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/findwidget"
+	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -36,6 +36,7 @@ type diffTab struct {
 	err     error
 	gen     int
 	bar     diffBar
+	ops     *hunkOps
 }
 
 func (g *Git) openDiff(kind diffKind, rel string) {
@@ -43,10 +44,23 @@ func (g *Git) openDiff(kind diffKind, rel string) {
 }
 
 func (g *Git) openDiffSource(src diffSource) {
-	g.openDiffWith(src, false, true)
+	g.openSingleDiff(src, false, true)
 }
 
 func (g *Git) openDiffWith(src diffSource, preview, focus bool) {
+	switch src.kind {
+	case diffWorkTree, diffUntracked:
+		g.openGroupAt(groupChanges, src.path, preview, focus)
+	case diffStaged:
+		g.openGroupAt(groupStaged, src.path, preview, focus)
+	case diffCommit:
+		g.openCommitTabAt(git.Commit{OID: src.rev}, src.path, preview, focus)
+	default:
+		g.openSingleDiff(src, preview, focus)
+	}
+}
+
+func (g *Git) openSingleDiff(src diffSource, preview, focus bool) {
 	if !g.ready() {
 		return
 	}
@@ -73,6 +87,7 @@ func (g *Git) diffTabFor(src diffSource) *diffTab {
 		return t
 	}
 	t := &diffTab{g: g, src: src}
+	t.ops = &hunkOps{g: g, src: src, live: func() bool { return t.live }, reload: t.load}
 	g.tabs[id] = t
 	g.tabOrder = append(g.tabOrder, id)
 	if len(g.tabOrder) > maxKeptTabs {
@@ -120,7 +135,8 @@ func (t *diffTab) apply(oldText, newText string, live *editor.Buffer) {
 	if t.state == nil || t.liveBuf != live {
 		t.dropState()
 		d := &editor.DiffState{Layout: editor.DiffLayout(t.layout)}
-		d.RenderHunkActions = t.hunkActions
+		t.ops.d = d
+		d.RenderHunkActions = t.ops.render
 		d.RenderFindBar = findwidget.Render
 		t.engine = diffmode.NewEngine(t.g.ctx, d, t.g.post)
 		t.engine.Install(nil)
@@ -134,14 +150,6 @@ func (t *diffTab) dropState() {
 		t.engine.Close()
 	}
 	t.state, t.engine, t.live, t.liveBuf = nil, nil, false, nil
-}
-
-func (t *diffTab) hasHunkActions() bool {
-	switch t.src.kind {
-	case diffWorkTree, diffStaged, diffHead:
-		return true
-	}
-	return false
 }
 
 func (t *diffTab) view(c *ui.Context) {
@@ -170,7 +178,7 @@ func (t *diffTab) body(c *ui.Context) {
 		t.state.Layout = editor.DiffLayout(t.layout)
 		t.g.h.ConfigureDiff(t.state, t.abs())
 		t.g.diffOpts.apply(t.state)
-		t.state.HunkActions = t.hasHunkActions() && !t.engine.Filtered()
+		t.state.HunkActions = t.ops.enabled() && !t.engine.Filtered()
 		t.state.Annotations = t.engine.Annotations(nil)
 		t.diffWithBars(c)
 	}
@@ -203,7 +211,7 @@ func (t *diffTab) toolbar(c *ui.Context) {
 		pane.Separator(c, true)
 		action.Segmented(c, "Diff Layout", &t.layout, layoutNames, action.SegmentedOptions{})
 		diffModeControls(c, t.engine)
-		if t.engine != nil && t.engine.Filtered() && (t.live || t.hasHunkActions()) {
+		if t.engine != nil && t.engine.Filtered() && (t.live || t.ops.enabled()) {
 			secondary(c, readOnlyNote).SingleLine().Shrink(0)
 		}
 		t.g.diffOptionsButton(c)
@@ -227,50 +235,4 @@ func (t *diffTab) fileActions(c *ui.Context) {
 			g.doSimple("Unstage", func(ctx context.Context, r repo) error { return r.UnstageFiles(ctx, rel) }, t.load)
 		}
 	}
-}
-
-func (t *diffTab) hunkActions(c *ui.Context, bar ui.Element, a *editor.DiffHunkActions) {
-	busy := t.g.busy != ""
-	bar.Gap(token.GapInline.Px()).Children(func() {
-		switch t.src.kind {
-		case diffWorkTree:
-			if smallButton(c, "Revert", busy) {
-				t.revertHunk(a)
-			}
-			if action.Button(c, "Stage", action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: busy}).Clicked() && !busy {
-				t.applyHunk(a.Hunk, false, true, false)
-			}
-		case diffStaged:
-			if smallButton(c, "Unstage", busy) {
-				t.applyHunk(a.Hunk, true, true, true)
-			}
-		case diffHead:
-			if smallButton(c, "Revert", busy) {
-				t.revertHunk(a)
-			}
-		}
-	})
-}
-
-func (t *diffTab) revertHunk(a *editor.DiffHunkActions) {
-	if t.live {
-		a.Revert()
-		return
-	}
-	t.applyHunk(a.Hunk, true, false, true)
-}
-
-func (t *diffTab) applyHunk(h editor.DiffHunk, contextFromNew, cached, reverse bool) {
-	d := t.state
-	if d == nil {
-		return
-	}
-	patch := hunkPatch(t.src.path, d.Old.String(), d.New.String(), h, contextFromNew)
-	if patch == nil {
-		t.g.h.Notify("This change cannot be applied on its own.")
-		return
-	}
-	t.g.doSimple("Apply Change", func(ctx context.Context, r repo) error {
-		return r.Apply(ctx, patch, cached, reverse)
-	}, t.load)
 }

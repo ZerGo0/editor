@@ -62,7 +62,7 @@ type PRs struct {
 	tickAt      time.Time
 	side        *sideState
 	details     map[int]*prData
-	diffs       map[string]*diffTab
+	diffs       map[string]*reviewTab
 	logs        map[string]*logTab
 	createForm  *createForm
 	dialog      dialog
@@ -93,7 +93,7 @@ func NewWith(h host.Host, env Env) *PRs {
 		cancel:  cancel,
 		checks:  map[int]checkState{},
 		details: map[int]*prData{},
-		diffs:   map[string]*diffTab{},
+		diffs:   map[string]*reviewTab{},
 		logs:    map[string]*logTab{},
 	}
 	p.connect()
@@ -184,7 +184,7 @@ func (p *PRs) apply(conn connection) {
 	p.side = newSideState()
 	p.checks = map[int]checkState{}
 	p.details = map[int]*prData{}
-	p.diffs = map[string]*diffTab{}
+	p.diffs = map[string]*reviewTab{}
 	p.logs = map[string]*logTab{}
 	p.current = currentPR{}
 	p.refreshed = p.env.Now()

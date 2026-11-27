@@ -5,6 +5,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/design/filediff"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -24,6 +25,8 @@ type featureState struct {
 	row           int
 	pickerTab     int
 	pickerRows    picker.ResultsState
+	fileOpen      bool
+	fileViewed    bool
 }
 
 func galleryFeatures(c *ui.Context, g *gallery) {
@@ -69,10 +72,28 @@ func galleryFeatures(c *ui.Context, g *gallery) {
 		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Github, Title: "Sign in to GitHub", Message: "Run this command in a terminal, then check again:",
 			Code: "gh auth login", Action: "Check Again", OnAction: func() {}, Link: "Copy Command", OnLink: func() {}})
 	})
+	gallerySection(c, "File diff header", func() {
+		for _, h := range galleryFileHeaders {
+			o := h
+			o.Open = f.fileOpen
+			o.OnToggle = func() { f.fileOpen = !f.fileOpen }
+			o.Viewed, o.OnViewed = f.fileViewed, func(on bool) { f.fileViewed = on }
+			o.Actions = func(c *ui.Context) {
+				action.IconButton(c, icons.Plus, "Stage Changes", action.IconOptions{})
+				action.IconButton(c, icons.File, "Open File", action.IconOptions{})
+			}
+			filediff.Header(c, o)
+		}
+	})
 	gallerySection(c, "Search popup parts", func() {
 		picker.Tabs(c, "Search scope", &f.pickerTab, galleryPickerTabs)
 		picker.Results(c, &f.pickerRows, galleryPickerRows, picker.ResultsOptions{Label: "Gallery results", Rows: galleryPickerRowCount})
 	})
+}
+
+var galleryFileHeaders = []filediff.HeaderOptions{
+	{Path: "internal/design/filediff/header.go", Status: token.GitModified, Adds: 24, Dels: 6},
+	{Path: "internal/design/new.go", OldPath: "internal/design/old.go", Status: token.GitRenamed, Adds: filediff.CountHidden, Dels: filediff.CountHidden},
 }
 
 var galleryPickerRows = []picker.Row{

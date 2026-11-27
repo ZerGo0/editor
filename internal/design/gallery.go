@@ -35,6 +35,7 @@ func newGallery() *gallery {
 	g := &gallery{checked: true, on: true, matchCase: true, invalid: "main.go/", query: "design", textValue: "Fix layout",
 		notes: "Adds the design system.\nTokens and components.", choice: "dark", sectionOpen: true, selectedRow: 1, treeRow: galleryTreeRow}
 	g.list.Selected = &g.selectedRow
+	g.features.fileOpen = true
 	g.tree.Open.Add("internal")
 	g.tree.Open.Add("internal/design")
 	g.tree.List.Selected = &g.treeRow
