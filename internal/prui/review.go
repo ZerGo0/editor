@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -83,7 +84,7 @@ func (p *PRs) openDiff(d *prData, f github.PRFile, spec diffSpec) {
 	rt.base = d.baseSHA
 	rt.view.SetEntries(p.reviewEntries(rt))
 	rt.view.RevealPath(f.Path)
-	p.h.OpenView(id, reviewTitle(d.number, spec, f.Path), func(c *ui.Context) { p.reviewView(c, rt) })
+	p.Host.OpenView(id, reviewTitle(d.number, spec, f.Path), func(c *ui.Context) { p.reviewView(c, rt) })
 }
 
 func (p *PRs) reviewFiles(rt *reviewTab) []github.PRFile {
@@ -98,11 +99,11 @@ func (p *PRs) reviewFiles(rt *reviewTab) []github.PRFile {
 
 func (p *PRs) closeReviewTabs() {
 	for id, rt := range p.diffs {
-		p.h.CloseView(id)
+		p.Host.CloseView(id)
 		rt.view.Close()
 	}
 	for id := range p.logs {
-		p.h.CloseView(id)
+		p.Host.CloseView(id)
 	}
 	clear(p.diffs)
 	clear(p.logs)
@@ -146,7 +147,7 @@ func (p *PRs) reviewEntry(rt *reviewTab, t *diffTab) multidiff.Entry {
 }
 
 func (p *PRs) loadReviewFile(ctx context.Context, rt *reviewTab, t *diffTab) (string, string, error) {
-	src := fileSource{local: p.local, be: p.be, repo: p.repo, root: p.h.RootDir()}
+	src := fileSource{local: p.local, be: p.be, repo: p.repo, root: p.Host.RootDir()}
 	d, pr, file, spec := rt.data, rt.data.pr, t.file, rt.spec
 	rt.mu.Lock()
 	base := rt.base
@@ -160,9 +161,9 @@ func (p *PRs) loadReviewFile(ctx context.Context, rt *reviewTab, t *diffTab) (st
 		}
 		rt.mu.Unlock()
 	}
-	p.post(func() {
+	p.Post(func() {
 		if err != nil {
-			p.authFailure(err)
+			p.AuthFailure(err)
 			return
 		}
 		if spec.mode == modePR {
@@ -202,19 +203,19 @@ func (p *PRs) reviewOptions(rt *reviewTab) multidiff.Options {
 	o := multidiff.Options{
 		Label: reviewTitle(d.number, rt.spec, ""),
 		Set:   rt.id,
-		Ctx:   p.ctx,
-		Post:  p.post,
+		Ctx:   p.Ctx,
+		Post:  p.Post,
 		Configure: func(st *editor.DiffState, rel string) {
-			p.h.ConfigureDiff(st, filepath.Join(p.h.RootDir(), rel))
+			p.Host.ConfigureDiff(st, filepath.Join(p.Host.RootDir(), rel))
 		},
-		Language: func(rel, text string) *editor.Language { return p.h.Language(rel, text) },
-		OpenFile: func(rel string) { p.h.OpenAt(filepath.Join(p.h.RootDir(), rel), -1, -1) },
+		Language: func(rel, text string) *editor.Language { return p.Host.Language(rel, text) },
+		OpenFile: func(rel string) { p.Host.OpenAt(filepath.Join(p.Host.RootDir(), rel), -1, -1) },
 		Busy:     d.loading,
 		Toolbar: func(c *ui.Context) {
 			if rt.spec.mode == modePR {
 				action.Checkbox(c, "Hide Comments", &rt.hideComments, action.ChoiceOptions{ID: "hide-comments"})
 			}
-			smallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
+			ghshared.SmallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
 		},
 	}
 	if rt.spec.mode == modePR && d.pr.NodeID != "" {
@@ -224,7 +225,7 @@ func (p *PRs) reviewOptions(rt *reviewTab) multidiff.Options {
 }
 
 func (p *PRs) reviewView(c *ui.Context, rt *reviewTab) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
 	detail.Page(c, func() {

@@ -12,6 +12,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
@@ -49,7 +50,7 @@ func (i *Issues) openCreate(draft createDraft) {
 		i.create = &createForm{title: draft.title, body: draft.body, milestone: noMilestoneOption}
 	}
 	i.ensureMeta()
-	i.h.OpenView(createViewID, createViewTitle, i.createView)
+	i.Host.OpenView(createViewID, createViewTitle, i.createView)
 }
 
 func (f *createForm) blocked() string {
@@ -72,7 +73,7 @@ func (i *Issues) submitCreate(f *createForm) {
 	}
 	be, repo := i.be, i.repo
 	f.err = ""
-	i.act(&f.busy, "Creating issue", "Cannot create the issue", func(ctx context.Context) (func(), error) {
+	i.Act(&f.busy, "Creating issue", "Cannot create the issue", func(ctx context.Context) (func(), error) {
 		issue, err := be.CreateIssue(ctx, repo, in)
 		if err != nil {
 			return nil, err
@@ -81,16 +82,16 @@ func (i *Issues) submitCreate(f *createForm) {
 			if i.create == f {
 				i.create = nil
 			}
-			i.h.CloseView(createViewID)
+			i.Host.CloseView(createViewID)
 			i.markListsStale()
-			i.h.Notify(fmt.Sprintf("Created #%d", issue.Number))
+			i.Host.Notify(fmt.Sprintf("Created #%d", issue.Number))
 			i.openIssue(issue.Number, &issue)
 		}, nil
 	})
 }
 
 func (i *Issues) createView(c *ui.Context) {
-	if i.closed {
+	if i.Closed {
 		return
 	}
 	f := i.create
@@ -99,9 +100,9 @@ func (i *Issues) createView(c *ui.Context) {
 			design.Text(c, createViewTitle, token.TextHeading)
 			switch {
 			case f == nil:
-				mutedText(c, "Use Create Issue in the Issues view to start a new issue.")
+				ghshared.MutedText(c, "Use Create Issue in the Issues view to start a new issue.")
 			case !i.ready():
-				i.stateView(c)
+				ghshared.StateView(c, i.StateMessage(i.repo.Host), i.Connect)
 			default:
 				i.createFields(c, f)
 			}
@@ -119,11 +120,11 @@ func (i *Issues) createFields(c *ui.Context, f *createForm) {
 	if i.meta.loading {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 			feedback.Spinner(c, "Loading labels, people and milestones")
-			mutedText(c, "Loading labels, people and milestones...")
+			ghshared.MutedText(c, "Loading labels, people and milestones...")
 		})
 	}
 	if i.meta.err != nil {
-		errorNotice(c, fmt.Errorf("Some choices could not be loaded: %s", errorText(i.meta.err)), i.loadMeta)
+		ghshared.ErrorNotice(c, fmt.Errorf("Some choices could not be loaded: %s", ghshared.ErrorText(i.meta.err)), i.loadMeta)
 	}
 	detail.Field(c, "Labels", func() {
 		ui.TokenField(c.Key("labels"), &f.labels, i.meta.labelNames()).Placeholder("Add a label").Label("Labels")
@@ -132,21 +133,14 @@ func (i *Issues) createFields(c *ui.Context, f *createForm) {
 		ui.TokenField(c.Key("assignees"), &f.assignees, i.meta.userLogins()).Placeholder("Add a person").Label("Assignees")
 	})
 	detail.Field(c, "Milestone", func() {
-		action.Select(c, "Milestone", &f.milestone, options(i.meta.milestoneOptions()), action.SelectOptions{ID: "milestone"})
+		action.Select(c, "Milestone", &f.milestone, ghshared.Options(i.meta.milestoneOptions()), action.SelectOptions{ID: "milestone"})
 	})
 	blocked := f.blocked()
 	if f.err != "" {
 		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: f.err})
 	}
 	ui.Row(c).FillWidth().AlignItems(ui.Center).Justify(ui.End).Gap(token.GapControl.Px()).Children(func() {
-		if f.busy != "" {
-			feedback.Spinner(c, f.busy)
-			mutedText(c, f.busy+"...")
-		}
-		if blocked != "" {
-			mutedText(c, blocked)
-		}
-		action.Button(c, "Create", action.ButtonOptions{Variant: action.Primary, Disabled: blocked != "" || f.busy != ""}).Label("Create issue").OnClick(func() { i.submitCreate(f) })
+		ghshared.CreateFooter(c, f.busy, blocked).Label("Create issue").OnClick(func() { i.submitCreate(f) })
 	})
 }
 
@@ -185,17 +179,17 @@ func (i *Issues) createAt(title, path string, startLine, endLine int, snippet st
 	if !i.requireReady() {
 		return
 	}
-	root := i.h.RootDir()
+	root := i.Host.RootDir()
 	applog.Go(func() {
 		link, err := i.Permalink(path, startLine, endLine)
 		rel := path
 		if r, relErr := repoRelative(root, path); relErr == nil {
 			rel = r
 		}
-		i.post(func() {
+		i.Post(func() {
 			body := link
 			if err != nil {
-				i.h.Notify(err.Error())
+				i.Host.Notify(err.Error())
 				body = locationBody(rel, startLine, snippet)
 			}
 			i.openCreate(createDraft{title: title, body: body})

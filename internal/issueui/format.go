@@ -6,70 +6,16 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
-const (
-	justNowLimit  = 45 * time.Second
-	hoursPerDay   = 24
-	daysPerWeek   = 7
-	daysPerYear   = 365
-	dotComHost    = "github.com"
-	issuesSegment = "issues"
-)
+const issuesSegment = "issues"
 
 var errBadIssueNumber = errors.New("Enter an issue number, such as 42 or #42.")
 
-var preferredRemotes = []string{originRemote, upstreamRemote}
-
 func trimmed(s string) string {
 	return strings.TrimSpace(s)
-}
-
-func relativeTime(now, t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	d := now.Sub(t)
-	switch {
-	case d < justNowLimit:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d/time.Minute))
-	case d < hoursPerDay*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d/time.Hour))
-	}
-	days := int(d / (hoursPerDay * time.Hour))
-	switch {
-	case days < daysPerWeek:
-		return fmt.Sprintf("%dd ago", days)
-	case days < daysPerYear:
-		return fmt.Sprintf("%dw ago", days/daysPerWeek)
-	}
-	return fmt.Sprintf("%dy ago", days/daysPerYear)
-}
-
-func errorText(err error) string {
-	var limit *github.RateLimitError
-	var api *github.APIError
-	switch {
-	case errors.As(err, &limit):
-		if limit.Reset.IsZero() {
-			return "GitHub rate limit reached. Try again later."
-		}
-		return "GitHub rate limit reached. Try again after " + limit.Reset.Format("15:04") + "."
-	case errors.As(err, &api):
-		return fmt.Sprintf("GitHub answered %d: %s", api.Status, api.Message)
-	}
-	return strings.TrimPrefix(err.Error(), "github: ")
-}
-
-func isUnauthorized(err error) bool {
-	var api *github.APIError
-	return errors.As(err, &api) && api.Status == 401
 }
 
 func parseIssueNumber(value string) (int, error) {
@@ -86,42 +32,6 @@ func parseIssueNumber(value string) (int, error) {
 		return 0, errBadIssueNumber
 	}
 	return number, nil
-}
-
-func pickRemote(remotes []git.Remote) (github.Remote, map[string]github.Remote, bool) {
-	byName := map[string]github.Remote{}
-	var first github.Remote
-	found := false
-	for _, r := range remotes {
-		parsed, ok := github.ParseRemote(r.FetchURL)
-		if !ok {
-			continue
-		}
-		byName[r.Name] = parsed
-		if !found {
-			first, found = parsed, true
-		}
-	}
-	for _, name := range preferredRemotes {
-		if r, ok := byName[name]; ok {
-			return r, byName, true
-		}
-	}
-	return first, byName, found
-}
-
-func remoteNameFor(remotes map[string]github.Remote, repo github.Remote) string {
-	for _, name := range preferredRemotes {
-		if r, ok := remotes[name]; ok && r == repo {
-			return name
-		}
-	}
-	for name, r := range remotes {
-		if r == repo {
-			return name
-		}
-	}
-	return originRemote
 }
 
 func issueURL(repo github.Remote, number int) string {

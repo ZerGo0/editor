@@ -2,6 +2,8 @@ package prui
 
 import (
 	"fmt"
+
+	"github.com/ZerGo0/editor/internal/ghshared"
 )
 
 const actionCategory = "GitHub"
@@ -67,12 +69,12 @@ func (p *PRs) Run(id string) bool {
 	case ActionCopyLink:
 		if p.requireCurrent() {
 			p.env.CopyText(p.current.pr.URL)
-			p.h.Notify("Copied the pull request link.")
+			p.Host.Notify("Copied the pull request link.")
 		}
 	case ActionOpenOnGitHub:
 		if p.requireCurrent() {
 			if err := p.env.OpenURL(p.current.pr.URL); err != nil {
-				p.h.ShowError("Cannot open the browser", err)
+				p.Host.ShowError("Cannot open the browser", err)
 			}
 		}
 	default:
@@ -82,8 +84,8 @@ func (p *PRs) Run(id string) bool {
 }
 
 func (p *PRs) requireReady() bool {
-	if p.phase != phaseReady {
-		p.h.Notify(p.stateMessage().title)
+	if p.Phase != ghshared.PhaseReady {
+		p.Host.Notify(p.StateMessage(p.repo.Host).Title)
 		return false
 	}
 	return true
@@ -94,7 +96,7 @@ func (p *PRs) requireCurrent() bool {
 		return false
 	}
 	if p.current.pr == nil {
-		p.h.Notify("The current branch has no pull request.")
+		p.Host.Notify("The current branch has no pull request.")
 		return false
 	}
 	return true
@@ -104,7 +106,7 @@ func (p *PRs) askCheckout() {
 	if !p.requireReady() {
 		return
 	}
-	p.h.Ask("Checkout Pull Request", "Checkout", "", func(value string) error {
+	p.Host.Ask("Checkout Pull Request", "Checkout", "", func(value string) error {
 		number, err := parsePRNumber(value)
 		if err != nil {
 			return err
@@ -118,10 +120,10 @@ func (p *PRs) askSearch() {
 	if !p.requireReady() {
 		return
 	}
-	p.h.Ask("Search Pull Requests", "Search", p.side.field, func(value string) error {
+	p.Host.Ask("Search Pull Requests", "Search", p.side.field, func(value string) error {
 		p.side.field = value
 		p.runSearch(value)
-		p.h.Notify(fmt.Sprintf("Search results are in the %s sidebar.", sideViewName))
+		p.Host.Notify(fmt.Sprintf("Search results are in the %s sidebar.", sideViewName))
 		return nil
 	})
 }

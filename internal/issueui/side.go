@@ -13,6 +13,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -132,15 +133,15 @@ func (i *Issues) loadSection(s *section, more bool) {
 	query := i.expandQuery(s.query.Query)
 	be := i.be
 	applog.Go(func() {
-		result, err := be.SearchIssues(i.ctx, query, page)
-		i.post(func() {
+		result, err := be.SearchIssues(i.Ctx, query, page)
+		i.Post(func() {
 			if gen != s.gen {
 				return
 			}
 			s.loading = false
 			if err != nil {
 				s.err = err
-				i.authFailure(err)
+				i.AuthFailure(err)
 				return
 			}
 			s.err, s.loaded, s.page, s.more, s.total = nil, true, page, result.HasMore, result.Total
@@ -262,11 +263,11 @@ func (i *Issues) selectedIssue() *github.Issue {
 }
 
 func (i *Issues) SideView(c *ui.Context) {
-	if i.closed {
+	if i.Closed {
 		return
 	}
 	if !i.ready() {
-		i.stateView(c)
+		ghshared.StateView(c, i.StateMessage(i.repo.Host), i.Connect)
 		return
 	}
 	i.ensureLoaded()
@@ -282,13 +283,7 @@ func (i *Issues) SideView(c *ui.Context) {
 			i.activate(rows[s.row])
 		}
 		if s.row >= 0 && s.row < len(rows) && rows[s.row].kind == rowHeader && s.list.Handle.Focused(c) {
-			sec := rows[s.row].sec
-			switch {
-			case !sec.open && c.Shortcut(0, ui.KeyRight):
-				sec.open = true
-			case sec.open && c.Shortcut(0, ui.KeyLeft):
-				sec.open = false
-			}
+			ghshared.ToggleSectionWithArrows(c, &rows[s.row].sec.open)
 		}
 	})
 }
@@ -347,9 +342,7 @@ func (i *Issues) sideItem(c *ui.Context, r sideRow) list.Item {
 	case rowNote:
 		return list.Item{Depth: 1, Muted: true, Label: r.text, Tooltip: r.text}
 	case rowError:
-		return list.Item{Depth: 1, Tone: token.ToneError, Label: errorText(r.err), Tooltip: errorText(r.err), Trailing: func(c *ui.Context) {
-			ghostButton(c, retryLabel, "retry").OnClick(func() { i.retrySection(r.sec) })
-		}}
+		return ghshared.ErrorItem(r.err, func() { i.retrySection(r.sec) })
 	}
 	return list.Item{}
 }
@@ -362,7 +355,7 @@ func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
 		depth++
 	}
 	description := "#" + strconv.Itoa(issue.Number)
-	if when := relativeTime(i.env.Now(), issue.Updated); when != "" {
+	if when := ghshared.RelativeTime(i.env.Now(), issue.Updated); when != "" {
 		description += issueMetaSeparator + when
 	}
 	svg := icons.Dot

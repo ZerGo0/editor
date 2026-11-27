@@ -1,9 +1,9 @@
 package prui
 
 import (
-	"context"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo"
@@ -20,18 +20,12 @@ func defaultEnv() Env {
 		NewBackend: func(host, token string) Backend {
 			return ghBackend{Client: github.New(host, token), restClient: newRESTClient(host, token)}
 		},
-		OpenLocal: func(ctx context.Context, dir string) (Local, error) {
-			repo, err := git.Open(ctx, dir)
-			if err != nil {
-				return nil, err
-			}
-			return repo, nil
-		},
-		Checkout: github.Checkout,
-		Confirm:  confirmDialog,
-		Now:      time.Now,
-		OpenURL:  mygo.Shell.OpenExternal,
-		CopyText: mygo.Clipboard.WriteText,
+		OpenLocal: ghshared.LocalOpener(func(repo *git.Repo) Local { return repo }),
+		Checkout:  github.Checkout,
+		Confirm:   confirmDialog,
+		Now:       time.Now,
+		OpenURL:   mygo.Shell.OpenExternal,
+		CopyText:  mygo.Clipboard.WriteText,
 	}
 }
 

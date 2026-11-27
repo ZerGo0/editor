@@ -184,20 +184,20 @@ func TestPermalinkActions(t *testing.T) {
 	hs := newHarness(t)
 	hs.ready(t)
 	hs.i.Run(ActionCopyPermalink)
-	if hs.h.lastNotice() != "Open a file in the editor first." {
-		t.Errorf("notice %q", hs.h.lastNotice())
+	if hs.h.LastNotice() != "Open a file in the editor first." {
+		t.Errorf("notice %q", hs.h.LastNotice())
 	}
-	hs.h.path = testRoot + "/src/a.go"
-	hs.h.state = &editor.State{Buffer: editor.NewBuffer("one\ntwo\nthree\n")}
-	hs.h.state.SetSelections(editor.Selection{Anchor: 4, Head: 7})
+	hs.h.Path = testRoot + "/src/a.go"
+	hs.h.State = &editor.State{Buffer: editor.NewBuffer("one\ntwo\nthree\n")}
+	hs.h.State.SetSelections(editor.Selection{Anchor: 4, Head: 7})
 	hs.i.Run(ActionCopyPermalink)
-	hs.h.pump(t, func() bool { return len(hs.copied) == 1 })
+	hs.h.Pump(t, func() bool { return len(hs.copied) == 1 })
 	want := "https://github.com/acme/widgets/blob/abc123/src/a.go#L2"
-	if hs.copied[0] != want || hs.h.lastNotice() != "Copied GitHub permalink" {
-		t.Errorf("copied %v notice %q", hs.copied, hs.h.lastNotice())
+	if hs.copied[0] != want || hs.h.LastNotice() != "Copied GitHub permalink" {
+		t.Errorf("copied %v notice %q", hs.copied, hs.h.LastNotice())
 	}
 	hs.i.Run(ActionOpenPermalink)
-	hs.h.pump(t, func() bool { return len(hs.urls) == 1 })
+	hs.h.Pump(t, func() bool { return len(hs.urls) == 1 })
 	if hs.urls[0] != want {
 		t.Errorf("opened %v", hs.urls)
 	}
@@ -205,8 +205,8 @@ func TestPermalinkActions(t *testing.T) {
 	hs.local.outgoing = nil
 	hs.local.status.Files = []git.FileStatus{{Path: "src/a.go", Index: ' ', WorkTree: 'M'}}
 	hs.local.mu.Unlock()
-	hs.i.CopyPermalink(hs.h.path, 0, 0)
-	hs.h.pump(t, func() bool { return hs.h.lastNotice() == errPermalinkModified.Error() })
+	hs.i.CopyPermalink(hs.h.Path, 0, 0)
+	hs.h.Pump(t, func() bool { return hs.h.LastNotice() == errPermalinkModified.Error() })
 	if len(hs.copied) != 1 {
 		t.Error("a failed permalink was copied")
 	}

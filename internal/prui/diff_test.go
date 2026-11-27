@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/multidiff"
 	"github.com/egoist/mygo/ui"
@@ -37,9 +38,9 @@ func (hs *harness) openDiffTab(t *testing.T) (*prData, *diffTab, *ui.Tester) {
 	t.Helper()
 	hs.withDiffFixtures()
 	d, detail := hs.openDetail(t)
-	mustClick(t, detail, diffPath)
-	if n := len(hs.h.opened); hs.h.opened[n-1] != diffViewID {
-		t.Fatalf("opened %v", hs.h.opened)
+	ghtest.MustClick(t, detail, diffPath)
+	if n := len(hs.h.Opened); hs.h.Opened[n-1] != diffViewID {
+		t.Fatalf("opened %v", hs.h.Opened)
 	}
 	tab, tt := hs.awaitDiff(t, diffViewID, diffPath)
 	return d, tab, tt
@@ -49,7 +50,7 @@ func (hs *harness) awaitDiff(t *testing.T, id, path string) (*diffTab, *ui.Teste
 	t.Helper()
 	rt := hs.p.diffs[id]
 	tt := viewTester(hs, id)
-	hs.h.pump(t, func() bool { tt.Frame(); return rt.view.File(path).Settled() })
+	hs.h.Pump(t, func() bool { tt.Frame(); return rt.view.File(path).Settled() })
 	return rt.files[path], tt
 }
 
@@ -67,10 +68,10 @@ func TestDiffTabLoadsBothVersionsAndThreads(t *testing.T) {
 	if d.baseSHA != "basesha" {
 		t.Errorf("base sha %q", d.baseSHA)
 	}
-	if title := hs.h.titles[diffViewID]; title != "#12 Files Changed" {
+	if title := hs.h.Titles[diffViewID]; title != "#12 Files Changed" {
 		t.Errorf("title %q", title)
 	}
-	mustHaveText(t, tt, diffPath, "+5", "-2", "Please rename this function", "carol", "Reply", "Resolve", "Resolved", "Show thread")
+	ghtest.MustHaveText(t, tt, diffPath, "+5", "-2", "Please rename this function", "carol", "Reply", "Resolve", "Resolved", "Show thread")
 	if tt.HasText("Elsewhere") {
 		t.Error("thread of another file shown")
 	}
@@ -90,7 +91,7 @@ func TestDiffTabPrefersLocalContents(t *testing.T) {
 	if tab.state.New.String() != "local head\n" || tab.state.Old.String() != "local base\n" {
 		t.Errorf("old %q new %q", tab.state.Old.String(), tab.state.New.String())
 	}
-	if hs.be.called("FileAt") != 0 {
+	if hs.be.Count("FileAt") != 0 {
 		t.Error("the API was used although git had the files")
 	}
 }
@@ -98,8 +99,8 @@ func TestDiffTabPrefersLocalContents(t *testing.T) {
 func TestDiffTabShowsResolvedThreadOnDemand(t *testing.T) {
 	hs := newHarness(t)
 	_, tab, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Show thread")
-	mustHaveText(t, tt, "Old note", "Unresolve")
+	ghtest.MustClick(t, tt, "Show thread")
+	ghtest.MustHaveText(t, tt, "Old note", "Unresolve")
 	if !tab.expanded["t-done"] {
 		t.Error("thread not expanded")
 	}
@@ -108,8 +109,8 @@ func TestDiffTabShowsResolvedThreadOnDemand(t *testing.T) {
 func TestDiffTabResolvesThread(t *testing.T) {
 	hs := newHarness(t)
 	d, _, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Resolve")
-	hs.h.pump(t, func() bool { return hs.be.called("Resolve") == 1 && d.busy == "" })
+	ghtest.MustClick(t, tt, "Resolve")
+	hs.h.Pump(t, func() bool { return hs.be.Count("Resolve") == 1 && d.busy == "" })
 	if !d.threads[0].Resolved {
 		t.Error("thread not marked resolved")
 	}
@@ -118,15 +119,15 @@ func TestDiffTabResolvesThread(t *testing.T) {
 func TestDiffTabReplies(t *testing.T) {
 	hs := newHarness(t)
 	d, _, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Reply")
-	mustHaveText(t, tt, "Reply to carol")
+	ghtest.MustClick(t, tt, "Reply")
+	ghtest.MustHaveText(t, tt, "Reply to carol")
 	hs.p.submitDialog()
 	if hs.p.dialog.err != "Write a reply first." {
 		t.Errorf("dialog error %q", hs.p.dialog.err)
 	}
 	hs.p.dialog.body = "Done, thanks"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("Reply") == 1 && !hs.p.dialog.open })
+	hs.h.Pump(t, func() bool { return hs.be.Count("Reply") == 1 && !hs.p.dialog.open })
 	if hs.be.replied != "t-open:Done, thanks" || len(d.threads[0].Comments) != 2 {
 		t.Errorf("replied %q comments %d", hs.be.replied, len(d.threads[0].Comments))
 	}
@@ -145,10 +146,10 @@ func TestDiffTabCommentStartsPendingReview(t *testing.T) {
 	}
 	hs.p.dialog.body = "Why?"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return !hs.p.dialog.open && d.pendingReview != "" })
+	hs.h.Pump(t, func() bool { return !hs.p.dialog.open && d.pendingReview != "" })
 	want := github.ReviewCommentOptions{Body: "Why?", Path: diffPath, Line: 3, StartLine: 2, Side: github.SideRight}
-	if hs.be.lineOpts != want || hs.be.called("StartReview") != 1 || hs.be.called("AddReviewComment:review-1") != 1 {
-		t.Errorf("opts %+v calls %v", hs.be.lineOpts, hs.be.calls)
+	if hs.be.lineOpts != want || hs.be.Count("StartReview") != 1 || hs.be.Count("AddReviewComment:review-1") != 1 {
+		t.Errorf("opts %+v calls %v", hs.be.lineOpts, hs.be.Names())
 	}
 	if len(d.threads) != 4 || d.threads[3].ID != "t-new" {
 		t.Errorf("threads %d", len(d.threads))
@@ -156,9 +157,9 @@ func TestDiffTabCommentStartsPendingReview(t *testing.T) {
 	tab.state.OnGutterButton(editor.DiffLineRange{Side: editor.DiffOld, Start: 0, End: 0})
 	hs.p.dialog.body = "Second"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return !hs.p.dialog.open && len(d.threads) == 5 })
-	if hs.be.called("StartReview") != 1 || hs.be.lineOpts.Side != github.SideLeft {
-		t.Errorf("review restarted: calls %v opts %+v", hs.be.calls, hs.be.lineOpts)
+	hs.h.Pump(t, func() bool { return !hs.p.dialog.open && len(d.threads) == 5 })
+	if hs.be.Count("StartReview") != 1 || hs.be.lineOpts.Side != github.SideLeft {
+		t.Errorf("review restarted: calls %v opts %+v", hs.be.Names(), hs.be.lineOpts)
 	}
 }
 
@@ -167,7 +168,7 @@ func TestDiffTabCommentRefusedOnClosedPR(t *testing.T) {
 	hs.be.pr.State = github.StateClosed
 	_, tab, _ := hs.openDiffTab(t)
 	tab.state.OnGutterButton(editor.DiffLineRange{Side: editor.DiffNew, End: 0})
-	if hs.p.dialog.open || len(hs.h.notices) == 0 {
+	if hs.p.dialog.open || len(hs.h.Notices) == 0 {
 		t.Error("comment dialog opened on a closed pull request")
 	}
 }
@@ -180,7 +181,7 @@ func TestDiffTabBinaryFile(t *testing.T) {
 	if err := hs.diffError(diffViewID, diffPath); !errors.As(err, new(multidiff.Note)) || err.Error() != ErrBinaryFile.Error() {
 		t.Fatalf("err %v", err)
 	}
-	mustHaveText(t, tt, ErrBinaryFile.Error())
+	ghtest.MustHaveText(t, tt, ErrBinaryFile.Error())
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Retry"); ok {
 		t.Error("retry offered for a binary file")
 	}
@@ -195,12 +196,12 @@ func TestDiffTabErrorOffersRetry(t *testing.T) {
 	if hs.diffError(diffViewID, diffPath) == nil {
 		t.Fatal("expected an error")
 	}
-	mustHaveText(t, tt, "Cannot load the diff of "+diffPath, "down", "Retry")
+	ghtest.MustHaveText(t, tt, "Cannot load the diff of "+diffPath, "down", "Retry")
 	hs.be.clearErr("FileAt")
 	hs.be.contents[testHeadKey()] = headText
 	hs.be.contents["basesha:"+diffPath] = baseText
-	mustClick(t, tt, "Retry")
-	hs.h.pump(t, func() bool { tt.Frame(); return hs.p.diffs[diffViewID].view.File(diffPath).State() != nil })
+	ghtest.MustClick(t, tt, "Retry")
+	hs.h.Pump(t, func() bool { tt.Frame(); return hs.p.diffs[diffViewID].view.File(diffPath).State() != nil })
 }
 
 func TestDiffTabAddedAndRemovedFiles(t *testing.T) {
@@ -218,7 +219,7 @@ func TestDiffTabAddedAndRemovedFiles(t *testing.T) {
 	hs.p.openDiff(d, d.files[0], diffSpec{mode: modePR})
 	rt := hs.p.diffs[diffViewID]
 	tt := viewTester(hs, diffViewID)
-	hs.h.pump(t, func() bool {
+	hs.h.Pump(t, func() bool {
 		tt.Frame()
 		for _, f := range d.files {
 			if !rt.view.File(f.Path).Settled() {
@@ -232,15 +233,15 @@ func TestDiffTabAddedAndRemovedFiles(t *testing.T) {
 			t.Errorf("%s: %v", f.Path, err)
 		}
 	}
-	if hs.be.called("MergeBase") != 1 {
-		t.Errorf("merge base resolved %d times", hs.be.called("MergeBase"))
+	if hs.be.Count("MergeBase") != 1 {
+		t.Errorf("merge base resolved %d times", hs.be.Count("MergeBase"))
 	}
 }
 
 func TestDiffLayoutAndChangeNavigation(t *testing.T) {
 	hs := newHarness(t)
 	_, tab, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Unified")
+	ghtest.MustClick(t, tt, "Unified")
 	tt.Frame()
 	if tab.state.Layout != editor.DiffUnified {
 		t.Errorf("layout %v", tab.state.Layout)
@@ -256,5 +257,5 @@ func TestDiffTabShowsWhitespaceAndMoveControls(t *testing.T) {
 	if tab.engine == nil || !tab.engine.Ready() {
 		t.Fatal("the diff engine is not ready")
 	}
-	mustHaveText(t, tt, "Ignore Whitespace", "Show Moved Code")
+	ghtest.MustHaveText(t, tt, "Ignore Whitespace", "Show Moved Code")
 }

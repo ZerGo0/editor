@@ -38,7 +38,7 @@ func (p *PRs) openLogs(d *prData, chk checkRow) {
 	if t.state == nil && !t.loading {
 		p.loadLogs(t)
 	}
-	p.h.OpenView(id, "Logs: "+chk.Name, func(c *ui.Context) { p.logView(c, t) })
+	p.Host.OpenView(id, "Logs: "+chk.Name, func(c *ui.Context) { p.logView(c, t) })
 }
 
 func (p *PRs) loadLogs(t *logTab) {
@@ -47,8 +47,8 @@ func (p *PRs) loadLogs(t *logTab) {
 	t.loading, t.err = true, nil
 	be, repo, job := p.be, p.repo, t.jobID
 	applog.Go(func() {
-		text, err := be.JobLogs(p.ctx, repo, job)
-		p.post(func() {
+		text, err := be.JobLogs(p.Ctx, repo, job)
+		p.Post(func() {
 			if gen != t.gen {
 				return
 			}
@@ -64,7 +64,7 @@ func (p *PRs) loadLogs(t *logTab) {
 }
 
 func (p *PRs) logView(c *ui.Context, t *logTab) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
 	detail.Page(c, func() {
@@ -76,7 +76,7 @@ func (p *PRs) logView(c *ui.Context, t *logTab) {
 		case t.state == nil:
 			detail.Centered(c, func() { feedback.Loading(c, "Loading logs...") })
 		default:
-			p.h.ConfigureEditor(t.state, "")
+			p.Host.ConfigureEditor(t.state, "")
 			editor.View(c, t.state).Grow(1).FillWidth().Label("Logs of " + t.name)
 		}
 	})
@@ -84,12 +84,12 @@ func (p *PRs) logView(c *ui.Context, t *logTab) {
 
 func (p *PRs) runAction(d *prData, chk checkRow, action string) {
 	repo, run := p.repo, chk.RunID
-	p.act(&d.busy, "Updating the workflow run", "Cannot update the workflow run", func(ctx context.Context) (func(), error) {
+	p.Act(&d.busy, "Updating the workflow run", "Cannot update the workflow run", func(ctx context.Context) (func(), error) {
 		if err := p.be.RunAction(ctx, repo, run, action); err != nil {
 			return nil, err
 		}
 		return func() {
-			p.h.Notify("Updated the workflow run of " + chk.Name)
+			p.Host.Notify("Updated the workflow run of " + chk.Name)
 			p.loadDetail(d)
 		}, nil
 	})

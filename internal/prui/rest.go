@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	dotComHost           = "github.com"
 	dotComRESTURL        = "https://api.github.com"
 	dotComGraphQLURL     = "https://api.github.com/graphql"
 	enterpriseRESTFmt    = "https://%s/api/v3"
@@ -67,7 +66,7 @@ func newRESTClient(host, token string) *restClient {
 			},
 		},
 	}
-	if host != "" && host != dotComHost {
+	if host != "" && host != github.DotComHost {
 		r.base = fmt.Sprintf(enterpriseRESTFmt, host)
 		r.graphqlURL = fmt.Sprintf(enterpriseGraphQLFmt, host)
 	}

@@ -90,14 +90,14 @@ func (i *Issues) loadMeta() {
 	i.meta.loading, i.meta.err = true, nil
 	be, repo := i.be, i.repo
 	applog.Go(func() {
-		res := fetchMeta(i.ctx, be, repo)
-		i.post(func() {
+		res := fetchMeta(i.Ctx, be, repo)
+		i.Post(func() {
 			if gen != i.meta.gen {
 				return
 			}
 			i.meta.loading, i.meta.loaded, i.meta.err = false, true, res.err
 			i.meta.labels, i.meta.milestones, i.meta.users = res.labels, res.milestones, res.users
-			i.authFailure(res.err)
+			i.AuthFailure(res.err)
 		})
 	})
 }

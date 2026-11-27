@@ -9,98 +9,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/ui"
-	"github.com/egoist/mygo/ui/editor"
 )
 
-const (
-	testTimeout = 5 * time.Second
-	testRepoURL = "https://github.com/acme/widgets.git"
-)
+const testRepoURL = "https://github.com/acme/widgets.git"
 
 var testNow = time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
 
-type askCall struct {
-	title, action, value string
-	submit               func(string) error
-}
-
-type fakeHost struct {
-	root     string
-	userData string
-	updates  chan func()
-	views    map[string]func(*ui.Context)
-	titles   map[string]string
-	opened   []string
-	closed   []string
-	notices  []string
-	errs     []string
-	asks     []askCall
-}
-
-func newFakeHost() *fakeHost {
-	return &fakeHost{root: "/work/widgets", updates: make(chan func(), 1024), views: map[string]func(*ui.Context){}, titles: map[string]string{}}
-}
-
-func (h *fakeHost) RootDir() string                          { return h.root }
-func (h *fakeHost) Window() *mygo.Window                     { return nil }
-func (h *fakeHost) Update(fn func())                         { h.updates <- fn }
-func (h *fakeHost) OpenAt(string, int, int)                  {}
-func (h *fakeHost) CloseView(id string)                      { h.closed = append(h.closed, id) }
-func (h *fakeHost) Notify(text string)                       { h.notices = append(h.notices, text) }
-func (h *fakeHost) SaveAllFiles() bool                       { return true }
-func (h *fakeHost) Buffer(string) *editor.Buffer             { return nil }
-func (h *fakeHost) ActivePath() string                       { return "" }
-func (h *fakeHost) ActiveEditor() *editor.State              { return nil }
-func (h *fakeHost) UserDataDir() string                      { return h.userData }
-func (h *fakeHost) Language(string, string) *editor.Language { return nil }
-func (h *fakeHost) ConfigureEditor(*editor.State, string)    {}
-func (h *fakeHost) ConfigureDiff(*editor.DiffState, string)  {}
-
-func (h *fakeHost) OpenView(id, title string, view func(*ui.Context)) {
-	h.opened = append(h.opened, id)
-	h.views[id] = view
-	h.titles[id] = title
-}
-
-func (h *fakeHost) ShowError(title string, err error) {
-	h.errs = append(h.errs, title+": "+err.Error())
-}
-
-func (h *fakeHost) Ask(title, action, value string, submit func(string) error) {
-	h.asks = append(h.asks, askCall{title, action, value, submit})
-}
-
-func (h *fakeHost) pump(t *testing.T, done func() bool) {
-	t.Helper()
-	deadline := time.After(testTimeout)
-	for !done() {
-		select {
-		case fn := <-h.updates:
-			fn()
-		case <-deadline:
-			t.Fatal("timed out waiting for the background work")
-		}
-	}
-}
-
-func (h *fakeHost) drain() {
-	for {
-		select {
-		case fn := <-h.updates:
-			fn()
-		case <-time.After(20 * time.Millisecond):
-			return
-		}
-	}
-}
-
 type fakeBackend struct {
+	ghtest.Calls
 	mu         sync.Mutex
-	calls      []string
 	lists      map[string][]github.PullRequest
 	listPages  map[int][]github.PullRequest
 	current    *github.PullRequest
@@ -136,22 +58,10 @@ type fakeBackend struct {
 }
 
 func (f *fakeBackend) record(name string, args ...any) error {
+	f.Add(name)
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.calls = append(f.calls, name)
 	return f.errs[name]
-}
-
-func (f *fakeBackend) called(name string) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n := 0
-	for _, c := range f.calls {
-		if c == name {
-			n++
-		}
-	}
-	return n
 }
 
 func listKey(o github.ListOptions) string {
@@ -359,7 +269,7 @@ func testPR(n int, title string) github.PullRequest {
 
 type harness struct {
 	p      *PRs
-	h      *fakeHost
+	h      *ghtest.FakeHost
 	be     *fakeBackend
 	local  *fakeLocal
 	env    Env
@@ -374,7 +284,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	hs := &harness{h: newFakeHost(), ok: true}
+	hs := &harness{h: ghtest.NewFakeHost("/work/widgets", ""), ok: true}
 	hs.local = &fakeLocal{remotes: []git.Remote{{Name: "origin", FetchURL: testRepoURL, PushURL: testRepoURL}}, files: map[string]string{}}
 	hs.local.setCurrent("feature", "origin/feature")
 	cur := testPR(12, "Fix the widget")
@@ -396,12 +306,7 @@ func newHarness(t *testing.T) *harness {
 	hs.env = Env{
 		Token:      func(context.Context, string) (string, error) { return "tok", hs.token },
 		NewBackend: func(string, string) Backend { return hs.be },
-		OpenLocal: func(context.Context, string) (Local, error) {
-			if hs.open != nil {
-				return nil, hs.open
-			}
-			return hs.local, nil
-		},
+		OpenLocal:  ghtest.OpenLocal(&hs.open, func() Local { return hs.local }),
 		Checkout: func(_ context.Context, _ string, n int) error {
 			hs.mu.Lock()
 			defer hs.mu.Unlock()
@@ -419,17 +324,16 @@ func newHarness(t *testing.T) *harness {
 func (hs *harness) start(t *testing.T) {
 	t.Helper()
 	hs.p = NewWith(hs.h, hs.env)
-	t.Cleanup(hs.p.Close)
-	hs.h.pump(t, func() bool { return hs.p.phase != phaseLoading })
+	ghtest.Start(t, hs.h, &hs.p.Session)
 }
 
 func (hs *harness) ready(t *testing.T) {
 	t.Helper()
 	hs.start(t)
-	if hs.p.phase != phaseReady {
-		t.Fatalf("phase %d, want ready", hs.p.phase)
+	if hs.p.Phase != ghshared.PhaseReady {
+		t.Fatalf("phase %d, want ready", hs.p.Phase)
 	}
-	hs.h.pump(t, func() bool { return hs.p.current.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.current.loaded })
 }
 
 func (f *fakeBackend) note(name, arg string) error {
@@ -578,21 +482,6 @@ func (l *fakeLocal) CompareBranches(context.Context, string, string) (git.Branch
 
 func prPtr(pr github.PullRequest) *github.PullRequest { return &pr }
 
-func (h *fakeHost) waitFor(t *testing.T, done func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(testTimeout)
-	for !done() {
-		if time.Now().After(deadline) {
-			t.Fatal("timed out waiting for a condition")
-		}
-		select {
-		case fn := <-h.updates:
-			fn()
-		case <-time.After(5 * time.Millisecond):
-		}
-	}
-}
-
 func (hs *harness) setOK(v bool) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
@@ -603,4 +492,29 @@ func (f *fakeBackend) clearErr(name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	delete(f.errs, name)
+}
+
+func (hs *harness) pumpCalled(t *testing.T, name string, n int, settled func() bool) {
+	t.Helper()
+	hs.h.Pump(t, func() bool { return hs.be.Count(name) == n && settled() })
+}
+
+func (hs *harness) dialogClosed() bool { return !hs.p.dialog.open }
+
+func (hs *harness) pickerClosed() bool { return !hs.p.picker.open }
+
+func (hs *harness) detailLoaded() bool {
+	d := hs.p.details[prNumber]
+	return d != nil && d.loaded
+}
+
+func (d *prData) idle() bool { return d.busy == "" }
+
+func savedQueryCount(t *testing.T, dir string) int {
+	t.Helper()
+	queries, err := loadQueries(queriesPath(dir))
+	if err != nil {
+		t.Fatalf("load saved queries: %v", err)
+	}
+	return len(queries)
 }

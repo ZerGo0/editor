@@ -16,6 +16,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
@@ -69,19 +70,19 @@ type createForm struct {
 }
 
 func (p *PRs) openCreate() {
-	if p.phase != phaseReady {
-		p.h.Notify(p.stateMessage().title)
+	if p.Phase != ghshared.PhaseReady {
+		p.Host.Notify(p.StateMessage(p.repo.Host).Title)
 		return
 	}
 	if p.branch.Name == "" {
-		p.h.Notify("Check out a branch before creating a pull request.")
+		p.Host.Notify("Check out a branch before creating a pull request.")
 		return
 	}
 	f := p.createForm
 	if f == nil || f.branch.Name != p.branch.Name {
 		p.createForm = p.newCreateForm()
 	}
-	p.h.OpenView(createViewID, createViewTitle, func(c *ui.Context) { p.createView(c) })
+	p.Host.OpenView(createViewID, createViewTitle, func(c *ui.Context) { p.createView(c) })
 }
 
 func (p *PRs) newCreateForm() *createForm {
@@ -113,10 +114,10 @@ func readTemplate(root string) string {
 }
 
 func (p *PRs) loadTemplate(f *createForm) {
-	root := p.h.RootDir()
+	root := p.Host.RootDir()
 	applog.Go(func() {
 		text := readTemplate(root)
-		p.post(func() {
+		p.Post(func() {
 			if text != "" && !f.typedBody && f.body == "" {
 				f.body = text
 			}
@@ -125,7 +126,7 @@ func (p *PRs) loadTemplate(f *createForm) {
 }
 
 func (p *PRs) targetRemote() string {
-	return remoteNameFor(p.remotes, p.repo)
+	return ghshared.RemoteNameFor(p.remotes, p.repo)
 }
 
 func (p *PRs) loadCreateBases(f *createForm) {
@@ -136,12 +137,12 @@ func (p *PRs) loadCreateBases(f *createForm) {
 	local, branch := p.local, p.branch
 	remote := p.targetRemote()
 	applog.Go(func() {
-		branches, err := local.Branches(p.ctx)
+		branches, err := local.Branches(p.Ctx)
 		var bases []string
 		if err == nil {
 			bases = remoteBranchNames(branches, remote, branch.HeadRef)
 		}
-		p.post(func() {
+		p.Post(func() {
 			if gen != f.gen {
 				return
 			}
@@ -166,7 +167,7 @@ func (p *PRs) loadCompare(f *createForm) {
 		var subjects []string
 		var files []github.PRFile
 		var err error
-		if cmp, cmpErr := local.CompareBranches(p.ctx, branch.Name, remote+"/"+base); cmpErr == nil {
+		if cmp, cmpErr := local.CompareBranches(p.Ctx, branch.Name, remote+"/"+base); cmpErr == nil {
 			for _, c := range cmp.AOnly {
 				subjects = append(subjects, c.Subject)
 			}
@@ -175,11 +176,11 @@ func (p *PRs) loadCompare(f *createForm) {
 		}
 		if err == nil && pushed {
 			var c Comparison
-			if c, err = be.Compare(p.ctx, repo, base, headSpec(repo, branch)); err == nil {
+			if c, err = be.Compare(p.Ctx, repo, base, headSpec(repo, branch)); err == nil {
 				files = c.Files
 			}
 		}
-		p.post(func() {
+		p.Post(func() {
 			if gen != f.cmpGen {
 				return
 			}
@@ -219,7 +220,7 @@ func (p *PRs) submitCreate(f *createForm) {
 	}
 	milestone := f.milestones[f.milestone]
 	autoMethod := autoMergeMethodFor(f.autoMergeLabel)
-	p.act(&f.busy, "Creating pull request", "Cannot create pull request", func(ctx context.Context) (func(), error) {
+	p.Act(&f.busy, "Creating pull request", "Cannot create pull request", func(ctx context.Context) (func(), error) {
 		if push {
 			if err := local.Push(ctx, git.PushOptions{Remote: remote, Branch: branch.Name, SetUpstream: true}); err != nil {
 				return nil, fmt.Errorf("push %s: %w", branch.Name, err)
@@ -232,7 +233,7 @@ func (p *PRs) submitCreate(f *createForm) {
 		var warnings []string
 		warn := func(what string, err error) {
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("%s: %s", what, errorText(err)))
+				warnings = append(warnings, fmt.Sprintf("%s: %s", what, ghshared.ErrorText(err)))
 			}
 		}
 		if len(reviewers) > 0 {
@@ -257,20 +258,20 @@ func (p *PRs) submitCreate(f *createForm) {
 		}
 		return func() {
 			p.createForm = nil
-			p.h.CloseView(createViewID)
+			p.Host.CloseView(createViewID)
 			p.current = currentPR{pr: &pr, loaded: true, gen: p.current.gen + 1}
 			p.branch.Upstream = remote + "/" + branch.Name
-			p.h.Notify(fmt.Sprintf("Created #%d", pr.Number))
+			p.Host.Notify(fmt.Sprintf("Created #%d", pr.Number))
 			p.openPR(pr.Number, &pr)
 			if len(warnings) > 0 {
-				p.h.ShowError(fmt.Sprintf("#%d was created, but some settings failed", pr.Number), fmt.Errorf("%s", strings.Join(warnings, "; ")))
+				p.Host.ShowError(fmt.Sprintf("#%d was created, but some settings failed", pr.Number), fmt.Errorf("%s", strings.Join(warnings, "; ")))
 			}
 		}, nil
 	})
 }
 
 func (p *PRs) createView(c *ui.Context) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
 	f := p.createForm
@@ -278,7 +279,7 @@ func (p *PRs) createView(c *ui.Context) {
 		detail.Body(c, createViewTitle, token.FormMaxWidth, func() {
 			design.Text(c, createViewTitle, token.TextHeading)
 			if f == nil {
-				mutedText(c, "Check out a branch, then open this view again.")
+				ghshared.MutedText(c, "Check out a branch, then open this view again.")
 				return
 			}
 			p.createFields(c, f)
@@ -289,19 +290,19 @@ func (p *PRs) createView(c *ui.Context) {
 func (p *PRs) createFields(c *ui.Context, f *createForm) {
 	head := f.branch.Name
 	ui.Row(c).FillWidth().AlignItems(ui.Center).Wrap().Gap(token.GapControl.Px()).Children(func() {
-		mutedText(c, "Compare").Shrink(0)
+		ghshared.MutedText(c, "Compare").Shrink(0)
 		branchChip(c, head)
-		mutedText(c, "into").Shrink(0)
+		ghshared.MutedText(c, "into").Shrink(0)
 		if f.loading {
 			feedback.Spinner(c, "Loading branches")
 		} else if len(f.bases) > 0 {
-			action.Select(c, "Base branch", &f.base, options(f.bases), action.SelectOptions{ID: "base"})
+			action.Select(c, "Base branch", &f.base, ghshared.Options(f.bases), action.SelectOptions{ID: "base"})
 		}
 	})
 	if f.err != nil {
-		errorNotice(c, f.err, func() { p.loadCreateBases(f) })
+		ghshared.ErrorNotice(c, f.err, func() { p.loadCreateBases(f) })
 	} else if !f.loading && len(f.bases) == 0 {
-		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "No remote branches found. Fetch the remote, then retry.", Action: retryLabel, OnAction: func() { p.loadCreateBases(f) }})
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "No remote branches found. Fetch the remote, then retry.", Action: ghshared.RetryLabel, OnAction: func() { p.loadCreateBases(f) }})
 	}
 	detail.Field(c, "Title", func() {
 		field.TextInput(c, "Title", &f.title, field.InputOptions{Placeholder: "Pull request title", ID: "title"})
@@ -314,18 +315,11 @@ func (p *PRs) createFields(c *ui.Context, f *createForm) {
 	p.createMetadata(c, f)
 	p.createCompare(c, f)
 	if f.pushNeed {
-		mutedText(c, "This branch has no upstream. It will be pushed to "+p.targetRemote()+" first.")
+		ghshared.MutedText(c, "This branch has no upstream. It will be pushed to "+p.targetRemote()+" first.")
 	}
 	blocked := f.blocked()
 	ui.Row(c).FillWidth().AlignItems(ui.Center).Justify(ui.End).Gap(token.GapControl.Px()).Children(func() {
-		if f.busy != "" {
-			feedback.Spinner(c, f.busy)
-			mutedText(c, f.busy+"...")
-		}
-		if blocked != "" {
-			mutedText(c, blocked)
-		}
-		action.Button(c, "Create", action.ButtonOptions{Variant: action.Primary, Disabled: blocked != "" || f.busy != ""}).OnClick(func() { p.submitCreate(f) })
+		ghshared.CreateFooter(c, f.busy, blocked).OnClick(func() { p.submitCreate(f) })
 	})
 }
 
@@ -333,12 +327,12 @@ func (p *PRs) createMetadata(c *ui.Context, f *createForm) {
 	line := func(title, edit string, onClick func(), values []string) {
 		detail.Property(c, title, func(c *ui.Context) {
 			if len(values) == 0 {
-				mutedText(c, "None")
+				ghshared.MutedText(c, "None")
 			}
 			for _, v := range values {
 				mutedTag(c, v)
 			}
-		}, func(c *ui.Context) { smallButton(c, edit, false).OnClick(onClick) })
+		}, func(c *ui.Context) { ghshared.SmallButton(c, edit, false).OnClick(onClick) })
 	}
 	line("Reviewers", "Choose Reviewers", func() { p.pickFormUsers(f, "Reviewers", &f.reviewers) }, f.reviewers)
 	line("Assignees", "Choose Assignees", func() { p.pickFormUsers(f, "Assignees", &f.assignees) }, f.assignees)
@@ -353,7 +347,7 @@ func (p *PRs) createMetadata(c *ui.Context, f *createForm) {
 		action.Checkbox(c, "Assign to me", &f.assignMe, action.ChoiceOptions{ID: "assign-me"})
 	})
 	detail.Property(c, "Auto-merge", func(c *ui.Context) {
-		action.Select(c, "Auto-merge", &f.autoMergeLabel, options(autoMergeChoices), action.SelectOptions{ID: "auto-merge"})
+		action.Select(c, "Auto-merge", &f.autoMergeLabel, ghshared.Options(autoMergeChoices), action.SelectOptions{ID: "auto-merge"})
 	}, nil)
 }
 
@@ -365,14 +359,7 @@ func (p *PRs) pickFormUsers(f *createForm, title string, target *[]string) {
 
 func (p *PRs) pickFormLabels(f *createForm) {
 	repo := p.repo
-	p.openPicker("Labels", "Choose", false, f.labels, func(ctx context.Context) ([]string, error) {
-		labels, err := p.be.Labels(ctx, repo)
-		names := make([]string, 0, len(labels))
-		for _, l := range labels {
-			names = append(names, l.Name)
-		}
-		return names, err
-	}, func(_ context.Context, selected []string) (func(), error) {
+	p.openPicker("Labels", "Choose", false, f.labels, p.loadLabelNames(repo), func(_ context.Context, selected []string) (func(), error) {
 		return func() { f.labels = selected }, nil
 	})
 }
@@ -384,15 +371,7 @@ func (p *PRs) pickFormMilestone(f *createForm) {
 	if f.milestone != "" {
 		current = []string{f.milestone}
 	}
-	p.openPicker("Milestone", "Choose", true, current, func(ctx context.Context) ([]string, error) {
-		ms, err := p.be.Milestones(ctx, repo)
-		titles := make([]string, 0, len(ms))
-		for _, m := range ms {
-			numbers[m.Title] = m.Number
-			titles = append(titles, m.Title)
-		}
-		return titles, err
-	}, func(_ context.Context, selected []string) (func(), error) {
+	p.openPicker("Milestone", "Choose", true, current, p.loadMilestoneTitles(repo, numbers), func(_ context.Context, selected []string) (func(), error) {
 		return func() {
 			f.milestone = ""
 			if len(selected) > 0 {
@@ -410,32 +389,32 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 	detail.Card(c, "Changes", detail.CardOptions{Count: len(f.cmpFiles)}, func() {
 		switch {
 		case f.base == "":
-			mutedText(c, "Choose a base branch to see the changes.")
+			ghshared.MutedText(c, "Choose a base branch to see the changes.")
 			return
 		case f.cmpLoading:
 			feedback.Loading(c, "Comparing...")
 			return
 		case f.cmpErr != nil:
-			errorNotice(c, f.cmpErr, func() { p.loadCompare(f) })
+			ghshared.ErrorNotice(c, f.cmpErr, func() { p.loadCompare(f) })
 			return
 		}
-		mutedText(c, fmt.Sprintf("%d commits ahead of %s", len(f.cmpCommits), f.base))
+		ghshared.MutedText(c, fmt.Sprintf("%d commits ahead of %s", len(f.cmpCommits), f.base))
 		for i, s := range f.cmpCommits[:min(len(f.cmpCommits), compareListRows)] {
 			design.Text(c.Key(i), s, token.TextBody).SingleLine()
 		}
 		if f.pushNeed {
-			mutedText(c, "Push the branch to list the changed files.")
+			ghshared.MutedText(c, "Push the branch to list the changed files.")
 			return
 		}
 		for i, file := range f.cmpFiles[:min(len(f.cmpFiles), compareListRows)] {
 			ui.Row(c.Key("f" + fmt.Sprint(i))).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 				badge.Decoration(c, fileGitStatus(file.Status))
 				design.Text(c, file.Path, token.TextBody).SingleLine().Grow(1).MinWidth(0)
-				mutedText(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).Shrink(0)
+				ghshared.MutedText(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).Shrink(0)
 			})
 		}
 		if len(f.cmpFiles) > compareListRows {
-			mutedText(c, fmt.Sprintf("and %d more files", len(f.cmpFiles)-compareListRows))
+			ghshared.MutedText(c, fmt.Sprintf("and %d more files", len(f.cmpFiles)-compareListRows))
 		}
 	})
 }

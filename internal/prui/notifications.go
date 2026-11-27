@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
@@ -33,7 +34,7 @@ func (p *PRs) NotificationsTitle() string {
 }
 
 func (p *PRs) NotificationsBadge() int {
-	if p.closed || p.phase != phaseReady {
+	if p.Closed || p.Phase != ghshared.PhaseReady {
 		return 0
 	}
 	n := 0
@@ -55,8 +56,8 @@ func (p *PRs) loadNotifications() {
 		modified = ""
 	}
 	applog.Go(func() {
-		page, err := be.Notifications(p.ctx, repo, modified)
-		p.post(func() {
+		page, err := be.Notifications(p.Ctx, repo, modified)
+		p.Post(func() {
 			if gen != p.notifs.gen {
 				return
 			}
@@ -65,7 +66,7 @@ func (p *PRs) loadNotifications() {
 			ns.fetchedAt = p.env.Now()
 			if err != nil {
 				ns.err = err
-				p.authFailure(err)
+				p.AuthFailure(err)
 				return
 			}
 			ns.err, ns.loaded = nil, true
@@ -105,10 +106,10 @@ func (p *PRs) markNotification(n Notification, done bool) {
 	be := p.be
 	id := n.ID
 	applog.Go(func() {
-		err := be.MarkNotification(p.ctx, id, done)
-		p.post(func() {
+		err := be.MarkNotification(p.Ctx, id, done)
+		p.Post(func() {
 			if err != nil {
-				p.h.ShowError("Cannot update the notification", err)
+				p.Host.ShowError("Cannot update the notification", err)
 				return
 			}
 			for i := range p.notifs.items {
@@ -145,10 +146,10 @@ func (p *PRs) NotificationsLoading() bool {
 }
 
 func (p *PRs) NotificationsView(c *ui.Context) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
-	if p.phase != phaseReady {
+	if p.Phase != ghshared.PhaseReady {
 		p.stateView(c)
 		return
 	}
@@ -158,7 +159,7 @@ func (p *PRs) NotificationsView(c *ui.Context) {
 		switch {
 		case ns.err != nil && len(ns.items) == 0:
 			ui.Column(c).FillWidth().Padding(token.GapInline.Px(), token.PadRow.Px()).Children(func() {
-				errorNotice(c, ns.err, func() { ns.fetchedAt = time.Time{} })
+				ghshared.ErrorNotice(c, ns.err, func() { ns.fetchedAt = time.Time{} })
 			})
 		case !ns.loaded:
 			feedback.Loading(c, "Loading notifications...")
@@ -181,7 +182,7 @@ func (p *PRs) NotificationsView(c *ui.Context) {
 func (p *PRs) notificationItem(c *ui.Context, n Notification) list.Item {
 	pal := token.Of(c)
 	description := "#" + strconv.Itoa(n.Number) + prMetaSeparator + reasonLabel(n.Reason)
-	if when := relativeTime(p.env.Now(), n.Updated); when != "" {
+	if when := ghshared.RelativeTime(p.env.Now(), n.Updated); when != "" {
 		description += prMetaSeparator + when
 	}
 	return list.Item{

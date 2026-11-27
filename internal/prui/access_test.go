@@ -53,7 +53,7 @@ func TestEveryControlHasAnAccessibleName(t *testing.T) {
 	hs.p.side.local.open = true
 
 	side := sideTester(hs.p)
-	hs.h.pump(t, func() bool { return hs.p.side.review.loaded && hs.p.side.local.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.side.review.loaded && hs.p.side.local.loaded })
 	side.Frame()
 	requireNamedControls(t, "side view", side)
 
@@ -65,26 +65,26 @@ func TestEveryControlHasAnAccessibleName(t *testing.T) {
 	requireNamedControls(t, "diff view", diffTester)
 
 	hs.p.openLogs(d, checkRow{Check: github.Check{Name: "build"}, JobID: 5})
-	hs.h.pump(t, func() bool { return hs.p.logs["pr/acme/widgets/12/log/5"].state != nil })
+	hs.h.Pump(t, func() bool { return hs.p.logs["pr/acme/widgets/12/log/5"].state != nil })
 	logs := viewTester(hs, "pr/acme/widgets/12/log/5")
 	if logs == nil {
 		t.Fatal("no log view")
 	}
 
 	notifs := notificationsTester(hs.p)
-	hs.h.pump(t, func() bool { return hs.p.notifs.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.notifs.loaded })
 	notifs.Frame()
 	requireNamedControls(t, "notifications", notifs)
 
 	hs.p.openCreate()
-	hs.h.pump(t, func() bool { return !hs.p.createForm.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.createForm.loading })
 	requireNamedControls(t, "create view", viewTester(hs, createViewID))
 
 	hs.p.openReviewDialog(d, 1)
 	requireNamedControls(t, "review dialog", viewTester(hs, detailID(hs.p.repo, prNumber)))
 	hs.p.dialog.open = false
 	hs.p.openLabelPicker(d)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	requireNamedControls(t, "picker", viewTester(hs, detailID(hs.p.repo, prNumber)))
 }
 

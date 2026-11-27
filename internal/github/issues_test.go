@@ -161,15 +161,19 @@ func TestIssueCommentsAndAdd(t *testing.T) {
 	}
 }
 
-func TestCreateIssueBody(t *testing.T) {
-	var got map[string]any
-	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/repos/octo/repo/issues" {
+func recordIssueRequest(t *testing.T, got *map[string]any, method, path string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method || r.URL.Path != path {
 			t.Errorf("%s %s", r.Method, r.URL.Path)
 		}
-		got = readJSON(t, r)
+		*got = readJSON(t, r)
 		io.WriteString(w, issueRESTFixture)
-	})
+	}
+}
+
+func TestCreateIssueBody(t *testing.T) {
+	var got map[string]any
+	c, _ := newTestClient(t, recordIssueRequest(t, &got, http.MethodPost, "/repos/octo/repo/issues"))
 	issue, err := c.CreateIssue(context.Background(), testRepo, IssueInput{Title: "T", Body: "B", Labels: []string{"bug"}, Assignees: []string{"bob"}, Milestone: 2})
 	if err != nil || issue.Number != 5 {
 		t.Fatalf("%v %+v", err, issue)
@@ -194,13 +198,7 @@ func TestCreateIssueBody(t *testing.T) {
 
 func TestEditIssueBody(t *testing.T) {
 	var got map[string]any
-	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch || r.URL.Path != "/repos/octo/repo/issues/5" {
-			t.Errorf("%s %s", r.Method, r.URL.Path)
-		}
-		got = readJSON(t, r)
-		io.WriteString(w, issueRESTFixture)
-	})
+	c, _ := newTestClient(t, recordIssueRequest(t, &got, http.MethodPatch, "/repos/octo/repo/issues/5"))
 	title, state, noMilestone := "New", StateClosed, 0
 	labels, assignees := []string(nil), []string{"bob"}
 	_, err := c.EditIssue(context.Background(), testRepo, 5, IssueEdit{Title: &title, State: &state, Labels: &labels, Assignees: &assignees, Milestone: &noMilestone})

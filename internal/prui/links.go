@@ -18,13 +18,13 @@ const (
 func blobURL(repo github.Remote, ref, path string, start, end int) string {
 	host := repo.Host
 	if host == "" {
-		host = dotComHost
+		host = github.DotComHost
 	}
 	return lineAnchor(fmt.Sprintf("https://%s/%s/%s/blob/%s/%s", host, repo.Owner, repo.Name, escapePath(ref), escapePath(path)), start, end)
 }
 
 func devURL(repo github.Remote, ref, path string, start, end int) (string, bool) {
-	if repo.Host != "" && repo.Host != dotComHost {
+	if repo.Host != "" && repo.Host != github.DotComHost {
 		return "", false
 	}
 	return lineAnchor(fmt.Sprintf("https://%s/%s/%s/blob/%s/%s", devHost, repo.Owner, repo.Name, escapePath(ref), escapePath(path)), start, end), true

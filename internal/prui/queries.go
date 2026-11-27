@@ -109,7 +109,7 @@ func (p *PRs) rebuildCustom() {
 }
 
 func (p *PRs) persistQueries() {
-	path := queriesPath(p.h.UserDataDir())
+	path := queriesPath(p.Host.UserDataDir())
 	queries := append([]savedQuery(nil), p.queries...)
 	p.queriesSeq++
 	seq := p.queriesSeq
@@ -121,7 +121,7 @@ func (p *PRs) persistQueries() {
 		}
 		p.queriesDone = seq
 		if err := saveQueries(path, queries); err != nil {
-			p.post(func() { p.h.ShowError("Cannot save the queries", err) })
+			p.Post(func() { p.Host.ShowError("Cannot save the queries", err) })
 		}
 	})
 }

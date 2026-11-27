@@ -9,32 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui/editor"
 )
-
-func TestRelativeTime(t *testing.T) {
-	cases := []struct {
-		ago  time.Duration
-		want string
-	}{
-		{10 * time.Second, "just now"},
-		{5 * time.Minute, "5m ago"},
-		{3 * time.Hour, "3h ago"},
-		{50 * time.Hour, "2d ago"},
-		{15 * 24 * time.Hour, "2w ago"},
-		{400 * 24 * time.Hour, "1y ago"},
-	}
-	for _, tc := range cases {
-		if got := relativeTime(testNow, testNow.Add(-tc.ago)); got != tc.want {
-			t.Errorf("%v: %q, want %q", tc.ago, got, tc.want)
-		}
-	}
-	if relativeTime(testNow, time.Time{}) != "" {
-		t.Error("zero time must give no text")
-	}
-}
 
 func TestSummarizeChecks(t *testing.T) {
 	ok := github.Check{Status: "completed", Conclusion: "success"}
@@ -88,22 +67,15 @@ func TestPendingAndLatestReviews(t *testing.T) {
 	}
 }
 
-func TestPickRemoteAndBranch(t *testing.T) {
+func TestCurrentBranch(t *testing.T) {
 	remotes := []git.Remote{
 		{Name: "zed", FetchURL: "git@github.com:zed/widgets.git"},
 		{Name: "origin", FetchURL: "https://github.com/acme/widgets.git"},
 		{Name: "gitlab", FetchURL: "git@gitlab.com:acme/widgets.git"},
 	}
-	repo, byName, ok := pickRemote(remotes)
-	if !ok || repo.Owner != "acme" || repo.Host != "github.com" || len(byName) != 3 {
-		t.Fatalf("%+v %v %v", repo, byName, ok)
-	}
-	if _, _, ok := pickRemote([]git.Remote{{Name: "x", FetchURL: "not a url"}}); ok {
-		t.Error("an invalid remote was accepted")
-	}
-	only := []git.Remote{{Name: "zed", FetchURL: "git@github.com:zed/widgets.git"}}
-	if repo, _, ok := pickRemote(only); !ok || repo.Owner != "zed" {
-		t.Errorf("fallback remote: %+v %v", repo, ok)
+	repo, byName, ok := ghshared.PickRemote(remotes)
+	if !ok {
+		t.Fatalf("no remote picked: %+v", byName)
 	}
 	branches := []git.Branch{{Name: "topic", Current: true, Upstream: "zed/topic-x", Subject: "S", OID: "abc"}, {Name: "origin/main", Remote: true}}
 	info := currentBranch(branches, repo, byName)
@@ -126,9 +98,6 @@ func TestRemoteBranchNames(t *testing.T) {
 	got := remoteBranchNames(branches, "origin", "feature")
 	if !reflect.DeepEqual(got, []string{"main", "develop", "zeta"}) {
 		t.Errorf("%v", got)
-	}
-	if remoteNameFor(map[string]github.Remote{"a": {Owner: "x"}, "b": {Owner: "x"}}, github.Remote{Owner: "x"}) != "a" {
-		t.Error("remoteNameFor must be deterministic")
 	}
 }
 
@@ -462,20 +431,5 @@ func TestDecodeNotifications(t *testing.T) {
 	}
 	if _, err := decodeNotifications([]byte("{")); err == nil {
 		t.Error("bad json accepted")
-	}
-}
-
-func TestErrorText(t *testing.T) {
-	reset := time.Date(2026, 1, 1, 15, 4, 0, 0, time.Local)
-	cases := map[string]error{
-		"GitHub rate limit reached. Try again after 15:04.": &github.RateLimitError{Reset: reset},
-		"GitHub rate limit reached. Try again later.":       &github.RateLimitError{},
-		"GitHub answered 404: Not Found":                    &github.APIError{Status: 404, Message: "Not Found"},
-		"plain":                                             errors.New("github: plain"),
-	}
-	for want, err := range cases {
-		if got := errorText(err); got != want {
-			t.Errorf("%q, want %q", got, want)
-		}
 	}
 }

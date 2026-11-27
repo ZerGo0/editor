@@ -4,22 +4,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown/parser"
 )
 
 const (
-	detailWidth  = 1000
-	detailHeight = 1400
-	issueNumber  = 5
-	issueViewID  = "issue/acme/widgets/5"
+	issueNumber = 5
+	issueViewID = "issue/acme/widgets/5"
 )
 
 func viewTester(hs *harness, id string) *ui.Tester {
-	return ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).Fill().Children(func() { hs.h.views[id](c) })
-	}, detailWidth, detailHeight)
+	return hs.h.ViewTester(id, nil)
 }
 
 func (hs *harness) seedIssue() {
@@ -39,7 +36,7 @@ func (hs *harness) openDetail(t *testing.T) (*issueData, *ui.Tester) {
 	hs.ready(t)
 	hs.i.openIssue(issueNumber, nil)
 	d := hs.i.details[issueNumber]
-	hs.h.pump(t, func() bool { return d.loaded })
+	hs.h.Pump(t, func() bool { return d.loaded })
 	return d, viewTester(hs, issueViewID)
 }
 
@@ -48,14 +45,14 @@ func TestOpenIssueUsesDocumentedViewID(t *testing.T) {
 	hs.seedIssue()
 	hs.ready(t)
 	hs.i.openIssue(issueNumber, nil)
-	if id := hs.h.opened[0]; id != issueViewID {
+	if id := hs.h.Opened[0]; id != issueViewID {
 		t.Errorf("view id %q", id)
 	}
-	if title := hs.h.titles[issueViewID]; title != "Issue #5" {
+	if title := hs.h.Titles[issueViewID]; title != "Issue #5" {
 		t.Errorf("title %q", title)
 	}
-	hs.h.pump(t, func() bool { return hs.i.details[issueNumber].loaded })
-	if title := hs.h.titles[issueViewID]; title != "#5 Crash on start" {
+	hs.h.Pump(t, func() bool { return hs.i.details[issueNumber].loaded })
+	if title := hs.h.Titles[issueViewID]; title != "#5 Crash on start" {
 		t.Errorf("title after load %q", title)
 	}
 }
@@ -64,7 +61,7 @@ func TestDetailShowsIssue(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
 	_ = d
-	mustHaveText(t, tt, "Crash on start", "#5", "Open", "alice opened this 2d ago", "Milestone", "v1", "Assignees", "bob", "Labels", "bug",
+	ghtest.MustHaveText(t, tt, "Crash on start", "#5", "Open", "alice opened this 2d ago", "Milestone", "v1", "Assignees", "bob", "Labels", "bug",
 		"Description", "Body of Crash on start", "Linked pull requests", "#9 Fix the crash", "Conversation", "carol", "commented", "2h ago", "I can reproduce this",
 		"Add a comment", "Edit", "Close Issue", "Open on GitHub", "Start Working")
 	if tt.HasText("Some details could not be loaded:") {
@@ -80,13 +77,13 @@ func TestDetailLoadingAndErrorStates(t *testing.T) {
 	hs.be.with(func() { hs.be.gate["GetIssue"] = gate })
 	hs.i.openIssue(issueNumber, nil)
 	tt := viewTester(hs, issueViewID)
-	mustHaveText(t, tt, "Loading #5...")
+	ghtest.MustHaveText(t, tt, "Loading #5...")
 	if _, ok := tt.AccessByRole(ui.RoleProgress, "Loading #5..."); !ok {
 		t.Error("the spinner has no accessible name")
 	}
 	hs.be.with(func() { delete(hs.be.gate, "GetIssue") })
 	close(gate)
-	hs.h.pump(t, func() bool { return hs.i.details[issueNumber].loaded })
+	hs.h.Pump(t, func() bool { return hs.i.details[issueNumber].loaded })
 
 	hs2 := newHarness(t)
 	hs2.seedIssue()
@@ -94,21 +91,21 @@ func TestDetailLoadingAndErrorStates(t *testing.T) {
 	hs2.ready(t)
 	hs2.i.openIssue(issueNumber, nil)
 	d := hs2.i.details[issueNumber]
-	hs2.h.pump(t, func() bool { return d.err != nil })
+	hs2.h.Pump(t, func() bool { return d.err != nil })
 	tt2 := viewTester(hs2, issueViewID)
-	mustHaveText(t, tt2, "Cannot load #5", "boom", "Retry")
+	ghtest.MustHaveText(t, tt2, "Cannot load #5", "boom", "Retry")
 	delete(hs2.be.errs, "GetIssue")
-	mustClick(t, tt2, "Retry")
-	hs2.h.pump(t, func() bool { return d.loaded })
+	ghtest.MustClick(t, tt2, "Retry")
+	hs2.h.Pump(t, func() bool { return d.loaded })
 	tt2.Frame()
-	mustHaveText(t, tt2, "Crash on start")
+	ghtest.MustHaveText(t, tt2, "Crash on start")
 }
 
 func TestDetailPartialFailureKeepsIssueAndOffersRetry(t *testing.T) {
 	hs := newHarness(t)
 	hs.be.errs["IssueComments"] = errBoom
 	_, tt := hs.openDetail(t)
-	mustHaveText(t, tt, "Some details could not be loaded:", "comments: boom", "Crash on start")
+	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "comments: boom", "Crash on start")
 }
 
 func TestDetailPreloadShowsListDataImmediately(t *testing.T) {
@@ -117,28 +114,28 @@ func TestDetailPreloadShowsListDataImmediately(t *testing.T) {
 	hs.ready(t)
 	preload := testIssue(issueNumber, "From the list")
 	hs.i.openIssue(issueNumber, &preload)
-	if title := hs.h.titles[issueViewID]; title != "#5 From the list" {
+	if title := hs.h.Titles[issueViewID]; title != "#5 From the list" {
 		t.Errorf("title %q", title)
 	}
-	mustHaveText(t, viewTester(hs, issueViewID), "From the list")
+	ghtest.MustHaveText(t, viewTester(hs, issueViewID), "From the list")
 }
 
 func TestCloseAndReopen(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Close Issue")
-	hs.h.pump(t, func() bool { return !isOpen(d.issue) && d.busy == "" })
+	ghtest.MustClick(t, tt, "Close Issue")
+	hs.h.Pump(t, func() bool { return !isOpen(d.issue) && d.busy == "" })
 	tt.Frame()
 	if len(hs.be.edits) != 1 || hs.be.edits[0].State == nil || *hs.be.edits[0].State != github.StateClosed {
 		t.Fatalf("edits %+v", hs.be.edits)
 	}
-	mustHaveText(t, tt, "Closed", "Reopen Issue")
+	ghtest.MustHaveText(t, tt, "Closed", "Reopen Issue")
 	if len(d.issue.LinkedPRs) != 1 {
 		t.Error("linked pull requests were lost after the edit")
 	}
-	mustClick(t, tt, "Reopen Issue")
-	hs.h.pump(t, func() bool { return isOpen(d.issue) && d.busy == "" })
-	if got := hs.h.lastNotice(); got != "Reopened #5" {
+	ghtest.MustClick(t, tt, "Reopen Issue")
+	hs.h.Pump(t, func() bool { return isOpen(d.issue) && d.busy == "" })
+	if got := hs.h.LastNotice(); got != "Reopened #5" {
 		t.Errorf("notice %q", got)
 	}
 }
@@ -147,8 +144,8 @@ func TestCloseFailureShowsError(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
 	hs.be.with(func() { hs.be.errs["EditIssue"] = errBoom })
-	mustClick(t, tt, "Close Issue")
-	hs.h.pump(t, func() bool { return d.busy == "" && hs.h.lastError() != "" })
+	ghtest.MustClick(t, tt, "Close Issue")
+	hs.h.Pump(t, func() bool { return d.busy == "" && hs.h.LastError() != "" })
 	if !isOpen(d.issue) {
 		t.Error("the issue changed although the edit failed")
 	}
@@ -157,47 +154,47 @@ func TestCloseFailureShowsError(t *testing.T) {
 func TestEditTitleAndBody(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Edit")
+	ghtest.MustClick(t, tt, "Edit")
 	tt.Frame()
-	mustHaveText(t, tt, "Save", "Cancel")
+	ghtest.MustHaveText(t, tt, "Save", "Cancel")
 	if d.editTitle != "Crash on start" || d.editBody != "Body of Crash on start" {
 		t.Fatalf("edit fields %q %q", d.editTitle, d.editBody)
 	}
 	d.editTitle, d.editBody = "  New title ", "New body"
 	tt.Frame()
-	mustClick(t, tt, "Save")
-	hs.h.pump(t, func() bool { return !d.editing })
+	ghtest.MustClick(t, tt, "Save")
+	hs.h.Pump(t, func() bool { return !d.editing })
 	if len(hs.be.edits) != 1 || *hs.be.edits[0].Title != "New title" || *hs.be.edits[0].Body != "New body" {
 		t.Fatalf("edits %+v", hs.be.edits)
 	}
-	if hs.h.titles[issueViewID] != "#5 New title" {
-		t.Errorf("tab title %q", hs.h.titles[issueViewID])
+	if hs.h.Titles[issueViewID] != "#5 New title" {
+		t.Errorf("tab title %q", hs.h.Titles[issueViewID])
 	}
 	tt.Frame()
-	mustHaveText(t, tt, "New title", "New body")
+	ghtest.MustHaveText(t, tt, "New title", "New body")
 }
 
 func TestEditValidationAndCancel(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Edit")
+	ghtest.MustClick(t, tt, "Edit")
 	d.editTitle = " "
 	tt.Frame()
-	mustClick(t, tt, "Save")
+	ghtest.MustClick(t, tt, "Save")
 	tt.Frame()
-	mustHaveText(t, tt, "Enter a title.")
+	ghtest.MustHaveText(t, tt, "Enter a title.")
 	if len(hs.be.edits) != 0 {
 		t.Error("an invalid edit was sent")
 	}
 	d.editTitle = d.issue.Title
 	d.editBody = d.issue.Body
 	tt.Frame()
-	mustClick(t, tt, "Save")
+	ghtest.MustClick(t, tt, "Save")
 	if d.editing || len(hs.be.edits) != 0 {
 		t.Errorf("an unchanged edit must close without a request: editing %v edits %v", d.editing, hs.be.edits)
 	}
-	mustClick(t, tt, "Edit")
-	mustClick(t, tt, "Cancel")
+	ghtest.MustClick(t, tt, "Edit")
+	ghtest.MustClick(t, tt, "Cancel")
 	if d.editing {
 		t.Error("cancel kept the edit form")
 	}
@@ -211,13 +208,13 @@ func TestPostComment(t *testing.T) {
 	}
 	d.draft = "  Thanks!  "
 	tt.Frame()
-	mustClick(t, tt, "Add Comment")
-	hs.h.pump(t, func() bool { return len(d.comments) == 2 })
+	ghtest.MustClick(t, tt, "Add Comment")
+	hs.h.Pump(t, func() bool { return len(d.comments) == 2 })
 	if hs.be.commented != "Thanks!" || d.draft != "" || d.issue.Comments != 2 {
 		t.Errorf("commented %q draft %q count %d", hs.be.commented, d.draft, d.issue.Comments)
 	}
 	tt.Frame()
-	mustHaveText(t, tt, "Thanks!")
+	ghtest.MustHaveText(t, tt, "Thanks!")
 }
 
 func TestPostCommentFailureKeepsDraft(t *testing.T) {
@@ -226,8 +223,8 @@ func TestPostCommentFailureKeepsDraft(t *testing.T) {
 	hs.be.with(func() { hs.be.errs["AddIssueComment"] = errBoom })
 	d.draft = "Hello"
 	tt.Frame()
-	mustClick(t, tt, "Add Comment")
-	hs.h.pump(t, func() bool { return d.busy == "" && hs.h.lastError() != "" })
+	ghtest.MustClick(t, tt, "Add Comment")
+	hs.h.Pump(t, func() bool { return d.busy == "" && hs.h.LastError() != "" })
 	if d.draft != "Hello" || len(d.comments) != 1 {
 		t.Errorf("draft %q comments %d", d.draft, len(d.comments))
 	}
@@ -236,8 +233,8 @@ func TestPostCommentFailureKeepsDraft(t *testing.T) {
 func TestOpenOnGitHubAndLinkedPullRequest(t *testing.T) {
 	hs := newHarness(t)
 	_, tt := hs.openDetail(t)
-	mustClick(t, tt, "Open on GitHub")
-	mustClick(t, tt, "Open pull request #9")
+	ghtest.MustClick(t, tt, "Open on GitHub")
+	ghtest.MustClick(t, tt, "Open pull request #9")
 	urls := tt.OpenedURLs()
 	if len(urls) != 2 || urls[0] != "https://github.com/acme/widgets/issues/5" || urls[1] != "https://github.com/acme/widgets/pull/9" {
 		t.Errorf("opened %v", urls)
@@ -311,9 +308,9 @@ func TestStaleDetailResultIsIgnored(t *testing.T) {
 		hs.be.issues[issueNumber] = newer
 	})
 	hs.i.loadDetail(d)
-	hs.h.pump(t, func() bool { return d.loaded })
+	hs.h.Pump(t, func() bool { return d.loaded })
 	close(gate)
-	hs.h.drain()
+	hs.h.Drain()
 	if d.issue.Title != "Newer title" {
 		t.Errorf("title %q", d.issue.Title)
 	}

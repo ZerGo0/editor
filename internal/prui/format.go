@@ -7,18 +7,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
 const (
-	justNowLimit    = 45 * time.Second
-	hoursPerDay     = 24
-	daysPerWeek     = 7
-	weeksPerYear    = 52
-	daysPerYear     = 365
 	shortSHALength  = 7
 	pullPathSegment = "pull"
 	detailIDPrefix  = "pr"
@@ -41,16 +35,12 @@ const (
 	prStateMerged = "Merged"
 	prStateClosed = "Closed"
 
-	conclusionSuccess   = "success"
-	conclusionNeutral   = "neutral"
-	conclusionSkipped   = "skipped"
-	conclusionStale     = "stale"
-	statusCompleted     = "completed"
-	defaultOriginName   = "origin"
-	defaultUpstreamName = "upstream"
+	conclusionSuccess = "success"
+	conclusionNeutral = "neutral"
+	conclusionSkipped = "skipped"
+	conclusionStale   = "stale"
+	statusCompleted   = "completed"
 )
-
-var preferredRemotes = []string{defaultOriginName, defaultUpstreamName}
 
 var preferredBases = []string{"main", "master", "develop", "trunk"}
 
@@ -62,33 +52,6 @@ const (
 	checkSuccess
 	checkFailure
 )
-
-func relativeTime(now, t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	d := now.Sub(t)
-	switch {
-	case d < justNowLimit:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d/time.Minute))
-	case d < hoursPerDay*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d/time.Hour))
-	}
-	days := int(d / (hoursPerDay * time.Hour))
-	switch {
-	case days < daysPerWeek:
-		return fmt.Sprintf("%dd ago", days)
-	case days < daysPerYear:
-		weeks := days / daysPerWeek
-		if weeks >= weeksPerYear {
-			weeks = weeksPerYear - 1
-		}
-		return fmt.Sprintf("%dw ago", weeks)
-	}
-	return fmt.Sprintf("%dy ago", days/daysPerYear)
-}
 
 func checkOutcome(c github.Check) checkState {
 	if c.Status != statusCompleted {
@@ -242,32 +205,6 @@ func latestReviewStates(reviews []github.Review) map[string]string {
 	return states
 }
 
-func pickRemote(remotes []git.Remote) (github.Remote, map[string]github.Remote, bool) {
-	byName := map[string]github.Remote{}
-	for _, r := range remotes {
-		for _, raw := range []string{r.FetchURL, r.PushURL} {
-			if gr, ok := github.ParseRemote(raw); ok {
-				byName[r.Name] = gr
-				break
-			}
-		}
-	}
-	for _, name := range preferredRemotes {
-		if gr, ok := byName[name]; ok {
-			return gr, byName, true
-		}
-	}
-	names := make([]string, 0, len(byName))
-	for name := range byName {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	if len(names) == 0 {
-		return github.Remote{}, byName, false
-	}
-	return byName[names[0]], byName, true
-}
-
 type branchInfo struct {
 	Name      string
 	HeadRef   string
@@ -338,26 +275,7 @@ func localBranchNames(branches []git.Branch) []string {
 func pullURL(repo github.Remote, number int) string {
 	host := repo.Host
 	if host == "" {
-		host = dotComHost
+		host = github.DotComHost
 	}
 	return fmt.Sprintf("https://%s/%s/%s/pull/%d", host, repo.Owner, repo.Name, number)
-}
-
-func remoteNameFor(remotes map[string]github.Remote, repo github.Remote) string {
-	for _, name := range preferredRemotes {
-		if r, ok := remotes[name]; ok && r == repo {
-			return name
-		}
-	}
-	names := make([]string, 0, len(remotes))
-	for name, r := range remotes {
-		if r == repo {
-			names = append(names, name)
-		}
-	}
-	slices.Sort(names)
-	if len(names) > 0 {
-		return names[0]
-	}
-	return defaultOriginName
 }

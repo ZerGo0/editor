@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/list"
-	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -16,19 +16,15 @@ const (
 )
 
 func TestNotificationTitleKeepsItsShareInNarrowSideBars(t *testing.T) {
-	var natural float32
-	probe := ui.NewTester(func(c *ui.Context) {
-		natural, _ = c.MeasureText(0, ui.Span{Text: fitTitle, Size: token.TextBody.Px(), Weight: token.TextBody.Weight()})
-	}, narrowSideWidth, sideHeight)
-	probe.Frame()
+	natural := ghtest.NaturalWidth(fitTitle, narrowSideWidth, ghtest.SideHeight)
 	for _, width := range []int{narrowSideWidth, tightSideWidth} {
 		hs := newHarness(t)
 		hs.be.notifs = NotificationPage{Items: []Notification{{ID: "n1", Title: fitTitle, Number: 3, Reason: "review_requested", Updated: testNow}}}
 		hs.ready(t)
-		hs.h.pump(t, func() bool { return hs.p.notifs.loaded })
+		hs.h.Pump(t, func() bool { return hs.p.notifs.loaded })
 		tt := ui.NewTester(func(c *ui.Context) {
 			ui.Column(c).Fill().Children(func() { hs.p.NotificationsView(c) })
-		}, width, sideHeight)
+		}, width, ghtest.SideHeight)
 		tt.Frame()
 		tt.Frame()
 		title, ok := tt.Find(fitTitle)

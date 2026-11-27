@@ -14,6 +14,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
@@ -111,7 +112,7 @@ func (p *PRs) openReviewDialog(d *prData, choice int) {
 			}
 			return func() {
 				d.pendingReview = ""
-				p.h.Notify(fmt.Sprintf("Submitted review for #%d", number))
+				p.Host.Notify(fmt.Sprintf("Submitted review for #%d", number))
 				p.loadDetail(d)
 			}, nil
 		},
@@ -136,8 +137,8 @@ func (p *PRs) submitDialog() {
 	dl.busy, dl.err = true, ""
 	gen, submit, title := dl.gen, dl.submit, dl.title
 	applog.Go(func() {
-		apply, err := submit(p.ctx, in)
-		p.post(func() {
+		apply, err := submit(p.Ctx, in)
+		p.Post(func() {
 			current := gen == p.dialog.gen
 			if current {
 				p.dialog.busy = false
@@ -145,10 +146,10 @@ func (p *PRs) submitDialog() {
 			switch {
 			case errors.Is(err, errCancelled):
 			case err != nil && current:
-				p.authFailure(err)
-				p.dialog.err = errorText(err)
+				p.AuthFailure(err)
+				p.dialog.err = ghshared.ErrorText(err)
 			case err != nil:
-				p.h.ShowError(title, err)
+				p.Host.ShowError(title, err)
 			default:
 				if current {
 					p.dialog.open = false
@@ -184,15 +185,15 @@ func (p *PRs) openPicker(title, action string, single bool, selected []string, l
 	}
 	p.picker = pk
 	applog.Go(func() {
-		items, err := load(p.ctx)
-		p.post(func() {
+		items, err := load(p.Ctx)
+		p.Post(func() {
 			if gen != p.picker.gen {
 				return
 			}
 			p.picker.loading = false
 			if err != nil {
-				p.authFailure(err)
-				p.picker.err = errorText(err)
+				p.AuthFailure(err)
+				p.picker.err = ghshared.ErrorText(err)
 				return
 			}
 			for s := range p.picker.selected {
@@ -236,18 +237,18 @@ func (p *PRs) submitPicker() {
 	pk.busy, pk.err = true, ""
 	gen, selected, apply := pk.gen, pk.chosen(), pk.apply
 	applog.Go(func() {
-		done, err := apply(p.ctx, selected)
-		p.post(func() {
+		done, err := apply(p.Ctx, selected)
+		p.Post(func() {
 			current := gen == p.picker.gen
 			if current {
 				p.picker.busy = false
 			}
 			switch {
 			case err != nil && current:
-				p.authFailure(err)
-				p.picker.err = errorText(err)
+				p.AuthFailure(err)
+				p.picker.err = ghshared.ErrorText(err)
 			case err != nil:
-				p.h.ShowError("Cannot update pull request", err)
+				p.Host.ShowError("Cannot update pull request", err)
 			default:
 				if current {
 					p.picker.open = false
@@ -261,7 +262,7 @@ func (p *PRs) submitPicker() {
 }
 
 func (p *PRs) Overlay(c *ui.Context) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
 	if p.dialog.open {
@@ -285,7 +286,7 @@ func (p *PRs) dialogView(c *ui.Context) {
 			field.TextArea(c, dl.title, &dl.body, field.AreaOptions{Placeholder: dl.placeholder, MinLines: dialogTextLines, AutoFocus: true, ID: "dialog-body"})
 		}
 		if dl.suggest != "" {
-			smallButton(c, "Insert Suggestion", false).OnClick(func() { dl.body = appendSuggestion(dl.body, dl.suggest) })
+			ghshared.SmallButton(c, "Insert Suggestion", false).OnClick(func() { dl.body = appendSuggestion(dl.body, dl.suggest) })
 		}
 		for i := range dl.checks {
 			action.Checkbox(c, dl.checks[i].label, &dl.checks[i].on, action.ChoiceOptions{ID: "check-" + strconv.Itoa(i)})
@@ -325,7 +326,7 @@ func (p *PRs) pickerView(c *ui.Context) {
 		default:
 			items := pk.visible()
 			if len(items) == 0 {
-				mutedText(c, "Nothing matches.")
+				ghshared.MutedText(c, "Nothing matches.")
 			}
 			ui.Scroll(c).Height(token.ListHeightMax.Px()).FillWidth().Children(func() {
 				for _, item := range items {

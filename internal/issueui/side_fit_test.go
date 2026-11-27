@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 )
@@ -34,8 +35,8 @@ func fitSide(t *testing.T, width int) *ui.Tester {
 	hs.ready(t)
 	tt := ui.NewTester(func(c *ui.Context) {
 		ui.Column(c).Fill().Children(func() { hs.i.SideView(c) })
-	}, width, sideHeight)
-	hs.h.pump(t, func() bool { return hs.i.side.sections[0].loaded })
+	}, width, ghtest.SideHeight)
+	hs.h.Pump(t, func() bool { return hs.i.side.sections[0].loaded })
 	tt.Frame()
 	tt.Frame()
 	tt.Frame()
@@ -43,11 +44,7 @@ func fitSide(t *testing.T, width int) *ui.Tester {
 }
 
 func TestIssueTitleKeepsItsShareInNarrowSideBars(t *testing.T) {
-	var natural float32
-	probe := ui.NewTester(func(c *ui.Context) {
-		natural, _ = c.MeasureText(0, ui.Span{Text: fitTitle, Size: token.TextBody.Px(), Weight: token.TextBody.Weight()})
-	}, narrowSideWidth, sideHeight)
-	probe.Frame()
+	natural := ghtest.NaturalWidth(fitTitle, narrowSideWidth, ghtest.SideHeight)
 	for _, width := range []int{narrowSideWidth, tightSideWidth} {
 		tt := fitSide(t, width)
 		title, ok := tt.Find(fitTitle)

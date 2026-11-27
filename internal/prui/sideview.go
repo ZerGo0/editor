@@ -14,6 +14,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -168,18 +169,18 @@ func (p *PRs) loadSection(s *section, more bool) {
 		var items []github.PullRequest
 		var err error
 		if local {
-			items, err = be.LocalBranchPRs(p.ctx, repo, names)
+			items, err = be.LocalBranchPRs(p.Ctx, repo, names)
 		} else {
-			items, err = be.List(p.ctx, repo, opts)
+			items, err = be.List(p.Ctx, repo, opts)
 		}
-		p.post(func() {
+		p.Post(func() {
 			if gen != s.gen {
 				return
 			}
 			s.loading = false
 			if err != nil {
 				s.err = err
-				p.authFailure(err)
+				p.AuthFailure(err)
 				return
 			}
 			s.err, s.loaded, s.page, s.more = nil, true, page, !local && len(items) >= pageSize
@@ -342,17 +343,17 @@ func (p *PRs) Title() string {
 }
 
 func (p *PRs) Badge() int {
-	if p.closed || p.phase != phaseReady || p.side == nil {
+	if p.Closed || p.Phase != ghshared.PhaseReady || p.side == nil {
 		return 0
 	}
 	return len(p.side.review.items)
 }
 
 func (p *PRs) SideView(c *ui.Context) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
-	if p.phase != phaseReady {
+	if p.Phase != ghshared.PhaseReady {
 		p.stateView(c)
 		return
 	}
@@ -372,13 +373,7 @@ func (p *PRs) SideView(c *ui.Context) {
 			}
 		}
 		if s.row >= 0 && s.row < len(rows) && rows[s.row].kind == rowHeader && s.list.Handle.Focused(c) {
-			sec := rows[s.row].sec
-			switch {
-			case !sec.open && c.Shortcut(0, ui.KeyRight):
-				sec.open = true
-			case sec.open && c.Shortcut(0, ui.KeyLeft):
-				sec.open = false
-			}
+			ghshared.ToggleSectionWithArrows(c, &rows[s.row].sec.open)
 		}
 	})
 }
@@ -450,9 +445,7 @@ func (p *PRs) sideItem(c *ui.Context, r sideRow) list.Item {
 	case rowReviewExit:
 		return list.Item{Depth: 1, Icon: icons.Close, Label: r.label(), Muted: p.checkoutBusy != "", OnClick: func() { p.activate(r) }}
 	case rowReviewHide:
-		return list.Item{Depth: 1, Content: func(c *ui.Context) {
-			action.Checkbox(c, "Hide viewed", &r.data.hideViewed, action.ChoiceOptions{ID: "hide-viewed"})
-		}}
+		return list.Item{Depth: 1, Content: r.data.hideViewedCheckbox}
 	case rowCreate:
 		return list.Item{Depth: 1, Icon: icons.Plus, Label: r.label(), Strong: true, OnClick: func() { p.activate(r) }}
 	case rowMore:
@@ -462,9 +455,7 @@ func (p *PRs) sideItem(c *ui.Context, r sideRow) list.Item {
 	case rowNote:
 		return list.Item{Depth: 1, Muted: true, Label: r.text, Tooltip: r.text}
 	case rowError:
-		return list.Item{Depth: 1, Tone: token.ToneError, Label: errorText(r.err), Tooltip: errorText(r.err), Trailing: func(c *ui.Context) {
-			ghostButton(c, retryLabel, "retry").OnClick(func() { p.retrySection(r.sec, r.data) })
-		}}
+		return ghshared.ErrorItem(r.err, func() { p.retrySection(r.sec, r.data) })
 	}
 	return list.Item{}
 }
@@ -489,7 +480,7 @@ func (p *PRs) headerItem(c *ui.Context, r sideRow) list.Item {
 func (p *PRs) prItem(c *ui.Context, pr *github.PullRequest) list.Item {
 	pal := token.Of(c)
 	description := "#" + strconv.Itoa(pr.Number)
-	if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
+	if when := ghshared.RelativeTime(p.env.Now(), pr.Updated); when != "" {
 		description += prMetaSeparator + when
 	}
 	_, _, hasCheck := checkAppearance(p.checks[pr.Number])
@@ -585,7 +576,7 @@ func (p *PRs) sectionMenu(m *ui.Menu, sec *section) {
 	case slicesContains(p.side.custom, sec):
 		m.Separator()
 		if m.Item("Edit Query...").Chosen() {
-			p.h.Ask("Edit Query", "Save", sec.query, func(v string) error { return p.editQuery(sec, v) })
+			p.Host.Ask("Edit Query", "Save", sec.query, func(v string) error { return p.editQuery(sec, v) })
 		}
 		if m.Item("Remove Query").Chosen() {
 			p.removeQuery(sec)
@@ -621,17 +612,17 @@ func (p *PRs) prMenu(c *ui.Context, m *ui.Menu, pr *github.PullRequest) {
 func (p *PRs) exitReview() {
 	pr := p.current.pr
 	if pr == nil || pr.BaseRef == "" {
-		p.h.Notify("The current branch has no pull request.")
+		p.Host.Notify("The current branch has no pull request.")
 		return
 	}
 	local, base := p.local, pr.BaseRef
-	p.act(&p.checkoutBusy, "Checking out "+base, "Cannot check out "+base, func(ctx context.Context) (func(), error) {
+	p.Act(&p.checkoutBusy, "Checking out "+base, "Cannot check out "+base, func(ctx context.Context) (func(), error) {
 		if err := local.Checkout(ctx, base, false); err != nil {
 			return nil, err
 		}
 		return func() {
 			p.closeReviewTabs()
-			p.h.Notify("Checked out " + base)
+			p.Host.Notify("Checked out " + base)
 			p.BranchChanged()
 		}, nil
 	})
@@ -639,9 +630,9 @@ func (p *PRs) exitReview() {
 
 func (p *PRs) askSaveQuery() {
 	if p.side.search == nil {
-		p.h.Notify("Search for pull requests first, then save the query.")
+		p.Host.Notify("Search for pull requests first, then save the query.")
 		return
 	}
 	query := p.side.search.query
-	p.h.Ask("Save Query", "Save", query, func(label string) error { return p.addQuery(label, query) })
+	p.Host.Ask("Save Query", "Save", query, func(label string) error { return p.addQuery(label, query) })
 }

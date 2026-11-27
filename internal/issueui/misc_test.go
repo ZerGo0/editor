@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -49,12 +48,12 @@ func TestActionsNeedAConnection(t *testing.T) {
 	hs.start(t)
 	for _, id := range []string{ActionCreate, ActionStartWorking, ActionContinueWorking} {
 		hs.i.Run(id)
-		if got := hs.h.lastNotice(); got != "GitHub CLI not found" {
+		if got := hs.h.LastNotice(); got != "GitHub CLI not found" {
 			t.Errorf("%s: notice %q", id, got)
 		}
 	}
-	if len(hs.h.asks) != 0 || len(hs.h.opened) != 0 {
-		t.Errorf("asks %v opened %v", hs.h.asks, hs.h.opened)
+	if len(hs.h.Asks) != 0 || len(hs.h.Opened) != 0 {
+		t.Errorf("asks %v opened %v", hs.h.Asks, hs.h.Opened)
 	}
 }
 
@@ -79,49 +78,6 @@ func TestParseIssueNumber(t *testing.T) {
 		if got != tc.want || (err == nil) != tc.ok {
 			t.Errorf("parseIssueNumber(%q) = %d, %v", tc.in, got, err)
 		}
-	}
-}
-
-func TestPickRemote(t *testing.T) {
-	remotes := []git.Remote{
-		{Name: "local", FetchURL: "/srv/repo.git"},
-		{Name: "fork", FetchURL: "git@github.com:me/widgets.git"},
-		{Name: "upstream", FetchURL: "git@github.com:acme/widgets.git"},
-	}
-	repo, byName, ok := pickRemote(remotes)
-	if !ok || repo.Owner != "acme" || len(byName) != 2 {
-		t.Errorf("%+v %v %v", repo, byName, ok)
-	}
-	if got := remoteNameFor(byName, repo); got != "upstream" {
-		t.Errorf("remote name %q", got)
-	}
-	if repo, _, ok := pickRemote(remotes[1:2]); !ok || repo.Owner != "me" {
-		t.Errorf("only fork: %+v %v", repo, ok)
-	}
-	if _, _, ok := pickRemote(remotes[:1]); ok {
-		t.Error("a local path is not a GitHub remote")
-	}
-}
-
-func TestRelativeTime(t *testing.T) {
-	tests := []struct {
-		ago  time.Duration
-		want string
-	}{
-		{10 * time.Second, "just now"},
-		{5 * time.Minute, "5m ago"},
-		{3 * time.Hour, "3h ago"},
-		{3 * 24 * time.Hour, "3d ago"},
-		{15 * 24 * time.Hour, "2w ago"},
-		{800 * 24 * time.Hour, "2y ago"},
-	}
-	for _, tc := range tests {
-		if got := relativeTime(testNow, testNow.Add(-tc.ago)); got != tc.want {
-			t.Errorf("%v: %q, want %q", tc.ago, got, tc.want)
-		}
-	}
-	if relativeTime(testNow, time.Time{}) != "" {
-		t.Error("a zero time must give no text")
 	}
 }
 
@@ -250,7 +206,7 @@ func TestCompletionsLoadInBackground(t *testing.T) {
 	if got := hs.i.Completions("#1"); len(got) != 0 {
 		t.Errorf("completions before the data arrived: %v", got)
 	}
-	hs.h.pump(t, func() bool { return hs.i.mention.usersLoaded && hs.i.mention.issuesLoaded })
+	hs.h.Pump(t, func() bool { return hs.i.mention.usersLoaded && hs.i.mention.issuesLoaded })
 	if got := hs.i.Completions("#1"); len(got) != 1 || got[0].Insert != "#12" {
 		t.Errorf("issues %+v", got)
 	}
@@ -260,8 +216,8 @@ func TestCompletionsLoadInBackground(t *testing.T) {
 	if hs.i.Completions("") != nil || hs.i.Completions("x") != nil {
 		t.Error("only # and @ trigger completions")
 	}
-	if hs.be.called("MentionableUsers") != 1 {
-		t.Errorf("mentionable users loaded %d times", hs.be.called("MentionableUsers"))
+	if hs.be.Count("MentionableUsers") != 1 {
+		t.Errorf("mentionable users loaded %d times", hs.be.Count("MentionableUsers"))
 	}
 	hs.i.Close()
 	if hs.i.Completions("#1") != nil {
@@ -274,7 +230,7 @@ func TestCompletionsIncludeLoadedIssues(t *testing.T) {
 	hs.seedSide()
 	hs.ready(t)
 	tt := sideTester(hs.i)
-	hs.h.pump(t, func() bool { return hs.i.side.sections[0].loaded })
+	hs.h.Pump(t, func() bool { return hs.i.side.sections[0].loaded })
 	tt.Frame()
 	got := issueCompletions(hs.i.allKnownIssues(), "")
 	if len(got) < 3 {

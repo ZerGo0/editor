@@ -2,15 +2,14 @@ package prui
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/ZerGo0/editor/internal/applog"
-	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo/ui"
@@ -22,28 +21,9 @@ const (
 	maxUserPages        = 5
 )
 
-type phase int
-
-const (
-	phaseLoading phase = iota
-	phaseNoRepo
-	phaseNoRemote
-	phaseNoGH
-	phaseNotLoggedIn
-	phaseError
-	phaseReady
-)
-
 type PRs struct {
-	h      host.Host
-	env    Env
-	ctx    context.Context
-	cancel context.CancelFunc
-	closed bool
-
-	phase    phase
-	phaseErr error
-	connGen  int
+	ghshared.Session[connection]
+	env Env
 
 	local       Local
 	be          Backend
@@ -86,36 +66,20 @@ func New(h host.Host) *PRs {
 }
 
 func NewWith(h host.Host, env Env) *PRs {
-	ctx, cancel := context.WithCancel(context.Background())
 	p := &PRs{
-		h:       h,
 		env:     env,
-		ctx:     ctx,
-		cancel:  cancel,
 		checks:  map[int]checkState{},
 		details: map[int]*prData{},
 		diffs:   map[string]*reviewTab{},
 		logs:    map[string]*logTab{},
 	}
-	p.connect()
+	p.Session = ghshared.NewSession(h, stateWording, p.resolveConnection, p.apply)
+	p.Connect()
 	return p
 }
 
-func (p *PRs) Close() {
-	p.closed = true
-	p.cancel()
-}
-
-func (p *PRs) post(fn func()) {
-	p.h.Update(func() {
-		if !p.closed {
-			fn()
-		}
-	})
-}
-
 type connection struct {
-	phase   phase
+	phase   ghshared.Phase
 	err     error
 	local   Local
 	be      Backend
@@ -126,58 +90,26 @@ type connection struct {
 	queries []savedQuery
 }
 
-func (p *PRs) connect() {
-	p.connGen++
-	gen := p.connGen
-	p.phase, p.phaseErr = phaseLoading, nil
-	root, dataDir := p.h.RootDir(), p.h.UserDataDir()
-	env := p.env
-	applog.Go(func() {
-		conn := resolveConnection(p.ctx, env, root, dataDir)
-		p.post(func() {
-			if gen == p.connGen {
-				p.apply(conn)
-			}
-		})
-	})
-}
-
-func resolveConnection(ctx context.Context, env Env, root, dataDir string) connection {
-	local, err := env.OpenLocal(ctx, root)
-	if err != nil {
-		if errors.Is(err, git.ErrNotRepo) {
-			return connection{phase: phaseNoRepo}
-		}
-		return connection{phase: phaseError, err: err}
+func (p *PRs) resolveConnection(ctx context.Context, root, dataDir string) connection {
+	res := ghshared.Resolve(ctx, p.env.OpenLocal, p.env.Token, root)
+	if res.Phase != ghshared.PhaseReady {
+		return connection{phase: res.Phase, repo: res.Repo, err: res.Err}
 	}
-	remotes, err := local.Remotes(ctx)
-	if err != nil {
-		return connection{phase: phaseError, err: err}
-	}
-	repo, byName, ok := pickRemote(remotes)
-	if !ok {
-		return connection{phase: phaseNoRemote}
-	}
-	token, err := env.Token(ctx, repo.Host)
-	switch {
-	case errors.Is(err, github.ErrNoGH):
-		return connection{phase: phaseNoGH, repo: repo}
-	case errors.Is(err, github.ErrNotLoggedIn):
-		return connection{phase: phaseNotLoggedIn, repo: repo, err: err}
-	case err != nil:
-		return connection{phase: phaseError, repo: repo, err: err}
-	}
-	conn := connection{phase: phaseReady, local: local, be: env.NewBackend(repo.Host, token), repo: repo, remotes: byName}
-	if branches, err := local.Branches(ctx); err == nil {
-		conn.branch = currentBranch(branches, repo, byName)
+	conn := connection{phase: ghshared.PhaseReady, local: res.Local, be: p.env.NewBackend(res.Repo.Host, res.Token), repo: res.Repo, remotes: res.Remotes}
+	if branches, err := res.Local.Branches(ctx); err == nil {
+		conn.branch = currentBranch(branches, res.Repo, res.Remotes)
 		conn.locals = localBranchNames(branches)
 	}
-	conn.queries, _ = loadQueries(queriesPath(dataDir))
+	queries, err := loadQueries(queriesPath(dataDir))
+	if err != nil {
+		log.Printf("load saved pull request queries: %v", err)
+	}
+	conn.queries = queries
 	return conn
 }
 
 func (p *PRs) apply(conn connection) {
-	p.phase, p.phaseErr = conn.phase, conn.err
+	p.Phase, p.PhaseErr = conn.phase, conn.err
 	p.local, p.be, p.repo, p.remotes, p.branch = conn.local, conn.be, conn.repo, conn.remotes, conn.branch
 	p.locals, p.queries = conn.locals, conn.queries
 	p.viewer = ""
@@ -189,7 +121,7 @@ func (p *PRs) apply(conn connection) {
 	p.logs = map[string]*logTab{}
 	p.current = currentPR{}
 	p.refreshed = p.env.Now()
-	if conn.phase == phaseReady {
+	if conn.phase == ghshared.PhaseReady {
 		p.rebuildCustom()
 		p.refreshCurrent()
 		p.loadViewer()
@@ -198,8 +130,8 @@ func (p *PRs) apply(conn connection) {
 }
 
 func (p *PRs) refresh() {
-	if p.phase != phaseReady {
-		p.connect()
+	if p.Phase != ghshared.PhaseReady {
+		p.Connect()
 		return
 	}
 	p.refreshed = p.env.Now()
@@ -214,13 +146,13 @@ func (p *PRs) refresh() {
 }
 
 func (p *PRs) BranchChanged() {
-	if p.closed {
+	if p.Closed {
 		return
 	}
-	switch p.phase {
-	case phaseNoRepo, phaseNoRemote, phaseError:
-		p.connect()
-	case phaseReady:
+	switch p.Phase {
+	case ghshared.PhaseNoRepo, ghshared.PhaseNoRemote, ghshared.PhaseError:
+		p.Connect()
+	case ghshared.PhaseReady:
 		p.readBranch(func() {
 			p.refreshCurrent()
 			p.branchUpdated()
@@ -233,14 +165,14 @@ func (p *PRs) readBranch(done func()) {
 	gen := p.branchGen
 	local, repo, remotes := p.local, p.repo, p.remotes
 	applog.Go(func() {
-		branches, err := local.Branches(p.ctx)
+		branches, err := local.Branches(p.Ctx)
 		var info branchInfo
 		var names []string
 		if err == nil {
 			info = currentBranch(branches, repo, remotes)
 			names = localBranchNames(branches)
 		}
-		p.post(func() {
+		p.Post(func() {
 			if gen != p.branchGen {
 				return
 			}
@@ -262,20 +194,20 @@ func (p *PRs) refreshCurrent() {
 	p.current.loading = true
 	be, repo, branch := p.be, p.repo, p.branch
 	applog.Go(func() {
-		pr, err := be.CurrentBranchPR(p.ctx, repo, branch.HeadRef, branch.HeadOwner)
+		pr, err := be.CurrentBranchPR(p.Ctx, repo, branch.HeadRef, branch.HeadOwner)
 		var state checkState
 		if err == nil && pr != nil {
-			if checks, checkErr := be.Checks(p.ctx, repo, pr.HeadSHA); checkErr == nil {
+			if checks, checkErr := be.Checks(p.Ctx, repo, pr.HeadSHA); checkErr == nil {
 				state = summarizeChecks(checks)
 			}
 		}
-		p.post(func() {
+		p.Post(func() {
 			if gen != p.current.gen {
 				return
 			}
 			p.current.loading, p.current.loaded, p.current.err = false, true, err
 			if err != nil {
-				p.authFailure(err)
+				p.AuthFailure(err)
 				return
 			}
 			p.current.pr = pr
@@ -286,16 +218,9 @@ func (p *PRs) refreshCurrent() {
 	})
 }
 
-func (p *PRs) authFailure(err error) {
-	var api *github.APIError
-	if errors.As(err, &api) && api.Status == 401 {
-		p.phase, p.phaseErr = phaseNotLoggedIn, err
-	}
-}
-
 func (p *PRs) openCurrent() bool {
 	if p.current.pr == nil {
-		p.h.Notify("The current branch has no pull request.")
+		p.Host.Notify("The current branch has no pull request.")
 		return false
 	}
 	p.openPR(p.current.pr.Number, p.current.pr)
@@ -311,7 +236,7 @@ func (p *PRs) openPR(number int, preload *github.PullRequest) {
 		p.loadDetail(d)
 	}
 	d.openedTitle = d.pr.Title
-	p.h.OpenView(detailID(p.repo, number), detailTitle(number, d.pr.Title), func(c *ui.Context) { p.detailView(c, d) })
+	p.Host.OpenView(detailID(p.repo, number), detailTitle(number, d.pr.Title), func(c *ui.Context) { p.detailView(c, d) })
 }
 
 func (p *PRs) dataFor(number int) *prData {
@@ -324,52 +249,17 @@ func (p *PRs) dataFor(number int) *prData {
 }
 
 func (p *PRs) checkoutPR(number int, busy *string) {
-	dir := p.h.RootDir()
+	dir := p.Host.RootDir()
 	checkout := p.env.Checkout
-	p.act(busy, fmt.Sprintf("Checking out #%d", number), fmt.Sprintf("Cannot check out #%d", number), func(ctx context.Context) (func(), error) {
+	p.Act(busy, fmt.Sprintf("Checking out #%d", number), fmt.Sprintf("Cannot check out #%d", number), func(ctx context.Context) (func(), error) {
 		if err := checkout(ctx, dir, number); err != nil {
 			return nil, err
 		}
 		return func() {
-			p.h.Notify(fmt.Sprintf("Checked out #%d", number))
+			p.Host.Notify(fmt.Sprintf("Checked out #%d", number))
 			p.BranchChanged()
 		}, nil
 	})
-}
-
-func (p *PRs) act(busy *string, status, failure string, work func(ctx context.Context) (func(), error)) {
-	if *busy != "" {
-		return
-	}
-	*busy = status
-	applog.Go(func() {
-		apply, err := work(p.ctx)
-		p.post(func() {
-			*busy = ""
-			if err != nil {
-				p.authFailure(err)
-				p.h.ShowError(failure, err)
-			}
-			if apply != nil {
-				apply()
-			}
-		})
-	})
-}
-
-func errorText(err error) string {
-	var limit *github.RateLimitError
-	var api *github.APIError
-	switch {
-	case errors.As(err, &limit):
-		if limit.Reset.IsZero() {
-			return "GitHub rate limit reached. Try again later."
-		}
-		return "GitHub rate limit reached. Try again after " + limit.Reset.Format("15:04") + "."
-	case errors.As(err, &api):
-		return fmt.Sprintf("GitHub answered %d: %s", api.Status, api.Message)
-	}
-	return strings.TrimPrefix(err.Error(), "github: ")
 }
 
 func appendUnique(items, more []github.PullRequest) []github.PullRequest {
@@ -382,12 +272,12 @@ func appendUnique(items, more []github.PullRequest) []github.PullRequest {
 }
 
 func (p *PRs) loadViewer() {
-	gen := p.connGen
+	gen := p.ConnGen
 	be := p.be
 	applog.Go(func() {
-		user, err := be.Viewer(p.ctx)
-		p.post(func() {
-			if err == nil && gen == p.connGen {
+		user, err := be.Viewer(p.Ctx)
+		p.Post(func() {
+			if err == nil && gen == p.ConnGen {
 				p.viewer = user.Login
 			}
 		})

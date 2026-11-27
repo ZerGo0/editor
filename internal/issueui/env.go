@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo"
@@ -53,15 +54,9 @@ func defaultEnv() Env {
 	return Env{
 		Token:      github.Token,
 		NewBackend: func(host, token string) Backend { return github.New(host, token) },
-		OpenLocal: func(ctx context.Context, dir string) (Local, error) {
-			repo, err := git.Open(ctx, dir)
-			if err != nil {
-				return nil, err
-			}
-			return cliLocal{repo}, nil
-		},
-		OpenURL: func(url string) error { return mygo.Shell.OpenExternal(url) },
-		Copy:    func(text string) { mygo.Clipboard.WriteText(text) },
-		Now:     time.Now,
+		OpenLocal:  ghshared.LocalOpener(func(repo *git.Repo) Local { return cliLocal{repo} }),
+		OpenURL:    func(url string) error { return mygo.Shell.OpenExternal(url) },
+		Copy:       func(text string) { mygo.Clipboard.WriteText(text) },
+		Now:        time.Now,
 	}
 }

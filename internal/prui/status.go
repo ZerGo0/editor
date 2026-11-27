@@ -5,12 +5,13 @@ import (
 
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 func (p *PRs) StatusItems(c *ui.Context) {
-	if p.closed || p.phase != phaseReady || p.current.pr == nil {
+	if p.Closed || p.Phase != ghshared.PhaseReady || p.current.pr == nil {
 		return
 	}
 	pr := p.current.pr

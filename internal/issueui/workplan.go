@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 )
@@ -39,7 +40,7 @@ func (p workPlan) start(ctx context.Context, issue github.Issue) (startOutcome, 
 		assignees := append(slices.Clone(issue.Assignees), p.user)
 		updated, err := p.be.EditIssue(ctx, p.repo, issue.Number, github.IssueEdit{Assignees: &assignees})
 		if err != nil {
-			out.warnings = append(out.warnings, "Could not assign you: "+errorText(err))
+			out.warnings = append(out.warnings, "Could not assign you: "+ghshared.ErrorText(err))
 		} else {
 			updated.LinkedPRs = issue.LinkedPRs
 			out.issue = updated
@@ -91,7 +92,7 @@ func (p workPlan) linkedBranch(ctx context.Context, name, remoteName string, num
 		base = head
 	}
 	if _, err := p.be.CreateLinkedBranch(ctx, p.repo, number, name, base); err != nil {
-		warning := "Could not create the linked branch: " + errorText(err)
+		warning := "Could not create the linked branch: " + ghshared.ErrorText(err)
 		return []string{warning}, wrap("create branch "+name, p.local.CreateBranch(ctx, name, "", true))
 	}
 	if err := p.local.Fetch(ctx, p.remote, false, nil); err != nil {

@@ -3,12 +3,14 @@ package issueui
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/chrome"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -35,13 +37,13 @@ type mentionState struct {
 }
 
 func (i *Issues) plan(prevBase string) workPlan {
-	return workPlan{be: i.be, local: i.local, repo: i.repo, remote: remoteNameFor(i.remotes, i.repo), user: i.user, settings: i.settings, prevBase: prevBase}
+	return workPlan{be: i.be, local: i.local, repo: i.repo, remote: ghshared.RemoteNameFor(i.remotes, i.repo), user: i.user, settings: i.settings, prevBase: prevBase}
 }
 
 // TECHDEBT: Writes the small state file on the UI thread; move it to a goroutine if the state grows.
 func (i *Issues) saveWork() {
-	if err := saveWork(i.h.UserDataDir(), i.repo, i.work); err != nil {
-		i.h.ShowError("Cannot save the working issue", err)
+	if err := saveWork(i.Host.UserDataDir(), i.repo, i.work); err != nil {
+		i.Host.ShowError("Cannot save the working issue", err)
 	}
 }
 
@@ -53,7 +55,7 @@ func (i *Issues) startWorkingAction() {
 		i.startWorking(issue.Number, issue)
 		return
 	}
-	i.h.Ask("Start Working on Issue", "Start Working", "", func(value string) error {
+	i.Host.Ask("Start Working on Issue", "Start Working", "", func(value string) error {
 		number, err := parseIssueNumber(value)
 		if err != nil {
 			return err
@@ -68,7 +70,7 @@ func (i *Issues) startWorking(number int, preload *github.Issue) {
 		return
 	}
 	if active := i.work.Active; active != nil && active.Number == number {
-		i.h.Notify(fmt.Sprintf("You are already working on #%d.", number))
+		i.Host.Notify(fmt.Sprintf("You are already working on #%d.", number))
 		return
 	}
 	prev, _ := i.work.previous(number)
@@ -78,7 +80,7 @@ func (i *Issues) startWorking(number int, preload *github.Issue) {
 		copied := *preload
 		known = &copied
 	}
-	i.act(&i.working.busy, fmt.Sprintf("Starting work on #%d", number), fmt.Sprintf("Cannot start working on #%d", number), func(ctx context.Context) (func(), error) {
+	i.Act(&i.working.busy, fmt.Sprintf("Starting work on #%d", number), fmt.Sprintf("Cannot start working on #%d", number), func(ctx context.Context) (func(), error) {
 		issue := known
 		if issue == nil {
 			fetched, err := plan.be.GetIssue(ctx, plan.repo, number)
@@ -107,13 +109,13 @@ func (i *Issues) finishStart(out startOutcome) {
 	if len(out.warnings) > 0 {
 		notice += ". " + strings.Join(out.warnings, " ")
 	}
-	i.h.Notify(notice)
+	i.Host.Notify(notice)
 }
 
 func (i *Issues) stopWorking() {
 	active := i.work.Active
 	if active == nil {
-		i.h.Notify("You are not working on an issue.")
+		i.Host.Notify("You are not working on an issue.")
 		return
 	}
 	item := *active
@@ -122,16 +124,16 @@ func (i *Issues) stopWorking() {
 	applog.Go(func() {
 		var err error
 		if item.Base != "" {
-			err = switchBack(i.ctx, local, item)
+			err = switchBack(i.Ctx, local, item)
 		}
-		i.post(func() {
+		i.Post(func() {
 			i.working.busy = ""
 			i.work.deactivate()
 			i.saveWork()
 			if err != nil {
-				i.h.ShowError("Cannot switch back to "+item.Base, err)
+				i.Host.ShowError("Cannot switch back to "+item.Base, err)
 			}
-			i.h.Notify(fmt.Sprintf("Stopped working on #%d", item.Number))
+			i.Host.Notify(fmt.Sprintf("Stopped working on #%d", item.Number))
 		})
 	})
 }
@@ -152,14 +154,14 @@ func (i *Issues) continueWorkingAction() {
 		return
 	}
 	if active := i.work.Active; active != nil {
-		i.h.Notify(fmt.Sprintf("You are already working on #%d.", active.Number))
+		i.Host.Notify(fmt.Sprintf("You are already working on #%d.", active.Number))
 		return
 	}
 	if len(i.work.Recent) == 0 {
-		i.h.Notify("No earlier issue to continue. Start working on an issue first.")
+		i.Host.Notify("No earlier issue to continue. Start working on an issue first.")
 		return
 	}
-	i.h.Ask("Continue Working on Issue", "Continue Working", strconv.Itoa(i.work.Recent[0].Number), func(value string) error {
+	i.Host.Ask("Continue Working on Issue", "Continue Working", strconv.Itoa(i.work.Recent[0].Number), func(value string) error {
 		number, err := parseIssueNumber(value)
 		if err != nil {
 			return err
@@ -178,26 +180,26 @@ func (i *Issues) continueWorking(item workItem) {
 		return
 	}
 	plan := i.plan(item.Base)
-	i.act(&i.working.busy, fmt.Sprintf("Continuing work on #%d", item.Number), fmt.Sprintf("Cannot continue working on #%d", item.Number), func(ctx context.Context) (func(), error) {
+	i.Act(&i.working.busy, fmt.Sprintf("Continuing work on #%d", item.Number), fmt.Sprintf("Cannot continue working on #%d", item.Number), func(ctx context.Context) (func(), error) {
 		if _, err := plan.ensureBranch(ctx, item.Branch, item.Number, false); err != nil {
 			return nil, err
 		}
 		return func() {
 			i.work.activate(item)
 			i.saveWork()
-			i.h.Notify(fmt.Sprintf("Working on #%d in branch %s", item.Number, item.Branch))
+			i.Host.Notify(fmt.Sprintf("Working on #%d in branch %s", item.Number, item.Branch))
 		}, nil
 	})
 }
 
 func (i *Issues) BranchChanged() {
-	if i.closed || !i.ready() || i.work.Active == nil {
+	if i.Closed || !i.ready() || i.work.Active == nil {
 		return
 	}
 	local, active := i.local, *i.work.Active
 	applog.Go(func() {
-		status, err := local.Status(i.ctx)
-		i.post(func() {
+		status, err := local.Status(i.Ctx)
+		i.Post(func() {
 			current := i.work.Active
 			if err != nil || current == nil || current.Number != active.Number || status.Branch == current.Branch {
 				return
@@ -218,7 +220,7 @@ func (i *Issues) CommitTemplate() string {
 
 func (i *Issues) StatusItems(c *ui.Context) {
 	active := i.work.Active
-	if i.closed || !i.ready() || active == nil {
+	if i.Closed || !i.ready() || active == nil {
 		return
 	}
 	number := active.Number
@@ -242,10 +244,13 @@ func (i *Issues) ensureCompletionData() {
 		i.mention.usersLoading = true
 		be, repo := i.be, i.repo
 		applog.Go(func() {
-			users, _ := collectUsers(i.ctx, func(ctx context.Context, after string) (github.UserPage, error) {
+			users, err := collectUsers(i.Ctx, func(ctx context.Context, after string) (github.UserPage, error) {
 				return be.MentionableUsers(ctx, repo, after)
 			})
-			i.post(func() {
+			if err != nil {
+				log.Printf("load mentionable users: %v", err)
+			}
+			i.Post(func() {
 				i.mention.users, i.mention.usersLoading, i.mention.usersLoaded = users, false, true
 			})
 		})
@@ -254,8 +259,11 @@ func (i *Issues) ensureCompletionData() {
 		i.mention.issuesLoading = true
 		be, query := i.be, i.expandQuery(recentIssuesQuery)
 		applog.Go(func() {
-			page, _ := be.SearchIssues(i.ctx, query, 1)
-			i.post(func() {
+			page, err := be.SearchIssues(i.Ctx, query, 1)
+			if err != nil {
+				log.Printf("load recent issues: %v", err)
+			}
+			i.Post(func() {
 				i.mention.issues, i.mention.issuesLoading, i.mention.issuesLoaded = page.Issues, false, true
 			})
 		})
@@ -263,7 +271,7 @@ func (i *Issues) ensureCompletionData() {
 }
 
 func (i *Issues) Completions(prefix string) []editor.Completion {
-	if i.closed || !i.ready() || prefix == "" {
+	if i.Closed || !i.ready() || prefix == "" {
 		return nil
 	}
 	i.ensureCompletionData()

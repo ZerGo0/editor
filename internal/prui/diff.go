@@ -14,6 +14,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -52,11 +53,11 @@ func (p *PRs) ensureReview(ctx context.Context, d *prData, pending string) (stri
 func (p *PRs) commentAt(t *diffTab, r editor.DiffLineRange) {
 	d := t.data
 	if !d.isOpen() {
-		p.h.Notify(noPRInTabHint)
+		p.Host.Notify(noPRInTabHint)
 		return
 	}
 	if t.spec.mode != modePR {
-		p.h.Notify("Open the file from the changed files of the pull request to comment on it.")
+		p.Host.Notify("Open the file from the changed files of the pull request to comment on it.")
 		return
 	}
 	pending := d.pendingReview
@@ -91,7 +92,7 @@ func (p *PRs) commentAt(t *diffTab, r editor.DiffLineRange) {
 func (p *PRs) commentOnFile(t *diffTab) {
 	d := t.data
 	if !d.isOpen() {
-		p.h.Notify(noPRInTabHint)
+		p.Host.Notify(noPRInTabHint)
 		return
 	}
 	pending, filePath := d.pendingReview, t.file.Path
@@ -150,7 +151,7 @@ func (p *PRs) replyTo(d *prData, th github.Thread) {
 					}
 				}
 				if resolveErr != nil {
-					p.h.ShowError("The reply was sent, but the thread was not resolved", resolveErr)
+					p.Host.ShowError("The reply was sent, but the thread was not resolved", resolveErr)
 				}
 			}, nil
 		},
@@ -184,7 +185,7 @@ func (p *PRs) editThreadComment(d *prData, th github.Thread, cm github.Comment) 
 func (p *PRs) deleteThreadComment(d *prData, cm github.Comment) {
 	p.confirmThen("Delete this comment?", "This cannot be undone.", "Delete", func() {
 		be := p.be
-		p.act(&d.busy, "Deleting comment", "Cannot delete the comment", func(ctx context.Context) (func(), error) {
+		p.Act(&d.busy, "Deleting comment", "Cannot delete the comment", func(ctx context.Context) (func(), error) {
 			if err := be.DeleteComment(ctx, commentReview, cm.ID); err != nil {
 				return nil, err
 			}
@@ -204,7 +205,7 @@ func (p *PRs) setResolved(d *prData, th github.Thread, resolved bool) {
 		label, failure = "Reopening thread", "Cannot unresolve thread"
 	}
 	be := p.be
-	p.act(&d.busy, label, failure, func(ctx context.Context) (func(), error) {
+	p.Act(&d.busy, label, failure, func(ctx context.Context) (func(), error) {
 		var err error
 		if resolved {
 			err = be.ResolveThread(ctx, th.ID)
@@ -225,25 +226,25 @@ func (p *PRs) setResolved(d *prData, th github.Thread, resolved bool) {
 }
 
 func (p *PRs) applySuggestion(d *prData, th github.Thread, code string) {
-	root := p.h.RootDir()
+	root := p.Host.RootDir()
 	target := filepath.Join(root, filepath.FromSlash(th.Path))
 	switch {
 	case p.branch.OID == "" || p.branch.OID != d.pr.HeadSHA:
-		p.h.Notify("Check out this pull request at its latest commit to apply the suggestion.")
+		p.Host.Notify("Check out this pull request at its latest commit to apply the suggestion.")
 		return
 	case !fsutil.Within(root, target):
-		p.h.Notify("The suggestion is outside the project folder.")
+		p.Host.Notify("The suggestion is outside the project folder.")
 		return
 	}
-	if buf := p.h.Buffer(target); buf != nil && buf.Modified() {
-		p.h.Notify("Save or revert " + th.Path + " first, then apply the suggestion.")
+	if buf := p.Host.Buffer(target); buf != nil && buf.Modified() {
+		p.Host.Notify("Save or revert " + th.Path + " first, then apply the suggestion.")
 		return
 	}
 	start, end := th.StartLine, th.Line
 	if start == 0 {
 		start = end
 	}
-	p.act(&d.busy, "Applying suggestion", "Cannot apply the suggestion", func(context.Context) (func(), error) {
+	p.Act(&d.busy, "Applying suggestion", "Cannot apply the suggestion", func(context.Context) (func(), error) {
 		info, err := os.Stat(target)
 		if err != nil {
 			return nil, err
@@ -259,7 +260,7 @@ func (p *PRs) applySuggestion(d *prData, th github.Thread, code string) {
 		if err := os.WriteFile(target, []byte(text), info.Mode().Perm()); err != nil {
 			return nil, err
 		}
-		return func() { p.h.Notify("Applied the suggestion to " + th.Path) }, nil
+		return func() { p.Host.Notify("Applied the suggestion to " + th.Path) }, nil
 	})
 }
 
@@ -341,13 +342,13 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 				mutedTag(c, "Outdated")
 			}
 			if collapsed {
-				mutedText(c, fmt.Sprintf("%d comments", len(thread.Comments))).Grow(1)
-				ghostButton(c, "Show", "show-"+id).Label("Show thread").OnClick(func() { t.expanded[id] = true })
+				ghshared.MutedText(c, fmt.Sprintf("%d comments", len(thread.Comments))).Grow(1)
+				ghshared.GhostButton(c, "Show", "show-"+id).Label("Show thread").OnClick(func() { t.expanded[id] = true })
 				return
 			}
 			design.Spacer(c)
 			if thread.Resolved {
-				ghostButton(c, "Hide", "hide-"+id).Label("Hide thread").OnClick(func() { delete(t.expanded, id) })
+				ghshared.GhostButton(c, "Hide", "hide-"+id).Label("Hide thread").OnClick(func() { delete(t.expanded, id) })
 			}
 		})
 		if collapsed {
@@ -357,11 +358,11 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 			p.threadComment(c, d, thread, i, cm, now)
 		}
 		ui.Row(c).FillWidth().Gap(token.GapControl.Px()).Children(func() {
-			smallButton(c, "Reply", d.busy != "").OnClick(func() { p.replyTo(d, thread) })
+			ghshared.SmallButton(c, "Reply", d.busy != "").OnClick(func() { p.replyTo(d, thread) })
 			if thread.Resolved {
-				smallButton(c, "Unresolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, false) })
+				ghshared.SmallButton(c, "Unresolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, false) })
 			} else {
-				smallButton(c, "Resolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, true) })
+				ghshared.SmallButton(c, "Resolve", d.busy != "").OnClick(func() { p.setResolved(d, thread, true) })
 			}
 		})
 	})
@@ -374,17 +375,17 @@ func (p *PRs) threadComment(c *ui.Context, d *prData, th github.Thread, i int, c
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapRowIcon.Px()).Children(func() {
 			badge.Avatar(c, cm.Author, token.AvatarSize)
 			design.Text(c, cm.Author, token.TextStrong)
-			mutedText(c, relativeTime(now, cm.Created))
+			ghshared.MutedText(c, ghshared.RelativeTime(now, cm.Created))
 			design.Spacer(c)
 			if cm.URL != "" {
-				ghostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + cm.Author).OnClick(func() { c.WriteClipboard(cm.URL) })
+				ghshared.GhostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + cm.Author).OnClick(func() { c.WriteClipboard(cm.URL) })
 			}
 			if hasSuggestion && th.Side == github.SideRight && !th.Outdated {
-				ghostButton(c, "Apply Suggestion", "apply-"+strconv.Itoa(i)).Disabled(d.busy != "").OnClick(func() { p.applySuggestion(d, th, suggestion) })
+				ghshared.GhostButton(c, "Apply Suggestion", "apply-"+strconv.Itoa(i)).Disabled(d.busy != "").OnClick(func() { p.applySuggestion(d, th, suggestion) })
 			}
 			if own {
-				ghostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.editThreadComment(d, th, cm) })
-				ghostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.deleteThreadComment(d, cm) })
+				ghshared.GhostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.editThreadComment(d, th, cm) })
+				ghshared.GhostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + cm.Author).Disabled(d.busy != "").OnClick(func() { p.deleteThreadComment(d, cm) })
 			}
 		})
 		design.Text(c, cm.Body, token.TextBody).Selectable()

@@ -16,16 +16,14 @@ import (
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 )
 
-const (
-	moreActionsLabel = "More"
-	commentLines     = 6
-)
+const moreActionsLabel = "More"
 
 var reactionNames = []struct{ content, label string }{
 	{"THUMBS_UP", "+1"}, {"THUMBS_DOWN", "-1"}, {"LAUGH", "Laugh"}, {"HOORAY", "Hooray"},
@@ -54,18 +52,16 @@ func markdownLink(pr github.PullRequest) string {
 }
 
 func (p *PRs) detailView(c *ui.Context, d *prData) {
-	if p.closed {
+	if p.Closed {
 		return
 	}
 	p.detailTick(c, d)
 	detail.Page(c, func() {
 		switch {
 		case d.err != nil && !d.loaded:
-			detail.Centered(c, func() {
-				feedback.Error(c, "Cannot load #"+strconv.Itoa(d.number), d.err, func() { p.loadDetail(d) })
-			})
+			ghshared.DetailLoadFailed(c, d.number, d.err, func() { p.loadDetail(d) })
 		case !d.loaded && d.pr.Title == "":
-			detail.Centered(c, func() { feedback.Loading(c, "Loading #"+strconv.Itoa(d.number)+"...") })
+			ghshared.DetailLoading(c, d.number)
 		default:
 			p.detailHeader(c, d)
 			detail.Body(c, "Pull request", token.PageMaxWidth, func() { p.detailBody(c, d) })
@@ -107,12 +103,12 @@ func (p *PRs) detailHeader(c *ui.Context, d *prData) {
 			author = "unknown"
 		}
 		badge.Avatar(c, author, token.AvatarSize)
-		mutedText(c, author+" wants to merge").Shrink(0)
+		ghshared.MutedText(c, author+" wants to merge").Shrink(0)
 		branchChip(c, pr.HeadRef)
-		mutedText(c, "into").Shrink(0)
+		ghshared.MutedText(c, "into").Shrink(0)
 		branchChip(c, pr.BaseRef)
-		if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
-			mutedText(c, "Updated "+when)
+		if when := ghshared.RelativeTime(p.env.Now(), pr.Updated); when != "" {
+			ghshared.MutedText(c, "Updated "+when)
 		}
 		if summary := mergeSummary(d); summary != "" && summary != prStateMerged && summary != prStateClosed {
 			badge.Tag(c, summary, badge.TagOptions{Tone: mergeSummaryTone(d)})
@@ -142,26 +138,26 @@ func (p *PRs) detailActions(c *ui.Context, d *prData) {
 	if checkedOut {
 		label = "Checked Out"
 	}
-	smallButton(c, label, !idle || checkedOut || !d.isOpen()).OnClick(func() { p.checkoutPR(d.number, &d.busy) })
-	smallButton(c, "Open on GitHub", pr.URL == "").OnClick(func() { openExternal(c, pr.URL) })
-	smallButton(c, "Copy Link", pr.URL == "").OnClick(func() { c.WriteClipboard(pr.URL) })
+	ghshared.SmallButton(c, label, !idle || checkedOut || !d.isOpen()).OnClick(func() { p.checkoutPR(d.number, &d.busy) })
+	ghshared.SmallButton(c, "Open on GitHub", pr.URL == "").OnClick(func() { openExternal(c, pr.URL) })
+	ghshared.SmallButton(c, "Copy Link", pr.URL == "").OnClick(func() { c.WriteClipboard(pr.URL) })
 	if pr.Draft && d.isOpen() {
-		smallButton(c, "Mark Ready for Review", !idle).OnClick(func() { p.markReady(d) })
+		ghshared.SmallButton(c, "Mark Ready for Review", !idle).OnClick(func() { p.markReady(d) })
 	}
 	if d.isOpen() {
 		p.mergeButton(c, d, idle)
 		if d.pendingReview != "" {
 			action.Button(c, "Submit Review", action.ButtonOptions{Variant: action.Primary, Small: true, Disabled: !idle}).OnClick(func() { p.openReviewDialog(d, 0) })
-			smallButton(c, "Discard Review", !idle).OnClick(func() { p.discardReview(d) })
+			ghshared.SmallButton(c, "Discard Review", !idle).OnClick(func() { p.discardReview(d) })
 		}
-		smallButton(c, "Approve", !idle).OnClick(func() { p.openReviewDialog(d, 1) })
-		smallButton(c, "Request Changes", !idle).OnClick(func() { p.openReviewDialog(d, 2) })
-		smallButton(c, "Comment", !idle).OnClick(func() { p.openReviewDialog(d, 0) })
+		ghshared.SmallButton(c, "Approve", !idle).OnClick(func() { p.openReviewDialog(d, 1) })
+		ghshared.SmallButton(c, "Request Changes", !idle).OnClick(func() { p.openReviewDialog(d, 2) })
+		ghshared.SmallButton(c, "Comment", !idle).OnClick(func() { p.openReviewDialog(d, 0) })
 	}
 	action.MenuButton(c, moreActionsLabel, action.ButtonOptions{Small: true, Disabled: !idle, ID: "more"}, func(m *ui.Menu) { p.moreMenu(c, m, d) }).Label("More actions")
 	if !idle {
 		feedback.Spinner(c, d.busy)
-		mutedText(c, d.busy+"...")
+		ghshared.MutedText(c, d.busy+"...")
 	}
 }
 
@@ -169,14 +165,14 @@ func (p *PRs) mergeButton(c *ui.Context, d *prData, idle bool) {
 	blocked := d.mergeBlocked()
 	switch {
 	case d.hasOv && d.ov.Queue.InQueue:
-		smallButton(c, "Remove from Merge Queue", !idle).OnClick(func() { p.dequeue(d) })
+		ghshared.SmallButton(c, "Remove from Merge Queue", !idle).OnClick(func() { p.dequeue(d) })
 	case d.hasOv && d.ov.Queue.Enabled:
-		b := smallButton(c, "Add to Merge Queue", blocked != "" || !idle).OnClick(func() { p.enqueue(d) })
+		b := ghshared.SmallButton(c, "Add to Merge Queue", blocked != "" || !idle).OnClick(func() { p.enqueue(d) })
 		if blocked != "" {
 			b.Tooltip(blocked)
 		}
 	default:
-		b := smallButton(c, "Merge", blocked != "" || !idle).OnClick(func() { p.openMergeDialog(d) })
+		b := ghshared.SmallButton(c, "Merge", blocked != "" || !idle).OnClick(func() { p.openMergeDialog(d) })
 		if blocked != "" {
 			b.Tooltip(blocked)
 		}
@@ -246,7 +242,7 @@ func (p *PRs) moreMenu(c *ui.Context, m *ui.Menu, d *prData) {
 
 func (p *PRs) detailBody(c *ui.Context, d *prData) {
 	if len(d.partErrs) > 0 {
-		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "Some details could not be loaded: " + strings.Join(d.partErrs, "; "), Action: retryLabel, OnAction: func() { p.loadDetail(d) }})
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: "Some details could not be loaded: " + strings.Join(d.partErrs, "; "), Action: ghshared.RetryLabel, OnAction: func() { p.loadDetail(d) }})
 	}
 	p.descriptionCard(c, d)
 	p.peopleCard(c, d)
@@ -257,19 +253,19 @@ func (p *PRs) detailBody(c *ui.Context, d *prData) {
 	}
 	p.commitsCard(c, d)
 	p.timelineCard(c, d)
-	p.commentBox(c, d)
+	ghshared.CommentBox(c, &d.draft, d.busy, func() { p.postComment(d) })
 }
 
 func (p *PRs) descriptionCard(c *ui.Context, d *prData) {
 	var actions func(c *ui.Context)
 	if !d.hasOv || d.ov.CanUpdate {
 		actions = func(c *ui.Context) {
-			smallButton(c, "Edit Description", d.busy != "").OnClick(func() { p.openBodyEditor(d) })
+			ghshared.SmallButton(c, "Edit Description", d.busy != "").OnClick(func() { p.openBodyEditor(d) })
 		}
 	}
 	detail.Card(c, "Description", detail.CardOptions{Actions: actions}, func() {
 		if strings.TrimSpace(d.pr.Body) == "" {
-			mutedText(c, "No description provided.")
+			ghshared.MutedText(c, "No description provided.")
 			return
 		}
 		markdown.View(c.Key("description"), d.pr.Body, &d.md)
@@ -290,9 +286,9 @@ func (p *PRs) peopleCard(c *ui.Context, d *prData) {
 		if !canEdit || !d.isOpen() {
 			return nil
 		}
-		return func(c *ui.Context) { smallButton(c, label, d.busy != "").OnClick(onClick) }
+		return func(c *ui.Context) { ghshared.SmallButton(c, label, d.busy != "").OnClick(onClick) }
 	}
-	none := func(c *ui.Context, text string) { mutedText(c, text) }
+	none := func(c *ui.Context, text string) { ghshared.MutedText(c, text) }
 	detail.Card(c, "Reviewers and Labels", detail.CardOptions{}, func() {
 		detail.Property(c, "Reviewers", func(c *ui.Context) {
 			if len(reviewers) == 0 {
@@ -332,7 +328,7 @@ func (p *PRs) peopleCard(c *ui.Context, d *prData) {
 		if len(d.ov.Linked) > 0 {
 			detail.Property(c, "Closes", func(c *ui.Context) {
 				for _, issue := range d.ov.Linked {
-					ghostButton(c, fmt.Sprintf("#%d %s", issue.Number, issue.Title), "linked").Label(fmt.Sprintf("Open issue #%d", issue.Number)).OnClick(func() { openExternal(c, issue.URL) })
+					ghshared.GhostButton(c, fmt.Sprintf("#%d %s", issue.Number, issue.Title), "linked").Label(fmt.Sprintf("Open issue #%d", issue.Number)).OnClick(func() { openExternal(c, issue.URL) })
 				}
 			}, nil)
 		}
@@ -346,10 +342,10 @@ func (p *PRs) checksCard(c *ui.Context, d *prData) {
 	}
 	detail.Card(c, "Checks", detail.CardOptions{Count: len(d.checks)}, func() {
 		if len(d.checks) == 0 {
-			mutedText(c, "No checks reported for this commit.")
+			ghshared.MutedText(c, "No checks reported for this commit.")
 			return
 		}
-		mutedText(c, fmt.Sprintf("%d of %d checks passed", countChecks(plain), len(d.checks)))
+		ghshared.MutedText(c, fmt.Sprintf("%d of %d checks passed", countChecks(plain), len(d.checks)))
 		for i, chk := range d.checks {
 			ui.Row(c.Key(i)).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 				checkIcon(c, checkOutcome(chk.Check))
@@ -358,9 +354,9 @@ func (p *PRs) checksCard(c *ui.Context, d *prData) {
 					mutedTag(c, "Required")
 				}
 				if chk.Conclusion != "" {
-					mutedText(c, chk.Conclusion).Shrink(0)
+					ghshared.MutedText(c, chk.Conclusion).Shrink(0)
 				} else {
-					mutedText(c, chk.Status).Shrink(0)
+					ghshared.MutedText(c, chk.Status).Shrink(0)
 				}
 				p.checkButtons(c, d, chk)
 			})
@@ -370,87 +366,97 @@ func (p *PRs) checksCard(c *ui.Context, d *prData) {
 
 func (p *PRs) checkButtons(c *ui.Context, d *prData, chk checkRow) {
 	if chk.URL != "" {
-		ghostButton(c, "Details", "details-"+chk.Name).Label("Details for " + chk.Name).OnClick(func() { openExternal(c, chk.URL) })
+		ghshared.GhostButton(c, "Details", "details-"+chk.Name).Label("Details for " + chk.Name).OnClick(func() { openExternal(c, chk.URL) })
 	}
 	if chk.JobID > 0 && chk.Status != "queued" {
-		ghostButton(c, "View Logs", "logs-"+chk.Name).Label("View logs of " + chk.Name).OnClick(func() { p.openLogs(d, chk) })
+		ghshared.GhostButton(c, "View Logs", "logs-"+chk.Name).Label("View logs of " + chk.Name).OnClick(func() { p.openLogs(d, chk) })
 	}
 	if chk.RunID <= 0 {
 		return
 	}
 	switch outcome := checkOutcome(chk.Check); {
 	case outcome == checkFailure && chk.Conclusion == "action_required":
-		ghostButton(c, "Approve Run", "approve-"+chk.Name).Label("Approve run of " + chk.Name).OnClick(func() { p.runAction(d, chk, actionApprove) })
+		ghshared.GhostButton(c, "Approve Run", "approve-"+chk.Name).Label("Approve run of " + chk.Name).OnClick(func() { p.runAction(d, chk, actionApprove) })
 	case outcome == checkFailure:
-		ghostButton(c, "Re-run", "rerun-"+chk.Name).Label("Re-run " + chk.Name).OnClick(func() { p.runAction(d, chk, actionRerunFailed) })
+		ghshared.GhostButton(c, "Re-run", "rerun-"+chk.Name).Label("Re-run " + chk.Name).OnClick(func() { p.runAction(d, chk, actionRerunFailed) })
 	case outcome == checkPending:
-		ghostButton(c, "Cancel", "cancel-"+chk.Name).Label("Cancel " + chk.Name).OnClick(func() { p.runAction(d, chk, actionCancel) })
+		ghshared.GhostButton(c, "Cancel", "cancel-"+chk.Name).Label("Cancel " + chk.Name).OnClick(func() { p.runAction(d, chk, actionCancel) })
 	}
+}
+
+func (d *prData) hideViewedCheckbox(c *ui.Context) {
+	action.Checkbox(c, "Hide viewed", &d.hideViewed, action.ChoiceOptions{ID: "hide-viewed"})
 }
 
 func (p *PRs) filesCard(c *ui.Context, d *prData) {
 	files := d.visibleFiles()
 	var actions func(c *ui.Context)
 	if d.viewedCount() > 0 || d.hideViewed {
-		actions = func(c *ui.Context) {
-			action.Checkbox(c, "Hide viewed", &d.hideViewed, action.ChoiceOptions{ID: "hide-viewed"})
-		}
+		actions = d.hideViewedCheckbox
 	}
 	detail.Card(c, "Changed files", detail.CardOptions{Count: len(d.files), Actions: actions}, func() {
 		if len(d.files) == 0 {
-			mutedText(c, "No changed files.")
+			ghshared.MutedText(c, "No changed files.")
 			return
 		}
-		mutedText(c, fmt.Sprintf("+%d -%d across %d files, %d viewed. Select a file to open its diff.", d.pr.Additions, d.pr.Deletions, len(d.files), d.viewedCount()))
-		p.fileList(c, d, &d.fileList, &d.fileRow, files, modePR, "Changed files")
+		ghshared.MutedText(c, fmt.Sprintf("+%d -%d across %d files, %d viewed. Select a file to open its diff.", d.pr.Additions, d.pr.Deletions, len(d.files), d.viewedCount()))
+		p.fileList(c, d, fileListView{state: &d.fileList, row: &d.fileRow, files: files, mode: modePR, label: "Changed files"})
 	})
 }
 
 func (p *PRs) sinceCard(c *ui.Context, d *prData) {
 	detail.Card(c, "Changes since your last review", detail.CardOptions{Count: len(d.since)}, func() {
-		mutedText(c, "Compared with commit "+shortSHA(d.sinceSHA)+", the one you last reviewed.")
-		p.fileList(c, d, &d.sinceList, &d.sinceRow, d.since, modeSince, "Changes since last review")
+		ghshared.MutedText(c, "Compared with commit "+shortSHA(d.sinceSHA)+", the one you last reviewed.")
+		p.fileList(c, d, fileListView{state: &d.sinceList, row: &d.sinceRow, files: d.since, mode: modeSince, label: "Changes since last review"})
 	})
 }
 
-func (p *PRs) fileList(c *ui.Context, d *prData, state *ui.ListState, row *int, files []github.PRFile, mode, label string) {
-	if len(files) == 0 {
-		mutedText(c, "Every file is marked as viewed.")
+type fileListView struct {
+	state *ui.ListState
+	row   *int
+	files []github.PRFile
+	mode  string
+	label string
+}
+
+func (p *PRs) fileList(c *ui.Context, d *prData, v fileListView) {
+	if len(v.files) == 0 {
+		ghshared.MutedText(c, "Every file is marked as viewed.")
 		return
 	}
-	state.Key = func(i int) any { return files[i].Path }
-	state.Label = func(i int) string { return files[i].Path }
-	state.Selected = row
-	rows := min(len(files), token.ListRowsMax)
-	spec := diffSpec{mode: mode, oldRef: d.sinceSHA}
+	v.state.Key = func(i int) any { return v.files[i].Path }
+	v.state.Label = func(i int) string { return v.files[i].Path }
+	v.state.Selected = v.row
+	rows := min(len(v.files), token.ListRowsMax)
+	spec := diffSpec{mode: v.mode, oldRef: d.sinceSHA}
 	var el ui.Element
 	ui.Column(c).FillWidth().Height(float32(rows) * token.RowHeight.Px()).Shrink(0).Children(func() {
-		el = list.View(c, state, len(files), list.ViewOptions{Label: label}, func(i int) list.Item {
-			f := files[i]
+		el = list.View(c, v.state, len(v.files), list.ViewOptions{Label: v.label}, func(i int) list.Item {
+			f := v.files[i]
 			it := list.Item{
 				Label:       f.Path,
 				Git:         fileGitStatus(f.Status),
 				OnClick:     func() { p.openDiff(d, f, spec) },
 				Description: fmt.Sprintf("+%d -%d", f.Additions, f.Deletions),
 			}
-			if n := d.commentCount(f.Path); n > 0 && mode == modePR {
+			if n := d.commentCount(f.Path); n > 0 && v.mode == modePR {
 				it.Count = n
 			}
-			if mode == modePR && d.pr.NodeID != "" {
+			if v.mode == modePR && d.pr.NodeID != "" {
 				it.Leading = func(c *ui.Context) { p.viewedBox(c, d, f.Path) }
 			}
 			return it
 		})
 	})
-	if el.Submitted() && *row >= 0 && *row < len(files) {
-		p.openDiff(d, files[*row], spec)
+	if el.Submitted() && *v.row >= 0 && *v.row < len(v.files) {
+		p.openDiff(d, v.files[*v.row], spec)
 	}
 }
 
 func (p *PRs) commitsCard(c *ui.Context, d *prData) {
 	detail.Card(c, "Commits", detail.CardOptions{Count: len(d.commits)}, func() {
 		if len(d.commits) == 0 {
-			mutedText(c, "No commits.")
+			ghshared.MutedText(c, "No commits.")
 			return
 		}
 		now := p.env.Now()
@@ -458,10 +464,10 @@ func (p *PRs) commitsCard(c *ui.Context, d *prData) {
 			ui.Row(c.Key(i)).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
 				token.TextMono.Apply(ui.Text(c, shortSHA(cm.SHA))).TextColor(token.Of(c).Text.Secondary).Shrink(0)
 				design.Text(c, firstLine(cm.Message), token.TextBody).SingleLine().Grow(1).MinWidth(0)
-				mutedText(c, cm.Author).SingleLine().Shrink(0)
-				mutedText(c, relativeTime(now, cm.Date)).Shrink(0)
+				ghshared.MutedText(c, cm.Author).SingleLine().Shrink(0)
+				ghshared.MutedText(c, ghshared.RelativeTime(now, cm.Date)).Shrink(0)
 				if cm.URL != "" {
-					ghostButton(c, "Open", "commit-"+cm.SHA).Label("Open commit " + shortSHA(cm.SHA)).OnClick(func() { openExternal(c, cm.URL) })
+					ghshared.GhostButton(c, "Open", "commit-"+cm.SHA).Label("Open commit " + shortSHA(cm.SHA)).OnClick(func() { openExternal(c, cm.URL) })
 				}
 			})
 		}
@@ -514,13 +520,13 @@ func eventSentence(e TimelineEvent) string {
 func (p *PRs) timelineCard(c *ui.Context, d *prData) {
 	detail.Card(c, "Conversation", detail.CardOptions{Count: len(d.timeline)}, func() {
 		if len(d.timeline) == 0 {
-			mutedText(c, "No activity yet.")
+			ghshared.MutedText(c, "No activity yet.")
 			return
 		}
 		now := p.env.Now()
 		for i, e := range d.timeline {
 			if !e.isComment() && !e.isReview() {
-				detail.Activity(c, e.Actor, eventSentence(e), relativeTime(now, e.Time))
+				detail.Activity(c, e.Actor, eventSentence(e), ghshared.RelativeTime(now, e.Time))
 				continue
 			}
 			p.commentView(c, d, i, e, now)
@@ -533,16 +539,16 @@ func (p *PRs) commentView(c *ui.Context, d *prData, i int, e TimelineEvent, now 
 	if e.isReview() {
 		verb = reviewStateLabel(e.State)
 	}
-	o := detail.CommentOptions{Author: e.Actor, Verb: verb, Time: relativeTime(now, e.Time)}
+	o := detail.CommentOptions{Author: e.Actor, Verb: verb, Time: ghshared.RelativeTime(now, e.Time)}
 	o.Actions = func(c *ui.Context) {
 		if e.URL != "" {
-			ghostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + e.Actor).OnClick(func() { c.WriteClipboard(e.URL) })
+			ghshared.GhostButton(c, "Copy Link", "copy-"+strconv.Itoa(i)).Label("Copy link to comment by " + e.Actor).OnClick(func() { c.WriteClipboard(e.URL) })
 		}
 		if e.isComment() && e.CanEdit {
-			ghostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.editComment(d, e) })
+			ghshared.GhostButton(c, "Edit", "edit-"+strconv.Itoa(i)).Label("Edit comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.editComment(d, e) })
 		}
 		if e.isComment() && e.CanDelete {
-			ghostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.deleteComment(d, e) })
+			ghshared.GhostButton(c, "Delete", "delete-"+strconv.Itoa(i)).Label("Delete comment by " + e.Actor).Disabled(d.busy != "").OnClick(func() { p.deleteComment(d, e) })
 		}
 	}
 	detail.Comment(c.Key(i), o, func() {
@@ -576,15 +582,5 @@ func (p *PRs) reactionBar(c *ui.Context, d *prData, e TimelineEvent) {
 				}
 			}
 		}).Label("Add reaction")
-	})
-}
-
-func (p *PRs) commentBox(c *ui.Context, d *prData) {
-	detail.Card(c, "Add a comment", detail.CardOptions{}, func() {
-		field.TextArea(c, "Comment", &d.draft, field.AreaOptions{Placeholder: "Leave a comment (Markdown is supported)", MinLines: commentLines, ID: "comment"})
-		blank := trimmed(d.draft) == ""
-		ui.Row(c).Justify(ui.End).FillWidth().Children(func() {
-			action.Button(c, "Add Comment", action.ButtonOptions{Variant: action.Primary, Disabled: blank || d.busy != ""}).OnClick(func() { p.postComment(d) })
-		})
 	})
 }

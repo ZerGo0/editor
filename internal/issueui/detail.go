@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -80,7 +81,7 @@ func (i *Issues) openLink(raw string) {
 		return
 	}
 	if err := i.env.OpenURL(raw); err != nil {
-		i.h.ShowError("Cannot open the link", err)
+		i.Host.ShowError("Cannot open the link", err)
 	}
 }
 
@@ -109,31 +110,24 @@ func fetchDetail(ctx context.Context, be Backend, repo github.Remote, number int
 	res.issue, res.err = be.GetIssue(ctx, repo, number)
 	wg.Wait()
 	if res.err == nil && commentErr != nil {
-		res.partErr = "comments: " + errorText(commentErr)
+		res.partErr = "comments: " + ghshared.ErrorText(commentErr)
 	}
 	return res
 }
 
 func (i *Issues) loadDetail(d *issueData) {
-	d.gen++
-	gen := d.gen
 	d.loading, d.stale = true, false
 	be, repo, number := i.be, i.repo, d.number
-	applog.Go(func() {
-		res := fetchDetail(i.ctx, be, repo, number)
-		i.post(func() {
-			if gen == d.gen {
-				i.applyDetail(d, res)
-			}
-		})
-	})
+	ghshared.Latest(&i.Session, &d.gen, func(ctx context.Context) detailResult {
+		return fetchDetail(ctx, be, repo, number)
+	}, func(res detailResult) { i.applyDetail(d, res) })
 }
 
 func (i *Issues) applyDetail(d *issueData, res detailResult) {
 	d.loading = false
 	if res.err != nil {
 		d.err = res.err
-		i.authFailure(res.err)
+		i.AuthFailure(res.err)
 		return
 	}
 	d.err, d.partErr = nil, res.partErr
@@ -150,7 +144,7 @@ func (i *Issues) retitle(d *issueData) {
 		return
 	}
 	d.openedTitle = d.issue.Title
-	i.h.OpenView(detailID(i.repo, d.number), detailTitle(d.number, d.issue.Title), func(c *ui.Context) { i.detailView(c, d) })
+	i.Host.OpenView(detailID(i.repo, d.number), detailTitle(d.number, d.issue.Title), func(c *ui.Context) { i.detailView(c, d) })
 }
 
 func (i *Issues) openIssue(number int, preload *github.Issue) {
@@ -165,31 +159,23 @@ func (i *Issues) openIssue(number int, preload *github.Issue) {
 		i.loadDetail(d)
 	}
 	d.openedTitle = d.issue.Title
-	i.h.OpenView(detailID(i.repo, number), detailTitle(number, d.issue.Title), func(c *ui.Context) { i.detailView(c, d) })
+	i.Host.OpenView(detailID(i.repo, number), detailTitle(number, d.issue.Title), func(c *ui.Context) { i.detailView(c, d) })
 }
 
 func (i *Issues) postComment(d *issueData) {
-	body := trimmed(d.draft)
-	if body == "" {
-		return
-	}
 	be, repo, number := i.be, i.repo, d.number
-	i.act(&d.busy, "Posting comment", "Cannot post comment", func(ctx context.Context) (func(), error) {
-		comment, err := be.AddIssueComment(ctx, repo, number, body)
-		if err != nil {
-			return nil, err
-		}
-		return func() {
-			d.comments = append(d.comments, comment)
-			d.issue.Comments++
-			d.draft = ""
-		}, nil
+	i.PostComment(&d.busy, d.draft, func(ctx context.Context, body string) (github.Comment, error) {
+		return be.AddIssueComment(ctx, repo, number, body)
+	}, func(comment github.Comment) {
+		d.comments = append(d.comments, comment)
+		d.issue.Comments++
+		d.draft = ""
 	})
 }
 
 func (i *Issues) editIssue(d *issueData, edit github.IssueEdit, status, failure string, done func()) {
 	be, repo, number := i.be, i.repo, d.number
-	i.act(&d.busy, status, failure, func(ctx context.Context) (func(), error) {
+	i.Act(&d.busy, status, failure, func(ctx context.Context) (func(), error) {
 		updated, err := be.EditIssue(ctx, repo, number, edit)
 		if err != nil {
 			return nil, err
@@ -219,7 +205,7 @@ func (i *Issues) toggleState(d *issueData) {
 	}
 	number := d.number
 	i.editIssue(d, github.IssueEdit{State: &next}, notice+" issue", "Cannot change the issue state", func() {
-		i.h.Notify(fmt.Sprintf("%s #%d", notice, number))
+		i.Host.Notify(fmt.Sprintf("%s #%d", notice, number))
 	})
 }
 

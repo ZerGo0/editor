@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 )
@@ -20,8 +21,6 @@ const (
 	permalinkRangeSep   = "-L"
 	untrackedMark       = '?'
 	ignoredMark         = '!'
-	originRemote        = "origin"
-	upstreamRemote      = "upstream"
 )
 
 var (
@@ -68,7 +67,7 @@ func permalinkRemote(remotes []git.Remote, upstream string) (github.Remote, bool
 	if name, _, ok := strings.Cut(upstream, "/"); ok && name != "" {
 		names = append(names, name)
 	}
-	names = append(names, originRemote, upstreamRemote)
+	names = append(names, ghshared.OriginRemote, ghshared.UpstreamRemote)
 	for _, name := range names {
 		if i := slices.IndexFunc(remotes, func(r git.Remote) bool { return r.Name == name }); i >= 0 {
 			if remote, ok := github.ParseRemote(remotes[i].FetchURL); ok {
@@ -140,39 +139,39 @@ func buildPermalink(ctx context.Context, local Local, path string, startLine, en
 }
 
 func (i *Issues) Permalink(path string, startLine, endLine int) (string, error) {
-	local, err := i.env.OpenLocal(i.ctx, i.h.RootDir())
+	local, err := i.env.OpenLocal(i.Ctx, i.Host.RootDir())
 	if err != nil {
 		return "", fmt.Errorf("open repository: %w", err)
 	}
-	return buildPermalink(i.ctx, local, path, startLine, endLine)
+	return buildPermalink(i.Ctx, local, path, startLine, endLine)
 }
 
 func (i *Issues) permalinkAsync(path string, startLine, endLine int, done func(link string, err error)) {
 	applog.Go(func() {
 		link, err := i.Permalink(path, startLine, endLine)
-		i.post(func() { done(link, err) })
+		i.Post(func() { done(link, err) })
 	})
 }
 
 func (i *Issues) CopyPermalink(path string, startLine, endLine int) {
 	i.permalinkAsync(path, startLine, endLine, func(link string, err error) {
 		if err != nil {
-			i.h.Notify(err.Error())
+			i.Host.Notify(err.Error())
 			return
 		}
 		i.env.Copy(link)
-		i.h.Notify("Copied GitHub permalink")
+		i.Host.Notify("Copied GitHub permalink")
 	})
 }
 
 func (i *Issues) OpenPermalink(path string, startLine, endLine int) {
 	i.permalinkAsync(path, startLine, endLine, func(link string, err error) {
 		if err != nil {
-			i.h.Notify(err.Error())
+			i.Host.Notify(err.Error())
 			return
 		}
 		if err := i.env.OpenURL(link); err != nil {
-			i.h.ShowError("Cannot open the permalink", err)
+			i.Host.ShowError("Cannot open the permalink", err)
 		}
 	})
 }

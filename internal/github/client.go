@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	dotComHost           = "github.com"
+	DotComHost           = "github.com"
 	dotComRESTURL        = "https://api.github.com"
 	dotComGraphQLURL     = "https://api.github.com/graphql"
 	enterpriseRESTFmt    = "https://%s/api/v3"
@@ -58,7 +58,7 @@ func New(host, token string) *Client {
 		},
 		cache: newResponseCache(maxCacheEntries),
 	}
-	if host == "" || host == dotComHost {
+	if host == "" || host == DotComHost {
 		c.restURL, c.graphqlURL = dotComRESTURL, dotComGraphQLURL
 	} else {
 		c.restURL = fmt.Sprintf(enterpriseRESTFmt, host)

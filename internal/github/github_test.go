@@ -85,6 +85,10 @@ func stubRunner(t *testing.T, fn Runner) {
 	t.Cleanup(func() { runCommand = previous })
 }
 
+func runnerWithoutGH(context.Context, string, string, ...string) ([]byte, error) {
+	return nil, &exec.Error{Name: "gh", Err: exec.ErrNotFound}
+}
+
 func TestToken(t *testing.T) {
 	var gotArgs []string
 	stubRunner(t, func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -99,9 +103,7 @@ func TestToken(t *testing.T) {
 		t.Fatalf("args %v", gotArgs)
 	}
 
-	stubRunner(t, func(context.Context, string, string, ...string) ([]byte, error) {
-		return nil, &exec.Error{Name: "gh", Err: exec.ErrNotFound}
-	})
+	stubRunner(t, runnerWithoutGH)
 	if _, err := Token(context.Background(), "github.com"); !errors.Is(err, ErrNoGH) {
 		t.Fatalf("want ErrNoGH, got %v", err)
 	}
@@ -141,9 +143,7 @@ func TestCheckout(t *testing.T) {
 	if err := Checkout(context.Background(), "/work", 0); err == nil {
 		t.Fatal("want error for bad number")
 	}
-	stubRunner(t, func(context.Context, string, string, ...string) ([]byte, error) {
-		return nil, &exec.Error{Name: "gh", Err: exec.ErrNotFound}
-	})
+	stubRunner(t, runnerWithoutGH)
 	if err := Checkout(context.Background(), "/work", 1); !errors.Is(err, ErrNoGH) {
 		t.Fatalf("want ErrNoGH, got %v", err)
 	}

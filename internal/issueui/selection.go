@@ -13,9 +13,9 @@ func selectionLines(buf *editor.Buffer, sel editor.Selection) (start, end int) {
 }
 
 func (i *Issues) withActiveSelection(fn func(path string, startLine, endLine int)) {
-	path, st := i.h.ActivePath(), i.h.ActiveEditor()
+	path, st := i.Host.ActivePath(), i.Host.ActiveEditor()
 	if path == "" || st == nil || st.Buffer == nil {
-		i.h.Notify("Open a file in the editor first.")
+		i.Host.Notify("Open a file in the editor first.")
 		return
 	}
 	start, end := selectionLines(st.Buffer, st.Selection())
@@ -24,6 +24,6 @@ func (i *Issues) withActiveSelection(fn func(path string, startLine, endLine int
 
 func (i *Issues) createFromActiveSelection() {
 	i.withActiveSelection(func(path string, startLine, endLine int) {
-		i.CreateFromSelection(path, startLine, endLine, i.h.ActiveEditor().SelectedText())
+		i.CreateFromSelection(path, startLine, endLine, i.Host.ActiveEditor().SelectedText())
 	})
 }

@@ -2,41 +2,26 @@ package issueui
 
 import (
 	"context"
-	"errors"
+	"log"
 	"slices"
 
-	"github.com/ZerGo0/editor/internal/applog"
-	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/host"
 )
 
 const sideViewTitle = "Issues"
 
-type phase int
-
-const (
-	phaseLoading phase = iota
-	phaseNoRepo
-	phaseNoRemote
-	phaseNoGH
-	phaseNotLoggedIn
-	phaseError
-	phaseReady
-)
+var stateWording = ghshared.StateWording{
+	NoRepoDetail: "Open a folder that is a Git repository to see its issues.",
+	ErrorTitle:   "Cannot connect to GitHub",
+}
 
 type Issues struct {
-	h      host.Host
-	env    Env
-	ctx    context.Context
-	cancel context.CancelFunc
-	closed bool
+	ghshared.Session[connection]
+	env Env
 
 	settings Settings
-
-	phase    phase
-	phaseErr error
-	connGen  int
 
 	local   Local
 	be      Backend
@@ -58,22 +43,14 @@ func New(h host.Host) *Issues {
 }
 
 func NewWith(h host.Host, env Env) *Issues {
-	ctx, cancel := context.WithCancel(context.Background())
 	i := &Issues{
-		h:        h,
 		env:      env,
-		ctx:      ctx,
-		cancel:   cancel,
 		settings: DefaultSettings(),
 		details:  map[int]*issueData{},
 	}
-	i.connect()
+	i.Session = ghshared.NewSession(h, stateWording, i.resolveConnection, i.apply)
+	i.Connect()
 	return i
-}
-
-func (i *Issues) Close() {
-	i.closed = true
-	i.cancel()
 }
 
 func (i *Issues) Title() string {
@@ -81,7 +58,7 @@ func (i *Issues) Title() string {
 }
 
 func (i *Issues) Badge() int {
-	if i.phase != phaseReady || i.side == nil || len(i.side.sections) == 0 {
+	if i.Phase != ghshared.PhaseReady || i.side == nil || len(i.side.sections) == 0 {
 		return 0
 	}
 	first := i.side.sections[0]
@@ -93,21 +70,13 @@ func (i *Issues) Badge() int {
 
 func (i *Issues) SetSettings(s Settings) {
 	i.settings = s.normalized()
-	if i.phase == phaseReady {
+	if i.Phase == ghshared.PhaseReady {
 		i.side = newSideState(i.settings.Queries)
 	}
 }
 
-func (i *Issues) post(fn func()) {
-	i.h.Update(func() {
-		if !i.closed {
-			fn()
-		}
-	})
-}
-
 type connection struct {
-	phase   phase
+	phase   ghshared.Phase
 	err     error
 	local   Local
 	be      Backend
@@ -117,58 +86,27 @@ type connection struct {
 	work    workState
 }
 
-func (i *Issues) connect() {
-	i.connGen++
-	gen := i.connGen
-	i.phase, i.phaseErr = phaseLoading, nil
-	root, dataDir, env := i.h.RootDir(), i.h.UserDataDir(), i.env
-	applog.Go(func() {
-		conn := resolveConnection(i.ctx, env, root, dataDir)
-		i.post(func() {
-			if gen == i.connGen {
-				i.apply(conn)
-			}
-		})
-	})
-}
-
-func resolveConnection(ctx context.Context, env Env, root, dataDir string) connection {
-	local, err := env.OpenLocal(ctx, root)
-	if err != nil {
-		if errors.Is(err, git.ErrNotRepo) {
-			return connection{phase: phaseNoRepo}
-		}
-		return connection{phase: phaseError, err: err}
+func (i *Issues) resolveConnection(ctx context.Context, root, dataDir string) connection {
+	res := ghshared.Resolve(ctx, i.env.OpenLocal, i.env.Token, root)
+	if res.Phase != ghshared.PhaseReady {
+		return connection{phase: res.Phase, repo: res.Repo, err: res.Err}
 	}
-	remotes, err := local.Remotes(ctx)
-	if err != nil {
-		return connection{phase: phaseError, err: err}
-	}
-	repo, byName, ok := pickRemote(remotes)
-	if !ok {
-		return connection{phase: phaseNoRemote}
-	}
-	token, err := env.Token(ctx, repo.Host)
-	switch {
-	case errors.Is(err, github.ErrNoGH):
-		return connection{phase: phaseNoGH, repo: repo}
-	case errors.Is(err, github.ErrNotLoggedIn):
-		return connection{phase: phaseNotLoggedIn, repo: repo, err: err}
-	case err != nil:
-		return connection{phase: phaseError, repo: repo, err: err}
-	}
-	be := env.NewBackend(repo.Host, token)
+	be := i.env.NewBackend(res.Repo.Host, res.Token)
 	viewer, err := be.Viewer(ctx)
 	switch {
-	case isUnauthorized(err):
-		return connection{phase: phaseNotLoggedIn, repo: repo, err: err}
+	case ghshared.IsUnauthorized(err):
+		return connection{phase: ghshared.PhaseNotLoggedIn, repo: res.Repo, err: err}
 	case err != nil:
-		return connection{phase: phaseError, repo: repo, err: err}
+		return connection{phase: ghshared.PhaseError, repo: res.Repo, err: err}
 	}
-	conn := connection{phase: phaseReady, local: local, be: be, repo: repo, remotes: byName, user: viewer.Login}
-	conn.work, _ = loadWork(dataDir, repo)
+	conn := connection{phase: ghshared.PhaseReady, local: res.Local, be: be, repo: res.Repo, remotes: res.Remotes, user: viewer.Login}
+	work, err := loadWork(dataDir, res.Repo)
+	if err != nil {
+		log.Printf("load working issue: %v", err)
+	}
+	conn.work = work
 	if conn.work.Active != nil {
-		if status, err := local.Status(ctx); err == nil && status.Branch != conn.work.Active.Branch {
+		if status, err := res.Local.Status(ctx); err == nil && status.Branch != conn.work.Active.Branch {
 			conn.work.deactivate()
 		}
 	}
@@ -176,7 +114,7 @@ func resolveConnection(ctx context.Context, env Env, root, dataDir string) conne
 }
 
 func (i *Issues) apply(conn connection) {
-	i.phase, i.phaseErr = conn.phase, conn.err
+	i.Phase, i.PhaseErr = conn.phase, conn.err
 	i.local, i.be, i.repo, i.remotes, i.user, i.work = conn.local, conn.be, conn.repo, conn.remotes, conn.user, conn.work
 	i.side = newSideState(i.settings.Queries)
 	i.details = map[int]*issueData{}
@@ -186,20 +124,20 @@ func (i *Issues) apply(conn connection) {
 }
 
 func (i *Issues) ready() bool {
-	return i.phase == phaseReady
+	return i.Phase == ghshared.PhaseReady
 }
 
 func (i *Issues) requireReady() bool {
 	if i.ready() {
 		return true
 	}
-	i.h.Notify(i.stateMessage().title)
+	i.Host.Notify(i.StateMessage(i.repo.Host).Title)
 	return false
 }
 
 func (i *Issues) refresh() {
 	if !i.ready() {
-		i.connect()
+		i.Connect()
 		return
 	}
 	i.markStale()
@@ -212,33 +150,6 @@ func (i *Issues) markStale() {
 	for _, d := range i.details {
 		d.stale = true
 	}
-}
-
-func (i *Issues) authFailure(err error) {
-	if isUnauthorized(err) {
-		i.phase, i.phaseErr = phaseNotLoggedIn, err
-	}
-}
-
-func (i *Issues) act(busy *string, status, failure string, work func(ctx context.Context) (func(), error)) {
-	if *busy != "" {
-		return
-	}
-	*busy = status
-	applog.Go(func() {
-		apply, err := work(i.ctx)
-		i.post(func() {
-			*busy = ""
-			if err != nil {
-				i.authFailure(err)
-				i.h.ShowError(failure, err)
-				return
-			}
-			if apply != nil {
-				apply()
-			}
-		})
-	})
 }
 
 func (i *Issues) allKnownIssues() []github.Issue {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
@@ -15,7 +16,7 @@ import (
 
 func chooseMore(t *testing.T, tt *ui.Tester, item string) {
 	t.Helper()
-	mustClick(t, tt, "More actions")
+	ghtest.MustClick(t, tt, "More actions")
 	if err := tt.ChooseMenuItem(item); err != nil {
 		t.Fatalf("menu %q: %v (menu %q)", item, err, tt.Menu())
 	}
@@ -33,11 +34,11 @@ func TestDetailShowsOverviewAndTimelineEvents(t *testing.T) {
 		{Kind: "IssueComment", ID: "IC1", Actor: "carol", Body: "Nice", Time: testNow.Add(-2 * time.Hour), Reactions: []Reaction{{Content: "THUMBS_UP", Count: 2, Viewer: true}}},
 	}
 	_, tt := hs.openDetail(t)
-	mustHaveText(t, tt, "a1", "v1", "#8 Crash on start", "Commits", "abcdef1", "Fix typo", "Ready to merge",
+	ghtest.MustHaveText(t, tt, "a1", "v1", "#8 Crash on start", "Commits", "abcdef1", "Fix typo", "Ready to merge",
 		"zed", "added the bug label", "force-pushed the branch (1111111 to 2222222)", "carol", "Nice", "+1 2", "React")
 	tt.Advance(time.Second)
-	mustClick(t, tt, "Open issue #8")
-	mustClick(t, tt, "Open commit abcdef1")
+	ghtest.MustClick(t, tt, "Open issue #8")
+	ghtest.MustClick(t, tt, "Open commit abcdef1")
 	if urls := tt.OpenedURLs(); len(urls) != 2 || urls[0] != "https://github.com/acme/widgets/issues/8" {
 		t.Errorf("urls %v", urls)
 	}
@@ -46,18 +47,18 @@ func TestDetailShowsOverviewAndTimelineEvents(t *testing.T) {
 func TestDetailEditTitle(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Edit Title")
-	mustHaveText(t, tt, "Save Title")
+	ghtest.MustClick(t, tt, "Edit Title")
+	ghtest.MustHaveText(t, tt, "Save Title")
 	d.titleDraft = "  A better title "
 	tt.Frame()
-	mustClick(t, tt, "Save Title")
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 1 && !d.loading && d.busy == "" })
+	ghtest.MustClick(t, tt, "Save Title")
+	hs.h.Pump(t, func() bool { return hs.be.Count("EditIssue") == 1 && !d.loading && d.busy == "" })
 	if hs.be.edit.Title == nil || *hs.be.edit.Title != "A better title" {
 		t.Errorf("%+v", hs.be.edit)
 	}
 	d.editingTitle, d.titleDraft = true, d.pr.Title
 	hs.p.saveTitle(d, d.pr.Title)
-	if d.editingTitle || hs.be.called("EditIssue") != 1 {
+	if d.editingTitle || hs.be.Count("EditIssue") != 1 {
 		t.Error("an unchanged title was sent")
 	}
 }
@@ -65,17 +66,17 @@ func TestDetailEditTitle(t *testing.T) {
 func TestDetailEditDescription(t *testing.T) {
 	hs := newHarness(t)
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Edit Description")
+	ghtest.MustClick(t, tt, "Edit Description")
 	if hs.p.dialog.body != "Fixes the **widget**." {
 		t.Fatalf("body %q", hs.p.dialog.body)
 	}
 	hs.p.dialog.body = "New text"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 1 && !hs.p.dialog.open })
+	hs.pumpCalled(t, "EditIssue", 1, hs.dialogClosed)
 	if hs.be.edit.Body == nil || *hs.be.edit.Body != "New text" {
 		t.Errorf("%+v", hs.be.edit)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 }
 
 func TestMoreMenuStateChanges(t *testing.T) {
@@ -99,8 +100,8 @@ func TestMoreMenuStateChanges(t *testing.T) {
 			}
 			d, tt := hs.openDetail(t)
 			chooseMore(t, tt, tc.item)
-			hs.h.pump(t, func() bool { return hs.be.called(tc.called) == 1 && d.busy == "" })
-			hs.h.pump(t, func() bool { return !d.loading })
+			hs.pumpCalled(t, tc.called, 1, d.idle)
+			hs.h.Pump(t, func() bool { return !d.loading })
 		})
 	}
 }
@@ -118,7 +119,7 @@ func TestMoreMenuCopiesLinks(t *testing.T) {
 		t.Errorf("clipboard %q", tt.Clipboard())
 	}
 	tt.Advance(time.Second)
-	mustClick(t, tt, "Copy Link")
+	ghtest.MustClick(t, tt, "Copy Link")
 	if tt.Clipboard() != "https://github.com/acme/widgets/pull/12" {
 		t.Errorf("clipboard %q", tt.Clipboard())
 	}
@@ -129,23 +130,23 @@ func TestMoreMenuReopenAndMergedActions(t *testing.T) {
 	hs.be.pr.State = github.StateClosed
 	d, _ := hs.openDetail(t)
 	hs.p.setState(d, github.StateOpen)
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 1 && d.busy == "" })
+	hs.pumpCalled(t, "EditIssue", 1, d.idle)
 	if hs.be.edit.State == nil || *hs.be.edit.State != "open" {
 		t.Errorf("%+v", hs.be.edit)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 	d.pr.Merged = true
 	hs.p.revert(d)
-	hs.h.pump(t, func() bool { return hs.be.called("Revert") == 1 && d.busy == "" })
-	if hs.h.opened[len(hs.h.opened)-1] != "pr/acme/widgets/90" {
-		t.Errorf("opened %v", hs.h.opened)
+	hs.pumpCalled(t, "Revert", 1, d.idle)
+	if hs.h.Opened[len(hs.h.Opened)-1] != "pr/acme/widgets/90" {
+		t.Errorf("opened %v", hs.h.Opened)
 	}
 	hs.p.deleteBranch(d)
-	hs.h.pump(t, func() bool { return hs.be.called("DeleteBranch") == 1 && d.busy == "" })
+	hs.pumpCalled(t, "DeleteBranch", 1, d.idle)
 	hs.setOK(false)
 	hs.p.deleteBranch(d)
-	hs.h.drain()
-	if hs.be.called("DeleteBranch") != 1 {
+	hs.h.Drain()
+	if hs.be.Count("DeleteBranch") != 1 {
 		t.Error("deleted without a confirmation")
 	}
 }
@@ -155,14 +156,14 @@ func TestAutoMergeDialog(t *testing.T) {
 	hs.be.ov.CanEnableAutoMerge = true
 	d, tt := hs.openDetail(t)
 	chooseMore(t, tt, "Enable Auto-Merge...")
-	mustHaveText(t, tt, "Enable Auto-Merge for #12", "Squash and merge")
+	ghtest.MustHaveText(t, tt, "Enable Auto-Merge for #12", "Squash and merge")
 	hs.p.dialog.choice = 1
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("SetAutoMerge") == 1 && !hs.p.dialog.open })
+	hs.pumpCalled(t, "SetAutoMerge", 1, hs.dialogClosed)
 	if hs.be.arg != "squash:true" {
 		t.Errorf("%q", hs.be.arg)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 }
 
 func TestMergeQueueButtons(t *testing.T) {
@@ -172,16 +173,16 @@ func TestMergeQueueButtons(t *testing.T) {
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Merge"); ok {
 		t.Error("plain merge offered with a merge queue")
 	}
-	mustClick(t, tt, "Add to Merge Queue")
-	hs.h.pump(t, func() bool { return hs.be.called("Enqueue") == 1 && d.busy == "" })
-	hs.h.pump(t, func() bool { return !d.loading })
+	ghtest.MustClick(t, tt, "Add to Merge Queue")
+	hs.pumpCalled(t, "Enqueue", 1, d.idle)
+	hs.h.Pump(t, func() bool { return !d.loading })
 	hs.be.ov.Queue = MergeQueue{Enabled: true, InQueue: true, EntryID: "E1", Position: 1, State: "QUEUED"}
 	hs.p.loadDetail(d)
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 	tt.Frame()
-	mustHaveText(t, tt, "In the merge queue (position 1, queued)")
-	mustClick(t, tt, "Remove from Merge Queue")
-	hs.h.pump(t, func() bool { return hs.be.called("Dequeue") == 1 })
+	ghtest.MustHaveText(t, tt, "In the merge queue (position 1, queued)")
+	ghtest.MustClick(t, tt, "Remove from Merge Queue")
+	hs.h.Pump(t, func() bool { return hs.be.Count("Dequeue") == 1 })
 }
 
 func TestPickersApplyChanges(t *testing.T) {
@@ -190,48 +191,48 @@ func TestPickersApplyChanges(t *testing.T) {
 	hs.be.users = []github.User{{Login: "bob"}, {Login: "carol"}}
 	hs.be.milestones = []github.Milestone{{Number: 3, Title: "v1"}, {Number: 4, Title: "v2"}}
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "Edit Labels")
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	ghtest.MustClick(t, tt, "Edit Labels")
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	tt.Frame()
-	mustHaveText(t, tt, "Labels", "bug", "docs", "Filter")
+	ghtest.MustHaveText(t, tt, "Labels", "bug", "docs", "Filter")
 	hs.p.picker.selected["docs"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 1 && !hs.p.picker.open })
+	hs.pumpCalled(t, "EditIssue", 1, hs.pickerClosed)
 	if hs.be.edit.Labels == nil || strings.Join(*hs.be.edit.Labels, ",") != "bug,docs" {
 		t.Errorf("%+v", hs.be.edit.Labels)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 
 	hs.p.openAssigneePicker(d)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.picker.selected["bob"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 2 && !hs.p.picker.open })
+	hs.pumpCalled(t, "EditIssue", 2, hs.pickerClosed)
 	if hs.be.edit.Assignees == nil || (*hs.be.edit.Assignees)[0] != "bob" {
 		t.Errorf("%+v", hs.be.edit.Assignees)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 
 	hs.p.openReviewerPicker(d)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return !hs.p.picker.busy })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.busy })
 	if hs.p.picker.err == "" || !hs.p.picker.open {
 		t.Error("an empty reviewer list was accepted")
 	}
 	hs.p.picker.selected["carol"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return hs.be.called("RequestReviewers") == 1 && !hs.p.picker.open })
+	hs.pumpCalled(t, "RequestReviewers", 1, hs.pickerClosed)
 	if hs.be.arg != "[carol]" {
 		t.Errorf("%q", hs.be.arg)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 
 	hs.p.openMilestonePicker(d)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.picker.selected["v2"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return hs.be.called("EditIssue") == 3 && !hs.p.picker.open })
+	hs.pumpCalled(t, "EditIssue", 3, hs.pickerClosed)
 	if hs.be.edit.Milestone == nil || *hs.be.edit.Milestone != 4 {
 		t.Errorf("%+v", hs.be.edit.Milestone)
 	}
@@ -253,24 +254,24 @@ func TestPickerLoadFailureShowsError(t *testing.T) {
 	hs.be.errs["Labels"] = &github.APIError{Status: 500, Message: "boom"}
 	d, tt := hs.openDetail(t)
 	hs.p.openLabelPicker(d)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	tt.Frame()
-	mustHaveText(t, tt, "GitHub answered 500: boom")
+	ghtest.MustHaveText(t, tt, "GitHub answered 500: boom")
 }
 
 func TestReactionsToggle(t *testing.T) {
 	hs := newHarness(t)
 	hs.be.timeline = []TimelineEvent{{Kind: "IssueComment", ID: "IC1", Actor: "carol", Body: "Nice", Time: testNow, Reactions: []Reaction{{Content: "THUMBS_UP", Count: 2, Viewer: true}, {Content: "HEART", Count: 1}}}}
 	d, tt := hs.openDetail(t)
-	mustClick(t, tt, "+1 reaction")
-	hs.h.pump(t, func() bool { return hs.be.called("React") == 1 && d.busy == "" })
+	ghtest.MustClick(t, tt, "+1 reaction")
+	hs.pumpCalled(t, "React", 1, d.idle)
 	if hs.be.arg != "IC1:THUMBS_UP:false" {
 		t.Errorf("%q", hs.be.arg)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 	tt.Advance(time.Second)
-	mustClick(t, tt, "Heart reaction")
-	hs.h.pump(t, func() bool { return hs.be.called("React") == 2 && d.busy == "" })
+	ghtest.MustClick(t, tt, "Heart reaction")
+	hs.pumpCalled(t, "React", 2, d.idle)
 	if hs.be.arg != "IC1:HEART:true" {
 		t.Errorf("%q", hs.be.arg)
 	}
@@ -289,7 +290,7 @@ func TestEditAndDeleteOwnComment(t *testing.T) {
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Edit comment by other"); ok {
 		t.Error("edit offered on another person's comment")
 	}
-	mustClick(t, tt, "Edit comment by me")
+	ghtest.MustClick(t, tt, "Edit comment by me")
 	if hs.p.dialog.body != "mine" {
 		t.Fatalf("body %q", hs.p.dialog.body)
 	}
@@ -300,14 +301,14 @@ func TestEditAndDeleteOwnComment(t *testing.T) {
 	}
 	hs.p.dialog.body = "edited"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("EditComment") == 1 && !hs.p.dialog.open })
+	hs.pumpCalled(t, "EditComment", 1, hs.dialogClosed)
 	if hs.be.arg != "issue:IC1:edited" || d.timeline[0].Body != "edited" {
 		t.Errorf("%q %q", hs.be.arg, d.timeline[0].Body)
 	}
 	tt.Advance(time.Second)
 	tt.Frame()
-	mustClick(t, tt, "Delete comment by me")
-	hs.h.pump(t, func() bool { return hs.be.called("DeleteComment") == 1 && d.busy == "" })
+	ghtest.MustClick(t, tt, "Delete comment by me")
+	hs.pumpCalled(t, "DeleteComment", 1, d.idle)
 	if len(d.timeline) != 1 || d.timeline[0].ID != "IC2" {
 		t.Errorf("%+v", d.timeline)
 	}
@@ -318,15 +319,15 @@ func TestViewedFilesToggle(t *testing.T) {
 	hs.be.files = append(hs.be.files, github.PRFile{Path: "b.go", Status: statusAdded})
 	hs.be.viewed = map[string]bool{"b.go": true}
 	d, tt := hs.openDetail(t)
-	mustHaveText(t, tt, "Hide viewed", "1 viewed")
-	mustClick(t, tt, "Viewed src/widget.go")
-	hs.h.pump(t, func() bool { return hs.be.called("SetViewed") == 1 && d.busy == "" })
+	ghtest.MustHaveText(t, tt, "Hide viewed", "1 viewed")
+	ghtest.MustClick(t, tt, "Viewed src/widget.go")
+	hs.pumpCalled(t, "SetViewed", 1, d.idle)
 	if hs.be.arg != "src/widget.go:true" || !d.viewed["src/widget.go"] {
 		t.Errorf("%q %v", hs.be.arg, d.viewed)
 	}
 	d.hideViewed = true
 	tt.Frame()
-	mustHaveText(t, tt, "Every file is marked as viewed.")
+	ghtest.MustHaveText(t, tt, "Every file is marked as viewed.")
 }
 
 func TestViewedFailureRollsBack(t *testing.T) {
@@ -334,7 +335,7 @@ func TestViewedFailureRollsBack(t *testing.T) {
 	hs.be.errs["SetViewed"] = &github.APIError{Status: 500, Message: "x"}
 	d, _ := hs.openDetail(t)
 	hs.p.setViewed(d, "src/widget.go", true)
-	hs.h.pump(t, func() bool { return d.busy == "" && hs.lastError() != "" })
+	hs.h.Pump(t, func() bool { return d.busy == "" && hs.h.LastError() != "" })
 	if d.viewed["src/widget.go"] {
 		t.Error("the failed change was kept")
 	}
@@ -350,27 +351,27 @@ func TestChecksShowRequiredLogsAndActions(t *testing.T) {
 	hs.be.ov.Checks = []CheckRun{{Name: "build", Required: true, JobID: 55, RunID: 66}, {Name: "lint", RunID: 67}, {Name: "deploy", RunID: 68}}
 	hs.be.logText = "\x1b[31mred line\x1b[0m\nsecond line"
 	d, tt := hs.openDetail(t)
-	mustHaveText(t, tt, "Required", "0 of 3 checks passed")
-	mustClick(t, tt, "View logs of build")
+	ghtest.MustHaveText(t, tt, "Required", "0 of 3 checks passed")
+	ghtest.MustClick(t, tt, "View logs of build")
 	logID := "pr/acme/widgets/12/log/55"
-	if hs.h.titles[logID] != "Logs: build" {
-		t.Fatalf("opened %v", hs.h.opened)
+	if hs.h.Titles[logID] != "Logs: build" {
+		t.Fatalf("opened %v", hs.h.Opened)
 	}
 	logTab := hs.p.logs[logID]
-	hs.h.pump(t, func() bool { return logTab.state != nil })
+	hs.h.Pump(t, func() bool { return logTab.state != nil })
 	if got := logTab.state.Buffer.String(); got != "red line\nsecond line" {
 		t.Errorf("logs %q", got)
 	}
 	lt := viewTester(hs, logID)
-	mustHaveText(t, lt, "Logs of build")
+	ghtest.MustHaveText(t, lt, "Logs of build")
 	for _, c := range []struct{ label, arg string }{
 		{"Re-run build", "66:rerun-failed-jobs"}, {"Cancel lint", "67:cancel"}, {"Approve run of deploy", "68:approve"},
 	} {
 		tt.Advance(time.Second)
 		tt.Frame()
-		mustClick(t, tt, c.label)
-		hs.h.pump(t, func() bool { return hs.be.arg == c.arg && d.busy == "" })
-		hs.h.pump(t, func() bool { return !d.loading })
+		ghtest.MustClick(t, tt, c.label)
+		hs.h.Pump(t, func() bool { return hs.be.arg == c.arg && d.busy == "" })
+		hs.h.Pump(t, func() bool { return !d.loading })
 	}
 }
 
@@ -380,13 +381,13 @@ func TestLogLoadFailureOffersRetry(t *testing.T) {
 	d, _ := hs.openDetail(t)
 	hs.p.openLogs(d, checkRow{Check: github.Check{Name: "build"}, JobID: 5})
 	tab := hs.p.logs["pr/acme/widgets/12/log/5"]
-	hs.h.pump(t, func() bool { return tab.err != nil })
+	hs.h.Pump(t, func() bool { return tab.err != nil })
 	lt := viewTester(hs, "pr/acme/widgets/12/log/5")
-	mustHaveText(t, lt, "Cannot load the logs of build", "Retry")
+	ghtest.MustHaveText(t, lt, "Cannot load the logs of build", "Retry")
 	hs.be.clearErr("JobLogs")
 	hs.be.logText = "ok"
-	mustClick(t, lt, "Retry")
-	hs.h.pump(t, func() bool { return tab.state != nil })
+	ghtest.MustClick(t, lt, "Retry")
+	hs.h.Pump(t, func() bool { return tab.state != nil })
 }
 
 func TestChangesSinceLastReview(t *testing.T) {
@@ -398,17 +399,17 @@ func TestChangesSinceLastReview(t *testing.T) {
 	if d.sinceSHA != "oldsha" || len(d.since) != 1 {
 		t.Fatalf("%q %v", d.sinceSHA, d.since)
 	}
-	mustHaveText(t, tt, "Changes since your last review", "Compared with commit oldsha, the one you last reviewed.", "src/new.go")
-	mustClick(t, tt, "src/new.go")
+	ghtest.MustHaveText(t, tt, "Changes since your last review", "Compared with commit oldsha, the one you last reviewed.", "src/new.go")
+	ghtest.MustClick(t, tt, "src/new.go")
 	id := "pr/acme/widgets/12/since"
-	if hs.h.opened[len(hs.h.opened)-1] != id {
-		t.Fatalf("opened %v", hs.h.opened)
+	if hs.h.Opened[len(hs.h.Opened)-1] != id {
+		t.Fatalf("opened %v", hs.h.Opened)
 	}
 	tab, _ := hs.awaitDiff(t, id, "src/new.go")
-	if err := hs.diffError(id, "src/new.go"); err != nil || tab.state.New.String() != "package n\n" || hs.h.titles[id] != "#12 Changes Since Review" {
-		t.Errorf("%v %q", err, hs.h.titles[id])
+	if err := hs.diffError(id, "src/new.go"); err != nil || tab.state.New.String() != "package n\n" || hs.h.Titles[id] != "#12 Changes Since Review" {
+		t.Errorf("%v %q", err, hs.h.Titles[id])
 	}
-	if hs.be.called("Compare") != 1 {
+	if hs.be.Count("Compare") != 1 {
 		t.Error("compare not requested once")
 	}
 }
@@ -418,15 +419,15 @@ func TestDiscardPendingReview(t *testing.T) {
 	hs.be.reviews = []github.Review{{ID: "pend", Author: "me", State: reviewPending}}
 	d, tt := hs.openDetail(t)
 	hs.setOK(false)
-	mustClick(t, tt, "Discard Review")
-	hs.h.drain()
-	if hs.be.called("DeleteReview") != 0 {
+	ghtest.MustClick(t, tt, "Discard Review")
+	hs.h.Drain()
+	if hs.be.Count("DeleteReview") != 0 {
 		t.Fatal("discarded without confirmation")
 	}
 	hs.setOK(true)
 	tt.Advance(time.Second)
-	mustClick(t, tt, "Discard Review")
-	hs.h.pump(t, func() bool { return hs.be.called("DeleteReview") == 1 && d.busy == "" })
+	ghtest.MustClick(t, tt, "Discard Review")
+	hs.pumpCalled(t, "DeleteReview", 1, d.idle)
 }
 
 func TestQuickPRFlowWithoutOverview(t *testing.T) {
@@ -436,7 +437,7 @@ func TestQuickPRFlowWithoutOverview(t *testing.T) {
 	if d.hasOv {
 		t.Fatal("overview must be absent")
 	}
-	mustHaveText(t, tt, "Some details could not be loaded:", "overview:")
+	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "overview:")
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Merge"); !ok {
 		t.Error("merge must stay available without an overview")
 	}
@@ -444,7 +445,7 @@ func TestQuickPRFlowWithoutOverview(t *testing.T) {
 
 func (hs *harness) openDiffAt(t *testing.T, root string) (*prData, *diffTab, *ui.Tester) {
 	t.Helper()
-	hs.h.root = root
+	hs.h.Root = root
 	return hs.openDiffTab(t)
 }
 
@@ -460,7 +461,7 @@ func TestDiffLinkMenu(t *testing.T) {
 		"Copy Pull Request Link": "https://github.com/acme/widgets/pull/12",
 	}
 	for item, want := range items {
-		mustClick(t, tt, "Copy or open a link")
+		ghtest.MustClick(t, tt, "Copy or open a link")
 		if err := tt.ChooseMenuItem(item); err != nil {
 			t.Fatalf("%s: %v (menu %q)", item, err, tt.Menu())
 		}
@@ -469,7 +470,7 @@ func TestDiffLinkMenu(t *testing.T) {
 		}
 		tt.Advance(time.Second)
 	}
-	mustClick(t, tt, "Copy or open a link")
+	ghtest.MustClick(t, tt, "Copy or open a link")
 	if err := tt.ChooseMenuItem("Open in github.dev"); err != nil {
 		t.Fatal(err)
 	}
@@ -479,7 +480,7 @@ func TestDiffLinkMenu(t *testing.T) {
 	tab.state.SetSelectedLines(editor.DiffLineRange{Side: editor.DiffOld, Start: 0, End: 0}, true)
 	tt.Frame()
 	tt.Advance(time.Second)
-	mustClick(t, tt, "Copy or open a link")
+	ghtest.MustClick(t, tt, "Copy or open a link")
 	if err := tt.ChooseMenuItem("Copy GitHub Permalink"); err != nil {
 		t.Fatal(err)
 	}
@@ -498,11 +499,11 @@ func TestDiffCompareWithLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _, tt := hs.openDiffAt(t, root)
-	mustClick(t, tt, "Compare with Local")
+	ghtest.MustClick(t, tt, "Compare with Local")
 	id := "pr/acme/widgets/12/local/src/widget.go"
 	tab, _ := hs.awaitDiff(t, id, diffPath)
-	if err := hs.diffError(id, diffPath); err != nil || tab.state.New.String() != "package local\n" || tab.state.Old.String() != headText || hs.h.titles[id] != "widget.go (#12, local)" {
-		t.Errorf("%v new %q old %q title %q", hs.diffError(id, diffPath), tab.state.New.String(), tab.state.Old.String(), hs.h.titles[id])
+	if err := hs.diffError(id, diffPath); err != nil || tab.state.New.String() != "package local\n" || tab.state.Old.String() != headText || hs.h.Titles[id] != "widget.go (#12, local)" {
+		t.Errorf("%v new %q old %q title %q", hs.diffError(id, diffPath), tab.state.New.String(), tab.state.Old.String(), hs.h.Titles[id])
 	}
 	lt := viewTester(hs, id)
 	if _, ok := lt.AccessByRole(ui.RoleButton, "Compare with Local"); ok {
@@ -525,18 +526,18 @@ func TestDiffStepFilesAndCloseEditors(t *testing.T) {
 	if a, ok := tt.AccessByRole(ui.RoleButton, "Next File"); !ok || a.Disabled {
 		t.Errorf("next file on the first of two files: %+v", a)
 	}
-	mustClick(t, tt, "Next File")
+	ghtest.MustClick(t, tt, "Next File")
 	tt.Frame()
 	hs.p.Run(ActionCloseEditors)
-	if len(hs.h.closed) != 1 || len(hs.p.diffs) != 0 {
-		t.Errorf("closed %v diffs %d", hs.h.closed, len(hs.p.diffs))
+	if len(hs.h.Closed) != 1 || len(hs.p.diffs) != 0 {
+		t.Errorf("closed %v diffs %d", hs.h.Closed, len(hs.p.diffs))
 	}
 }
 
 func TestDiffHideCommentsToggle(t *testing.T) {
 	hs := newHarness(t)
 	_, tab, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Hide Comments")
+	ghtest.MustClick(t, tt, "Hide Comments")
 	tt.Frame()
 	if hidden := hs.p.diffs[diffViewID].hideComments; !hidden || len(tab.state.Annotations) != 0 || tt.HasText("Please rename this function") {
 		t.Errorf("hidden %v annotations %d", hidden, len(tab.state.Annotations))
@@ -546,15 +547,15 @@ func TestDiffHideCommentsToggle(t *testing.T) {
 func TestDiffFileComment(t *testing.T) {
 	hs := newHarness(t)
 	d, tab, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Comment on File")
-	mustHaveText(t, tt, "Comment on src/widget.go")
+	ghtest.MustClick(t, tt, "Comment on File")
+	ghtest.MustHaveText(t, tt, "Comment on src/widget.go")
 	hs.p.dialog.body = "About the whole file"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("AddFileThread") == 1 && !hs.p.dialog.open })
+	hs.pumpCalled(t, "AddFileThread", 1, hs.dialogClosed)
 	if hs.be.arg != "review-1:src/widget.go:About the whole file" || d.pendingReview != "review-1" {
 		t.Errorf("%q %q", hs.be.arg, d.pendingReview)
 	}
-	hs.h.pump(t, func() bool { return !d.loading })
+	hs.h.Pump(t, func() bool { return !d.loading })
 	_ = tab
 }
 
@@ -566,7 +567,7 @@ func TestDiffSuggestionInsertion(t *testing.T) {
 		t.Fatalf("suggest %q", hs.p.dialog.suggest)
 	}
 	tt := viewTester(hs, diffViewID)
-	mustClick(t, tt, "Insert Suggestion")
+	ghtest.MustClick(t, tt, "Insert Suggestion")
 	if hs.p.dialog.body != "```suggestion\nfunc A() {}\n```" {
 		t.Errorf("body %q", hs.p.dialog.body)
 	}
@@ -588,22 +589,22 @@ func TestDiffThreadCommentOwnerActions(t *testing.T) {
 	if _, ok := tt.AccessByRole(ui.RoleButton, "Edit comment by carol"); ok {
 		t.Error("edit offered on another person's comment")
 	}
-	mustClick(t, tt, "Edit comment by me")
+	ghtest.MustClick(t, tt, "Edit comment by me")
 	hs.p.dialog.body = "changed"
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("EditComment") == 1 && !hs.p.dialog.open })
+	hs.pumpCalled(t, "EditComment", 1, hs.dialogClosed)
 	if hs.be.arg != "review:c-mine:changed" || d.threads[0].Comments[1].Body != "changed" {
 		t.Errorf("%q", hs.be.arg)
 	}
 	tt.Advance(time.Second)
 	tt.Frame()
-	mustClick(t, tt, "Delete comment by me")
-	hs.h.pump(t, func() bool { return hs.be.called("DeleteComment") == 1 && d.busy == "" })
+	ghtest.MustClick(t, tt, "Delete comment by me")
+	hs.pumpCalled(t, "DeleteComment", 1, d.idle)
 	if len(d.threads[0].Comments) != 1 {
 		t.Errorf("comments %d", len(d.threads[0].Comments))
 	}
 	hs.p.deleteThreadComment(d, d.threads[0].Comments[0])
-	hs.h.pump(t, func() bool { return hs.be.called("DeleteComment") == 2 && d.busy == "" })
+	hs.pumpCalled(t, "DeleteComment", 2, d.idle)
 	for _, th := range d.threads {
 		if th.ID == "t-open" {
 			t.Error("an empty thread was kept")
@@ -614,12 +615,12 @@ func TestDiffThreadCommentOwnerActions(t *testing.T) {
 func TestReplyCanResolveThread(t *testing.T) {
 	hs := newHarness(t)
 	d, _, tt := hs.openDiffTab(t)
-	mustClick(t, tt, "Reply")
-	mustHaveText(t, tt, resolveAfterLabel)
+	ghtest.MustClick(t, tt, "Reply")
+	ghtest.MustHaveText(t, tt, resolveAfterLabel)
 	hs.p.dialog.body = "Fixed"
 	hs.p.dialog.checks[0].on = true
 	hs.p.submitDialog()
-	hs.h.pump(t, func() bool { return hs.be.called("Reply") == 1 && hs.be.called("Resolve") == 1 && !hs.p.dialog.open })
+	hs.h.Pump(t, func() bool { return hs.be.Count("Reply") == 1 && hs.be.Count("Resolve") == 1 && !hs.p.dialog.open })
 	if !d.threads[0].Resolved || len(d.threads[0].Comments) != 2 {
 		t.Errorf("%+v", d.threads[0])
 	}
@@ -639,18 +640,18 @@ func TestApplySuggestion(t *testing.T) {
 	if err := os.WriteFile(target, []byte("package w\n\nfunc A() {}\n"), 0o640); err != nil {
 		t.Fatal(err)
 	}
-	hs.h.root = root
+	hs.h.Root = root
 	hs.withDiffFixtures()
 	hs.be.threads[0].Comments[0].Body = "Use this:\n```suggestion\nfunc Renamed() {}\n```"
 	d, _ := hs.openDetail(t)
 	th := d.threads[0]
 	hs.p.applySuggestion(d, th, "func Renamed() {}")
-	if len(hs.h.notices) != 1 || !strings.Contains(hs.h.notices[0], "Check out this pull request") {
-		t.Fatalf("notices %v", hs.h.notices)
+	if len(hs.h.Notices) != 1 || !strings.Contains(hs.h.Notices[0], "Check out this pull request") {
+		t.Fatalf("notices %v", hs.h.Notices)
 	}
 	hs.p.branch.OID = "headsha"
 	hs.p.applySuggestion(d, th, "func Renamed() {}")
-	hs.h.pump(t, func() bool { return d.busy == "" && len(hs.h.notices) == 2 })
+	hs.h.Pump(t, func() bool { return d.busy == "" && len(hs.h.Notices) == 2 })
 	data, err := os.ReadFile(target)
 	if err != nil || string(data) != "package w\n\nfunc Renamed() {}\n" {
 		t.Errorf("%q %v", data, err)
@@ -661,8 +662,8 @@ func TestApplySuggestion(t *testing.T) {
 	bad := th
 	bad.Path = "../../escape"
 	hs.p.applySuggestion(d, bad, "x")
-	if !strings.Contains(hs.h.notices[len(hs.h.notices)-1], "outside the project folder") {
-		t.Errorf("notices %v", hs.h.notices)
+	if !strings.Contains(hs.h.Notices[len(hs.h.Notices)-1], "outside the project folder") {
+		t.Errorf("notices %v", hs.h.Notices)
 	}
 }
 
@@ -671,19 +672,19 @@ func TestReviewModeSection(t *testing.T) {
 	hs.be.viewed = map[string]bool{}
 	hs.ready(t)
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { d := hs.p.details[prNumber]; return d != nil && d.loaded })
+	hs.h.Pump(t, hs.detailLoaded)
 	tt.Frame()
-	mustHaveText(t, tt, "Changes in Pull Request", "0/1", "src/widget.go", "Open Pull Request", "Exit Review Mode")
-	mustClick(t, tt, "Viewed src/widget.go")
-	hs.h.pump(t, func() bool { return hs.be.called("SetViewed") == 1 })
+	ghtest.MustHaveText(t, tt, "Changes in Pull Request", "0/1", "src/widget.go", "Open Pull Request", "Exit Review Mode")
+	ghtest.MustClick(t, tt, "Viewed src/widget.go")
+	hs.h.Pump(t, func() bool { return hs.be.Count("SetViewed") == 1 })
 	tt.Advance(time.Second)
-	mustClick(t, tt, "src/widget.go")
-	if hs.h.opened[len(hs.h.opened)-1] != diffViewID {
-		t.Errorf("opened %v", hs.h.opened)
+	ghtest.MustClick(t, tt, "src/widget.go")
+	if hs.h.Opened[len(hs.h.Opened)-1] != diffViewID {
+		t.Errorf("opened %v", hs.h.Opened)
 	}
 	hs.local.setCurrent("main", "origin/main")
-	mustClick(t, tt, "Exit Review Mode")
-	hs.h.pump(t, func() bool { return len(hs.h.notices) > 0 })
+	ghtest.MustClick(t, tt, "Exit Review Mode")
+	hs.h.Pump(t, func() bool { return len(hs.h.Notices) > 0 })
 	hs.local.mu.Lock()
 	defer hs.local.mu.Unlock()
 	if len(hs.local.checkouts) != 1 || hs.local.checkouts[0] != "main" || len(hs.p.diffs) != 0 {
@@ -696,18 +697,18 @@ func TestReviewModeHidesViewedFilesAndHandlesStates(t *testing.T) {
 	hs.be.viewed = map[string]bool{"src/widget.go": true}
 	hs.ready(t)
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { d := hs.p.details[prNumber]; return d != nil && d.loaded })
+	hs.h.Pump(t, hs.detailLoaded)
 	tt.Frame()
-	mustHaveText(t, tt, "1/1")
-	mustClick(t, tt, "Hide viewed")
-	mustHaveText(t, tt, "Every file is marked as viewed.")
+	ghtest.MustHaveText(t, tt, "1/1")
+	ghtest.MustClick(t, tt, "Hide viewed")
+	ghtest.MustHaveText(t, tt, "Every file is marked as viewed.")
 	hs.p.details[prNumber].files = nil
 	tt.Frame()
-	mustHaveText(t, tt, "No changed files.")
+	ghtest.MustHaveText(t, tt, "No changed files.")
 	d := hs.p.details[prNumber]
 	d.loaded, d.err = false, &github.APIError{Status: 500, Message: "boom"}
 	tt.Frame()
-	mustHaveText(t, tt, "GitHub answered 500: boom")
+	ghtest.MustHaveText(t, tt, "GitHub answered 500: boom")
 }
 
 func TestExitReviewWithoutPR(t *testing.T) {
@@ -715,8 +716,8 @@ func TestExitReviewWithoutPR(t *testing.T) {
 	hs.be.current = nil
 	hs.ready(t)
 	hs.p.Run(ActionExitReview)
-	if len(hs.h.notices) != 1 {
-		t.Errorf("notices %v", hs.h.notices)
+	if len(hs.h.Notices) != 1 {
+		t.Errorf("notices %v", hs.h.Notices)
 	}
 }
 
@@ -727,14 +728,14 @@ func TestLocalBranchesSection(t *testing.T) {
 	hs.be.localPRs = []github.PullRequest{topic}
 	hs.ready(t)
 	tt := sideTester(hs.p)
-	mustHaveText(t, tt, "Local Pull Request Branches")
-	if hs.be.called("LocalBranchPRs") != 0 {
+	ghtest.MustHaveText(t, tt, "Local Pull Request Branches")
+	if hs.be.Count("LocalBranchPRs") != 0 {
 		t.Fatal("loaded while collapsed")
 	}
-	mustClick(t, tt, "Local Pull Request Branches")
-	hs.h.pump(t, func() bool { return hs.p.side.local.loaded })
+	ghtest.MustClick(t, tt, "Local Pull Request Branches")
+	hs.h.Pump(t, func() bool { return hs.p.side.local.loaded })
 	tt.Frame()
-	mustHaveText(t, tt, "Topic work", "#61")
+	ghtest.MustHaveText(t, tt, "Topic work", "#61")
 	if hs.p.side.local.more {
 		t.Error("the local section pages")
 	}
@@ -747,7 +748,7 @@ func TestPRRowContextMenu(t *testing.T) {
 	hs := newHarness(t)
 	hs.ready(t)
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { return hs.p.side.review.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.side.review.loaded })
 	tt.Frame()
 	if err := tt.RightClick("Review me please"); err != nil {
 		t.Fatal(err)
@@ -773,7 +774,7 @@ func TestPRRowContextMenu(t *testing.T) {
 	if err := tt.ChooseMenuItem("Checkout"); err != nil {
 		t.Fatal(err)
 	}
-	hs.h.pump(t, func() bool { return len(hs.h.notices) > 0 })
+	hs.h.Pump(t, func() bool { return len(hs.h.Notices) > 0 })
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	if len(hs.co) != 1 || hs.co[0] != 31 {
@@ -784,44 +785,44 @@ func TestPRRowContextMenu(t *testing.T) {
 func TestSavedQueriesPersistAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	hs := newHarness(t)
-	hs.h.userData = dir
+	hs.h.UserData = dir
 	hs.be.lists["search:label:bug"] = []github.PullRequest{testPR(9, "Bug hunt")}
 	hs.ready(t)
 	hs.p.Run(ActionSaveQuery)
-	if len(hs.h.asks) != 0 || len(hs.h.notices) != 1 {
-		t.Fatalf("asks %d notices %v", len(hs.h.asks), hs.h.notices)
+	if len(hs.h.Asks) != 0 || len(hs.h.Notices) != 1 {
+		t.Fatalf("asks %d notices %v", len(hs.h.Asks), hs.h.Notices)
 	}
 	hs.p.runSearch("label:bug")
 	hs.p.Run(ActionSaveQuery)
-	if len(hs.h.asks) != 1 {
+	if len(hs.h.Asks) != 1 {
 		t.Fatal("no prompt")
 	}
-	if err := hs.h.asks[0].submit(" "); err == nil {
+	if err := hs.h.Asks[0].Submit(" "); err == nil {
 		t.Error("an empty label was accepted")
 	}
-	if err := hs.h.asks[0].submit("Bugs"); err != nil {
+	if err := hs.h.Asks[0].Submit("Bugs"); err != nil {
 		t.Fatal(err)
 	}
-	if err := hs.h.asks[0].submit("bugs"); err == nil {
+	if err := hs.h.Asks[0].Submit("bugs"); err == nil {
 		t.Error("a duplicate label was accepted")
 	}
-	hs.h.waitFor(t, func() bool { qs, _ := loadQueries(queriesPath(dir)); return len(qs) == 1 })
+	hs.h.WaitFor(t, func() bool { return savedQueryCount(t, dir) == 1 })
 	tt := sideTester(hs.p)
 	tt.Frame()
-	mustHaveText(t, tt, "Bugs")
+	ghtest.MustHaveText(t, tt, "Bugs")
 
 	second := newHarness(t)
-	second.h.userData = dir
+	second.h.UserData = dir
 	second.be.lists["search:label:bug"] = []github.PullRequest{testPR(9, "Bug hunt")}
 	second.ready(t)
 	if len(second.p.side.custom) != 1 || second.p.side.custom[0].title != "Bugs" {
 		t.Fatalf("custom %+v", second.p.side.custom)
 	}
 	tt2 := sideTester(second.p)
-	mustClick(t, tt2, "Bugs")
-	second.h.pump(t, func() bool { return second.p.side.custom[0].loaded })
+	ghtest.MustClick(t, tt2, "Bugs")
+	second.h.Pump(t, func() bool { return second.p.side.custom[0].loaded })
 	tt2.Frame()
-	mustHaveText(t, tt2, "Bug hunt")
+	ghtest.MustHaveText(t, tt2, "Bug hunt")
 
 	sec := second.p.side.custom[0]
 	if err := second.p.editQuery(sec, ""); err == nil {
@@ -837,7 +838,7 @@ func TestSavedQueriesPersistAndLoad(t *testing.T) {
 	if len(second.p.side.custom) != 0 || len(second.p.queries) != 0 {
 		t.Error("query not removed")
 	}
-	second.h.waitFor(t, func() bool { qs, _ := loadQueries(queriesPath(dir)); return len(qs) == 0 })
+	second.h.WaitFor(t, func() bool { return savedQueryCount(t, dir) == 0 })
 }
 
 func TestAddQueryLimits(t *testing.T) {
@@ -851,7 +852,7 @@ func TestAddQueryLimits(t *testing.T) {
 	if err := hs.p.addQuery("one more", "x"); err == nil {
 		t.Error("the limit was not enforced")
 	}
-	hs.h.drain()
+	hs.h.Drain()
 }
 
 func TestSectionMenuOfSearch(t *testing.T) {
@@ -859,7 +860,7 @@ func TestSectionMenuOfSearch(t *testing.T) {
 	hs.ready(t)
 	hs.p.runSearch("is:open")
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { return hs.p.side.search.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.side.search.loaded })
 	tt.Frame()
 	if err := tt.RightClick("Search Results"); err != nil {
 		t.Fatal(err)
@@ -882,7 +883,7 @@ func TestTitleAndBadge(t *testing.T) {
 		t.Error("badge before anything loaded")
 	}
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { return hs.p.side.review.loaded })
+	hs.h.Pump(t, func() bool { return hs.p.side.review.loaded })
 	tt.Frame()
 	if hs.p.Badge() != 1 {
 		t.Errorf("badge %d", hs.p.Badge())
@@ -907,13 +908,13 @@ func TestNewActions(t *testing.T) {
 	hs.p.current.pr = nil
 	hs.p.Run(ActionCopyLink)
 	hs.p.Run(ActionOpenOnGitHub)
-	if len(hs.h.notices) != 3 {
-		t.Errorf("notices %v", hs.h.notices)
+	if len(hs.h.Notices) != 3 {
+		t.Errorf("notices %v", hs.h.Notices)
 	}
 	hs.local.setCurrent("feature", "origin/feature")
 	hs.p.current.pr = prPtr(hs.be.pr)
 	hs.p.Run(ActionExitReview)
-	hs.h.pump(t, func() bool { return hs.checkedOut("main") })
+	hs.h.Pump(t, func() bool { return hs.checkedOut("main") })
 }
 
 func (hs *harness) checkedOut(ref string) bool {
@@ -931,40 +932,40 @@ func TestCreateExtras(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".github/pull_request_template.md"), []byte("## What changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hs.h.root = root
+	hs.h.Root = root
 	hs.be.users = []github.User{{Login: "bob"}, {Login: "me"}}
 	hs.be.labels = []github.Label{{Name: "bug"}}
 	hs.be.milestones = []github.Milestone{{Number: 4, Title: "v2"}}
 	hs.be.compare = Comparison{Files: []github.PRFile{{Path: "a.go", Status: statusModified, Additions: 1}}}
 	hs.local.ahead = []git.Commit{{Subject: "first commit"}, {Subject: "second commit"}}
 	f, tt := hs.openCreateView(t)
-	hs.h.pump(t, func() bool { return f.body != "" && !f.cmpLoading && f.cmpFor == "main" })
+	hs.h.Pump(t, func() bool { return f.body != "" && !f.cmpLoading && f.cmpFor == "main" })
 	tt.Frame()
-	mustHaveText(t, tt, "Changes", "2 commits ahead of main", "first commit", "second commit", "a.go", "Choose Reviewers", "Assign to me")
+	ghtest.MustHaveText(t, tt, "Changes", "2 commits ahead of main", "first commit", "second commit", "a.go", "Choose Reviewers", "Assign to me")
 	if f.body != "## What changed\n" {
 		t.Errorf("template %q", f.body)
 	}
 
-	mustClick(t, tt, "Choose Reviewers")
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	ghtest.MustClick(t, tt, "Choose Reviewers")
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.picker.selected["bob"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return !hs.p.picker.open })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.open })
 	hs.p.pickFormLabels(f)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.picker.selected["bug"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return !hs.p.picker.open })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.open })
 	hs.p.pickFormMilestone(f)
-	hs.h.pump(t, func() bool { return !hs.p.picker.loading })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	hs.p.picker.selected["v2"] = true
 	hs.p.submitPicker()
-	hs.h.pump(t, func() bool { return !hs.p.picker.open })
+	hs.h.Pump(t, func() bool { return !hs.p.picker.open })
 	hs.p.viewer = "me"
 	f.assignMe = true
 	f.autoMergeLabel = autoMergeChoices[2]
 	hs.p.submitCreate(f)
-	hs.h.pump(t, func() bool { return hs.p.createForm == nil })
+	hs.h.Pump(t, func() bool { return hs.p.createForm == nil })
 	if hs.be.created.Body != "## What changed\n" {
 		t.Errorf("created %+v", hs.be.created)
 	}
@@ -977,8 +978,8 @@ func TestCreateExtras(t *testing.T) {
 	if hs.be.arg != "squash:true" {
 		t.Errorf("auto-merge %q", hs.be.arg)
 	}
-	if len(hs.h.errs) != 0 {
-		t.Errorf("errors %v", hs.h.errs)
+	if len(hs.h.Errs) != 0 {
+		t.Errorf("errors %v", hs.h.Errs)
 	}
 }
 
@@ -988,9 +989,9 @@ func TestCreateReportsPartialFailures(t *testing.T) {
 	f, _ := hs.openCreateView(t)
 	f.reviewers = []string{"bob"}
 	hs.p.submitCreate(f)
-	hs.h.pump(t, func() bool { return hs.p.createForm == nil && len(hs.h.errs) == 1 })
-	if !strings.Contains(hs.h.errs[0], "#77 was created") || !strings.Contains(hs.h.errs[0], "reviewers") {
-		t.Errorf("%q", hs.h.errs[0])
+	hs.h.Pump(t, func() bool { return hs.p.createForm == nil && len(hs.h.Errs) == 1 })
+	if !strings.Contains(hs.h.Errs[0], "#77 was created") || !strings.Contains(hs.h.Errs[0], "reviewers") {
+		t.Errorf("%q", hs.h.Errs[0])
 	}
 }
 
@@ -1000,14 +1001,14 @@ func TestCreateUntypedBodyOnlyReceivesTemplate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "pull_request_template.md"), []byte("template"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hs.h.root = root
+	hs.h.Root = root
 	hs.be.current = nil
 	hs.ready(t)
 	hs.p.openCreate()
 	f := hs.p.createForm
 	f.typedBody, f.body = true, "mine"
-	hs.h.pump(t, func() bool { return !f.loading })
-	hs.h.drain()
+	hs.h.Pump(t, func() bool { return !f.loading })
+	hs.h.Drain()
 	if f.body != "mine" {
 		t.Errorf("body %q", f.body)
 	}
@@ -1020,9 +1021,9 @@ func TestReviewModeReloadsOnRefresh(t *testing.T) {
 	hs := newHarness(t)
 	hs.ready(t)
 	tt := sideTester(hs.p)
-	hs.h.pump(t, func() bool { d := hs.p.details[prNumber]; return d != nil && d.loaded })
-	base := hs.be.called("Get")
+	hs.h.Pump(t, hs.detailLoaded)
+	base := hs.be.Count("Get")
 	hs.p.refresh()
 	tt.Frame()
-	hs.h.pump(t, func() bool { return hs.be.called("Get") > base && !hs.p.details[prNumber].loading })
+	hs.h.Pump(t, func() bool { return hs.be.Count("Get") > base && !hs.p.details[prNumber].loading })
 }

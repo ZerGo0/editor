@@ -9,15 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/ghshared"
+	"github.com/ZerGo0/editor/internal/ghshared/ghtest"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
-	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/ui"
-	"github.com/egoist/mygo/ui/editor"
 )
 
 const (
-	testTimeout = 5 * time.Second
 	testRepoURL = "https://github.com/acme/widgets.git"
 	testUser    = "me"
 	testRoot    = "/work/widgets"
@@ -25,100 +23,9 @@ const (
 
 var testNow = time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
 
-type askCall struct {
-	title, action, value string
-	submit               func(string) error
-}
-
-type fakeHost struct {
-	root    string
-	data    string
-	updates chan func()
-	views   map[string]func(*ui.Context)
-	titles  map[string]string
-	opened  []string
-	closed  []string
-	notices []string
-	errs    []string
-	asks    []askCall
-	path    string
-	state   *editor.State
-}
-
-func newFakeHost(t *testing.T) *fakeHost {
-	return &fakeHost{root: testRoot, data: t.TempDir(), updates: make(chan func(), 1024), views: map[string]func(*ui.Context){}, titles: map[string]string{}}
-}
-
-func (h *fakeHost) RootDir() string                          { return h.root }
-func (h *fakeHost) Window() *mygo.Window                     { return nil }
-func (h *fakeHost) Update(fn func())                         { h.updates <- fn }
-func (h *fakeHost) OpenAt(string, int, int)                  {}
-func (h *fakeHost) CloseView(id string)                      { h.closed = append(h.closed, id) }
-func (h *fakeHost) Notify(text string)                       { h.notices = append(h.notices, text) }
-func (h *fakeHost) SaveAllFiles() bool                       { return true }
-func (h *fakeHost) Buffer(string) *editor.Buffer             { return nil }
-func (h *fakeHost) ActivePath() string                       { return h.path }
-func (h *fakeHost) ActiveEditor() *editor.State              { return h.state }
-func (h *fakeHost) UserDataDir() string                      { return h.data }
-func (h *fakeHost) Language(string, string) *editor.Language { return nil }
-func (h *fakeHost) ConfigureEditor(*editor.State, string)    {}
-func (h *fakeHost) ConfigureDiff(*editor.DiffState, string)  {}
-
-func (h *fakeHost) OpenView(id, title string, view func(*ui.Context)) {
-	h.opened = append(h.opened, id)
-	h.views[id] = view
-	h.titles[id] = title
-}
-
-func (h *fakeHost) ShowError(title string, err error) {
-	h.errs = append(h.errs, title+": "+err.Error())
-}
-
-func (h *fakeHost) Ask(title, action, value string, submit func(string) error) {
-	h.asks = append(h.asks, askCall{title, action, value, submit})
-}
-
-func (h *fakeHost) pump(t *testing.T, done func() bool) {
-	t.Helper()
-	deadline := time.After(testTimeout)
-	for !done() {
-		select {
-		case fn := <-h.updates:
-			fn()
-		case <-deadline:
-			t.Fatal("timed out waiting for the background work")
-		}
-	}
-}
-
-func (h *fakeHost) drain() {
-	for {
-		select {
-		case fn := <-h.updates:
-			fn()
-		case <-time.After(20 * time.Millisecond):
-			return
-		}
-	}
-}
-
-func (h *fakeHost) lastError() string {
-	if len(h.errs) == 0 {
-		return ""
-	}
-	return h.errs[len(h.errs)-1]
-}
-
-func (h *fakeHost) lastNotice() string {
-	if len(h.notices) == 0 {
-		return ""
-	}
-	return h.notices[len(h.notices)-1]
-}
-
 type fakeBackend struct {
+	ghtest.Calls
 	mu         sync.Mutex
-	calls      []string
 	searches   []string
 	viewer     github.User
 	pages      map[string][]github.IssuePage
@@ -147,8 +54,8 @@ func newFakeBackend() *fakeBackend {
 }
 
 func (f *fakeBackend) record(name string) error {
+	f.Add(name)
 	f.mu.Lock()
-	f.calls = append(f.calls, name)
 	gate := f.gate[name]
 	err := f.errs[name]
 	f.mu.Unlock()
@@ -162,18 +69,6 @@ func (f *fakeBackend) with(fn func()) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	fn()
-}
-
-func (f *fakeBackend) called(name string) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n := 0
-	for _, c := range f.calls {
-		if c == name {
-			n++
-		}
-	}
-	return n
 }
 
 func (f *fakeBackend) Viewer(context.Context) (github.User, error) {
@@ -409,7 +304,7 @@ func (l *fakeLocal) Fetch(_ context.Context, remote string, _ bool, _ func(strin
 
 type harness struct {
 	t      *testing.T
-	h      *fakeHost
+	h      *ghtest.FakeHost
 	be     *fakeBackend
 	local  *fakeLocal
 	env    Env
@@ -422,19 +317,14 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	hs := &harness{t: t, h: newFakeHost(t), be: newFakeBackend(), local: newFakeLocal()}
+	hs := &harness{t: t, h: ghtest.NewFakeHost(testRoot, t.TempDir()), be: newFakeBackend(), local: newFakeLocal()}
 	hs.env = Env{
 		Token:      func(context.Context, string) (string, error) { return "tok", hs.token },
 		NewBackend: func(string, string) Backend { return hs.be },
-		OpenLocal: func(context.Context, string) (Local, error) {
-			if hs.open != nil {
-				return nil, hs.open
-			}
-			return hs.local, nil
-		},
-		OpenURL: func(u string) error { hs.urls = append(hs.urls, u); return nil },
-		Copy:    func(text string) { hs.copied = append(hs.copied, text) },
-		Now:     func() time.Time { return testNow },
+		OpenLocal:  ghtest.OpenLocal(&hs.open, func() Local { return hs.local }),
+		OpenURL:    func(u string) error { hs.urls = append(hs.urls, u); return nil },
+		Copy:       func(text string) { hs.copied = append(hs.copied, text) },
+		Now:        func() time.Time { return testNow },
 	}
 	return hs
 }
@@ -442,31 +332,14 @@ func newHarness(t *testing.T) *harness {
 func (hs *harness) start(t *testing.T) {
 	t.Helper()
 	hs.i = NewWith(hs.h, hs.env)
-	t.Cleanup(hs.i.Close)
-	hs.h.pump(t, func() bool { return hs.i.phase != phaseLoading })
+	ghtest.Start(t, hs.h, &hs.i.Session)
 }
 
 func (hs *harness) ready(t *testing.T) {
 	t.Helper()
 	hs.start(t)
-	if hs.i.phase != phaseReady {
-		t.Fatalf("phase %d, error %v", hs.i.phase, hs.i.phaseErr)
-	}
-}
-
-func mustHaveText(t *testing.T, tt *ui.Tester, texts ...string) {
-	t.Helper()
-	for _, s := range texts {
-		if !tt.HasText(s) {
-			t.Errorf("missing text %q in %q", s, tt.Texts())
-		}
-	}
-}
-
-func mustClick(t *testing.T, tt *ui.Tester, label string) {
-	t.Helper()
-	if err := tt.Click(label); err != nil {
-		t.Fatalf("click %q: %v (texts %q)", label, err, tt.Texts())
+	if hs.i.Phase != ghshared.PhaseReady {
+		t.Fatalf("phase %d, error %v", hs.i.Phase, hs.i.PhaseErr)
 	}
 }
 
