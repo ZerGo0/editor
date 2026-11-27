@@ -33,8 +33,9 @@ var overflowConfigs = []overflowConfig{
 var overflowThemes = []string{themeDark, themeLight}
 
 var overflowAllow = []qa.Allow{
-	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "notes-with-a-rather-long-name", Reason: "internal/search/finder: at the 640 px smallest window a file row's name and directory share about 580 px of text that needs 1030 px, so both cannot keep 60% of their width; the row cuts both with an ellipsis as Go to File does"},
-	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "internal/a-very-long-directory-name", Reason: "internal/search/finder: the directory of the same file row, see above"},
+	{Rule: qa.RuleTextCut, View: "scm", Role: "text", LabelPrefix: demoLongOutgoing, Context: "narrow-sidebar", Reason: "internal/design/list: at the 170 px side bar the row keeps the 60% of its width for the subject that list.TitleShare asks, which is less than the 60% of the 11 pt text this check asks for"},
+	{Rule: qa.RuleTextCut, View: "scm", Role: "text", LabelPrefix: demoLongOutgoing, Context: "smallest-window", Reason: "internal/design/list: the smallest window uses the same 170 px side bar, see above"},
+	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "internal/a-very-long-directory-name", Reason: "internal/search/finder: the file name keeps its space first and the directory of the same file row is cut with an ellipsis as Go to File does"},
 }
 
 func themeSuffix(theme string) string { return strings.ToLower(theme) }

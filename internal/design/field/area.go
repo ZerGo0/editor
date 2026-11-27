@@ -3,6 +3,7 @@ package field
 import (
 	"math"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -38,7 +39,12 @@ func TextArea(c *ui.Context, label string, value *string, o AreaOptions) ui.Elem
 	}
 	f := frame{label: label, error: o.Error, toggles: o.Toggles, actions: o.Actions, disabled: o.Disabled}
 	in := f.build(c, p, true, func() ui.Element {
-		in := ui.TextAreaBase(c.Key(keyOf(o.ID, label)), value).Placeholder(o.Placeholder).ReadOnly(o.ReadOnly).Lines(lo, hi)
+		in := ui.TextAreaBase(c.Key(keyOf(o.ID, label)), value).ReadOnly(o.ReadOnly).Lines(lo, hi)
+		placeholder, cut := oneLinePlaceholder(c, o.Placeholder, in.Bounds().W-2*token.PadInputX.Px())
+		in.Placeholder(placeholder)
+		if cut && *value == "" {
+			action.Tooltip(c, in, o.Placeholder)
+		}
 		if o.AutoFocus {
 			in.AutoFocus()
 		}

@@ -37,6 +37,7 @@ type Allow struct {
 	View        string
 	Role        string
 	LabelPrefix string
+	Context     string
 	Reason      string
 }
 
@@ -44,6 +45,7 @@ func (a Allow) Matches(f Flag) bool {
 	return (a.Rule == "" || a.Rule == f.Rule) &&
 		(a.View == "" || a.View == f.View) &&
 		(a.Role == "" || a.Role == f.Role) &&
+		strings.HasPrefix(f.Context, a.Context) &&
 		strings.HasPrefix(f.Label, a.LabelPrefix)
 }
 

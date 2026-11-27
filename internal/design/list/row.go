@@ -24,6 +24,9 @@ type Item struct {
 	Depth         int
 	Branch        bool
 	Open          bool
+	Pills         []Pill
+	LeadingWidth  float32
+	TrailingWidth float32
 	Trailing      func(c *ui.Context)
 	Content       func(c *ui.Context)
 	Tone          token.Tone
@@ -46,6 +49,7 @@ type State struct {
 	Focused  bool
 	Hovered  bool
 	Depth    int
+	Width    float32
 	Guides   bool
 	Branch   bool
 	Open     bool
@@ -73,8 +77,17 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 	case hovered:
 		row.Background(p.List.Hover)
 	}
+	showDescription := s.showDescription(c, it)
+	shown, dropped := s.fitPills(c, it, showDescription)
 	if it.Tooltip != "" {
-		action.Tooltip(c, row, it.Tooltip)
+		tip := it.Tooltip
+		if it.Description != "" && !showDescription {
+			tip += "\n" + it.Description
+		}
+		if len(dropped) > 0 {
+			tip += "\n" + droppedNames(dropped)
+		}
+		action.Tooltip(c, row, tip)
 	}
 	if s.tree && s.Guides && s.Depth > 0 {
 		guides(row, s.Depth, p.List.IndentGuide)
@@ -84,7 +97,14 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 			twistie(c, p, s)
 		}
 		leading(c, p, it, active)
-		label(c, p, it, active)
+		label(c, p, it, active, showDescription)
+		if len(shown) > 0 {
+			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Margin(0, 0, 0, token.GapInline.Px()).Children(func() {
+				for _, t := range shown {
+					badge.Tag(c, t.text, t.opts)
+				}
+			})
+		}
 		if it.Trailing != nil {
 			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { it.Trailing(c) })
 		}
@@ -156,7 +176,7 @@ func leading(c *ui.Context, p *token.Palette, it Item, active bool) {
 	}
 }
 
-func label(c *ui.Context, p *token.Palette, it Item, active bool) {
+func label(c *ui.Context, p *token.Palette, it Item, active, showDescription bool) {
 	if it.Content != nil {
 		ui.Row(c).Grow(1).MinWidth(0).FillHeight().AlignItems(ui.Center).Children(func() { it.Content(c) })
 		return
@@ -187,8 +207,8 @@ func label(c *ui.Context, p *token.Palette, it Item, active bool) {
 		if it.Strike {
 			name.Strikethrough()
 		}
-		if it.Description != "" {
-			token.TextLabel.Apply(ui.Text(c, it.Description)).TextColor(secondary).SingleLine().Shrink(1).MinWidth(0)
+		if showDescription {
+			token.TextLabel.Apply(ui.Text(c, it.Description)).TextColor(secondary).SingleLine().Shrink(descriptionShrink).MinWidth(0)
 		}
 	})
 }

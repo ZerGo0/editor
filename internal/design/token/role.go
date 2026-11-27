@@ -100,6 +100,7 @@ var (
 	NoticeMaxWidth        = Size{480}
 	TooltipMaxWidth       = Size{300}
 	TagMaxWidth           = Size{160}
+	PillNameMaxWidth      = Size{100}
 )
 
 const (

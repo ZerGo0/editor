@@ -491,18 +491,29 @@ func (p *PRs) prItem(c *ui.Context, pr *github.PullRequest) list.Item {
 	if when := relativeTime(p.env.Now(), pr.Updated); when != "" {
 		description += prMetaSeparator + when
 	}
+	_, _, hasCheck := checkAppearance(p.checks[pr.Number])
+	trailing := token.GapInline.Px()
+	if hasCheck {
+		trailing += token.IconSizeSmall.Px() + token.GapInline.Px()
+	}
+	if pr.Author != "" {
+		trailing += token.AvatarSize.Px()
+	}
+	var pills []list.Pill
+	if pr.Draft {
+		pills = append(pills, list.Pill{Text: prStateDraft})
+	}
 	return list.Item{
-		Depth:       1,
-		Label:       pr.Title,
-		Description: description,
-		Tooltip:     fmt.Sprintf("%s\n#%d by %s", pr.Title, pr.Number, pr.Author),
+		Depth:         1,
+		Label:         pr.Title,
+		Description:   description,
+		Pills:         pills,
+		TrailingWidth: trailing,
+		Tooltip:       fmt.Sprintf("%s\n#%d by %s", pr.Title, pr.Number, pr.Author),
 		Leading: func(c *ui.Context) {
 			ui.Icon(c, icons.PullRequest).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(*pr))).Shrink(0).AccessHidden(true)
 		},
 		Trailing: func(c *ui.Context) {
-			if pr.Draft {
-				mutedTag(c, prStateDraft)
-			}
 			checkIcon(c, p.checks[pr.Number])
 			if pr.Author != "" {
 				badge.Avatar(c, pr.Author, token.AvatarSize)

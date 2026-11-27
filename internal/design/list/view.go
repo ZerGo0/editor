@@ -20,9 +20,10 @@ func (o ViewOptions) size(el ui.Element) ui.Element {
 
 func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int) Item) ui.Element {
 	l := o.size(ui.List(c, s, n)).FillWidth().Label(o.Label).Background(ui.Transparent)
+	width := ObserveWidth(c, l)
 	l.Rows(func(r ui.ListRow) {
 		it := item(r.Index)
-		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, flat: o.Tree}, it)
+		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, Width: width, flat: o.Tree}, it)
 	})
 	if n == 0 && o.Empty != nil {
 		l.Children(func() { o.Empty(c) })
@@ -33,6 +34,7 @@ func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int)
 func Tree[K comparable](c *ui.Context, s *ui.OutlineState[K], roots []K, children func(K) []K, o ViewOptions, item func(K) Item) ui.Element {
 	box := o.size(ui.Column(c)).FillWidth()
 	guides := box.Hovered()
+	width := ObserveWidth(c, box)
 	focused := s.List.FocusWithin(c)
 	selected := selection(s)
 	var outline ui.Element
@@ -41,7 +43,7 @@ func Tree[K comparable](c *ui.Context, s *ui.OutlineState[K], roots []K, childre
 		s.Prefix = func(r ui.OutlineRow) { cur = r }
 		outline = ui.Outline(c, s, roots, children, func(k K) {
 			st := State{Selected: selected(k), Focused: focused, Depth: cur.Depth, Branch: cur.Branch, Open: cur.Open,
-				Guides: guides || focused, arrow: cur.Arrow, tree: true}
+				Guides: guides || focused, Width: width, arrow: cur.Arrow, tree: true}
 			Row(c, st, item(k))
 		}).Grow(1).FillWidth().MinHeight(0).Label(o.Label).Background(ui.Transparent)
 		if len(roots) == 0 && o.Empty != nil {

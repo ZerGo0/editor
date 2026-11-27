@@ -21,6 +21,7 @@ const (
 	demoIncoming       = 3
 	demoOutgoing       = 2
 	demoGitDate        = "2026-01-15T12:00:00+0000"
+	demoLongOutgoing   = "feat(local): unpushed change with long title"
 	demoStashMessage   = "WIP: experimental refactor of the renderer with a message long enough to overflow the row"
 	demoStashUntracked = "WIP: scratch notes kept as untracked files"
 	demoUntrackedPer   = 160
@@ -226,7 +227,11 @@ func (d *DemoProject) remote(g *demoGit) {
 	g.run("branch", "-q", "-D", "incoming")
 	g.run("fetch", "-q", demoRemoteName)
 	for i := range demoOutgoing {
-		g.commitFile(fmt.Sprintf("outgoing/local-change-%d.txt", i), fmt.Sprintf("local change %d\n", i), fmt.Sprintf("feat(local): unpushed change %d", i))
+		subject := fmt.Sprintf("feat(local): unpushed change %d", i)
+		if i == demoOutgoing-1 {
+			subject = demoLongOutgoing
+		}
+		g.commitFile(fmt.Sprintf("outgoing/local-change-%d.txt", i), fmt.Sprintf("local change %d\n", i), subject)
 	}
 }
 

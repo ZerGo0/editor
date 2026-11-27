@@ -3,6 +3,7 @@ package gitui
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/design/action"
@@ -18,11 +19,8 @@ import (
 const (
 	graphAuto      = ""
 	graphNearEnd   = 40
-	graphMaxBadges = 3
 	fileRowLoading = -1
 	commitRow      = -2
-
-	incomingInkNudgeX float32 = 1
 )
 
 type graphFiles struct {
@@ -213,13 +211,14 @@ func (g *Git) graphPane(c *ui.Context) {
 	s.list.NearEnd = graphNearEnd
 	s.list.EndReached = func(int) { g.loadGraphPage() }
 	l := ui.List(c.Key("graph"), &s.list, len(entries)).Grow(1).FillWidth().MinHeight(0).Label("Graph").Background(ui.Transparent)
+	width := list.ObserveWidth(c, l)
 	l.Rows(func(row ui.ListRow) {
 		rc := row.Context
-		st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered()}
+		st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered(), Width: width}
 		e := entries[row.Index]
 		cm := commits[e.commit]
 		if e.file == commitRow {
-			el := list.Row(rc, st, g.graphCommitItem(rc, st, e.commit, gw, remotes))
+			el := list.Row(rc, st, g.graphCommitItem(rc, e.commit, gw, remotes))
 			feedback.HoverCard(rc, el, func() { g.commitCard(rc, cm, remotes) })
 			return
 		}
@@ -265,51 +264,62 @@ func (g *Git) graphLanes(c *ui.Context, i int, gw float32, through bool) {
 	})
 }
 
-func (g *Git) graphCommitItem(c *ui.Context, st list.State, i int, gw float32, remotes map[string]bool) list.Item {
+func (g *Git) graphCommitItem(c *ui.Context, i int, gw float32, remotes map[string]bool) list.Item {
 	s := &g.graph
 	cm := s.commits[i]
 	_, open := s.expanded[cm.OID]
 	return list.Item{
-		Label:       cm.Subject,
-		Description: cm.Author,
-		Muted:       len(cm.Parents) > 1,
-		Open:        open,
-		Content:     func(c *ui.Context) { commitSubject(c, st, cm) },
-		Leading:     func(c *ui.Context) { g.graphLanes(c, i, gw, false) },
-		Trailing:    func(c *ui.Context) { g.commitMarkers(c, cm, remotes) },
-		Menu:        func(m *ui.Menu) { g.graphCommitMenu(c, m, cm) },
-		OnClick:     func() { g.toggleCommitFiles(cm) },
+		Label:        cm.Subject,
+		Description:  cm.Author,
+		Muted:        len(cm.Parents) > 1,
+		Open:         open,
+		Pills:        g.graphPills(cm, remotes),
+		LeadingWidth: gw,
+		Leading:      func(c *ui.Context) { g.graphLanes(c, i, gw, false) },
+		Menu:         func(m *ui.Menu) { g.graphCommitMenu(c, m, cm) },
+		OnClick:      func() { g.toggleCommitFiles(cm) },
 		OnDoubleClick: func() {
 			g.openCommitTab(cm)
 		},
 	}
 }
 
-func commitSubject(c *ui.Context, st list.State, cm git.Commit) {
-	p := token.Of(c)
-	text, secondary := p.Text.Primary, p.Text.Secondary
+func (g *Git) graphPills(cm git.Commit, remotes map[string]bool) []list.Pill {
+	var pills []list.Pill
 	switch {
-	case st.Selected && st.Focused:
-		text, secondary = p.List.ActiveSelectionText, p.List.ActiveSelectionSecondary
-	case len(cm.Parents) > 1:
-		text = p.Git.Ignored
+	case g.graph.incoming[cm.OID]:
+		pills = append(pills, list.Pill{Icon: icons.Pull, Tone: token.ToneInfo, Tooltip: "Incoming commit"})
+	case g.graph.outgoing[cm.OID]:
+		pills = append(pills, list.Pill{Icon: icons.Push, Tone: token.ToneSuccess, Tooltip: "Outgoing commit"})
 	}
-	ui.Row(c).Grow(1).MinWidth(0).Gap(token.GapRowIcon.Px()).AlignItems(ui.Baseline).Children(func() {
-		ui.Text(c, cm.Subject).FontSize(token.TextBody.Px()).TextColor(text).SingleLine().Shrink(1).MinWidth(0).AccessHidden(true)
-		ui.Text(c, cm.Author).FontSize(token.TextLabel.Px()).TextColor(secondary).SingleLine().Shrink(1).MinWidth(0).AccessHidden(true)
-	})
-}
-
-func (g *Git) commitMarkers(c *ui.Context, cm git.Commit, remotes map[string]bool) {
-	s := &g.graph
-	p := token.Of(c)
-	switch {
-	case s.incoming[cm.OID]:
-		ui.Icon(c, icons.Pull).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).Translate(incomingInkNudgeX, 0).TextColor(p.Severity.Info).Label("Incoming").Tooltip("Incoming commit")
-	case s.outgoing[cm.OID]:
-		ui.Icon(c, icons.Push).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Severity.Success).Label("Outgoing").Tooltip("Outgoing commit")
+	named := false
+	byKind := map[refKind][]string{}
+	var kinds []refKind
+	for _, b := range refBadges(cm.Refs, remotes) {
+		if b.kind != refHead && (b.kind != refRemote || b.name != g.graph.upstream) {
+			continue
+		}
+		tone, icon := refTone(b.kind)
+		if !named {
+			named = true
+			pills = append(pills, list.Pill{Text: b.name, Icon: icon, Tone: tone, Tooltip: b.name})
+			continue
+		}
+		if len(byKind[b.kind]) == 0 {
+			kinds = append(kinds, b.kind)
+		}
+		byKind[b.kind] = append(byKind[b.kind], b.name)
 	}
-	refTags(c, cm.Refs, remotes, graphMaxBadges)
+	for _, k := range kinds {
+		tone, icon := refTone(k)
+		names := byKind[k]
+		count := ""
+		if len(names) > 1 {
+			count = strconv.Itoa(len(names))
+		}
+		pills = append(pills, list.Pill{Text: count, Short: count, Icon: icon, Tone: tone, Tooltip: strings.Join(names, ", ")})
+	}
+	return pills
 }
 
 func refTone(k refKind) (token.Tone, *ui.SVG) {

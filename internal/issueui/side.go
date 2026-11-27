@@ -26,7 +26,6 @@ const (
 	repoQueryPrefix    = "repo:${owner}/${repository} "
 	noMilestoneTitle   = "No Milestone"
 	issueMetaSeparator = " · "
-	maxSideLabels      = 1
 )
 
 type section struct {
@@ -373,19 +372,12 @@ func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
 		Depth:       depth,
 		Label:       issue.Title,
 		Description: description,
-		Tooltip:     fmt.Sprintf("%s\n#%d by %s", issue.Title, issue.Number, issue.Author),
+		Tooltip:     issueTooltip(issue),
 		Count:       issue.Comments,
 		Leading: func(c *ui.Context) {
 			ui.Icon(c, svg).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(issue))).Shrink(0).Label(stateLabel(issue))
 		},
 		Trailing: func(c *ui.Context) {
-			for n, l := range issue.Labels {
-				if n == maxSideLabels {
-					mutedTag(c, "+"+strconv.Itoa(len(issue.Labels)-maxSideLabels))
-					break
-				}
-				labelTag(c, l)
-			}
 			if issue.Author != "" {
 				badge.Avatar(c, issue.Author, token.AvatarSize)
 			}
@@ -393,6 +385,18 @@ func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
 		OnClick: func() { i.openIssue(issue.Number, r.issue) },
 		Menu:    func(m *ui.Menu) { i.issueMenu(c, m, issue) },
 	}
+}
+
+func issueTooltip(issue github.Issue) string {
+	tip := fmt.Sprintf("%s\n#%d by %s", issue.Title, issue.Number, issue.Author)
+	if len(issue.Labels) == 0 {
+		return tip
+	}
+	names := make([]string, len(issue.Labels))
+	for i, l := range issue.Labels {
+		names[i] = l.Name
+	}
+	return tip + "\n" + strings.Join(names, ", ")
 }
 
 func (i *Issues) issueMenu(c *ui.Context, m *ui.Menu, issue github.Issue) {
