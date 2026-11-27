@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -87,8 +88,8 @@ func (e *Engine) setMoves(moves []Move) {
 	e.annots = make([]editor.DiffAnnotation, 0, 2*len(moves))
 	for i, m := range moves {
 		e.annots = append(e.annots,
-			editor.DiffAnnotation{Side: editor.DiffOld, Line: m.OldStart, Height: moveRowHeight, Key: moveKey{i, editor.DiffOld}},
-			editor.DiffAnnotation{Side: editor.DiffNew, Line: m.NewStart, Height: moveRowHeight, Key: moveKey{i, editor.DiffNew}},
+			editor.DiffAnnotation{Side: editor.DiffOld, Line: m.OldStart, Height: token.ControlHeightSmall.Px(), Key: moveKey{i, editor.DiffOld}},
+			editor.DiffAnnotation{Side: editor.DiffNew, Line: m.NewStart, Height: token.ControlHeightSmall.Px(), Key: moveKey{i, editor.DiffNew}},
 		)
 	}
 }

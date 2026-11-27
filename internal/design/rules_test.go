@@ -26,7 +26,7 @@ const (
 var ruleDirs = []string{
 	"internal/app", "internal/workspace", "internal/gitui", "internal/prui", "internal/issueui", "internal/search/view",
 	"internal/viewer", "internal/insights", "internal/palette", "internal/prefs", "internal/largefile", "internal/history",
-	"internal/findwidget",
+	"internal/findwidget", "internal/git/diffmode",
 }
 
 var visualSetters = map[string]bool{

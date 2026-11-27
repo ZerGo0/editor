@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -11,10 +12,6 @@ import (
 
 const (
 	selectionFlash = 1500 * time.Millisecond
-	moveRowPadding = 8
-	moveRowGap     = 4
-	moveIconSize   = 12
-	moveFontSize   = 12
 	scrollAnchor   = 3.0
 )
 
@@ -32,18 +29,8 @@ func (e *Engine) moveRow(c *ui.Context, k moveKey) {
 	if down {
 		icon = icons.ChevronDown
 	}
-	t := c.Theme()
-	b := ui.ButtonBase(c.Key(fmt.Sprintf("move-%d-%d", k.index, k.side))).FillWidth().Height(moveRowHeight).
-		Padding(0, moveRowPadding).AlignItems(ui.Center).Justify(ui.Start).Label(label).Background(t.Surface)
-	if b.Hovered() {
-		b.Background(t.SurfaceHover)
-	}
-	b.Children(func() {
-		ui.Row(c).Gap(moveRowGap).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, icon).Size(moveIconSize, moveIconSize).TextColor(t.TextMuted)
-			ui.Text(c, label).FontSize(moveFontSize).TextColor(t.TextMuted).SingleLine()
-		})
-	})
+	b := action.Button(c, label, action.ButtonOptions{Variant: action.Ghost, Small: true, Icon: icon, ID: fmt.Sprintf("move-%d-%d", k.index, k.side)}).
+		FillWidth().Justify(ui.Start)
 	if b.Clicked() {
 		e.Jump(k.index, k.side)
 	}

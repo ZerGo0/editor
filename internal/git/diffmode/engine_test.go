@@ -221,7 +221,7 @@ func TestWhitespaceMenuChoosesMode(t *testing.T) {
 	if err := tt.Click("Ignore Whitespace"); err != nil {
 		t.Fatal(err)
 	}
-	if err := tt.ChooseMenuItem("Ignore whitespaces"); err != nil {
+	if err := tt.Click("Ignore whitespaces"); err != nil {
 		t.Fatal(err)
 	}
 	if Session.Whitespace != git.WhitespaceIgnore {

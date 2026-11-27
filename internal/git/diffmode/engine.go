@@ -16,7 +16,6 @@ const (
 	DefaultDelay           = 300 * time.Millisecond
 	MaxMoveChangedLines    = 5000
 	MaxWhitespaceTextBytes = 16 << 20
-	moveRowHeight          = 22
 	noticeLimit            = 90
 	noticePrefix           = "Showing all changes: "
 	unsetMode              = git.WhitespaceMode(-1)
