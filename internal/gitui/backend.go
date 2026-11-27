@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo"
 )
@@ -177,6 +179,11 @@ func openCLI(ctx context.Context, dir, dataDir string) (repo, error) {
 	if err != nil {
 		return nil, err
 	}
+	applog.Go(func() {
+		if err := r.EnsureCommitGraph(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("git commit-graph: %v", err)
+		}
+	})
 	sum := sha256.Sum256([]byte(r.Root))
 	parts := append([]string{dataDir}, shelfDataDirs...)
 	shelf := git.Shelf{Dir: filepath.Join(append(parts, hex.EncodeToString(sum[:])[:shelfHashLength])...)}
