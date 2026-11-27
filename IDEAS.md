@@ -23,3 +23,7 @@ Features we chose not to build now. Each one comes from the [IDE research](docs/
 ## Extras
 
 - **Zen mode (S):** full-screen editing without distractions.
+
+## Review
+
+- **Annotated review for agents (L):** owner request, modeled on [Plannotator](https://plannotator.ai/). Annotate local changes (PR-style diff with a file tree and staging), Markdown plans (rendered preview, with versions and diffs between them), GitHub PR diffs and any open file. Annotation types as in Plannotator: comments, replacements or code suggestions, deletions, and a global comment. The finished review goes straight to a running agent, for example Claude Code through a hook or a watched file, as structured feedback.
