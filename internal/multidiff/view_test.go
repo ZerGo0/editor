@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -51,14 +52,33 @@ type rig struct {
 	tt      *ui.Tester
 	viewed  *Memory
 	onFrame func()
+	mu      sync.Mutex
+	posted  []func()
+}
+
+func (r *rig) post(f func()) {
+	r.mu.Lock()
+	r.posted = append(r.posted, f)
+	r.mu.Unlock()
+}
+
+func (r *rig) runPosted() {
+	r.mu.Lock()
+	posted := r.posted
+	r.posted = nil
+	r.mu.Unlock()
+	for _, f := range posted {
+		f()
+	}
 }
 
 func newRig(t testing.TB, entries []Entry) *rig {
 	t.Helper()
 	r := &rig{v: New(), viewed: NewMemory()}
 	r.v.SetEntries(entries)
-	o := Options{Label: "Changes", Set: testSet, Ctx: context.Background(), Post: func(f func()) { f() }, Viewed: r.viewed}
+	o := Options{Label: "Changes", Set: testSet, Ctx: context.Background(), Post: r.post, Viewed: r.viewed}
 	r.tt = ui.NewTester(func(c *ui.Context) {
+		r.runPosted()
 		r.v.Render(c, o)
 		if r.onFrame != nil {
 			r.onFrame()
