@@ -93,6 +93,30 @@ func TestLogRowsKeepTheSubjectAndTruncateAuthor(t *testing.T) {
 	}
 }
 
+func TestLogRowsKeepTheSubjectBesideAGraph(t *testing.T) {
+	now := time.Now()
+	r := &fakeRepo{status: &git.Status{Branch: "main", OID: "c2"}, commits: []git.Commit{
+		{OID: "c2", Parents: []string{"c0"}, Author: longAuthor, AuthorTime: now, Subject: longSubject},
+		{OID: "c1", Parents: []string{"c0"}, Author: "Ada", AuthorTime: now, Subject: "Side change", Refs: []string{longBranch}},
+		{OID: "c0", Author: "Ada", AuthorTime: now, Subject: "First change"},
+	}}
+	g, h := newFakeGit(t, r)
+	tt := ui.NewTester(g.LogPanel, widePanelW, panelHeightPx)
+	h.drain(t, func() bool { tt.Frame(); return tt.HasText("First change") })
+	tt.Frame()
+	row, ok := tt.Find(longSubject)
+	if !ok {
+		t.Fatalf("no row for %q", longSubject)
+	}
+	author, ok := tt.Find(longAuthor)
+	if !ok {
+		t.Fatal("no author column")
+	}
+	if subject := author.X - row.X - graphWidth(g.log.graph); subject < subjectMin() {
+		t.Errorf("the subject gets %.1f px before the author, want at least %.1f", subject, subjectMin())
+	}
+}
+
 func TestLogColumnsDropWhatDoesNotFit(t *testing.T) {
 	s := &logState{}
 	if got := s.columns(0, 3); got != (logColumns{}) {
