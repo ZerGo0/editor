@@ -72,7 +72,7 @@ func (v *View) SetEntries(entries []Entry) {
 		}
 		f := old[e.Key]
 		delete(old, e.Key)
-		if f != nil && f.entry.Fingerprint != e.Fingerprint {
+		if f != nil && f.entry.Fingerprint != "" && f.entry.Fingerprint != e.Fingerprint {
 			delete(v.open, e.Key)
 			if f.state != nil && f.engine != nil && e.Patch == nil {
 				f.reload()

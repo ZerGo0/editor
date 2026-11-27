@@ -47,6 +47,7 @@ type patchTab struct {
 	id      string
 	title   string
 	load    func(ctx context.Context, r repo) ([]patchItem, error)
+	quick   func() []patchItem
 	prepare func()
 	items   []patchItem
 	loaded  bool
@@ -105,6 +106,10 @@ func (t *patchTab) reload() {
 	t.gen++
 	gen, r, load := t.gen, g.repo, t.load
 	t.loading, t.err = true, nil
+	if !t.loaded && t.quick != nil {
+		t.items, t.loaded = t.quick(), true
+		t.view.SetEntries(t.entries(r))
+	}
 	applog.Go(func() {
 		items, err := load(g.ctx, r)
 		g.post(func() {

@@ -25,6 +25,7 @@ func (g *Git) openGroupAt(gr group, rel string, preview, focus bool) {
 	g.openPatchTabWith(id, title, nil, patchOpen{reveal: rel, preview: preview, focus: focus, prepare: func(t *patchTab) {
 		t.prepare = func() {
 			rows := changeGroups(g.snap.status)[gr]
+			t.quick = func() []patchItem { return rowItems(rows) }
 			t.load = func(ctx context.Context, r repo) ([]patchItem, error) { return g.groupItems(ctx, r, gr, rows) }
 		}
 	}})
@@ -47,11 +48,10 @@ func (g *Git) groupItems(ctx context.Context, r repo, gr group, rows []changeRow
 			counts[fd.Path()] = fd
 		}
 	}
-	items := make([]patchItem, 0, len(rows))
-	for i := range rows {
+	items := rowItems(rows)
+	for i := range items {
+		it := &items[i]
 		row := rows[i]
-		src := rowSource(row)
-		it := patchItem{title: row.file.Path, detail: row.file.OrigPath, code: row.code(), src: &src, row: &row}
 		if fd, ok := counts[row.file.Path]; ok {
 			it.adds, it.dels, it.counted, it.binary = diffCounts(fd), diffDels(fd), true, fd.Binary
 			it.fingerprint = diffFingerprint(fd)
@@ -59,9 +59,18 @@ func (g *Git) groupItems(ctx context.Context, r repo, gr group, rows []changeRow
 			it.size = info.Size()
 			it.fingerprint = strconv.FormatInt(info.Size(), 36) + ":" + strconv.FormatInt(info.ModTime().UnixNano(), 36)
 		}
-		items = append(items, it)
 	}
 	return items, nil
+}
+
+func rowItems(rows []changeRow) []patchItem {
+	items := make([]patchItem, len(rows))
+	for i := range rows {
+		row := rows[i]
+		src := rowSource(row)
+		items[i] = patchItem{title: row.file.Path, detail: row.file.OrigPath, code: row.code(), src: &src, row: &row}
+	}
+	return items
 }
 
 func trackedPaths(rows []changeRow) []string {

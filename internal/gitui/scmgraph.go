@@ -92,12 +92,18 @@ func (g *Git) loadGraphPage() {
 	s.loading = true
 	gen, skip, r := s.gen, len(s.commits), g.repo
 	opts := g.graphOptions(skip)
+	if skip == 0 {
+		applog.Go(func() {
+			in, out := syncSets(g, r)
+			g.post(func() {
+				if gen == s.gen {
+					s.incoming, s.outgoing = in, out
+				}
+			})
+		})
+	}
 	applog.Go(func() {
 		page, err := r.Log(g.ctx, opts)
-		var in, out map[string]bool
-		if err == nil && skip == 0 {
-			in, out = syncSets(g, r)
-		}
 		g.post(func() {
 			if gen != s.gen {
 				return
@@ -106,9 +112,6 @@ func (g *Git) loadGraphPage() {
 			if err != nil {
 				s.err = err
 				return
-			}
-			if skip == 0 {
-				s.incoming, s.outgoing = in, out
 			}
 			s.err = nil
 			s.commits = append(s.commits, page...)
