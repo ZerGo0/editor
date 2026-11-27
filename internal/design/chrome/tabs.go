@@ -151,20 +151,21 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 func tabEnd(c *ui.Context, p *token.Palette, active, hovered bool, i int, t Tab, o TabStripOptions) {
 	slot := ui.Box(c).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Center().Shrink(0)
 	slot.Children(func() {
+		pointed := hovered || slot.Hovered()
 		switch {
+		case t.Dirty && !pointed:
+			ui.Box(c).Size(token.DirtyDotSize.Px(), token.DirtyDotSize.Px()).Radius(token.RadiusPill.Px()).Background(p.Text.Primary).
+				AccessHidden(true)
 		case t.Pinned && o.OnUnpin != nil:
 			if action.IconButton(c, icons.Pin, unpinLabel+" "+t.Label, action.IconOptions{Tooltip: unpinLabel}).Clicked() {
 				o.OnUnpin(i)
 			}
 		case t.Pinned:
 			ui.Icon(c, icons.Pin).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Icon).AccessHidden(true)
-		case hovered || slot.Hovered() || active && !t.Dirty:
+		case pointed || active:
 			if action.IconButton(c, icons.Close, closeLabel+" "+t.Label, action.IconOptions{Tooltip: closeLabel}).Clicked() && o.OnClose != nil {
 				o.OnClose(i)
 			}
-		case t.Dirty:
-			ui.Box(c).Size(token.DirtyDotSize.Px(), token.DirtyDotSize.Px()).Radius(token.RadiusPill.Px()).Background(p.Text.Primary).
-				AccessHidden(true)
 		}
 	})
 }
