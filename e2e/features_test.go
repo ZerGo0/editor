@@ -171,11 +171,11 @@ func TestOpenRecentFocusesAFolderOpenInAnotherWindow(t *testing.T) {
 			other := app.WaitWindow(filepath.Base(second))
 			app.Idle(win)
 			choose(app, win, filepath.Base(second))
-			app.Eventually("the other window comes to the front", func() bool {
-				return slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.ID == other && w.Visible })
-			})
-			if !slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.ID == win }) {
-				t.Fatalf("the window that opened the folder closed; windows %v", app.Windows())
+			app.Idle(other)
+			windows := app.Windows()
+			if len(windows) != 2 || !slices.ContainsFunc(windows, func(w Window) bool { return w.ID == win }) ||
+				!slices.ContainsFunc(windows, func(w Window) bool { return w.ID == other }) {
+				t.Fatalf("windows = %v, want the two windows %d and %d and no new one", windows, win, other)
 			}
 		})
 	}

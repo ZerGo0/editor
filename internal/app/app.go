@@ -150,10 +150,21 @@ func (a *App) restore() {
 	}
 }
 
+func (a *App) raise(win *mygo.Window) {
+	win.Restore()
+	if !a.options.Hidden {
+		win.Focus()
+	}
+}
+
+func (a *App) raiseProject(pw *projectWindow) {
+	a.raise(pw.win)
+	a.touchWindow(pw)
+}
+
 func (a *App) focusAny() {
 	if pw := a.lastActiveWindow(); pw != nil {
-		pw.win.Restore()
-		pw.win.Focus()
+		a.raiseProject(pw)
 		return
 	}
 	a.showWelcome()
@@ -161,8 +172,7 @@ func (a *App) focusAny() {
 
 func (a *App) openProject(root string) *projectWindow {
 	if pw, ok := a.projects[root]; ok {
-		pw.win.Restore()
-		pw.win.Focus()
+		a.raiseProject(pw)
 		return pw
 	}
 	ws := workspace.New(root, a.store.State.Projects[root], a.env)

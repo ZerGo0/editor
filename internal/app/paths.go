@@ -43,8 +43,7 @@ func (a *App) openPathIn(path string, window *projectWindow) bool {
 	pw := window
 	if pw == nil {
 		if pw = a.windowForFile(path); pw != nil {
-			pw.win.Restore()
-			pw.win.Focus()
+			a.raiseProject(pw)
 		} else {
 			pw = a.openProject(filepath.Dir(path))
 		}

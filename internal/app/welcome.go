@@ -26,8 +26,7 @@ const (
 
 func (a *App) showWelcome() {
 	if a.welcome != nil {
-		a.welcome.Restore()
-		a.welcome.Focus()
+		a.raise(a.welcome)
 		return
 	}
 	a.welcome = mygo.NewWindow(mygo.WindowOptions{

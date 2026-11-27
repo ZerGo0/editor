@@ -70,8 +70,16 @@ func TestFileOutsideTheFolderReloadsWhenItChangesOnDisk(t *testing.T) {
 	root := Project(t, map[string]string{"a.txt": "alpha\n"})
 	outside := filepath.Join(Project(t, map[string]string{"loose.txt": "before\n"}), "loose.txt")
 	app := LaunchWith(t, t.TempDir(), root, outside)
-	win := app.WaitWindow("loose.txt - " + filepath.Base(root))
+	var win int
+	app.Eventually("the folder window", func() bool {
+		windows := app.Windows()
+		if len(windows) == 1 {
+			win = windows[0].ID
+		}
+		return win != 0
+	})
 	app.Idle(win)
+	app.WaitWindow("loose.txt - " + filepath.Base(root))
 	app.WaitNode(win, "text before the change", func(n Node) bool {
 		return n.Role == "textField" && strings.Contains(n.Value, "before")
 	})
