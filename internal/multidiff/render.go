@@ -50,7 +50,7 @@ func (v *View) Render(c *ui.Context, o Options) {
 	root.Children(func() {
 		v.toolbar(c, o)
 		if v.treeShown() {
-			ui.Split(c, &v.tree.width, func() { v.sidebar(c) }, func() { v.stack(c, o) }).Grow(1).FillWidth().MinHeight(0)
+			ui.Split(c, &v.tree.width, func() { v.sidebar(c) }, func() { v.stack(c, o) }).SplitReset(token.SidebarMinWidth.Px()).Grow(1).FillWidth().MinHeight(0)
 		} else {
 			v.stack(c, o)
 		}

@@ -264,3 +264,31 @@ func TestFilesRowsShowTheFolderAsAsideWithThePathAsTooltip(t *testing.T) {
 		}
 	}
 }
+
+func TestFindWindowRowMenu(t *testing.T) {
+	f := newFixture(t, demoProject)
+	f.open(TabText, "")
+	f.type_("needle")
+	f.click(findWindowLabel)
+	f.find.Show(f.found[0])
+	f.settle()
+	if err := f.tt.RightClick("readme.md"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.tt.ChooseMenuItem("Copy Path"); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.tt.Clipboard(); got != f.path("docs/readme.md") {
+		t.Fatalf("clipboard %q", got)
+	}
+	f.opened, f.sides = nil, nil
+	if err := f.tt.RightClick("readme.md"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.tt.ChooseMenuItem("Open to the Side"); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.opened) != 1 || f.opened[0].Path != f.path("docs/readme.md") || !f.sides[0] {
+		t.Fatalf("opened %+v sides %v", f.opened, f.sides)
+	}
+}

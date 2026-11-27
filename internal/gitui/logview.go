@@ -267,7 +267,7 @@ func (s *logState) view(c *ui.Context) {
 		s.reload()
 	}
 	s.filterBar(c)
-	ui.SplitPercent(c, &s.split, func() { s.listView(c) }, func() { s.detailsView(c) }).Grow(1).FillWidth().MinHeight(0)
+	ui.SplitPercent(c, &s.split, func() { s.listView(c) }, func() { s.detailsView(c) }).SplitReset(defaultLogSplit).Grow(1).FillWidth().MinHeight(0)
 }
 
 func (s *logState) filterBar(c *ui.Context) {

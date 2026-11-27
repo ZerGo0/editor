@@ -139,15 +139,11 @@ func (w *Workspace) gutterClick(tab *layout.Tab, line int) {
 		return
 	}
 	selectLine(st, line)
+	w.gutter = &gutterDrag{st: st, line: line}
 }
 
 func selectLine(st *editor.State, line int) {
-	buf := st.Buffer
-	end := buf.Len()
-	if line+1 < buf.LineCount() {
-		end = buf.Offset(editor.Pos{Line: line + 1})
-	}
-	st.Select(buf.Offset(editor.Pos{Line: line}), end)
+	st.Select(lineOffset(st.Buffer, line), lineOffset(st.Buffer, line+1))
 }
 
 func (w *Workspace) groupOf(tab *layout.Tab) *layout.Group {

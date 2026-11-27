@@ -66,6 +66,7 @@ type Workspace struct {
 	focus         focusFlags
 	title         titleState
 	drag          dragState
+	gutter        *gutterDrag
 	closed        []string
 	settingsView  *prefs.SettingsView
 	keysView      *prefs.KeysView

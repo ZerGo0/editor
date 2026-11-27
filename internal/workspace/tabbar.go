@@ -99,21 +99,35 @@ func (w *Workspace) editorActions(c *ui.Context, g *layout.Group) {
 }
 
 func (w *Workspace) dropTarget(el ui.Element, g *layout.Group, at int) {
-	if d, ok := ui.Drop[tabDrag](el); ok {
-		w.moveTab(d, g, at)
-	}
-	if paths, ok := ui.Drop[filetree.Paths](el); ok {
-		w.openDropped(g, paths)
+	switch v := droppedValue(el).(type) {
+	case tabDrag:
+		w.moveTab(v, g, at)
+	case filetree.Paths:
+		w.openDropped(g, v)
 	}
 	if files := el.DroppedFiles(); len(files) > 0 {
 		w.openDropped(g, files)
 	}
 }
 
+func droppedValue(el ui.Element) any {
+	if v, ok := ui.Drop[any](el); ok && isWorkbenchDrag(v) {
+		return v
+	}
+	return nil
+}
+
+func isWorkbenchDrag(v any) bool {
+	switch v.(type) {
+	case tabDrag, filetree.Paths:
+		return true
+	}
+	return false
+}
+
 func dragging(el ui.Element) bool {
-	_, tab := ui.DragOver[tabDrag](el)
-	_, files := ui.DragOver[filetree.Paths](el)
-	return tab || files
+	v, ok := ui.DragOver[any](el)
+	return ok && isWorkbenchDrag(v)
 }
 
 func (w *Workspace) tabIcon(c *ui.Context, p string) {

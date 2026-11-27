@@ -92,6 +92,20 @@ func TestTreeClickPreviewsAndEnterPins(t *testing.T) {
 	}
 }
 
+func TestTreeDoubleClickOpensPermanently(t *testing.T) {
+	_, tt, got, _ := newTestTree(t, "a.txt")
+	row, ok := tt.AccessByRole(ui.RoleTreeItem, "a.txt")
+	if !ok {
+		t.Fatal("no row for a.txt")
+	}
+	x, y := row.Bounds.X+row.Bounds.W/2, row.Bounds.Y+row.Bounds.H/2
+	tt.ClickAt(x, y)
+	tt.ClickAt(x, y)
+	if len(got.preview) == 0 || got.preview[len(got.preview)-1] {
+		t.Fatalf("double click opened with preview %v", got.preview)
+	}
+}
+
 func TestTreeRenameInline(t *testing.T) {
 	_, tt, got, root := newTestTree(t, "a.txt")
 	if err := tt.Click("a.txt"); err != nil {

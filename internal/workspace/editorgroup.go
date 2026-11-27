@@ -69,15 +69,15 @@ func (w *Workspace) dropZone(c *ui.Context, g *layout.Group, z dropZone) {
 	if z.center {
 		el.Grow(2)
 	}
-	if d, ok := ui.Drop[tabDrag](el); ok {
+	switch v := droppedValue(el).(type) {
+	case tabDrag:
 		if z.center {
-			w.moveTab(d, g, len(g.Tabs))
+			w.moveTab(v, g, len(g.Tabs))
 		} else {
-			w.splitWith(d, g, z.vertical, z.before)
+			w.splitWith(v, g, z.vertical, z.before)
 		}
-	}
-	if paths, ok := ui.Drop[filetree.Paths](el); ok {
-		w.openDropped(g, paths)
+	case filetree.Paths:
+		w.openDropped(g, v)
 	}
 	if dragging(el) {
 		el.Children(func() { dropHighlight(c) })

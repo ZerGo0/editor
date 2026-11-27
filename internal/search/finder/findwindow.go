@@ -2,6 +2,7 @@ package finder
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -88,8 +89,12 @@ func (f *FindWindow) toggle(file *FileNode) {
 }
 
 func (f *FindWindow) openRow(r findRow) {
+	f.openRowWith(r, OpenOptions{Preview: true, Focus: true})
+}
+
+func (f *FindWindow) openRowWith(r findRow, o OpenOptions) {
 	f.cursor, f.hasCursor = r, true
-	f.env.open(r.file.location(r.match), OpenOptions{Preview: true, Focus: true})
+	f.env.open(r.file.location(r.match), o)
 }
 
 func (f *FindWindow) Actions(c *ui.Context) {
@@ -114,7 +119,7 @@ func (f *FindWindow) View(c *ui.Context) {
 				token.TextLabel.Apply(ui.Text(c, f.summary())).TextColor(p.Text.Secondary).SingleLine().Role(ui.RoleStatus)
 			})
 		}
-		list.View(c, &f.list, len(f.rows), list.ViewOptions{Label: findListLabel, Tree: true, Empty: f.empty}, func(i int) list.Item { return f.item(p, i) })
+		list.View(c, &f.list, len(f.rows), list.ViewOptions{Label: findListLabel, Tree: true, Empty: f.empty}, func(i int) list.Item { return f.item(c, p, i) })
 	})
 }
 
@@ -142,11 +147,29 @@ func (f *FindWindow) empty(c *ui.Context) {
 	feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No results to show", Message: "Choose Open in Find Window in Search Everywhere to keep its results here."})
 }
 
-func (f *FindWindow) item(p *token.Palette, i int) list.Item {
+func (f *FindWindow) rowMenu(c *ui.Context, r findRow) func(m *ui.Menu) {
+	return func(m *ui.Menu) {
+		if m.Item("Open").Chosen() {
+			f.openRow(r)
+		}
+		if m.Item("Open to the Side").Chosen() {
+			f.openRowWith(r, OpenOptions{Focus: true, Side: true})
+		}
+		m.Separator()
+		if m.Item("Copy").Disabled(r.match < 0).Chosen() {
+			c.WriteClipboard(strings.TrimSpace(r.file.Matches[r.match].Preview))
+		}
+		if m.Item("Copy Path").Chosen() {
+			c.WriteClipboard(r.file.Path)
+		}
+	}
+}
+
+func (f *FindWindow) item(c *ui.Context, p *token.Palette, i int) list.Item {
 	r := f.rows[i]
 	if r.match < 0 {
 		file := r.file
-		it := list.Item{Label: file.Name, Description: file.Dir, Leading: fileIcon(file.Name), Count: len(file.Matches), Strong: true}
+		it := list.Item{Label: file.Name, Description: file.Dir, Leading: fileIcon(file.Name), Count: len(file.Matches), Strong: true, Menu: f.rowMenu(c, r)}
 		if len(file.Matches) > 0 {
 			it.Branch, it.Open = true, !f.collapsed[file.Path]
 			it.OnClick = func() { f.toggle(file) }
@@ -158,7 +181,7 @@ func (f *FindWindow) item(p *token.Palette, i int) list.Item {
 	}
 	m := r.file.Matches[r.match]
 	return list.Item{Label: lineLabel(m), Depth: 1, Description: "line " + strconv.Itoa(m.Start.Line+1),
-		Rich: func(s list.Style) []ui.Span { return matchSpans(p, s, m, "", false) }, OnClick: func() { f.openRow(r) }}
+		Rich: func(s list.Style) []ui.Span { return matchSpans(p, s, m, "", false) }, OnClick: func() { f.openRow(r) }, Menu: f.rowMenu(c, r)}
 }
 
 func (f *FindWindow) targets() []findRow {

@@ -34,7 +34,8 @@ func (w *Workspace) zoom() float32 {
 
 func (w *Workspace) configure(st *editor.State, path string) {
 	w.ConfigureEditor(st, path)
-	st.OnInput = w.editorInput
+	st.OnInput = func(ev ui.InputEvent) bool { return w.editorPointer(st, ev) || w.editorInput(ev) }
+	st.OnDefinition = func(int) { w.goToDefinition(st) }
 	st.ContextMenu = w.editorMenu
 	st.RenderFindBar = findwidget.ForEditor(st)
 }

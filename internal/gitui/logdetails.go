@@ -73,7 +73,7 @@ func (s *logState) detailsView(c *ui.Context) {
 	d := &s.details
 	ui.SplitVerticalPercent(c, &d.split, func() { s.filesView(c, cm) }, func() {
 		ui.Scroll(c).Fill().Children(func() { s.g.commitInfo(c, cm, d.contains, s.focusCommit) })
-	}).Fill()
+	}).SplitReset(filesSplit).Fill()
 }
 
 func (s *logState) filesView(c *ui.Context, cm git.Commit) {

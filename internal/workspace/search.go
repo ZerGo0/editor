@@ -45,12 +45,14 @@ type searchState struct {
 	cancel      context.CancelFunc
 	shiftAt     time.Time
 	engine      *everywhere.Search
+	symbols     *symbols.Index
 }
 
 func (w *Workspace) initSearch(saved session.Project) {
 	w.palette.WindowKeys = w.modalKeys()
 	w.search.files = &files.Index{Root: w.Root}
 	syms := symbols.NewIndex()
+	w.search.symbols = syms
 	w.search.scanner = &files.Scanner{Root: w.Root, Visitors: []files.Visitor{everywhere.SymbolVisitor{Index: syms}, w.insights.todos}}
 	engine := everywhere.New(&everywhere.Env{
 		Root:    w.Root,

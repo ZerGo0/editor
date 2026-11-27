@@ -61,7 +61,7 @@ func (t *Tree) View(c *ui.Context, h Handlers) ui.Element {
 			func(p string) list.Item { return t.item(c, p, h) })
 		outline.ContextMenu(func(m *ui.Menu) { h.Menu(m, t.Root) })
 		if paths, ok := ui.Drop[Paths](outline); ok {
-			h.Move(paths, t.Root)
+			dropPaths(c, h, paths, t.Root)
 		}
 		if files := outline.DroppedFiles(); len(files) > 0 && h.Import != nil {
 			h.Import(files, t.Root)
@@ -162,6 +162,14 @@ func (t *Tree) paste(dir string, h Handlers) {
 	}
 }
 
+func dropPaths(c *ui.Context, h Handlers, paths []string, dir string) {
+	if c.Modifiers()&ui.Alt != 0 && h.Import != nil {
+		h.Import(paths, dir)
+		return
+	}
+	h.Move(paths, dir)
+}
+
 func (t *Tree) activate(p string, preview bool, h Handlers) {
 	if t.isDir[p] {
 		t.toggle(p)
@@ -210,7 +218,7 @@ func (t *Tree) item(c *ui.Context, p string, h Handlers) list.Item {
 	}
 	it.Drop = func(row ui.Element) bool {
 		if paths, ok := ui.Drop[Paths](row); ok {
-			h.Move(paths, p)
+			dropPaths(c, h, paths, p)
 		}
 		if files := row.DroppedFiles(); len(files) > 0 && h.Import != nil {
 			h.Import(files, p)

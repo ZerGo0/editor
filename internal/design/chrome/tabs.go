@@ -15,6 +15,11 @@ const (
 	noTab        = -1
 )
 
+type stripState struct {
+	scroll ui.ScrollState
+	middle int
+}
+
 type Tab struct {
 	Label       string
 	Description string
@@ -48,13 +53,14 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 	strip := ui.Row(c.Key("tab-strip:"+o.Label)).FillWidth().Height(token.TabHeight.Px()).Shrink(0).Background(p.Layer.TabBar).
 		Padding(token.TabStripInset.Px(), 0, 0, token.GapInline.Px()).AlignItems(ui.Center)
 	shown := ui.Local(strip, "shown", func() int { return noTab })
+	state := ui.Local(strip, "state", func() stripState { return stripState{middle: noTab} })
 	strip.Children(func() {
-		ui.ScrollHorizontal(c).Shrink(1).MinWidth(0).FillHeight().Children(func() {
+		ui.ScrollHorizontal(c).TrackScroll(&state.scroll).HandleInput(state.wheel).Shrink(1).MinWidth(0).FillHeight().Children(func() {
 			parts := ui.TabsBase(c, selected, len(tabs))
 			parts.List.FillHeight().AlignItems(ui.Center).Gap(token.GapTight.Px()).Label(o.Label).Children(func() {
 				for i, t := range tabs {
 					tab := parts.Tab(i)
-					tabItem(c, p, tab, i == *selected, i, t, o)
+					tabItem(c, p, tab, i == *selected, i, t, o, state)
 					if i == *selected && *shown != i {
 						tab.ScrollIntoView()
 					}
@@ -88,7 +94,15 @@ func dropMark(c *ui.Context, p *token.Palette) {
 		Background(p.Accent.Base).PassThrough()
 }
 
-func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int, t Tab, o TabStripOptions) {
+func (s *stripState) wheel(ev ui.InputEvent) bool {
+	if ev.Kind != ui.InputScroll || ev.DY == 0 || ev.DX != 0 || ev.Mods != 0 {
+		return false
+	}
+	s.scroll.X = max(0, min(s.scroll.X+ev.DY, s.scroll.MaxX))
+	return true
+}
+
+func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int, t Tab, o TabStripOptions, s *stripState) {
 	hovered := tab.Hovered()
 	fg := p.Tab.InactiveText
 	switch {
@@ -140,8 +154,13 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 		}
 		tabEnd(c, p, active, hovered, i, t, o)
 	})
-	if b, ok := tab.PressedButton(); ok && b == middleButton && o.OnAuxClick != nil {
-		o.OnAuxClick(i)
+	if b, ok := tab.PressedButton(); ok && b == middleButton {
+		s.middle = i
+	} else if s.middle == i {
+		s.middle = noTab
+		if hovered && o.OnAuxClick != nil {
+			o.OnAuxClick(i)
+		}
 	}
 	if o.OnDoubleClick != nil && tab.DoubleClicked() {
 		o.OnDoubleClick(i)
