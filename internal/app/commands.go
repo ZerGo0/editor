@@ -26,6 +26,7 @@ const (
 	categoryExplorer    = "Explorer"
 	categoryGo          = "Go"
 	categorySearch      = "Search"
+	categoryDeveloper   = "Developer"
 )
 
 func (a *App) registerCommands() {
@@ -121,6 +122,7 @@ func (a *App) registerCommands() {
 	add("workbench.action.zoomIn", categoryView, "Zoom In", app(func() { a.zoom(1) }))
 	add("workbench.action.zoomOut", categoryView, "Zoom Out", app(func() { a.zoom(-1) }))
 	add("workbench.action.zoomReset", categoryView, "Reset Zoom", app(func() { a.zoom(0) }))
+	add("workbench.action.openLogsFolder", categoryDeveloper, "Open Logs Folder", app(openLogsFolder))
 	add("workbench.action.installCommandLine", categoryFile, "Install '"+shellcmd.Name+"' Command in PATH", func(win *mygo.Window) { a.installCommand(nil, win) })
 	add("workbench.action.uninstallCommandLine", categoryFile, "Uninstall '"+shellcmd.Name+"' Command", func(win *mygo.Window) { a.uninstallCommand(nil, win) })
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
