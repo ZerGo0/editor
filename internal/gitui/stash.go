@@ -101,7 +101,9 @@ func (g *Git) stashesDialog(c *ui.Context) {
 		case s.err != nil:
 			errorState(c, "Cannot load the stashes", s.err, g.loadStashes)
 		case s.loading && s.items == nil:
-			loadingState(c, "Loading stashes")
+			boxedSkeleton(c, "Loading stashes", func(i int) list.Item {
+				return stashItem(git.Stash{Ref: placeholderWord(i), Message: placeholderSubject(i), Time: placeholderTime(c.Now(), i)}, nil)
+			})
 		case len(s.items) == 0:
 			emptyState(c, "No stashes", "Stash your changes to see them here.")
 		default:
@@ -109,12 +111,7 @@ func (g *Git) stashesDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].OID }
 			s.list.Label = func(i int) string { return items[i].Message }
 			s.list.Selected = &s.selected
-			l := boxedList(c, "Stashes", &s.list, len(items), func(i int) list.Item {
-				st := items[i]
-				return list.Item{Label: st.Message, Icon: icons.Stash, Description: st.Ref,
-					Trailing:      func(c *ui.Context) { secondary(c, formatTime(st.Time, c.Now())).SingleLine() },
-					OnDoubleClick: func() { g.showStash(st) }}
-			})
+			l := boxedList(c, "Stashes", &s.list, len(items), func(i int) list.Item { return stashItem(items[i], g.showStash) })
 			if l.Submitted() {
 				g.showStash(s.selectedStash())
 			}
@@ -214,4 +211,10 @@ func (g *Git) clearStashes() {
 			return nil
 		}, g.loadStashes)
 	})
+}
+
+func stashItem(st git.Stash, show func(git.Stash)) list.Item {
+	return list.Item{Label: st.Message, Icon: icons.Stash, Description: st.Ref,
+		Trailing:      func(c *ui.Context) { secondary(c, formatTime(st.Time, c.Now())).SingleLine() },
+		OnDoubleClick: func() { show(st) }}
 }

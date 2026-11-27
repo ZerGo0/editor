@@ -177,7 +177,7 @@ func (g *Git) toggleCommitFiles(cm git.Commit) {
 func (g *Git) graphPane(c *ui.Context) {
 	s := &g.graph
 	if g.snap.status == nil {
-		loadingState(c, "Loading commits")
+		g.graphSkeleton(c)
 		return
 	}
 	if !s.started {
@@ -189,7 +189,7 @@ func (g *Git) graphPane(c *ui.Context) {
 		errorState(c, "Cannot load the graph", s.err, g.reloadGraph)
 		return
 	case len(s.commits) == 0 && !s.done:
-		loadingState(c, "Loading commits")
+		g.graphSkeleton(c)
 		return
 	case len(s.commits) == 0:
 		emptyState(c, "No commits yet", "Commit your changes to start the history.")
@@ -219,7 +219,7 @@ func (g *Git) graphPane(c *ui.Context) {
 		e := entries[row.Index]
 		cm := commits[e.commit]
 		if e.file == commitRow {
-			el := list.Row(rc, st, g.graphCommitItem(rc, e.commit, gw, remotes))
+			el := list.Row(rc, st, g.graphCommitItem(rc, commits, s.rows, e.commit, gw, remotes))
 			feedback.HoverCard(rc, el, func() { g.commitCard(rc, cm, remotes) })
 			return
 		}
@@ -248,27 +248,25 @@ func (g *Git) graphLabel(e graphEntry) string {
 	return "Loading files"
 }
 
-func (g *Git) graphLanes(c *ui.Context, i int, gw float32, through bool) {
-	s := &g.graph
+func graphLanes(c *ui.Context, commits []git.Commit, rows []git.GraphRow, i int, gw float32, through bool) {
 	p := token.Of(c)
 	bg := p.Layer.SideBar
-	merge := len(s.commits[i].Parents) > 1
+	merge := len(commits[i].Parents) > 1
 	ui.Box(c).Width(gw).Height(token.RowHeight.Px()).Shrink(0).AccessHidden(true).Draw(func(pt *ui.Painter, r ui.Rect) {
-		if i >= len(s.rows) {
+		if i >= len(rows) {
 			return
 		}
 		if through {
-			drawGraphContinue(pt, r, p, s.rows[i])
+			drawGraphContinue(pt, r, p, rows[i])
 			return
 		}
-		drawGraphRow(pt, r, p, bg, s.rows[i], merge)
+		drawGraphRow(pt, r, p, bg, rows[i], merge)
 	})
 }
 
-func (g *Git) graphCommitItem(c *ui.Context, i int, gw float32, remotes map[string]bool) list.Item {
-	s := &g.graph
-	cm := s.commits[i]
-	_, open := s.expanded[cm.OID]
+func (g *Git) graphCommitItem(c *ui.Context, commits []git.Commit, rows []git.GraphRow, i int, gw float32, remotes map[string]bool) list.Item {
+	cm := commits[i]
+	_, open := g.graph.expanded[cm.OID]
 	return list.Item{
 		Label:        cm.Subject,
 		Description:  cm.Author,
@@ -276,7 +274,7 @@ func (g *Git) graphCommitItem(c *ui.Context, i int, gw float32, remotes map[stri
 		Open:         open,
 		Pills:        g.graphPills(cm, remotes),
 		LeadingWidth: gw,
-		Leading:      func(c *ui.Context) { g.graphLanes(c, i, gw, false) },
+		Leading:      func(c *ui.Context) { graphLanes(c, commits, rows, i, gw, false) },
 		Menu:         func(m *ui.Menu) { g.graphCommitMenu(c, m, cm) },
 		OnClick:      func() { g.toggleCommitFiles(cm) },
 		OnDoubleClick: func() {
@@ -378,7 +376,7 @@ func (g *Git) graphFileItem(c *ui.Context, e graphEntry, gw float32) list.Item {
 	s := &g.graph
 	cm := s.commits[e.commit]
 	f := s.expanded[cm.OID]
-	lanes := func(c *ui.Context) { g.graphLanes(c, e.commit, gw, true) }
+	lanes := func(c *ui.Context) { graphLanes(c, g.graph.commits, g.graph.rows, e.commit, gw, true) }
 	if f == nil || e.file < 0 || e.file >= len(f.files) {
 		it := list.Item{Label: "Loading files", Muted: true, Leading: lanes}
 		if f != nil && f.err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -152,7 +153,7 @@ func (t *patchTab) render(c *ui.Context) {
 		case t.err != nil:
 			errorState(c, "Cannot load the changes", t.err, t.reload)
 		case !t.loaded:
-			loadingState(c, "Loading changes")
+			feedback.CodeSkeleton(c, "Loading changes")
 		case len(t.items) == 0:
 			emptyState(c, "No changes", "")
 		default:

@@ -6,7 +6,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const FontMono = "Menlo"
+const (
+	FontMono     = "Menlo"
+	FontSkeleton = "Editor Skeleton"
+)
 
 const (
 	WeightRegular  = 400

@@ -2,6 +2,7 @@ package finder
 
 import (
 	"errors"
+	"github.com/ZerGo0/editor/internal/design/list"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,28 +17,30 @@ import (
 )
 
 const (
-	dialogID         = "search"
-	scopeLabel       = "Search scope"
-	resultsLabel     = "Results"
-	previewLabel     = "Preview"
-	filterLabel      = "Filter"
-	findWindowLabel  = "Open in Find Window"
-	allTypesLabel    = "All File Types"
-	nonProjectLabel  = "Include Non-Project Items"
-	searchingText    = "Searching..."
-	pageRows         = token.SearchPopupRows - 1
-	labelEverywhere  = "Search Everywhere"
-	labelActions     = "Command Palette"
-	labelFiles       = "Go to File"
-	labelText        = "Find in Files"
-	labelSymbols     = "Go to Symbol in Workspace"
-	labelEditorSyms  = "Go to Symbol in Editor"
-	labelLine        = "Go to Line/Column"
-	labelHelp        = "Help"
-	placeholderAll   = "Search files, actions and text"
-	placeholderActs  = "Type the name of a command to run"
-	placeholderFiles = "Search files by name (type ? for help)"
-	placeholderText  = "Type the text to search for"
+	dialogID              = "search"
+	scopeLabel            = "Search scope"
+	resultsLabel          = "Results"
+	previewLabel          = "Preview"
+	filterLabel           = "Filter"
+	findWindowLabel       = "Open in Find Window"
+	allTypesLabel         = "All File Types"
+	nonProjectLabel       = "Include Non-Project Items"
+	searchingText         = "Searching..."
+	placeholderAsideWords = 2
+	placeholderLineWords  = 3
+	pageRows              = token.SearchPopupRows - 1
+	labelEverywhere       = "Search Everywhere"
+	labelActions          = "Command Palette"
+	labelFiles            = "Go to File"
+	labelText             = "Find in Files"
+	labelSymbols          = "Go to Symbol in Workspace"
+	labelEditorSyms       = "Go to Symbol in Editor"
+	labelLine             = "Go to Line/Column"
+	labelHelp             = "Help"
+	placeholderAll        = "Search files, actions and text"
+	placeholderActs       = "Type the name of a command to run"
+	placeholderFiles      = "Search files by name (type ? for help)"
+	placeholderText       = "Type the text to search for"
 )
 
 func (d *Dialog) label() string {
@@ -246,7 +249,10 @@ func (d *Dialog) emptyState(c *ui.Context) {
 	q := strings.TrimSpace(d.st.Query)
 	switch {
 	case d.busy() && d.showBusy:
-		feedback.Loading(c, searchingText)
+		list.Skeleton(c, searchingText, list.SkeletonRows, func(i int) list.Item {
+			name := feedback.Placeholder(i, 1)
+			return list.Item{Label: name, Aside: feedback.Placeholder(i+1, placeholderAsideWords), Leading: fileIcon(name)}
+		})
 	case d.busy():
 		if d.settled != "" {
 			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})

@@ -22,6 +22,9 @@ var graphLanes = struct {
 }{byPalette: map[*Palette][GraphLaneCount]ui.Color{}}
 
 func (p *Palette) GraphLane(i int) ui.Color {
+	if p.skeleton {
+		return p.Icon
+	}
 	graphLanes.Lock()
 	defer graphLanes.Unlock()
 	lanes, ok := graphLanes.byPalette[p]

@@ -147,7 +147,7 @@ func plural(n int, noun string) string {
 
 func (f *FindWindow) empty(c *ui.Context) {
 	if f.res.Busy {
-		feedback.Loading(c, searchingLabel)
+		f.skeleton(c)
 		return
 	}
 	feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No results to show", Message: "Choose Open in Find Window in Search Everywhere to keep its results here."})
@@ -190,6 +190,19 @@ func (f *FindWindow) item(c *ui.Context, p *token.Palette, i int) list.Item {
 	it.OnClick = func() { f.openRow(r) }
 	it.Menu = f.rowMenu(c, r)
 	return it
+}
+
+func (f *FindWindow) skeleton(c *ui.Context) {
+	p := token.Of(c)
+	file := &FileNode{Name: feedback.Placeholder(0, 1), Dir: feedback.Placeholder(1, 1), Matches: make([]textsearch.Match, list.SkeletonRows-1)}
+	list.Skeleton(c, searchingLabel, list.SkeletonRows, func(i int) list.Item {
+		if i == 0 {
+			it := FileItem(file)
+			it.Branch, it.Open = true, true
+			return it
+		}
+		return MatchItem(p, textsearch.Match{Preview: feedback.Placeholder(i, placeholderLineWords+i%placeholderLineWords), Start: textsearch.Pos{Line: i}})
+	})
 }
 
 func FileItem(file *FileNode) list.Item {

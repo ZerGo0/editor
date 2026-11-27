@@ -1,11 +1,15 @@
 package icons
 
 import (
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fileicons"
 	"github.com/egoist/mygo/ui"
 )
 
 func FileIcon(c *ui.Context, name string, dir, open bool, size float32) ui.Element {
+	if token.Of(c).IsSkeleton() {
+		return Placeholder(c, size)
+	}
 	icon := fileicons.For(name)
 	if dir {
 		icon = fileicons.Folder(name, open)

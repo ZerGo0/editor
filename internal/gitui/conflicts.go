@@ -76,7 +76,10 @@ func (g *Git) conflictsDialog(c *ui.Context) {
 		case s.err != nil:
 			errorState(c, "Cannot load the conflicts", s.err, g.loadConflicts)
 		case s.loading && s.items == nil:
-			loadingState(c, "Loading conflicts")
+			conflictHeader(c)
+			boxedSkeleton(c, "Loading conflicts", func(i int) list.Item {
+				return conflictItem(git.ConflictFile{Path: placeholderPath(i), Ours: true, Theirs: true}, nil)
+			})
 		case len(s.items) == 0:
 			emptyState(c, "No conflicts", "All conflicts are resolved.")
 		default:
@@ -112,27 +115,37 @@ func (g *Git) conflictList(c *ui.Context) {
 	s.list.Key = func(i int) any { return items[i].Path }
 	s.list.Label = func(i int) string { return items[i].Path }
 	s.list.Selected = &s.selected
+	conflictHeader(c)
+	boxedList(c, "Conflicted Files", &s.list, len(items), func(i int) list.Item {
+		f := items[i]
+		return conflictItem(f, func() {
+			s.open = false
+			g.openMergeTool(f.Path)
+		})
+	})
+}
+
+func conflictHeader(c *ui.Context) {
 	ui.Row(c).FillWidth().Padding(token.Space0.Px(), token.PadRow.Px()).Gap(token.GapControl.Px()).Children(func() {
 		secondary(c, "Name").Grow(1)
 		secondary(c, "Yours").Width(token.ColumnMedium.Px())
 		secondary(c, "Theirs").Width(token.ColumnMedium.Px())
 	})
-	boxedList(c, "Conflicted Files", &s.list, len(items), func(i int) list.Item {
-		f := items[i]
-		it := changedFileItem(f.Path, codeConflict, func(bool, bool) {})
-		it.OnClick = nil
-		it.OnDoubleClick = func() {
-			if f.Ours && f.Theirs {
-				s.open = false
-				g.openMergeTool(f.Path)
-			}
+}
+
+func conflictItem(f git.ConflictFile, merge func()) list.Item {
+	it := changedFileItem(f.Path, codeConflict, func(bool, bool) {})
+	it.OnClick = nil
+	it.OnDoubleClick = func() {
+		if f.Ours && f.Theirs {
+			merge()
 		}
-		it.Trailing = func(c *ui.Context) {
-			secondary(c, sideState(f.Ours)).Width(token.ColumnMedium.Px()).Shrink(0)
-			secondary(c, sideState(f.Theirs)).Width(token.ColumnMedium.Px()).Shrink(0)
-		}
-		return it
-	})
+	}
+	it.Trailing = func(c *ui.Context) {
+		secondary(c, sideState(f.Ours)).Width(token.ColumnMedium.Px()).Shrink(0)
+		secondary(c, sideState(f.Theirs)).Width(token.ColumnMedium.Px()).Shrink(0)
+	}
+	return it
 }
 
 func (s *conflictsState) selectedFile() (git.ConflictFile, bool) {

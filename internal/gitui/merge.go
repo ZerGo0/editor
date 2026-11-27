@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 	"io/fs"
 	"os"
 
@@ -130,7 +131,7 @@ func (t *mergeTool) view(c *ui.Context) {
 		case t.err != nil:
 			errorState(c, "Cannot load the conflict", t.err, t.load)
 		case t.model == nil:
-			loadingState(c, "Loading conflict")
+			feedback.CodeSkeleton(c, "Loading conflict")
 		default:
 			t.toolbar(c)
 			t.panes(c)

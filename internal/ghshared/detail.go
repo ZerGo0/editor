@@ -14,7 +14,7 @@ import (
 const commentLines = 6
 
 func DetailLoading(c *ui.Context, number int) {
-	detail.Centered(c, func() { feedback.Loading(c, "Loading #"+strconv.Itoa(number)+"...") })
+	detail.Loading(c, "Loading #"+strconv.Itoa(number)+"...")
 }
 
 func DetailLoadFailed(c *ui.Context, number int, err error, retry func()) {

@@ -29,15 +29,17 @@ type paletteKey struct {
 
 var registry = struct {
 	sync.Mutex
-	palettes map[paletteKey]*Palette
-	byTheme  map[*ui.Theme]*Palette
-	themes   map[*Palette]*ui.Theme
-	code     map[*Palette]*editor.Theme
+	palettes  map[paletteKey]*Palette
+	byTheme   map[*ui.Theme]*Palette
+	themes    map[*Palette]*ui.Theme
+	code      map[*Palette]*editor.Theme
+	skeletons map[*Palette]*Palette
 }{
-	palettes: map[paletteKey]*Palette{},
-	byTheme:  map[*ui.Theme]*Palette{},
-	themes:   map[*Palette]*ui.Theme{},
-	code:     map[*Palette]*editor.Theme{},
+	palettes:  map[paletteKey]*Palette{},
+	byTheme:   map[*ui.Theme]*Palette{},
+	themes:    map[*Palette]*ui.Theme{},
+	code:      map[*Palette]*editor.Theme{},
+	skeletons: map[*Palette]*Palette{},
 }
 
 func Dark() *Palette  { return For(true, ui.Transparent, false) }

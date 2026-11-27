@@ -162,6 +162,10 @@ func (v *View) failure(c *ui.Context, e *Entry, f *File, o Options) {
 	feedback.Error(c, "Cannot load the diff of "+e.Path, f.err, func() { f.drop(); v.request(f, o) })
 }
 
+func placeholder(c *ui.Context, e *Entry) {
+	ui.Column(c).FillWidth().Height(placeholderHeight(e)).Clip().Children(func() { feedback.CodeSkeleton(c, loadingLabel) })
+}
+
 func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	if e.Live != nil && f.ready && e.Live() != f.liveBuf {
 		f.drop()
@@ -174,13 +178,13 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 		f.stale = false
 	}
 	if !f.ready && !f.stale {
-		ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+		placeholder(c, e)
 		return
 	}
 	if f.state == nil || f.mode != diffmode.Session.Whitespace && e.Patch != nil {
 		if v.builds >= buildsPerFrame {
 			c.Invalidate()
-			ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+			placeholder(c, e)
 			return
 		}
 		if f.engine != nil {
@@ -193,7 +197,7 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	d, eng := f.state, f.engine
 	eng.Refresh()
 	if e.Patch == nil && !eng.Ready() {
-		ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
+		placeholder(c, e)
 		return
 	}
 	if len(d.Hunks()) == 0 && !d.Comparing() {

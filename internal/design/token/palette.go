@@ -23,6 +23,7 @@ type Palette struct {
 	Shadow   ui.Color
 	Avatar   [avatarColors]ui.Color
 	OnAvatar ui.Color
+	skeleton bool
 }
 
 type Layers struct {

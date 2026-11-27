@@ -58,7 +58,7 @@ func (s *Session[C]) StateMessage(host string) StateMessage {
 func StateView(c *ui.Context, m StateMessage, connect func()) ui.Element {
 	return ui.Column(c).FillWidth().Children(func() {
 		if m.Spin {
-			feedback.Loading(c, m.Title)
+			feedback.LoadingPane(c, m.Title)
 			return
 		}
 		o := feedback.EmptyOptions{Icon: icons.Github, Title: m.Title, Message: m.Detail, Code: m.Command, Action: m.Retry, OnAction: connect}

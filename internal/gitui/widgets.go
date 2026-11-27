@@ -28,10 +28,6 @@ func emptyState(c *ui.Context, title, detail string) {
 	feedback.Empty(c, feedback.EmptyOptions{Title: title, Message: detail})
 }
 
-func loadingState(c *ui.Context, label string) {
-	feedback.Loading(c, label)
-}
-
 func errorState(c *ui.Context, title string, err error, retry func()) {
 	feedback.Error(c, title, err, retry)
 }
@@ -71,13 +67,17 @@ func modal(c *ui.Context, open *bool, title string, width token.Size, body func(
 }
 
 func boxedList(c *ui.Context, label string, s *ui.ListState, n int, item func(i int) list.Item) ui.Element {
-	p := token.Of(c)
 	var l ui.Element
-	ui.Column(c).FillWidth().Height(token.ListHeightMax.Px()).Radius(token.RadiusControl.Px()).Clip().
-		Border(token.BorderWidth.Px(), p.Border.Input).Children(func() {
-		l = list.View(c, s, n, list.ViewOptions{Label: label}, item)
-	})
+	boxFrame(c, func() { l = list.View(c, s, n, list.ViewOptions{Label: label}, item) })
 	return l
+}
+
+func boxFrame(c *ui.Context, body func()) {
+	bordered(c, ui.Column(c).FillWidth().Height(token.ListHeightMax.Px())).Children(body)
+}
+
+func bordered(c *ui.Context, el ui.Element) ui.Element {
+	return el.Radius(token.RadiusControl.Px()).Clip().Border(token.BorderWidth.Px(), token.Of(c).Border.Input)
 }
 
 func changedFileItem(rel string, code byte, open func(preview, focus bool)) list.Item {

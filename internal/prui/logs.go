@@ -74,7 +74,7 @@ func (p *PRs) logView(c *ui.Context, t *logTab) {
 				feedback.Error(c, "Cannot load the logs of "+t.name, t.err, func() { p.loadLogs(t) })
 			})
 		case t.state == nil:
-			detail.Centered(c, func() { feedback.Loading(c, "Loading logs...") })
+			feedback.CodeSkeleton(c, "Loading logs")
 		default:
 			p.Host.ConfigureEditor(t.state, "")
 			editor.View(c, t.state).Grow(1).FillWidth().Label("Logs of " + t.name)

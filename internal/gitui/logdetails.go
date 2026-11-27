@@ -84,7 +84,7 @@ func (s *logState) filesView(c *ui.Context, cm git.Commit) {
 		errorState(c, "Cannot load the changed files", d.err, func() { s.loadDetails(cm) })
 		return
 	case d.loading:
-		loadingState(c, "Loading files")
+		filesSkeleton(c, "Loading files")
 		return
 	case len(d.files) == 0:
 		emptyState(c, "No changed files", "")

@@ -330,7 +330,7 @@ func (s *logState) listView(c *ui.Context) {
 		errorState(c, "Cannot load the log", s.err, s.reload)
 		return
 	case len(s.commits) == 0 && (s.loading || !s.done):
-		loadingState(c, "Loading commits")
+		s.skeleton(c, "Loading commits")
 		return
 	case len(s.commits) == 0 && s.filtered():
 		emptyState(c, "No commits match the filters", "Change or reset the filters.")
@@ -346,9 +346,9 @@ func (s *logState) listView(c *ui.Context) {
 	s.list.RowHeight = token.RowHeight.Px()
 	s.list.NearEnd = logNearEnd
 	s.list.EndReached = func(int) { s.loadPage() }
-	var gw float32
+	lanes := logLanes{rows: s.graph}
 	if s.graph != nil {
-		gw = graphWidth(s.graph)
+		lanes.width = graphWidth(s.graph)
 	}
 	remotes := s.g.remoteSet()
 	ui.Column(c).Fill().Children(func() {
@@ -356,7 +356,7 @@ func (s *logState) listView(c *ui.Context) {
 		l.Rows(func(row ui.ListRow) {
 			rc := row.Context
 			st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered()}
-			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], gw, remotes, st.Selected && st.Focused))
+			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], lanes, remotes, st.Selected && st.Focused))
 		})
 		if l.Submitted() {
 			if cm, ok := s.selectedCommit(); ok {
@@ -420,7 +420,13 @@ func (s *logState) columns(gw float32, refs int) logColumns {
 	return cols
 }
 
-func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes map[string]bool, active bool) list.Item {
+type logLanes struct {
+	rows  []git.GraphRow
+	width float32
+}
+
+func (s *logState) item(c *ui.Context, i int, cm git.Commit, lanes logLanes, remotes map[string]bool, active bool) list.Item {
+	graph, gw := lanes.rows, lanes.width
 	merge := len(cm.Parents) > 1
 	p := token.Of(c)
 	color := p.Text.Primary
@@ -433,10 +439,10 @@ func (s *logState) item(c *ui.Context, i int, cm git.Commit, gw float32, remotes
 	return list.Item{
 		Label: cm.Subject,
 		Leading: func(c *ui.Context) {
-			if gw == 0 || i >= len(s.graph) {
+			if gw == 0 || i >= len(graph) {
 				return
 			}
-			gr := s.graph[i]
+			gr := graph[i]
 			ui.Box(c).Width(gw).Height(token.RowHeight.Px()).Shrink(0).AccessHidden(true).Draw(func(pt *ui.Painter, r ui.Rect) {
 				drawGraphRow(pt, r, p, p.Layer.Panel, gr, merge)
 			})
@@ -469,4 +475,15 @@ func (s *logState) rowContent(c *ui.Context, cm git.Commit, gw float32, cols log
 			secondary(c, shortHash(cm.OID)).SingleLine().Width(token.ColumnSmall.Px()).Shrink(0)
 		}
 	})
+}
+
+func (s *logState) skeleton(c *ui.Context, label string) {
+	commits := placeholderCommits(c.Now())
+	graph := git.Lanes(commits)
+	lanes := logLanes{rows: graph, width: graphWidth(graph)}
+	el := list.Skeleton(c, label, len(commits), func(i int) list.Item { return s.item(c, i, commits[i], lanes, nil, false) })
+	if w := el.Bounds().W; w != s.listWidth {
+		s.listWidth = w
+		c.Invalidate()
+	}
 }

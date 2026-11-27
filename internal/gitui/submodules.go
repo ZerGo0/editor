@@ -18,6 +18,8 @@ type submoduleState struct {
 	listState[git.Submodule]
 }
 
+const submoduleClean byte = ' '
+
 func submoduleStatus(code byte) string {
 	switch code {
 	case '-':
@@ -58,7 +60,9 @@ func (g *Git) submodulesDialog(c *ui.Context) {
 		case s.err != nil:
 			errorState(c, "Cannot list the submodules", s.err, g.loadSubmodules)
 		case s.loading && s.items == nil:
-			loadingState(c, "Loading submodules")
+			boxedSkeleton(c, "Loading submodules", func(i int) list.Item {
+				return submoduleItem(git.Submodule{Path: placeholderPath(i), OID: placeholderOID(i), Status: submoduleClean})
+			})
 		case len(s.items) == 0:
 			emptyState(c, "No submodules", "This repository has no submodules.")
 		default:
@@ -66,19 +70,7 @@ func (g *Git) submodulesDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].Path }
 			s.list.Label = func(i int) string { return items[i].Path }
 			s.list.Selected = &s.selected
-			boxedList(c, "Submodules", &s.list, len(items), func(i int) list.Item {
-				m := items[i]
-				it := list.Item{Label: m.Path, Icon: icons.Folder, Description: shortHash(m.OID)}
-				status := submoduleStatus(m.Status)
-				it.Trailing = func(c *ui.Context) {
-					if m.Status != ' ' && m.Status != 0 {
-						badge.Tag(c, status, badge.TagOptions{Tone: token.ToneWarning})
-						return
-					}
-					secondary(c, status).SingleLine()
-				}
-				return it
-			})
+			boxedList(c, "Submodules", &s.list, len(items), func(i int) list.Item { return submoduleItem(items[i]) })
 		}
 		busy := g.busy != ""
 		dialog.Actions(c, func() {
@@ -106,4 +98,17 @@ func (g *Git) updateSubmodules() {
 			g.loadSubmodules()
 		},
 	})
+}
+
+func submoduleItem(m git.Submodule) list.Item {
+	it := list.Item{Label: m.Path, Icon: icons.Folder, Description: shortHash(m.OID)}
+	status := submoduleStatus(m.Status)
+	it.Trailing = func(c *ui.Context) {
+		if m.Status != submoduleClean && m.Status != 0 {
+			badge.Tag(c, status, badge.TagOptions{Tone: token.ToneWarning})
+			return
+		}
+		secondary(c, status).SingleLine()
+	}
+	return it
 }

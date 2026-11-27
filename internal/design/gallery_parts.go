@@ -13,6 +13,11 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+const (
+	galleryLoadingRows  = 4
+	galleryLoadingWords = 3
+)
+
 func galleryButtons(c *ui.Context, g *gallery) {
 	gallerySection(c, "Buttons", func() {
 		Inline(c, token.GapControl, func() {
@@ -151,6 +156,8 @@ func galleryFeedback(c *ui.Context) {
 			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.GitBranch, Title: "No source control providers", Message: "Open a folder that contains a Git repository.", Action: "Open Folder", OnAction: func() {}}).Grow(1).Basis(0)
 			feedback.Error(c, "Could not load pull requests", errors.New("network is unreachable"), func() {}).Grow(1).Basis(0)
 		})
-		feedback.Loading(c, "Loading pull requests...")
+		list.Skeleton(c, "Loading pull requests...", galleryLoadingRows, func(i int) list.Item {
+			return list.Item{Label: feedback.Placeholder(i, galleryLoadingWords), Icon: icons.PullRequest, Description: feedback.Placeholder(i+1, 1)}
+		})
 	})
 }

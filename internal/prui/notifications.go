@@ -162,7 +162,9 @@ func (p *PRs) NotificationsView(c *ui.Context) {
 				ghshared.ErrorNotice(c, ns.err, func() { ns.fetchedAt = time.Time{} })
 			})
 		case !ns.loaded:
-			feedback.Loading(c, "Loading notifications...")
+			list.Skeleton(c, "Loading notifications", list.SkeletonRows, func(i int) list.Item {
+				return p.notificationItem(c, Notification{Title: feedback.Placeholder(i, notificationWords+i%notificationWords), Number: i + 1, Updated: p.env.Now()})
+			})
 		case len(ns.items) == 0:
 			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Check, Title: "You are all caught up", Message: "New pull request activity shows here."})
 		default:
@@ -178,6 +180,8 @@ func (p *PRs) NotificationsView(c *ui.Context) {
 		}
 	})
 }
+
+const notificationWords = 3
 
 func (p *PRs) notificationItem(c *ui.Context, n Notification) list.Item {
 	pal := token.Of(c)

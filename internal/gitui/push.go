@@ -152,7 +152,7 @@ func (g *Git) pushPreview(c *ui.Context) {
 		errorState(c, "Cannot load the outgoing commits", s.err, g.loadOutgoing)
 		return
 	case s.loading:
-		loadingState(c, "Loading outgoing commits")
+		pushSkeleton(c, "Loading outgoing commits")
 		return
 	case len(s.commits) == 0:
 		emptyState(c, "No commits to push", "You can still push tags or create the branch on the remote.")
@@ -162,15 +162,13 @@ func (g *Git) pushPreview(c *ui.Context) {
 	if s.selected >= 0 && s.selected < len(commits) && s.filesFor != commits[s.selected].OID {
 		g.loadPushFiles(commits[s.selected].OID)
 	}
-	ui.Row(c).FillWidth().Height(token.ListHeightMax.Px()).Gap(token.GapControl.Px()).Children(func() {
+	pushColumns(c, func() {
 		s.list.Key = func(i int) any { return commits[i].OID }
 		s.list.Label = func(i int) string { return commits[i].Subject }
 		s.list.Selected = &s.selected
 		pushColumn(c, func() {
 			list.View(c.Key("push-commits"), &s.list, len(commits), list.ViewOptions{Label: "Outgoing Commits"}, func(i int) list.Item {
-				cm := commits[i]
-				return list.Item{Label: cm.Subject, Icon: icons.Commit, Description: shortHash(cm.OID),
-					Tooltip: fmt.Sprintf("%s, %s", cm.Author, formatTime(cm.AuthorTime, c.Now()))}
+				return pushCommitItem(c, commits[i])
 			})
 		})
 		pushColumn(c, func() {
@@ -178,7 +176,7 @@ func (g *Git) pushPreview(c *ui.Context) {
 			case s.filesErr != nil:
 				errorState(c, "Cannot load the files", s.filesErr, func() { g.loadPushFiles(s.filesFor) })
 			case s.files == nil:
-				loadingState(c, "Loading files")
+				filesSkeleton(c, "Loading files")
 			default:
 				files := s.files
 				s.fileList.Label = func(i int) string { return files[i].Path }
@@ -192,10 +190,17 @@ func (g *Git) pushPreview(c *ui.Context) {
 	})
 }
 
+func pushCommitItem(c *ui.Context, cm git.Commit) list.Item {
+	return list.Item{Label: cm.Subject, Icon: icons.Commit, Description: shortHash(cm.OID),
+		Tooltip: fmt.Sprintf("%s, %s", cm.Author, formatTime(cm.AuthorTime, c.Now()))}
+}
+
+func pushColumns(c *ui.Context, body func()) {
+	ui.Row(c).FillWidth().Height(token.ListHeightMax.Px()).Gap(token.GapControl.Px()).Children(body)
+}
+
 func pushColumn(c *ui.Context, body func()) {
-	p := token.Of(c)
-	ui.Column(c).Grow(1).Basis(0).FillHeight().MinWidth(0).Radius(token.RadiusControl.Px()).Clip().
-		Border(token.BorderWidth.Px(), p.Border.Input).Children(body)
+	bordered(c, ui.Column(c).Grow(1).Basis(0).FillHeight().MinWidth(0)).Children(body)
 }
 
 func (g *Git) startPush(opts git.PushOptions, done func()) {

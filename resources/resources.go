@@ -22,6 +22,9 @@ var iconSVG []byte
 //go:embed fonts/*.ttf
 var fonts embed.FS
 
+//go:embed skeleton/EditorSkeleton.ttf
+var skeletonFont []byte
+
 var (
 	logoOnce sync.Once
 	logo     *ui.SVG
@@ -40,7 +43,12 @@ func Logo() *ui.SVG {
 }
 
 func RegisterFonts() error {
-	fontOnce.Do(func() { fontErr = registerFonts(fonts) })
+	fontOnce.Do(func() {
+		fontErr = registerFonts(fonts)
+		if fontErr == nil {
+			fontErr = registerSkeletonFont()
+		}
+	})
 	return fontErr
 }
 
@@ -60,6 +68,13 @@ func registerFonts(fsys fs.FS) error {
 		if err := ui.RegisterFont(data, token.FontEditor); err != nil {
 			return fmt.Errorf("register font %s: %w", e.Name(), err)
 		}
+	}
+	return nil
+}
+
+func registerSkeletonFont() error {
+	if err := ui.RegisterFont(skeletonFont, token.FontSkeleton); err != nil {
+		return fmt.Errorf("register skeleton font: %w", err)
 	}
 	return nil
 }

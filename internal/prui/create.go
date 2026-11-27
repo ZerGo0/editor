@@ -392,7 +392,7 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 			ghshared.MutedText(c, "Choose a base branch to see the changes.")
 			return
 		case f.cmpLoading:
-			feedback.Loading(c, "Comparing...")
+			compareSkeleton(c)
 			return
 		case f.cmpErr != nil:
 			ghshared.ErrorNotice(c, f.cmpErr, func() { p.loadCompare(f) })
@@ -407,14 +407,32 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 			return
 		}
 		for i, file := range f.cmpFiles[:min(len(f.cmpFiles), compareListRows)] {
-			ui.Row(c.Key("f" + fmt.Sprint(i))).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
-				badge.Decoration(c, fileGitStatus(file.Status))
-				design.Text(c, file.Path, token.TextBody).SingleLine().Grow(1).MinWidth(0)
-				ghshared.MutedText(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).Shrink(0)
-			})
+			compareFileRow(c.Key("f"+fmt.Sprint(i)), file)
 		}
 		if len(f.cmpFiles) > compareListRows {
 			ghshared.MutedText(c, fmt.Sprintf("and %d more files", len(f.cmpFiles)-compareListRows))
+		}
+	})
+}
+
+func compareFileRow(c *ui.Context, file github.PRFile) {
+	ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(token.GapControl.Px()).Children(func() {
+		badge.Decoration(c, fileGitStatus(file.Status))
+		design.Text(c, file.Path, token.TextBody).SingleLine().Grow(1).MinWidth(0)
+		ghshared.MutedText(c, fmt.Sprintf("+%d -%d", file.Additions, file.Deletions)).Shrink(0)
+	})
+}
+
+const compareSkeletonWords = 4
+
+func compareSkeleton(c *ui.Context) {
+	feedback.Skeleton(c, "Comparing", func() {
+		ghshared.MutedText(c, feedback.Placeholder(0, compareSkeletonWords))
+		for i := range compareListRows {
+			design.Text(c.Key(i), feedback.Placeholder(i, compareSkeletonWords), token.TextBody).SingleLine()
+		}
+		for i := range compareListRows {
+			compareFileRow(c.Key("f"+fmt.Sprint(i)), github.PRFile{Path: feedback.Placeholder(i, 1) + "/" + feedback.Placeholder(i+1, 1), Additions: i + 1, Deletions: i})
 		}
 	})
 }

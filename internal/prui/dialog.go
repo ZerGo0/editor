@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ZerGo0/editor/internal/design/list"
 	"slices"
 	"strconv"
 	"strings"
@@ -314,13 +315,24 @@ func (p *PRs) dialogView(c *ui.Context) {
 	}
 }
 
+const pickWords = 2
+
+func pickRow(c *ui.Context, item string, on *bool) ui.Element {
+	return action.Checkbox(c, item, on, action.ChoiceOptions{ID: "pick-" + item}).Height(token.RowHeight.Px())
+}
+
 func (p *PRs) pickerView(c *ui.Context) {
 	pk := &p.picker
 	modal.Modal(c, &pk.open, pk.title, modal.Options{}, func() {
 		field.SearchInput(c, "Filter", &pk.filter, field.SearchOptions{Placeholder: "Filter", ID: "filter"})
 		switch {
 		case pk.loading:
-			feedback.Loading(c, "Loading...")
+			feedback.Skeleton(c, "Loading", func() {
+				for i := range list.SkeletonRows {
+					on := false
+					pickRow(c.Key(i), feedback.Placeholder(i, pickWords), &on)
+				}
+			})
 		case pk.err != "" && len(pk.items) == 0:
 			feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneError, Text: pk.err})
 		default:
@@ -331,7 +343,7 @@ func (p *PRs) pickerView(c *ui.Context) {
 			ui.Scroll(c).Height(token.ListHeightMax.Px()).FillWidth().Children(func() {
 				for _, item := range items {
 					on := pk.selected[item]
-					if action.Checkbox(c, item, &on, action.ChoiceOptions{ID: "pick-" + item}).Height(token.RowHeight.Px()).Changed() {
+					if pickRow(c, item, &on).Changed() {
 						if pk.single {
 							clear(pk.selected)
 						}

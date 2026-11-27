@@ -74,7 +74,7 @@ func (g *Git) SideView(c *ui.Context) {
 func (g *Git) gate(c *ui.Context) bool {
 	switch g.phase {
 	case phaseLoading:
-		loadingState(c, "Loading repository")
+		changesSkeleton(c, "Loading repository")
 	case phaseNoGit:
 		emptyState(c, "Git is not installed", "Install Git, then reopen this folder.")
 	case phaseNoRepo:
@@ -120,7 +120,7 @@ func (g *Git) changesPane(c *ui.Context) {
 		errorState(c, "Cannot read the status", g.snap.err, g.refreshNow)
 		return
 	case st == nil:
-		loadingState(c, "Loading changes")
+		changesSkeleton(c, "Loading changes")
 		return
 	}
 	g.commitBox(c)

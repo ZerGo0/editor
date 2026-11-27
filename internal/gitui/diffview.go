@@ -174,7 +174,7 @@ func (t *diffTab) body(c *ui.Context) {
 	case t.err != nil:
 		errorState(c, "Cannot load the diff", t.err, t.load)
 	case t.state == nil || !t.engine.Ready():
-		loadingState(c, "Loading diff")
+		feedback.CodeSkeleton(c, "Loading diff")
 	default:
 		t.state.Layout = editor.DiffLayout(t.layout)
 		t.g.h.ConfigureDiff(t.state, t.abs())

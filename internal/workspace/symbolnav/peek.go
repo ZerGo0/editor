@@ -260,7 +260,7 @@ func listWidth(total float32) float32 {
 
 func (p *Peek) body(c *ui.Context, pal *token.Palette, width float32) {
 	if p.loading {
-		ui.Column(c).Grow(1).FillWidth().MinHeight(0).Center().Children(func() { feedback.Loading(c, loadingLabel) })
+		feedback.CodeSkeleton(c, loadingLabel)
 		return
 	}
 	showList := p.res.Total > 1
@@ -287,7 +287,7 @@ func (p *Peek) previewPane(c *ui.Context) {
 	pv := &p.preview
 	switch {
 	case pv.loading:
-		feedback.Loading(c, loadingLabel)
+		feedback.CodeSkeleton(c, loadingLabel)
 	case pv.st == nil:
 		feedback.Empty(c, feedback.EmptyOptions{Title: pv.message})
 	default:

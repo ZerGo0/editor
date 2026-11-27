@@ -169,6 +169,8 @@ func leading(c *ui.Context, p *token.Palette, it Item, active bool) {
 	switch {
 	case it.Leading != nil:
 		ui.Row(c).Shrink(0).AlignItems(ui.Center).Margin(0, token.GapRowIcon.Px(), 0, 0).Children(func() { it.Leading(c) })
+	case it.Icon != nil && p.IsSkeleton():
+		icons.Placeholder(c, token.IconSize.Px()).Margin(0, token.GapRowIcon.Px(), 0, 0)
 	case it.Icon != nil:
 		color := p.Icon
 		if active {

@@ -82,7 +82,9 @@ func (g *Git) worktreesDialog(c *ui.Context) {
 		case s.err != nil:
 			errorState(c, "Cannot list the worktrees", s.err, g.loadWorktrees)
 		case s.loading && s.items == nil:
-			loadingState(c, "Loading worktrees")
+			boxedSkeleton(c, "Loading worktrees", func(i int) list.Item {
+				return worktreeItem(git.Worktree{Path: placeholderPath(i), Branch: placeholderWord(i)}, i == 0)
+			})
 		default:
 			g.worktreeList(c)
 		}
@@ -116,21 +118,22 @@ func (g *Git) worktreeList(c *ui.Context) {
 	s.list.Key = func(i int) any { return items[i].Path }
 	s.list.Label = func(i int) string { return items[i].Path }
 	s.list.Selected = &s.selected
-	boxedList(c, "Worktrees", &s.list, len(items), func(i int) list.Item {
-		w := items[i]
-		label := w.Branch
-		if w.Detached {
-			label = shortHash(w.HEAD)
+	boxedList(c, "Worktrees", &s.list, len(items), func(i int) list.Item { return worktreeItem(items[i], i == 0) })
+}
+
+func worktreeItem(w git.Worktree, main bool) list.Item {
+	label := w.Branch
+	if w.Detached {
+		label = shortHash(w.HEAD)
+	}
+	it := list.Item{Label: w.Path, Icon: icons.Folder, Strong: main, Muted: w.Prunable, Tooltip: w.Path}
+	it.Trailing = func(c *ui.Context) {
+		secondary(c, label).SingleLine()
+		if w.Locked {
+			badge.Tag(c, lockedReason, badge.TagOptions{Tone: token.ToneWarning, Icon: icons.Lock})
 		}
-		it := list.Item{Label: w.Path, Icon: icons.Folder, Strong: i == 0, Muted: w.Prunable, Tooltip: w.Path}
-		it.Trailing = func(c *ui.Context) {
-			secondary(c, label).SingleLine()
-			if w.Locked {
-				badge.Tag(c, lockedReason, badge.TagOptions{Tone: token.ToneWarning, Icon: icons.Lock})
-			}
-		}
-		return it
-	})
+	}
+	return it
 }
 
 func (s *worktreeState) selectedWorktree() (git.Worktree, bool) {

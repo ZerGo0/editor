@@ -28,6 +28,7 @@ const (
 	codeConflict  = 'U'
 	codeDeleted   = 'D'
 	codeAdded     = 'A'
+	codeModified  = 'M'
 	keyGroup      = "g:"
 	keyDir        = ":d:"
 	keyFile       = ":f:"

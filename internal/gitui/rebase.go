@@ -79,7 +79,7 @@ func (g *Git) rebaseDialog(c *ui.Context) {
 			errorState(c, "Cannot list the commits to rebase", s.err, g.loadTodo)
 			return
 		case s.loading:
-			loadingState(c, "Loading commits")
+			todoSkeleton(c, "Loading commits")
 			return
 		case len(s.items) == 0:
 			emptyState(c, "No commits to rebase", "The current branch has no commits after "+displayRev(s.onto)+".")
@@ -111,20 +111,15 @@ func (g *Git) todoList(c *ui.Context) {
 	s.list.Key = func(i int) any { return items[i].OID }
 	s.list.Label = func(i int) string { return items[i].Subject }
 	s.list.Selected = &s.selected
-	options := make([]action.Option[string], len(todoActions))
-	for i, a := range todoActions {
-		options[i] = action.Option[string]{Value: a, Label: a}
-	}
+	options := todoOptions()
 	p := token.Of(c)
 	var list ui.Element
-	ui.Column(c).FillWidth().Height(token.ListHeightMax.Px()).Radius(token.RadiusControl.Px()).Clip().
-		Border(token.BorderWidth.Px(), p.Border.Input).Children(func() {
+	boxFrame(c, func() {
 		list = ui.List(c.Key("todo"), &s.list, len(items)).Fill().Label("Rebase Commits").Background(ui.Transparent)
 		list.Rows(func(row ui.ListRow) {
 			i := row.Index
-			it := items[i]
 			rc := row.Context
-			el := ui.Row(rc).FillWidth().Padding(token.Space2.Px(), token.PadRow.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center)
+			el := todoRow(rc)
 			switch {
 			case row.Selected() && row.ListFocused():
 				el.Background(p.List.ActiveSelection)
@@ -133,16 +128,7 @@ func (g *Git) todoList(c *ui.Context) {
 			case row.Hovered():
 				el.Background(p.List.Hover)
 			}
-			el.Children(func() {
-				ui.Row(rc).Width(token.ColumnMedium.Px()).Shrink(0).Children(func() {
-					action.Select(rc, "Action for "+shortHash(it.OID), &s.actions[i], options, action.SelectOptions{ID: "action"})
-				})
-				subject := token.TextBody.Apply(ui.Text(rc, s.subject(i))).TextColor(p.Text.Primary).SingleLine().Grow(1).Shrink(1).MinWidth(0)
-				if s.actions[i] == string(git.ActionDrop) {
-					subject.Strikethrough().TextColor(p.Text.Muted)
-				}
-				secondary(rc, shortHash(it.OID)).SingleLine().Shrink(0)
-			})
+			el.Children(func() { todoRowContent(rc, items[i].OID, s.subject(i), &s.actions[i], options) })
 		})
 	})
 	if list.Shortcut(ui.Alt, ui.KeyUp) {
@@ -204,4 +190,28 @@ func (g *Git) runRebase() {
 			g.headChanged()
 		},
 	})
+}
+
+func todoOptions() []action.Option[string] {
+	options := make([]action.Option[string], len(todoActions))
+	for i, a := range todoActions {
+		options[i] = action.Option[string]{Value: a, Label: a}
+	}
+	return options
+}
+
+func todoRow(c *ui.Context) ui.Element {
+	return ui.Row(c).FillWidth().Padding(token.Space2.Px(), token.PadRow.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center)
+}
+
+func todoRowContent(c *ui.Context, oid, subject string, choice *string, options []action.Option[string]) {
+	p := token.Of(c)
+	ui.Row(c).Width(token.ColumnMedium.Px()).Shrink(0).Children(func() {
+		action.Select(c, "Action for "+shortHash(oid), choice, options, action.SelectOptions{ID: "action"})
+	})
+	text := token.TextBody.Apply(ui.Text(c, subject)).TextColor(p.Text.Primary).SingleLine().Grow(1).Shrink(1).MinWidth(0)
+	if *choice == string(git.ActionDrop) {
+		text.Strikethrough().TextColor(p.Text.Muted)
+	}
+	secondary(c, shortHash(oid)).SingleLine().Shrink(0)
 }

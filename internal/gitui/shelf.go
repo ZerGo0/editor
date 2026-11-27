@@ -149,7 +149,9 @@ func (g *Git) shelfDialog(c *ui.Context) {
 		case s.err != nil:
 			errorState(c, "Cannot load the shelf", s.err, g.loadShelf)
 		case s.loading && s.items == nil:
-			loadingState(c, "Loading the shelf")
+			boxedSkeleton(c, "Loading the shelf", func(i int) list.Item {
+				return shelfItem(git.ShelfEntry{Name: placeholderSubject(i), Created: placeholderTime(c.Now(), i)}, nil)
+			})
 		case len(s.items) == 0:
 			emptyState(c, "The shelf is empty", "Shelve changes from the Commit window to see them here.")
 		default:
@@ -157,11 +159,7 @@ func (g *Git) shelfDialog(c *ui.Context) {
 			s.list.Key = func(i int) any { return items[i].ID }
 			s.list.Label = func(i int) string { return items[i].Name }
 			s.list.Selected = &s.selected
-			l := boxedList(c, "Shelved Changes", &s.list, len(items), func(i int) list.Item {
-				e := items[i]
-				return list.Item{Label: e.Name, Icon: icons.Stash, Trailing: func(c *ui.Context) { secondary(c, formatTime(e.Created, c.Now())).SingleLine() },
-					OnDoubleClick: func() { g.showShelf(e) }}
-			})
+			l := boxedList(c, "Shelved Changes", &s.list, len(items), func(i int) list.Item { return shelfItem(items[i], g.showShelf) })
 			if l.Submitted() {
 				g.showShelf(s.selectedEntry())
 			}
@@ -258,4 +256,9 @@ func (g *Git) deleteShelf(e git.ShelfEntry) {
 	}, func() {
 		g.doSimple("Delete Shelf", func(_ context.Context, r repo) error { return r.ShelfDelete(e.ID) }, g.loadShelf)
 	})
+}
+
+func shelfItem(e git.ShelfEntry, show func(git.ShelfEntry)) list.Item {
+	return list.Item{Label: e.Name, Icon: icons.Stash, Trailing: func(c *ui.Context) { secondary(c, formatTime(e.Created, c.Now())).SingleLine() },
+		OnDoubleClick: func() { show(e) }}
 }
