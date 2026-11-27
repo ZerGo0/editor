@@ -2,5 +2,13 @@
   "name": "Editor",
   "identifier": "com.zergo0.editor",
   "version": "0.1.0",
-  "out": "build"
+  "out": "build",
+  "fileAssociations": [
+    {
+      "ext": ["txt","md","markdown","json","jsonc","yaml","yml","toml","xml","html","htm","css","scss","js","jsx","mjs","cjs","ts","tsx","go","mod","py","rb","rs","java","kt","swift","c","h","cpp","hpp","cc","cs","php","sh","zsh","bash","sql","lua","svelte","vue","ini","cfg","conf","log","env","gitignore","editorconfig"],
+      "name": "Text Document",
+      "mimeType": "text/plain",
+      "role": "Editor"
+    }
+  ]
 }

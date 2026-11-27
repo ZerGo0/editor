@@ -56,6 +56,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.autoSave(w.focusedTab)
 	w.publishViewState()
 	w.syncBackups()
+	w.syncOutsideWatches()
 	w.overlays(c)
 	w.holdFocus()
 	w.quickInputView(c)

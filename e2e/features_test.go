@@ -53,41 +53,62 @@ func TestNewUntitledFile(t *testing.T) {
 	}
 }
 
+func writeUserSettings(t *testing.T, userData, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(userData, "settings.json"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestHotExitRestoresUnsavedText(t *testing.T) {
 	t.Parallel()
-	userData := t.TempDir()
-	root := Project(t, map[string]string{"a.txt": "alpha\n"})
-	app := LaunchWith(t, userData, root)
-	win := app.WaitWindow(filepath.Base(root))
-	app.Idle(win)
-	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-	focusEditor(app, win)
-	app.Type(win, "unsaved ")
-	app.WaitNode(win, "modified a.txt tab", tabModified("a.txt"))
-	app.Menu(win, "File", "Close Window")
-	app.Eventually("project window closed", func() bool {
-		return !slices.ContainsFunc(app.Windows(), func(w Window) bool { return strings.HasSuffix(w.Title, filepath.Base(root)) && w.Visible })
-	})
-	app.Quit()
-	if data, err := os.ReadFile(filepath.Join(root, "a.txt")); err != nil || string(data) != "alpha\n" {
-		t.Fatalf("a.txt on disk = %q, %v", data, err)
-	}
+	for name, tc := range map[string]struct {
+		settings    string
+		closeWindow bool
+	}{
+		"quit keeps unsaved text with the default onExit": {},
+		"window close keeps it with onExitAndWindowClose": {settings: `{"files.hotExit": "onExitAndWindowClose"}`, closeWindow: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			userData := t.TempDir()
+			if tc.settings != "" {
+				writeUserSettings(t, userData, tc.settings)
+			}
+			root := Project(t, map[string]string{"a.txt": "alpha\n"})
+			app := LaunchWith(t, userData, root)
+			win := app.WaitWindow(filepath.Base(root))
+			app.Idle(win)
+			app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
+			focusEditor(app, win)
+			app.Type(win, "unsaved ")
+			app.WaitNode(win, "modified a.txt tab", tabModified("a.txt"))
+			if tc.closeWindow {
+				app.Menu(win, "File", "Close Window")
+				app.Eventually("project window closed", func() bool {
+					return !slices.ContainsFunc(app.Windows(), func(w Window) bool { return strings.HasSuffix(w.Title, filepath.Base(root)) && w.Visible })
+				})
+			}
+			app.Quit()
+			if data, err := os.ReadFile(filepath.Join(root, "a.txt")); err != nil || string(data) != "alpha\n" {
+				t.Fatalf("a.txt on disk = %q, %v", data, err)
+			}
 
-	again := LaunchWith(t, userData, root)
-	win = again.WaitWindow("a.txt - " + filepath.Base(root))
-	again.Idle(win)
-	again.WaitNode(win, "restored a.txt tab", tabModified("a.txt"))
-	again.WaitNode(win, "restored text", func(n Node) bool {
-		return n.Role == "textField" && strings.Contains(n.Value, "unsaved alpha")
-	})
+			again := LaunchWith(t, userData, root)
+			win = again.WaitWindow("a.txt - " + filepath.Base(root))
+			again.Idle(win)
+			again.WaitNode(win, "restored a.txt tab", tabModified("a.txt"))
+			again.WaitNode(win, "restored text", func(n Node) bool {
+				return n.Role == "textField" && strings.Contains(n.Value, "unsaved alpha")
+			})
+		})
+	}
 }
 
 func TestFolderSettingsOverrideUserSetting(t *testing.T) {
 	t.Parallel()
 	userData := t.TempDir()
-	if err := os.WriteFile(filepath.Join(userData, "settings.json"), []byte(`{"files.exclude": ["*.tmp"]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeUserSettings(t, userData, `{"files.exclude": ["*.tmp"]}`)
 	root := Project(t, map[string]string{"keep.tmp": "", "skip.log": ""})
 	app := LaunchWith(t, userData, root)
 	win := app.WaitWindow(filepath.Base(root))

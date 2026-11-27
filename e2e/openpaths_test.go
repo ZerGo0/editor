@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	pickedPathsEnv   = "EDITOR_E2E_PICKED_PATHS"
 	openFilePalette  = "File: Open File..."
 	openFileQuery    = "File: Open File"
 	openPaletteKey   = "Cmd+Shift+P"
+	pickedPathsEnv   = "EDITOR_E2E_PICKED_PATHS"
 	sessionFilePerm  = 0o600
 	recentSessionKey = "recent"
 )
@@ -53,6 +53,7 @@ func TestOpenFolderReplacingTheWindowKeepsUnsavedText(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(userData, "session.json"), recent, sessionFilePerm); err != nil {
 		t.Fatal(err)
 	}
+	writeUserSettings(t, userData, `{"files.hotExit": "onExitAndWindowClose"}`)
 	app := LaunchWith(t, userData, first)
 	win := app.WaitWindow(filepath.Base(first))
 	app.Idle(win)
@@ -100,7 +101,7 @@ func TestOpenFileOutsideEveryFolderOpensInTheCurrentWindow(t *testing.T) {
 	app.Idle(win)
 	windows := len(app.Windows())
 
-	runOpenFile(app, win)
+	app.Menu(win, "File", "Open File...")
 	app.WaitWindow("loose.txt - " + filepath.Base(root))
 	if got := len(app.Windows()); got != windows {
 		t.Fatalf("windows = %d, want %d", got, windows)

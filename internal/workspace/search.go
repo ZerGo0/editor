@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 	"unicode"
 
 	"github.com/ZerGo0/editor/internal/command"
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/history"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -137,16 +137,29 @@ func (w *Workspace) touchRecent(p string) {
 	}
 }
 
-func (w *Workspace) loadRecentFiles() {
-	if w.env.RecentFiles == nil {
-		return
-	}
-	for _, p := range w.env.RecentFiles() {
-		if r, err := filepath.Rel(w.Root, p); err == nil && filepath.IsLocal(r) && !slices.Contains(w.search.recent, p) {
+func (w *Workspace) loadRecentFiles(saved []string) {
+	for _, p := range saved {
+		p = w.abs(p)
+		if _, err := os.Stat(p); err == nil && !slices.Contains(w.search.recent, p) {
 			w.search.recent = append(w.search.recent, p)
 		}
 	}
+	if w.env.RecentFiles != nil {
+		for _, p := range w.env.RecentFiles() {
+			if fsutil.Within(w.Root, p) && !slices.Contains(w.search.recent, p) {
+				w.search.recent = append(w.search.recent, p)
+			}
+		}
+	}
 	w.search.recent = w.search.recent[:min(len(w.search.recent), maxRecentFiles)]
+}
+
+func (w *Workspace) snapshotRecentFiles() []string {
+	out := make([]string, len(w.search.recent))
+	for i, p := range w.search.recent {
+		out[i] = w.rel(p)
+	}
+	return out
 }
 
 func (w *Workspace) openPaths() []string {

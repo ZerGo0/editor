@@ -87,6 +87,7 @@ type Workspace struct {
 	settings      *settings.Store
 	folderStamp   fileStamp
 	hot           hotExitState
+	outside       map[string]context.CancelFunc
 	ec            editorConfigState
 	brackets      bracketState
 }
@@ -127,7 +128,7 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	w.initGit()
 	w.initGitHub()
 	w.layout = w.restoreNode(saved.Layout)
-	w.loadRecentFiles()
+	w.loadRecentFiles(saved.RecentFiles)
 	if l := saved.LastEdit; l != nil {
 		w.nav.lastEdit = &session.Location{Path: w.abs(l.Path), Line: l.Line, Col: l.Col}
 	}
@@ -244,6 +245,7 @@ func (w *Workspace) Snapshot() session.Project {
 		Layout:        w.snapshotNode(w.layout),
 		ActiveGroup:   slices.Index(w.layout.Groups(), w.active),
 		LastEdit:      w.lastEditSnapshot(),
+		RecentFiles:   w.snapshotRecentFiles(),
 	}
 	w.snapshotTools(&p)
 	w.snapshotSearch(&p)

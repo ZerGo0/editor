@@ -22,6 +22,13 @@ const (
 	projectKeyBytes = 8
 )
 
+type CloseReason int
+
+const (
+	WindowClose CloseReason = iota
+	AppQuit
+)
+
 type hotExitState struct {
 	store   *backup.Store
 	seq     uint64
@@ -73,7 +80,14 @@ func (w *Workspace) initHotExit() {
 }
 
 func (w *Workspace) hotExitOn() bool {
-	return w.hot.store != nil && w.settings.String(settings.HotExit) == settings.HotExitOnClose
+	return w.hot.store != nil && w.settings.String(settings.HotExit) != settings.HotExitOff
+}
+
+func (w *Workspace) backsUpOn(reason CloseReason) bool {
+	if !w.hotExitOn() {
+		return false
+	}
+	return reason == AppQuit || w.settings.String(settings.HotExit) == settings.HotExitOnClose
 }
 
 func (w *Workspace) hasBackup(path string) bool {
@@ -257,9 +271,18 @@ func (w *Workspace) unbacked() []*document.Document {
 	return slices.DeleteFunc(w.modified(), w.backedUp)
 }
 
-func (w *Workspace) PrepareClose() bool {
-	w.flushBackups()
-	return len(w.unbacked()) > 0
+func (w *Workspace) unsaved(reason CloseReason) []*document.Document {
+	if !w.backsUpOn(reason) {
+		return w.modified()
+	}
+	return w.unbacked()
+}
+
+func (w *Workspace) PrepareClose(reason CloseReason) bool {
+	if w.backsUpOn(reason) {
+		w.flushBackups()
+	}
+	return len(w.unsaved(reason)) > 0
 }
 
 func (w *Workspace) takeBackup(path string) (backup.Meta, bool) {

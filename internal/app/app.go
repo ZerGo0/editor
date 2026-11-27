@@ -37,6 +37,7 @@ type projectWindow struct {
 	win     *mygo.Window
 	ws      *workspace.Workspace
 	closing bool
+	focused uint64
 }
 
 type App struct {
@@ -50,6 +51,9 @@ type App struct {
 	welcome      *mygo.Window
 	recentList   ui.ListState
 	quitting     bool
+	focusSeq     uint64
+	ready        bool
+	launchFiles  []string
 	drawing      *workspace.Workspace
 	wordWrapItem *mygo.MenuItem
 }
@@ -69,6 +73,7 @@ func (a *App) Run(args []string) error {
 			a.focusAny()
 		}
 	})
+	mygo.App.OnOpenFile(a.openFile)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(visible bool) {
 		if !visible {
@@ -89,7 +94,8 @@ func (a *App) Run(args []string) error {
 		a.loadConfig()
 		action.SetCommands(commandSource{app: a})
 		a.refreshMenu()
-		if !a.openArgs(args, wd) {
+		a.ready = true
+		if !a.openArgs(args, wd) && !a.openLaunchFiles() {
 			a.restore()
 		}
 	})
@@ -142,7 +148,7 @@ func (a *App) restore() {
 }
 
 func (a *App) focusAny() {
-	for _, pw := range a.projects {
+	if pw := a.lastActiveWindow(); pw != nil {
 		pw.win.Restore()
 		pw.win.Focus()
 		return
@@ -177,7 +183,11 @@ func (a *App) openProject(root string) *projectWindow {
 			a.applyViewState(s)
 		}
 	}
-	win.OnFocus(a.syncViewMenu)
+	a.touchWindow(pw)
+	win.OnFocus(func() {
+		a.touchWindow(pw)
+		a.syncViewMenu()
+	})
 	a.projects[root] = pw
 	win.OnClose(func(e *mygo.CloseEvent) { a.confirmClose(pw, e) })
 	win.OnClosed(func() { a.projectClosed(root, pw) })
@@ -192,18 +202,25 @@ func (a *App) openProject(root string) *projectWindow {
 	return pw
 }
 
+func (a *App) closeReason() workspace.CloseReason {
+	if a.quitting {
+		return workspace.AppQuit
+	}
+	return workspace.WindowClose
+}
+
 func (a *App) confirmClose(pw *projectWindow, e *mygo.CloseEvent) {
-	if pw.closing || !a.needsSavePrompt(pw) {
+	reason := a.closeReason()
+	if pw.closing || !a.needsSavePrompt(pw, reason) {
 		return
 	}
 	e.PreventDefault()
-	quitting := a.quitting
-	pw.ws.ConfirmClose(func(ok bool) {
+	pw.ws.ConfirmClose(reason, func(ok bool) {
 		if !ok {
 			return
 		}
 		pw.closing = true
-		if quitting {
+		if reason == workspace.AppQuit {
 			mygo.App.Quit()
 			return
 		}
@@ -211,17 +228,17 @@ func (a *App) confirmClose(pw *projectWindow, e *mygo.CloseEvent) {
 	})
 }
 
-func (a *App) needsSavePrompt(pw *projectWindow) bool {
-	prompt := pw.ws.PrepareClose()
+func (a *App) needsSavePrompt(pw *projectWindow, reason workspace.CloseReason) bool {
+	prompt := pw.ws.PrepareClose(reason)
 	return prompt && !a.options.DiscardOnClose
 }
 
 func (a *App) confirmWindowClose(pw *projectWindow, done func(ok bool)) {
-	if !a.needsSavePrompt(pw) {
+	if !a.needsSavePrompt(pw, workspace.WindowClose) {
 		done(true)
 		return
 	}
-	pw.ws.ConfirmClose(done)
+	pw.ws.ConfirmClose(workspace.WindowClose, done)
 }
 
 func (a *App) projectClosed(root string, pw *projectWindow) {

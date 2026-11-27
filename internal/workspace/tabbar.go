@@ -32,7 +32,7 @@ func (w *Workspace) tabLabels() map[string]string {
 
 func (w *Workspace) tabTooltip(p string) string {
 	if onDisk(p) {
-		return p
+		return fsutil.DisplayPath(p)
 	}
 	return w.tabTitle(p)
 }

@@ -98,14 +98,15 @@ type Window struct {
 }
 
 type App struct {
-	t        *testing.T
-	UserData string
-	cmd      *exec.Cmd
-	conn     net.Conn
-	reader   *bufio.Reader
-	output   *syncBuffer
-	nextID   int
-	done     chan struct{}
+	t          *testing.T
+	UserData   string
+	runtimeDir string
+	cmd        *exec.Cmd
+	conn       net.Conn
+	reader     *bufio.Reader
+	output     *syncBuffer
+	nextID     int
+	done       chan struct{}
 }
 
 type syncBuffer struct {
@@ -147,7 +148,7 @@ func LaunchEnv(t *testing.T, userData string, env []string, args ...string) *App
 		t.Fatal(err)
 	}
 	sock := filepath.Join(sockDir, "app.sock")
-	a := &App{t: t, UserData: userData, output: &syncBuffer{}, done: make(chan struct{})}
+	a := &App{t: t, UserData: userData, runtimeDir: runtimeDir, output: &syncBuffer{}, done: make(chan struct{})}
 	a.cmd = exec.Command(appBinary, args...)
 	a.cmd.Env = append(os.Environ(), socketEnv+"="+sock, userDataEnv+"="+userData, runtimeDirEnv+"="+runtimeDir)
 	a.cmd.Env = append(a.cmd.Env, env...)
@@ -176,6 +177,29 @@ func LaunchEnv(t *testing.T, userData string, env []string, args ...string) *App
 			t.Fatalf("app did not listen on %s: %v\n%s", sock, err, a.output.String())
 		}
 		time.Sleep(launchPollInterval)
+	}
+}
+
+func (a *App) SecondInstance(dir string, args ...string) {
+	a.t.Helper()
+	cmd := exec.Command(appBinary, args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), socketEnv+"=", userDataEnv+"="+a.UserData, runtimeDirEnv+"="+a.runtimeDir)
+	done := make(chan struct{})
+	var out []byte
+	var err error
+	go func() {
+		out, err = cmd.CombinedOutput()
+		close(done)
+	}()
+	select {
+	case <-done:
+		if err != nil {
+			a.t.Fatalf("second instance: %v\n%s", err, out)
+		}
+	case <-time.After(startTimeout):
+		_ = cmd.Process.Kill()
+		a.t.Fatal("second instance did not hand its arguments over")
 	}
 }
 

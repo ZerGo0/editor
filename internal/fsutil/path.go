@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-const homePrefix = "~"
+const HomePrefix = "~"
 
 func Within(dir, path string) bool {
 	r, err := filepath.Rel(dir, path)
@@ -15,7 +15,7 @@ func Within(dir, path string) bool {
 func DisplayPath(path string) string {
 	if home, err := os.UserHomeDir(); err == nil && Within(home, path) {
 		r, _ := filepath.Rel(home, path)
-		return filepath.Join(homePrefix, r)
+		return filepath.Join(HomePrefix, r)
 	}
 	return path
 }

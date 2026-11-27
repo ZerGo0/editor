@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -133,7 +134,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 	w.NewUntitled()
 	untitled := w.active.ActiveTab().Path
 	w.entry(untitled).doc.Buffer.Set("draft text")
-	if w.PrepareClose() {
+	if w.PrepareClose(AppQuit) {
 		t.Fatal("hot exit asks to save backed-up documents")
 	}
 	snap := w.Snapshot()
@@ -171,8 +172,53 @@ func TestHotExitOffAsksToSave(t *testing.T) {
 	w := newTestWorkspace(t, root, env, session.Project{})
 	_, e := openTab(t, w, filepath.Join(root, "a.txt"))
 	e.doc.Buffer.Set("edited")
-	if !w.PrepareClose() || len(w.hot.store.Entries()) != 0 {
+	if !w.PrepareClose(AppQuit) || len(w.hot.store.Entries()) != 0 {
 		t.Fatal("hot exit off kept a backup or skipped the prompt")
+	}
+}
+
+func TestHotExitDefaultsToOnExit(t *testing.T) {
+	if got := newTestEnv(t).Settings.String(settings.HotExit); got != settings.HotExitOnExit {
+		t.Fatalf("files.hotExit defaults to %q, want %q", got, settings.HotExitOnExit)
+	}
+}
+
+func TestHotExitModeDecidesWhichClosesAsk(t *testing.T) {
+	for _, tc := range []struct {
+		mode   string
+		reason CloseReason
+		asks   bool
+	}{
+		{settings.HotExitOff, AppQuit, true},
+		{settings.HotExitOff, WindowClose, true},
+		{settings.HotExitOnExit, AppQuit, false},
+		{settings.HotExitOnExit, WindowClose, true},
+		{settings.HotExitOnClose, AppQuit, false},
+		{settings.HotExitOnClose, WindowClose, false},
+	} {
+		t.Run(fmt.Sprintf("%s reason %d", tc.mode, tc.reason), func(t *testing.T) {
+			root := t.TempDir()
+			writeFiles(t, root, map[string]string{"a.txt": "disk"})
+			env := newTestEnv(t)
+			if err := env.Settings.Set(settings.HotExit, tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			w := newTestWorkspace(t, root, env, session.Project{})
+			_, e := openTab(t, w, filepath.Join(root, "a.txt"))
+			e.doc.Buffer.Set("edited")
+			w.NewUntitled()
+			w.entry(w.active.ActiveTab().Path).doc.Buffer.Set("draft")
+			if got := w.PrepareClose(tc.reason); got != tc.asks {
+				t.Fatalf("PrepareClose = %v, want %v", got, tc.asks)
+			}
+			wantBackups := 0
+			if !tc.asks {
+				wantBackups = 2
+			}
+			if got := len(w.hot.store.Entries()); got != wantBackups {
+				t.Fatalf("%d backups after PrepareClose, want %d", got, wantBackups)
+			}
+		})
 	}
 }
 

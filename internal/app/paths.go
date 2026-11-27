@@ -41,7 +41,7 @@ func (a *App) openPathIn(path string, window *projectWindow) bool {
 	}
 	pw := window
 	if pw == nil {
-		if pw = a.projectContaining(path); pw != nil {
+		if pw = a.windowForFile(path); pw != nil {
 			pw.win.Restore()
 			pw.win.Focus()
 		} else {
@@ -50,6 +50,48 @@ func (a *App) openPathIn(path string, window *projectWindow) bool {
 	}
 	pw.win.Update(func() { pw.ws.OpenFile(path, false, true) })
 	return true
+}
+
+func (a *App) windowForFile(path string) *projectWindow {
+	if pw := a.projectContaining(path); pw != nil {
+		return pw
+	}
+	return a.lastActiveWindow()
+}
+
+func (a *App) touchWindow(pw *projectWindow) {
+	a.focusSeq++
+	pw.focused = a.focusSeq
+}
+
+func (a *App) lastActiveWindow() *projectWindow {
+	var last *projectWindow
+	for _, pw := range a.projects {
+		if last == nil || pw.focused > last.focused {
+			last = pw
+		}
+	}
+	return last
+}
+
+func (a *App) openFile(path string) {
+	if !a.ready {
+		a.launchFiles = append(a.launchFiles, path)
+		return
+	}
+	a.openPath(path)
+}
+
+func (a *App) openLaunchFiles() bool {
+	files := a.launchFiles
+	a.launchFiles = nil
+	opened := false
+	for _, path := range files {
+		if a.openPath(path) {
+			opened = true
+		}
+	}
+	return opened
 }
 
 func resolvePath(path string) (string, os.FileInfo, error) {

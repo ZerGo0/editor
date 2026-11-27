@@ -34,8 +34,8 @@ func askSave(win *mygo.Window, names []string) saveChoice {
 	return saveChoice(res.Button)
 }
 
-func (w *Workspace) ConfirmClose(done func(ok bool)) {
-	dirty := w.unbacked()
+func (w *Workspace) ConfirmClose(reason CloseReason, done func(ok bool)) {
+	dirty := w.unsaved(reason)
 	if len(dirty) == 0 || w.win == nil {
 		done(true)
 		return
@@ -49,7 +49,10 @@ func (w *Workspace) ConfirmClose(done func(ok bool)) {
 		w.update(func() {
 			switch choice {
 			case choiceSave:
-				w.saveThen(dirty, func() { done(true) })
+				w.saveThen(dirty, func() {
+					w.discardBackups(dirty)
+					done(true)
+				})
 			case choiceDiscard:
 				w.discardBackups(dirty)
 				done(true)

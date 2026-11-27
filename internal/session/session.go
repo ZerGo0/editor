@@ -64,6 +64,7 @@ type Project struct {
 	HiddenViews   []string        `json:"hiddenViews,omitempty"`
 	StatusHidden  []string        `json:"statusHidden,omitempty"`
 	LastEdit      *Location       `json:"lastEdit,omitempty"`
+	RecentFiles   []string        `json:"recentFiles,omitempty"`
 }
 
 type State struct {

@@ -31,18 +31,11 @@ func (w *Workspace) breadcrumbs(c *ui.Context, g *layout.Group, tab *layout.Tab)
 	if !onDisk(tab.Path) {
 		return
 	}
-	inside := fsutil.Within(w.Root, tab.Path)
-	segments := []string{filepath.Base(tab.Path)}
-	if inside {
-		segments = strings.Split(w.rel(tab.Path), string(filepath.Separator))
-	}
+	segments, dirs := w.crumbPath(tab.Path)
 	crumbs := make([]chrome.Crumb, 0, len(segments)+1)
 	for i, seg := range segments {
 		last := i == len(segments)-1
-		p := filepath.Join(append([]string{w.Root}, segments[:i+1]...)...)
-		if !inside {
-			p = tab.Path
-		}
+		p := dirs[i]
 		cr := chrome.Crumb{Label: seg, Leading: func(c *ui.Context) { icons.FileIcon(c, seg, !last, false, token.IconSize.Px()) }}
 		if last {
 			cr.Menu = func(m *ui.Menu) { w.fileCrumbMenu(m, g, tab) }
@@ -57,6 +50,25 @@ func (w *Workspace) breadcrumbs(c *ui.Context, g *layout.Group, tab *layout.Tab)
 	ui.Row(c).FillWidth().Shrink(0).Background(token.Of(c).Layer.Editor).Clip().Children(func() {
 		chrome.Breadcrumbs(c, breadcrumbLabel, crumbs)
 	})
+}
+
+func (w *Workspace) crumbPath(file string) (names, paths []string) {
+	anchor := string(filepath.Separator)
+	home, err := os.UserHomeDir()
+	switch {
+	case fsutil.Within(w.Root, file):
+		anchor = w.Root
+	case err == nil && fsutil.Within(home, file):
+		anchor = home
+		names, paths = []string{fsutil.HomePrefix}, []string{home}
+	}
+	rel, _ := filepath.Rel(anchor, file)
+	parts := strings.Split(rel, string(filepath.Separator))
+	for i, part := range parts {
+		names = append(names, part)
+		paths = append(paths, filepath.Join(anchor, filepath.Join(parts[:i+1]...)))
+	}
+	return names, paths
 }
 
 func (w *Workspace) folderCrumbMenu(m *ui.Menu, dir string) {

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/egoist/mygo/ui"
@@ -68,7 +69,7 @@ func (w *Workspace) showSwitcher() {
 		case labels[path] != "":
 			items[i].Detail = labels[path]
 		case !isVirtual(path) && w.rel(filepath.Dir(path)) != ".":
-			items[i].Detail = w.rel(filepath.Dir(path))
+			items[i].Detail = fsutil.DisplayPath(w.rel(filepath.Dir(path)))
 		}
 	}
 	w.palette.Show(palette.Mode{

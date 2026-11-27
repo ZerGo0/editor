@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/fuzzy"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/search/symbols"
@@ -118,6 +119,9 @@ func fileResult(rel, abs string, positions []int) Result {
 		dir = ""
 	}
 	nameStart := utf8.RuneCountInString(rel) - utf8.RuneCountInString(name)
+	if path.IsAbs(rel) {
+		dir = fsutil.DisplayPath(dir)
+	}
 	r := Result{Kind: KindFile, Label: name, Detail: dir, Path: abs}
 	for _, p := range positions {
 		if p >= nameStart {

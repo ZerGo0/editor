@@ -103,6 +103,7 @@ func (a *App) fileMenu() *mygo.MenuItem {
 		a.item("explorer.newFolder", ""),
 		a.item("workbench.action.newWindow", ""),
 		mygo.Separator(),
+		a.item("workbench.action.files.openFile", ""),
 		a.item("workbench.action.files.openFolder", ""),
 		{Label: "Open Recent", Submenu: a.recentItems()},
 		mygo.Separator(),

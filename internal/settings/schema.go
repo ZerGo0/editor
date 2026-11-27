@@ -118,6 +118,7 @@ const (
 	AutoSaveFocusChange = "onFocusChange"
 
 	HotExitOff     = "off"
+	HotExitOnExit  = "onExit"
 	HotExitOnClose = "onExitAndWindowClose"
 
 	PullMerge  = "merge"
@@ -176,7 +177,7 @@ var Defs = []Def{
 	{Key: AutoSaveDelay, Title: "Auto Save Delay", Description: "Milliseconds to wait after a change before a file saves, when Auto Save is afterDelay.", Category: CategoryFiles, Kind: Int, Default: defaultAutoSaveDelay, Min: minAutoSaveDelay, Max: maxAutoSaveDelay},
 	{Key: TrimTrailing, Title: "Trim Trailing Whitespace", Description: "Remove spaces and tabs at the end of lines when a file saves.", Category: CategoryFiles, Kind: Bool, Default: false},
 	{Key: FinalNewline, Title: "Insert Final Newline", Description: "End the file with a newline when it saves.", Category: CategoryFiles, Kind: Bool, Default: false},
-	{Key: HotExit, Title: "Hot Exit", Description: "Keep unsaved changes when a window closes or the app quits, and restore them when the project opens again. Off asks to save them.", Category: CategoryFiles, Kind: Enum, Default: HotExitOnClose, Options: []string{HotExitOnClose, HotExitOff}},
+	{Key: HotExit, Title: "Hot Exit", Description: "Controls whether unsaved files are remembered between sessions, allowing the save prompt when exiting the editor to be skipped. off disables hot exit: a prompt shows when a window with unsaved changes closes. onExit triggers hot exit when the app quits (Quit command); a window that closes alone still shows the prompt. onExitAndWindowClose triggers hot exit when the app quits, and also when any window closes.", Category: CategoryFiles, Kind: Enum, Default: HotExitOnExit, Options: []string{HotExitOff, HotExitOnExit, HotExitOnClose}},
 	{Key: Exclude, Title: "Exclude", Description: "Glob patterns of files and folders to hide, for example **/node_modules.", Category: CategoryFiles, Kind: StringList, Default: []string{"**/.git", "**/.DS_Store"}},
 	{Key: SearchExclude, Title: "Exclude", Description: "Glob patterns of files and folders that Search skips, besides Files: Exclude, for example **/node_modules.", Category: CategorySearch, Kind: StringList, Default: []string{"**/node_modules", "**/bower_components"}},
 	{Key: SearchUseIgnoreFiles, Title: "Use Ignore Files", Description: "Skip the files that .gitignore lists when Search uses the exclude settings.", Category: CategorySearch, Kind: Bool, Default: true},
