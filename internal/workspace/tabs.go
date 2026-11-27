@@ -3,6 +3,7 @@ package workspace
 import (
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
@@ -49,7 +50,7 @@ func (w *Workspace) requestClose(g *layout.Group, tabs []*layout.Tab) {
 	for i, d := range dirty {
 		names[i] = w.tabTitle(d.Path)
 	}
-	go func() {
+	applog.Go(func() {
 		choice := askSave(w.win, names)
 		w.update(func() {
 			switch choice {
@@ -59,7 +60,7 @@ func (w *Workspace) requestClose(g *layout.Group, tabs []*layout.Tab) {
 				w.removeTabs(g, tabs)
 			}
 		})
-	}()
+	})
 }
 
 func (w *Workspace) unsavedOnlyIn(closing []*layout.Tab) []*document.Document {

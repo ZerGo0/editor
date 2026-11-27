@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -131,7 +132,7 @@ func (p *mediaPane) startWatch() {
 	p.stop = stop
 	last := p.seq.Load()
 	every := p.checkEvery
-	go func() {
+	applog.Go(func() {
 		tick := time.NewTicker(every)
 		defer tick.Stop()
 		for {
@@ -151,7 +152,7 @@ func (p *mediaPane) startWatch() {
 				last = cur
 			}
 		}
-	}()
+	})
 }
 
 func (p *mediaPane) stopWatch() {

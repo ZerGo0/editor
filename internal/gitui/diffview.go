@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -117,7 +118,7 @@ func (t *diffTab) load() {
 		live = g.h.Buffer(t.abs())
 	}
 	r, src, abs := g.repo, t.src, t.abs()
-	go func() {
+	applog.Go(func() {
 		oldText, newText, err := loadDiffTexts(g.ctx, r, src, abs, live == nil)
 		g.post(func() {
 			if gen != t.gen {
@@ -128,7 +129,7 @@ func (t *diffTab) load() {
 				t.apply(oldText, newText, live)
 			}
 		})
-	}()
+	})
 }
 
 func (t *diffTab) apply(oldText, newText string, live *editor.Buffer) {

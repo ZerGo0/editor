@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/shellcmd"
 	"github.com/egoist/mygo"
 )
@@ -19,7 +20,7 @@ func (a *App) installCommand(*mygo.MenuItem, *mygo.Window) {
 		path, err = shellcmd.Install(exe)
 	}
 	a.refreshMenu()
-	go func() {
+	applog.Go(func() {
 		if err != nil {
 			mygo.Dialog.Error("Cannot install the '"+shellcmd.Name+"' command", err.Error())
 			return
@@ -29,7 +30,7 @@ func (a *App) installCommand(*mygo.MenuItem, *mygo.Window) {
 			Message: "The '" + shellcmd.Name + "' command is installed.",
 			Detail:  fmt.Sprintf("It is at %s. Make sure that %s is in your PATH. Run '%s .' to open the current folder.", path, filepath.Dir(path), shellcmd.Name),
 		})
-	}()
+	})
 }
 
 func (a *App) uninstallCommand(*mygo.MenuItem, *mygo.Window) {

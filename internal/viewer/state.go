@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo/ui"
@@ -139,11 +140,11 @@ func (s *State) publish(fn func()) {
 func (s *State) redraw() { s.publish(func() {}) }
 
 func (s *State) system(args ...string) {
-	go func() {
+	applog.Go(func() {
 		if err := s.run(openCommand, args...); err != nil {
 			s.publish(func() { s.h.Notify(err.Error()) })
 		}
-	}()
+	})
 }
 
 func (s *State) reveal()        { s.system(revealFlag, s.path) }

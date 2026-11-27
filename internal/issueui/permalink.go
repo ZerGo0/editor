@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 )
@@ -147,10 +148,10 @@ func (i *Issues) Permalink(path string, startLine, endLine int) (string, error) 
 }
 
 func (i *Issues) permalinkAsync(path string, startLine, endLine int, done func(link string, err error)) {
-	go func() {
+	applog.Go(func() {
 		link, err := i.Permalink(path, startLine, endLine)
 		i.post(func() { done(link, err) })
-	}()
+	})
 }
 
 func (i *Issues) CopyPermalink(path string, startLine, endLine int) {

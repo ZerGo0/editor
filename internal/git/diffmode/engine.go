@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -221,7 +222,7 @@ func (e *Engine) startPatch() {
 	e.wsCancel, e.busy = cancel, true
 	gen := e.wsGen
 	mode, oldText, differ := e.mode, s.Old, e.Differ
-	go func() {
+	applog.Go(func() {
 		res, err := buildPatch(ctx, differ, oldText, newText, mode)
 		e.Post(func() {
 			if gen != e.wsGen || ctx.Err() != nil {
@@ -230,7 +231,7 @@ func (e *Engine) startPatch() {
 			e.busy = false
 			e.finishPatch(res, newText, err)
 		})
-	}()
+	})
 }
 
 func buildPatch(ctx context.Context, differ Differ, oldText, newText string, mode git.WhitespaceMode) (patchResult, error) {

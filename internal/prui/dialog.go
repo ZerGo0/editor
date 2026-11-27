@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	modal "github.com/ZerGo0/editor/internal/design/dialog"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -134,7 +135,7 @@ func (p *PRs) submitDialog() {
 	}
 	dl.busy, dl.err = true, ""
 	gen, submit, title := dl.gen, dl.submit, dl.title
-	go func() {
+	applog.Go(func() {
 		apply, err := submit(p.ctx, in)
 		p.post(func() {
 			current := gen == p.dialog.gen
@@ -157,7 +158,7 @@ func (p *PRs) submitDialog() {
 				}
 			}
 		})
-	}()
+	})
 }
 
 type picker struct {
@@ -182,7 +183,7 @@ func (p *PRs) openPicker(title, action string, single bool, selected []string, l
 		pk.selected[s] = true
 	}
 	p.picker = pk
-	go func() {
+	applog.Go(func() {
 		items, err := load(p.ctx)
 		p.post(func() {
 			if gen != p.picker.gen {
@@ -202,7 +203,7 @@ func (p *PRs) openPicker(title, action string, single bool, selected []string, l
 			slices.Sort(items)
 			p.picker.items = items
 		})
-	}()
+	})
 }
 
 func (pk *picker) chosen() []string {
@@ -234,7 +235,7 @@ func (p *PRs) submitPicker() {
 	}
 	pk.busy, pk.err = true, ""
 	gen, selected, apply := pk.gen, pk.chosen(), pk.apply
-	go func() {
+	applog.Go(func() {
 		done, err := apply(p.ctx, selected)
 		p.post(func() {
 			current := gen == p.picker.gen
@@ -256,7 +257,7 @@ func (p *PRs) submitPicker() {
 				}
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) Overlay(c *ui.Context) {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
@@ -58,8 +59,8 @@ func (a *App) loadConfig() {
 	}
 	a.registerCommands()
 	a.applyDiffSettings()
-	go a.watchConfig(context.Background(), dir)
-	go a.openHistory(dir)
+	applog.Go(func() { a.watchConfig(context.Background(), dir) })
+	applog.Go(func() { a.openHistory(dir) })
 }
 
 func (a *App) watchConfig(ctx context.Context, dir string) {
@@ -114,6 +115,6 @@ func (a *App) settingsChanged() {
 	a.applyDiffSettings()
 	a.refreshMenu()
 	for _, pw := range a.projects {
-		pw.win.Update(pw.ws.SettingsChanged)
+		pw.ws.Update(pw.ws.SettingsChanged)
 	}
 }

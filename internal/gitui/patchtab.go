@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
@@ -103,7 +104,7 @@ func (t *patchTab) reload() {
 	t.gen++
 	gen, r, load := t.gen, g.repo, t.load
 	t.loading, t.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := load(g.ctx, r)
 		g.post(func() {
 			if gen != t.gen {
@@ -115,7 +116,7 @@ func (t *patchTab) reload() {
 				t.view.SetEntries(t.entries(r))
 			}
 		})
-	}()
+	})
 }
 
 func (t *patchTab) options() multidiff.Options {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -130,7 +131,7 @@ func (i *Issues) loadSection(s *section, more bool) {
 	}
 	query := i.expandQuery(s.query.Query)
 	be := i.be
-	go func() {
+	applog.Go(func() {
 		result, err := be.SearchIssues(i.ctx, query, page)
 		i.post(func() {
 			if gen != s.gen {
@@ -149,7 +150,7 @@ func (i *Issues) loadSection(s *section, more bool) {
 			}
 			s.items = result.Issues
 		})
-	}()
+	})
 }
 
 func (i *Issues) runSearch(text string) {

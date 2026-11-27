@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
@@ -223,7 +224,7 @@ func (w *Workspace) pasteEntries(paths []string, dir string, cut bool) {
 		w.moveEntries(paths, dir)
 		return
 	}
-	go func() {
+	applog.Go(func() {
 		var last string
 		for _, p := range paths {
 			to, err := copyEntry(p, dir)
@@ -239,7 +240,7 @@ func (w *Workspace) pasteEntries(paths []string, dir string, cut bool) {
 				w.tree.Reveal(last)
 			}
 		})
-	}()
+	})
 }
 
 func copyEntry(src, dir string) (string, error) {
@@ -338,7 +339,7 @@ func (w *Workspace) moved(from, to string) {
 
 func (w *Workspace) trash(p string) {
 	name := filepath.Base(p)
-	go func() {
+	applog.Go(func() {
 		res, err := mygo.Dialog.Message(mygo.MessageOptions{
 			Parent:             w.win,
 			Type:               mygo.MessageWarning,
@@ -356,7 +357,7 @@ func (w *Workspace) trash(p string) {
 			return
 		}
 		w.update(func() { w.removed(p) })
-	}()
+	})
 }
 
 func (w *Workspace) removed(p string) {

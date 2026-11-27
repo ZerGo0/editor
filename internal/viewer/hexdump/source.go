@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/ZerGo0/editor/internal/applog"
 )
 
 const maxCachedPages = 16
@@ -54,7 +56,7 @@ func (s *Source) Page(i int64) ([]byte, error) {
 	s.evict()
 	e := &entry{used: s.tick}
 	s.pages[i] = e
-	go s.read(i, e)
+	applog.Go(func() { s.read(i, e) })
 	return nil, ErrLoading
 }
 

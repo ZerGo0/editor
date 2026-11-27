@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
@@ -113,14 +114,14 @@ func readTemplate(root string) string {
 
 func (p *PRs) loadTemplate(f *createForm) {
 	root := p.h.RootDir()
-	go func() {
+	applog.Go(func() {
 		text := readTemplate(root)
 		p.post(func() {
 			if text != "" && !f.typedBody && f.body == "" {
 				f.body = text
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) targetRemote() string {
@@ -134,7 +135,7 @@ func (p *PRs) loadCreateBases(f *createForm) {
 	f.branch = p.branch
 	local, branch := p.local, p.branch
 	remote := p.targetRemote()
-	go func() {
+	applog.Go(func() {
 		branches, err := local.Branches(p.ctx)
 		var bases []string
 		if err == nil {
@@ -150,7 +151,7 @@ func (p *PRs) loadCreateBases(f *createForm) {
 				f.base = bases[0]
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) loadCompare(f *createForm) {
@@ -161,7 +162,7 @@ func (p *PRs) loadCompare(f *createForm) {
 	local, be, repo, branch := p.local, p.be, p.repo, f.branch
 	remote := p.targetRemote()
 	pushed := branch.Upstream != ""
-	go func() {
+	applog.Go(func() {
 		var subjects []string
 		var files []github.PRFile
 		var err error
@@ -184,7 +185,7 @@ func (p *PRs) loadCompare(f *createForm) {
 			}
 			f.cmpLoading, f.cmpErr, f.cmpCommits, f.cmpFiles = false, err, subjects, files
 		})
-	}()
+	})
 }
 
 func (f *createForm) blocked() string {

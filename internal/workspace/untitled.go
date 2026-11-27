@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui/editor"
@@ -78,7 +79,7 @@ func (w *Workspace) saveUntitled(docs []*document.Document, done func()) {
 	}
 	d := docs[0]
 	name := w.tabTitle(d.Path) + extensionOf(d.Buffer.Language())
-	go func() {
+	applog.Go(func() {
 		p, err := mygo.Dialog.Save(mygo.SaveDialogOptions{
 			Parent:            w.win,
 			Title:             saveAsTitle,
@@ -97,7 +98,7 @@ func (w *Workspace) saveUntitled(docs []*document.Document, done func()) {
 				w.saveUntitled(docs[1:], done)
 			}
 		})
-	}()
+	})
 }
 
 func extensionOf(lang *editor.Language) string {

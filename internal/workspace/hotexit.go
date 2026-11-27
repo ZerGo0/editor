@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/backup"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/settings"
@@ -161,10 +162,10 @@ func (w *Workspace) backupDoc(path string) {
 	}
 	w.hot.seq++
 	seq, store, meta := w.hot.seq, w.hot.store, w.backupMeta(d)
-	go func() {
+	applog.Go(func() {
 		err := store.Write(seq, meta, snap, int64(snap.Len()))
 		w.update(func() { w.backupWritten(path, v, err) })
-	}()
+	})
 }
 
 func (w *Workspace) backupWritten(path string, version uint64, err error) {
@@ -205,7 +206,7 @@ func (w *Workspace) deleteBackup(path string) {
 		remove()
 		return
 	}
-	go remove()
+	applog.Go(remove)
 }
 
 func (w *Workspace) clearBackups() {
@@ -217,11 +218,11 @@ func (w *Workspace) clearBackups() {
 	}
 	w.hot.seq++
 	seq, store := w.hot.seq, w.hot.store
-	go func() {
+	applog.Go(func() {
 		if err := store.Clear(seq); err != nil {
 			log.Printf("hot exit: %v", err)
 		}
-	}()
+	})
 }
 
 func (w *Workspace) stopBackupTimers() {

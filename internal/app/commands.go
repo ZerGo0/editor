@@ -32,13 +32,7 @@ const (
 )
 
 func (a *App) registerCommands() {
-	ws := func(fn func(*workspace.Workspace)) func(*mygo.Window) {
-		return func(win *mygo.Window) {
-			if pw := a.workspaceFor(win); pw != nil {
-				pw.win.Update(func() { fn(pw.ws) })
-			}
-		}
-	}
+	ws := a.inWorkspace
 	app := func(fn func()) func(*mygo.Window) { return func(*mygo.Window) { fn() } }
 	add := func(id, category, title string, run func(*mygo.Window)) {
 		a.commands.Add(&command.Command{ID: id, Category: category, Title: title, Run: run})

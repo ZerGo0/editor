@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/dialog"
@@ -134,7 +135,7 @@ func (g *Git) loadShelf() {
 	s.gen++
 	gen, r := s.gen, g.repo
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := r.ShelfList()
 		g.post(func() {
 			if gen != s.gen {
@@ -145,7 +146,7 @@ func (g *Git) loadShelf() {
 				s.selected = min(max(s.selected, 0), len(items)-1)
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) shelfDialog(c *ui.Context) {

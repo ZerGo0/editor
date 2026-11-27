@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/ZerGo0/editor/internal/applog"
 )
 
 const loginShellTimeout = 3 * time.Second
@@ -16,7 +18,7 @@ var wellKnownBinDirs = []string{"/opt/homebrew/bin", "/usr/local/bin"}
 
 func extendPath() {
 	addPath(wellKnownBinDirs)
-	go func() {
+	applog.Go(func() {
 		shell := os.Getenv("SHELL")
 		if shell == "" || !filepath.IsAbs(shell) {
 			return
@@ -28,7 +30,7 @@ func extendPath() {
 			return
 		}
 		addPath(strings.Split(strings.TrimSpace(string(out)), string(os.PathListSeparator)))
-	}()
+	})
 }
 
 func addPath(dirs []string) {

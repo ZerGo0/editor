@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -55,7 +56,7 @@ func (p *markdownPane) load() {
 	gen := p.gen
 	path := p.s.path
 	p.loading, p.err = true, nil
-	go func() {
+	applog.Go(func() {
 		data, err := os.ReadFile(path)
 		p.s.publish(func() {
 			if gen != p.gen {
@@ -68,7 +69,7 @@ func (p *markdownPane) load() {
 			}
 			p.setText(string(data))
 		})
-	}()
+	})
 	p.s.redraw()
 }
 

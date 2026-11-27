@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo"
 )
@@ -70,7 +71,7 @@ func (g *Git) refreshNow() {
 	g.refresh.gen++
 	gen, r := g.refresh.gen, g.repo
 	force := g.refresh.retries >= lockRetryLimit
-	go func() {
+	applog.Go(func() {
 		if !force && locked(r.MetaDir()) {
 			g.post(func() {
 				g.refresh.running = false
@@ -90,7 +91,7 @@ func (g *Git) refreshNow() {
 				g.refreshNow()
 			}
 		})
-	}()
+	})
 }
 
 func locked(gitDir string) bool {

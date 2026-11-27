@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -84,10 +85,10 @@ func (p *imagePane) load() {
 	gen := p.gen
 	source, kind, path, limit, convert := p.source, p.kind, p.s.path, p.limit, p.convert
 	p.loading, p.err, p.big, p.empty = true, nil, nil, false
-	go func() {
+	applog.Go(func() {
 		res, size, err := decodeSource(source, kind, path, limit, convert)
 		p.s.publish(func() { p.finish(gen, res, size, err) })
-	}()
+	})
 	p.s.redraw()
 }
 

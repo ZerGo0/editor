@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/detail"
@@ -185,7 +186,7 @@ func (i *Issues) createAt(title, path string, startLine, endLine int, snippet st
 		return
 	}
 	root := i.h.RootDir()
-	go func() {
+	applog.Go(func() {
 		link, err := i.Permalink(path, startLine, endLine)
 		rel := path
 		if r, relErr := repoRelative(root, path); relErr == nil {
@@ -199,7 +200,7 @@ func (i *Issues) createAt(title, path string, startLine, endLine int, snippet st
 			}
 			i.openCreate(createDraft{title: title, body: body})
 		})
-	}()
+	})
 }
 
 func (i *Issues) CreateFromTODO(path string, line int, text string) {

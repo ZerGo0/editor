@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
@@ -68,7 +69,7 @@ func (g *Git) loadWorktrees() {
 	s.gen++
 	gen, r := s.gen, g.repo
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := r.Worktrees(g.ctx)
 		g.post(func() {
 			if gen != s.gen {
@@ -76,7 +77,7 @@ func (g *Git) loadWorktrees() {
 			}
 			s.loading, s.err, s.items = false, err, items
 		})
-	}()
+	})
 }
 
 func (g *Git) worktreesDialog(c *ui.Context) {

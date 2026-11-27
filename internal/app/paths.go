@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/egoist/mygo"
 )
 
@@ -48,7 +49,7 @@ func (a *App) openPathIn(path string, window *projectWindow) bool {
 			pw = a.openProject(filepath.Dir(path))
 		}
 	}
-	pw.win.Update(func() { pw.ws.OpenFile(path, false, true) })
+	pw.ws.Update(func() { pw.ws.OpenFile(path, false, true) })
 	return true
 }
 
@@ -131,7 +132,7 @@ func (a *App) openFileDialog(parent *mygo.Window) {
 }
 
 func (a *App) openDialog(parent *mygo.Window, title string, directory bool) {
-	go func() {
+	applog.Go(func() {
 		paths, err := a.pickPaths(parent, title, directory)
 		if err != nil {
 			log.Printf("%s: %v", strings.ToLower(title), err)
@@ -145,7 +146,7 @@ func (a *App) openDialog(parent *mygo.Window, title string, directory bool) {
 			return
 		}
 		mygo.RunOnMain(func() { a.openPathIn(paths[0], a.workspaceFor(parent)) })
-	}()
+	})
 }
 
 func (a *App) pickPaths(parent *mygo.Window, title string, directory bool) ([]string, error) {

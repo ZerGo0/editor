@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/search/textsearch"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -109,7 +110,7 @@ func (d *Dialog) apply(targets []replaceTarget) {
 		replaced += len(edits)
 		changed++
 	}
-	go func() {
+	applog.Go(func() {
 		var errs []error
 		for _, t := range disk {
 			path := t.file.Path
@@ -124,7 +125,7 @@ func (d *Dialog) apply(targets []replaceTarget) {
 			}
 		}
 		h.Update(func() { d.replaceDone(replaced, changed, errors.Join(errs...)) })
-	}()
+	})
 }
 
 func (d *Dialog) beforeWrite(path string) {

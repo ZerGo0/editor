@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
@@ -42,7 +43,7 @@ func (s *logState) loadDetails(cm git.Commit) {
 	}
 	*d = commitDetails{oid: cm.OID, loading: true, selected: -1, gen: gen, split: split}
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		files, err := r.CommitFiles(g.ctx, cm.OID)
 		contains, _ := r.BranchesContaining(g.ctx, cm.OID)
 		g.post(func() {
@@ -51,7 +52,7 @@ func (s *logState) loadDetails(cm git.Commit) {
 			}
 			d.loading, d.err, d.files, d.contains = false, err, files, contains
 		})
-	}()
+	})
 }
 
 func commitSource(cm git.Commit, f git.ChangedFile) diffSource {

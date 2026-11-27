@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/host"
@@ -131,14 +132,14 @@ func (p *PRs) connect() {
 	p.phase, p.phaseErr = phaseLoading, nil
 	root, dataDir := p.h.RootDir(), p.h.UserDataDir()
 	env := p.env
-	go func() {
+	applog.Go(func() {
 		conn := resolveConnection(p.ctx, env, root, dataDir)
 		p.post(func() {
 			if gen == p.connGen {
 				p.apply(conn)
 			}
 		})
-	}()
+	})
 }
 
 func resolveConnection(ctx context.Context, env Env, root, dataDir string) connection {
@@ -231,7 +232,7 @@ func (p *PRs) readBranch(done func()) {
 	p.branchGen++
 	gen := p.branchGen
 	local, repo, remotes := p.local, p.repo, p.remotes
-	go func() {
+	applog.Go(func() {
 		branches, err := local.Branches(p.ctx)
 		var info branchInfo
 		var names []string
@@ -248,7 +249,7 @@ func (p *PRs) readBranch(done func()) {
 			}
 			done()
 		})
-	}()
+	})
 }
 
 func (p *PRs) refreshCurrent() {
@@ -260,7 +261,7 @@ func (p *PRs) refreshCurrent() {
 	}
 	p.current.loading = true
 	be, repo, branch := p.be, p.repo, p.branch
-	go func() {
+	applog.Go(func() {
 		pr, err := be.CurrentBranchPR(p.ctx, repo, branch.HeadRef, branch.HeadOwner)
 		var state checkState
 		if err == nil && pr != nil {
@@ -282,7 +283,7 @@ func (p *PRs) refreshCurrent() {
 				p.checks[pr.Number] = state
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) authFailure(err error) {
@@ -341,7 +342,7 @@ func (p *PRs) act(busy *string, status, failure string, work func(ctx context.Co
 		return
 	}
 	*busy = status
-	go func() {
+	applog.Go(func() {
 		apply, err := work(p.ctx)
 		p.post(func() {
 			*busy = ""
@@ -353,7 +354,7 @@ func (p *PRs) act(busy *string, status, failure string, work func(ctx context.Co
 				apply()
 			}
 		})
-	}()
+	})
 }
 
 func errorText(err error) string {
@@ -383,12 +384,12 @@ func appendUnique(items, more []github.PullRequest) []github.PullRequest {
 func (p *PRs) loadViewer() {
 	gen := p.connGen
 	be := p.be
-	go func() {
+	applog.Go(func() {
 		user, err := be.Viewer(p.ctx)
 		p.post(func() {
 			if err == nil && gen == p.connGen {
 				p.viewer = user.Login
 			}
 		})
-	}()
+	})
 }

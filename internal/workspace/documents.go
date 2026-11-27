@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/backup"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/document"
@@ -55,10 +56,10 @@ func (w *Workspace) entry(path string) *docEntry {
 		w.finishLoad(e, path, load(), meta, restore)
 		return e
 	}
-	go func() {
+	applog.Go(func() {
 		l := load()
 		w.update(func() { w.finishLoad(e, path, l, meta, restore) })
-	}()
+	})
 	return e
 }
 
@@ -204,7 +205,7 @@ func (w *Workspace) reloadChanged(dir string) {
 		if d == nil || !d.Editable() || d.Modified() || !fsutil.Within(dir, path) || !d.ChangedOnDisk() {
 			continue
 		}
-		go func() {
+		applog.Go(func() {
 			s, err := d.ReadDisk()
 			if err != nil {
 				return
@@ -214,7 +215,7 @@ func (w *Workspace) reloadChanged(dir string) {
 					w.recordHistory(d.Path, externalChangeLabel)
 				}
 			})
-		}()
+		})
 	}
 }
 
@@ -226,7 +227,7 @@ func (w *Workspace) saveLarge(d *document.Document) {
 	e.saving = true
 	name := filepath.Base(d.Path)
 	id := w.notify(notices.Notice{Tone: token.ToneInfo, Title: "Saving " + name + "...", Busy: true})
-	go func() {
+	applog.Go(func() {
 		err := d.SaveLarge(w.ctx, nil)
 		w.update(func() {
 			e.saving = false
@@ -237,5 +238,5 @@ func (w *Workspace) saveLarge(d *document.Document) {
 			}
 			w.setNotice("Saved " + name)
 		})
-	}()
+	})
 }

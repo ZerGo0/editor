@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
@@ -150,13 +151,13 @@ func (w *Workspace) symbolAt(tab *layout.Tab) string {
 	if version := buf.Version(); !e.running && (e.syms == nil || e.version != version) {
 		e.running = true
 		text := buf.String()
-		go func() {
+		applog.Go(func() {
 			syms := symbols.Scan(lang, text)
 			if syms == nil {
 				syms = []symbols.Symbol{}
 			}
 			w.update(func() { e.running, e.version, e.syms = false, version, syms })
-		}()
+		})
 	}
 	line := st.CursorPos().Line
 	name := ""

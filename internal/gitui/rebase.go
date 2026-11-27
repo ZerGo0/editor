@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -49,7 +50,7 @@ func (g *Git) loadTodo() {
 	s.gen++
 	gen, r, onto := s.gen, g.repo, s.onto
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := r.RebaseTodo(g.ctx, onto)
 		g.post(func() {
 			if gen != s.gen {
@@ -64,7 +65,7 @@ func (g *Git) loadTodo() {
 				s.selected = 0
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) rebaseDialog(c *ui.Context) {

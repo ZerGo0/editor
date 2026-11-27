@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/multidiff"
@@ -111,7 +112,7 @@ func (g *Git) initViews() {
 func (g *Git) open() {
 	g.phase, g.openErr = phaseLoading, nil
 	root, data := g.h.RootDir(), g.h.UserDataDir()
-	go func() {
+	applog.Go(func() {
 		if !g.deps.available() {
 			g.post(func() { g.phase = phaseNoGit })
 			return
@@ -129,7 +130,7 @@ func (g *Git) open() {
 				g.setRepo(r)
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) setRepo(r repo) {
@@ -138,7 +139,7 @@ func (g *Git) setRepo(r repo) {
 	g.phase = phaseReady
 	g.refreshNow()
 	g.scheduleAutoFetch()
-	go g.deps.watch(g.ctx, r.MetaDir(), func() { g.post(g.scheduleRefresh) })
+	applog.Go(func() { g.deps.watch(g.ctx, r.MetaDir(), func() { g.post(g.scheduleRefresh) }) })
 }
 
 func (g *Git) Close() {
@@ -194,7 +195,7 @@ func (g *Git) initRepository() {
 	}
 	root := g.h.RootDir()
 	g.phase = phaseLoading
-	go func() {
+	applog.Go(func() {
 		err := g.deps.initRepo(g.ctx, root)
 		g.post(func() {
 			if err != nil {
@@ -205,5 +206,5 @@ func (g *Git) initRepository() {
 			g.h.Notify("Initialized a Git repository")
 			g.open()
 		})
-	}()
+	})
 }

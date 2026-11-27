@@ -3,6 +3,7 @@ package gitui
 import (
 	"context"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/dialog"
@@ -48,7 +49,7 @@ func (g *Git) loadSubmodules() {
 	s.gen++
 	gen, r := s.gen, g.repo
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := r.Submodules(g.ctx)
 		g.post(func() {
 			if gen != s.gen {
@@ -56,7 +57,7 @@ func (g *Git) loadSubmodules() {
 			}
 			s.loading, s.err, s.items = false, err, items
 		})
-	}()
+	})
 }
 
 func (g *Git) submodulesDialog(c *ui.Context) {

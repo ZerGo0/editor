@@ -13,6 +13,7 @@ type updateQueue struct {
 }
 
 func (w *Workspace) update(fn func()) {
+	fn = w.guarded(fn)
 	q := &w.updates
 	q.mu.Lock()
 	win := q.win

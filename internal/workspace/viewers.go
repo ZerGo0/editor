@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/layout"
@@ -137,7 +138,7 @@ func (w *Workspace) reloadViewers(dir string) {
 			continue
 		}
 		old := e.stamp
-		go func() {
+		applog.Go(func() {
 			stamp, err := statFile(path)
 			if err != nil || stamp.same(old) {
 				return
@@ -150,7 +151,7 @@ func (w *Workspace) reloadViewers(dir string) {
 					}
 				}
 			})
-		}()
+		})
 	}
 }
 

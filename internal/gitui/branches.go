@@ -3,6 +3,7 @@ package gitui
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/quickinput"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -46,14 +47,14 @@ func (g *Git) loadTags() {
 	s := &g.branches
 	s.gen++
 	gen, r := s.gen, g.repo
-	go func() {
+	applog.Go(func() {
 		tags, err := r.Tags(g.ctx)
 		g.post(func() {
 			if gen == s.gen {
 				s.tags, s.tagsErr = tags, err
 			}
 		})
-	}()
+	})
 }
 
 type popupCommand struct {

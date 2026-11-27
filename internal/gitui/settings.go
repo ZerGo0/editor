@@ -3,6 +3,7 @@ package gitui
 import (
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 )
 
@@ -68,7 +69,7 @@ func (g *Git) fetchQuietly() {
 		return
 	}
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		err := r.Fetch(g.ctx, "", true, nil)
 		g.post(func() {
 			if err == nil {
@@ -76,5 +77,5 @@ func (g *Git) fetchQuietly() {
 			}
 			g.scheduleAutoFetch()
 		})
-	}()
+	})
 }

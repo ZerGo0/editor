@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
@@ -233,7 +234,7 @@ func (d *Dialog) refresh() {
 	in := d.quickInput()
 	sess := d.session()
 	d.loading = true
-	go func() {
+	applog.Go(func() {
 		entries := in.compute(ctx, sess)
 		d.env.Host.Update(func() {
 			if gen != d.gen {
@@ -242,7 +243,7 @@ func (d *Dialog) refresh() {
 			d.loading, d.quick = false, entries
 			d.compose(true)
 		})
-	}()
+	})
 }
 
 func (d *Dialog) startText(limit int) {

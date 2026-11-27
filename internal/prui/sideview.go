@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -163,7 +164,7 @@ func (p *PRs) loadSection(s *section, more bool) {
 	opts.State, opts.Page, opts.PerPage = github.StateOpen, page, pageSize
 	be, repo, local := p.be, p.repo, s.local
 	names := append([]string(nil), p.locals...)
-	go func() {
+	applog.Go(func() {
 		var items []github.PullRequest
 		var err error
 		if local {
@@ -188,7 +189,7 @@ func (p *PRs) loadSection(s *section, more bool) {
 			}
 			s.items = items
 		})
-	}()
+	})
 }
 
 func (p *PRs) runSearch(query string) {

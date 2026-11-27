@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo"
 )
@@ -36,7 +37,7 @@ func (g *Git) do(o op) {
 			g.progress = line
 		}
 	}}
-	go func() {
+	applog.Go(func() {
 		if !o.network {
 			g.writeMu.Lock()
 			defer g.writeMu.Unlock()
@@ -58,7 +59,7 @@ func (g *Git) do(o op) {
 				o.done(res)
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) doSimple(title string, run func(ctx context.Context, r repo) error, done func()) {
@@ -109,11 +110,11 @@ type question struct {
 
 func (g *Git) confirm(q question, yes func()) {
 	win := g.h.Window()
-	go func() {
+	applog.Go(func() {
 		if g.deps.ask(win, q) {
 			g.post(yes)
 		}
-	}()
+	})
 }
 
 func askNative(win *mygo.Window, q question) bool {

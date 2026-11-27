@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -101,10 +102,10 @@ func fetchDetail(ctx context.Context, be Backend, repo github.Remote, number int
 	var commentErr error
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() {
+	applog.Go(func() {
 		defer wg.Done()
 		res.comments, commentErr = be.IssueComments(ctx, repo, number)
-	}()
+	})
 	res.issue, res.err = be.GetIssue(ctx, repo, number)
 	wg.Wait()
 	if res.err == nil && commentErr != nil {
@@ -118,14 +119,14 @@ func (i *Issues) loadDetail(d *issueData) {
 	gen := d.gen
 	d.loading, d.stale = true, false
 	be, repo, number := i.be, i.repo, d.number
-	go func() {
+	applog.Go(func() {
 		res := fetchDetail(i.ctx, be, repo, number)
 		i.post(func() {
 			if gen == d.gen {
 				i.applyDetail(d, res)
 			}
 		})
-	}()
+	})
 }
 
 func (i *Issues) applyDetail(d *issueData, res detailResult) {

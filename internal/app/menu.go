@@ -35,7 +35,7 @@ func (a *App) item(id, label string) *mygo.MenuItem {
 	if label == "" {
 		label = cmd.Title
 	}
-	item := &mygo.MenuItem{Label: label, Click: func(_ *mygo.MenuItem, win *mygo.Window) { a.commands.Run(id, win) }}
+	item := &mygo.MenuItem{Label: label, Click: func(_ *mygo.MenuItem, win *mygo.Window) { a.runMenuCommand(id, win) }}
 	if a.options.NoMenuAccelerators {
 		return item
 	}

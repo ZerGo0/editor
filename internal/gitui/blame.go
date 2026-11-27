@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -99,7 +100,7 @@ func (g *Git) runBlame(b *blameState) {
 	gen, r, rel := b.gen, g.repo, b.rel
 	contents := []byte(b.st.Buffer.String())
 	b.loading, b.err = true, nil
-	go func() {
+	applog.Go(func() {
 		lines, err := r.Blame(g.ctx, rel, "", contents)
 		g.post(func() {
 			if gen != b.gen {
@@ -114,7 +115,7 @@ func (g *Git) runBlame(b *blameState) {
 			b.lines = lines
 			g.paintBlame(b)
 		})
-	}()
+	})
 }
 
 func (b *blameState) at(line int) (git.BlameLine, bool) {
@@ -206,7 +207,7 @@ func (g *Git) openCommitOID(oid string) {
 		return
 	}
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		commits, err := r.Log(g.ctx, git.LogOptions{Revs: []string{oid}, Max: 1})
 		if err == nil && len(commits) == 0 {
 			err = fmt.Errorf("commit %s not found", shortHash(oid))
@@ -218,5 +219,5 @@ func (g *Git) openCommitOID(oid string) {
 			}
 			g.openCommitTab(commits[0])
 		})
-	}()
+	})
 }

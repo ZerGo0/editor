@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 )
 
@@ -192,7 +193,7 @@ func (g *Git) copyCommitPatch(cm git.Commit) {
 		return
 	}
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		var patch []byte
 		fds, err := diffOfCommit(g.ctx, r, cm)
 		if err == nil {
@@ -206,7 +207,7 @@ func (g *Git) copyCommitPatch(cm git.Commit) {
 			g.clipboard = string(patch)
 			g.h.Notify("Copied the patch of " + shortHash(cm.OID))
 		})
-	}()
+	})
 }
 
 const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"

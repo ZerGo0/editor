@@ -1,6 +1,7 @@
 package symbolnav
 
 import (
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -39,10 +40,10 @@ func (pv *preview) show(res Result, f *finder.FileNode, current int, escape func
 		return
 	}
 	pv.loading = true
-	go func() {
+	applog.Go(func() {
 		text, message := finder.ReadPreview(f.Path)
 		pv.env.Host.Update(func() { pv.build(gen, res, f, current, text, message) })
-	}()
+	})
 }
 
 func (pv *preview) build(gen int, res Result, f *finder.FileNode, current int, text, message string) {

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"sync"
+
+	"github.com/ZerGo0/editor/internal/applog"
 )
 
 const (
@@ -57,7 +59,7 @@ func openSource(path string) (*source, error) {
 func (s *source) startIndex(notify func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	go s.idx.run(ctx, notify)
+	applog.Go(func() { s.idx.run(ctx, notify) })
 }
 
 func (s *source) close() error {

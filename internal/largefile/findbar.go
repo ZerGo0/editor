@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/findwidget"
@@ -131,7 +132,7 @@ func (s *State) search(backward bool) {
 	}
 	req := findResult{seq: s.find.seq, version: s.Doc.Version()}
 	doc, services, matchCase := s.Doc, s.services, s.find.matchCase
-	go func() {
+	applog.Go(func() {
 		r := req
 		r.start, r.end, r.found, r.err = doc.Find(ctx, from, query, matchCase, backward)
 		if r.err == nil && !r.found {
@@ -145,7 +146,7 @@ func (s *State) search(backward bool) {
 		s.find.result = &r
 		s.find.mu.Unlock()
 		services.Invalidate()
-	}()
+	})
 }
 
 func (s *State) applyFound() {

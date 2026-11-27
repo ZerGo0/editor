@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
@@ -112,7 +113,7 @@ func (p *PRs) persistQueries() {
 	queries := append([]savedQuery(nil), p.queries...)
 	p.queriesSeq++
 	seq := p.queriesSeq
-	go func() {
+	applog.Go(func() {
 		p.queriesMu.Lock()
 		defer p.queriesMu.Unlock()
 		if seq < p.queriesDone {
@@ -122,7 +123,7 @@ func (p *PRs) persistQueries() {
 		if err := saveQueries(path, queries); err != nil {
 			p.post(func() { p.h.ShowError("Cannot save the queries", err) })
 		}
-	}()
+	})
 }
 
 func (p *PRs) addQuery(label, query string) error {

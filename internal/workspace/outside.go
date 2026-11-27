@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/egoist/mygo"
 )
@@ -38,7 +39,7 @@ func (w *Workspace) syncOutsideWatches() {
 		}
 		ctx, stop := context.WithCancel(w.ctx)
 		w.outside[p] = stop
-		go w.watchOutside(ctx, p)
+		applog.Go(func() { w.watchOutside(ctx, p) })
 	}
 }
 

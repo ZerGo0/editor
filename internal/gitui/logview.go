@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -136,7 +137,7 @@ func (s *logState) loadPage() {
 	s.loading = true
 	gen, skip, r, text := s.gen, len(s.commits), g.repo, s.applied.text
 	opts := s.options(skip)
-	go func() {
+	applog.Go(func() {
 		page, err := r.Log(g.ctx, opts)
 		full := len(page) == opts.Max
 		if err == nil && skip == 0 && isHashLike(text) {
@@ -162,7 +163,7 @@ func (s *logState) loadPage() {
 			}
 			s.applyFocus()
 		})
-	}()
+	})
 }
 
 func prependMissing(hits, page []git.Commit) []git.Commit {

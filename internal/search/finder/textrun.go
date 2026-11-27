@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/search/textsearch"
 	"github.com/egoist/mygo/ui/editor"
@@ -168,14 +169,14 @@ func (r *textRun) start(req textRequest) {
 	snaps := r.overlay()
 	opts := textsearch.Options{Root: r.root(), Overlay: overlayFunc(snaps), Limit: limit}
 	source := r.fileSource(m, req)
-	go func() {
+	applog.Go(func() {
 		opts.Files = source(ctx)
 		stats, err := textsearch.Search(ctx, m, opts, func(fr textsearch.FileResult) { r.enqueue(gen, fr) })
 		if err != nil && ctx.Err() != nil {
 			return
 		}
 		r.env.Host.Update(func() { r.finish(gen, stats) })
-	}()
+	})
 }
 
 func (r *textRun) fileSource(m *textsearch.Matcher, req textRequest) func(ctx context.Context) []string {

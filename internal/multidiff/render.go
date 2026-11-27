@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/filediff"
@@ -238,7 +239,7 @@ func (v *View) request(f *File, o Options) {
 	f.liveBuf = live
 	load, ctx, post := e.Load, o.Ctx, o.Post
 	v.Stats.Loads++
-	go func() {
+	applog.Go(func() {
 		oldText, newText, err := load(ctx, live != nil)
 		post(func() {
 			if gen != f.gen {
@@ -250,7 +251,7 @@ func (v *View) request(f *File, o Options) {
 				f.ready = true
 			}
 		})
-	}()
+	})
 }
 
 func (v *View) summary() (files, adds, dels int) {

@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/egoist/mygo"
 )
 
@@ -44,7 +45,7 @@ func (w *Workspace) ConfirmClose(reason CloseReason, done func(ok bool)) {
 	for i, d := range dirty {
 		names[i] = w.tabTitle(d.Path)
 	}
-	go func() {
+	applog.Go(func() {
 		choice := askSave(w.win, names)
 		w.update(func() {
 			switch choice {
@@ -60,5 +61,5 @@ func (w *Workspace) ConfirmClose(reason CloseReason, done func(ok bool)) {
 				done(false)
 			}
 		})
-	}()
+	})
 }

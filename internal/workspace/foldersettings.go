@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/fsutil"
 )
 
@@ -37,7 +38,7 @@ func (w *Workspace) folderSettingsChanged(dirs []string) {
 		return
 	}
 	old := w.folderStamp
-	go func() {
+	applog.Go(func() {
 		stamp, _ := statFile(p)
 		if stamp.same(old) {
 			return
@@ -47,5 +48,5 @@ func (w *Workspace) folderSettingsChanged(dirs []string) {
 			w.settings.Reload()
 			w.SettingsChanged()
 		})
-	}()
+	})
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
@@ -96,10 +97,10 @@ func (p *preview) show(loc Location) {
 		p.build(gen, loc, buf.String(), "")
 		return
 	}
-	go func() {
+	applog.Go(func() {
 		text, message := ReadPreview(loc.Path)
 		p.env.Host.Update(func() { p.build(gen, loc, text, message) })
-	}()
+	})
 }
 
 func (p *preview) build(gen int, loc Location, text, message string) {

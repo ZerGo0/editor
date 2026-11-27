@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/glob"
@@ -108,7 +109,7 @@ func (w *Workspace) reindex() {
 	w.search.cancel = cancel
 	patterns := slices.Clone(w.settings.Strings(settings.Exclude))
 	excluded := func(rel string) bool { return glob.MatchAny(patterns, rel) }
-	go func() {
+	applog.Go(func() {
 		if err := w.search.files.Refresh(ctx, excluded); err != nil {
 			return
 		}
@@ -116,7 +117,7 @@ func (w *Workspace) reindex() {
 		paths, _ := w.search.files.Paths()
 		w.search.scanner.Scan(ctx, paths)
 		w.update(w.search.dialog.IndexChanged)
-	}()
+	})
 }
 
 func (w *Workspace) scheduleReindex() {

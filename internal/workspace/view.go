@@ -18,7 +18,7 @@ func ApplyTheme(c *ui.Context, s *settings.Store) *token.Palette {
 	return design.Apply(c, design.Settings{Appearance: appearances[s.String(settings.ColorTheme)], SystemAccent: true})
 }
 
-func (w *Workspace) View(c *ui.Context) {
+func (w *Workspace) view(c *ui.Context) {
 	w.runPendingUpdates()
 	c.SetZoom(w.zoom())
 	p := ApplyTheme(c, w.env.Settings)

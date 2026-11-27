@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/keymap"
@@ -55,11 +56,12 @@ type App struct {
 	ready        bool
 	launchFiles  []string
 	drawing      *workspace.Workspace
+	panicReloads map[string]int
 	wordWrapItem *mygo.MenuItem
 }
 
 func New(options Options) *App {
-	return &App{options: options, projects: map[string]*projectWindow{}}
+	return &App{options: options, projects: map[string]*projectWindow{}, panicReloads: map[string]int{}}
 }
 
 func (a *App) Run(args []string) error {
@@ -74,6 +76,7 @@ func (a *App) Run(args []string) error {
 		}
 	})
 	mygo.App.OnOpenFile(a.openFile)
+	applog.OnRecovered(a.showPanic)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(visible bool) {
 		if !visible {
@@ -183,6 +186,7 @@ func (a *App) openProject(root string) *projectWindow {
 			a.applyViewState(s)
 		}
 	}
+	ws.OnPanicLoop = func() { win.Update(func() { a.reloadAfterPanic(pw) }) }
 	a.touchWindow(pw)
 	win.OnFocus(func() {
 		a.touchWindow(pw)
@@ -252,6 +256,14 @@ func (a *App) projectClosed(root string, pw *projectWindow) {
 		}
 	}
 	a.saveSession()
+}
+
+func (a *App) inWorkspace(fn func(*workspace.Workspace)) func(*mygo.Window) {
+	return func(win *mygo.Window) {
+		if pw := a.workspaceFor(win); pw != nil {
+			pw.ws.Update(func() { fn(pw.ws) })
+		}
+	}
 }
 
 func (a *App) workspaceFor(win *mygo.Window) *projectWindow {

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/layout"
@@ -38,7 +39,7 @@ func (w *Workspace) startSearch(t *layout.Tab, a symbolnav.Action, word string, 
 	}
 	q.Word, q.Root, q.Current, q.Overlay, q.Exclude = word, w.Root, t.Path, w.overlay(), w.excludePatterns()
 	useIndex := w.settings.Bool(settings.SearchUseIgnoreFiles)
-	go func() {
+	applog.Go(func() {
 		var res references.Result
 		var err error
 		if locate {
@@ -51,7 +52,7 @@ func (w *Workspace) startSearch(t *layout.Tab, a symbolnav.Action, word string, 
 			return
 		}
 		w.update(func() { w.finishSearch(gen, a, word, near, symbolnav.NewResult(a.Kind, word, w.Root, res)) })
-	}()
+	})
 }
 
 func (w *Workspace) finishSearch(gen int, a symbolnav.Action, word string, near symbolnav.Near, res symbolnav.Result) {

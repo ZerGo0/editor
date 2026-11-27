@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/egoist/mygo/ui"
@@ -45,7 +46,7 @@ func (p *PRs) loadLogs(t *logTab) {
 	gen := t.gen
 	t.loading, t.err = true, nil
 	be, repo, job := p.be, p.repo, t.jobID
-	go func() {
+	applog.Go(func() {
 		text, err := be.JobLogs(p.ctx, repo, job)
 		p.post(func() {
 			if gen != t.gen {
@@ -59,7 +60,7 @@ func (p *PRs) loadLogs(t *logTab) {
 			buf := editor.NewBuffer(strings.TrimRight(stripANSI(text), "\r\n"))
 			t.state = &editor.State{Buffer: buf, ReadOnly: true}
 		})
-	}()
+	})
 }
 
 func (p *PRs) logView(c *ui.Context, t *logTab) {

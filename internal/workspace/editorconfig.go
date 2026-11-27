@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/editorconfig"
 	"github.com/ZerGo0/editor/internal/fsutil"
@@ -63,10 +64,10 @@ func (w *Workspace) refreshEditorConfig(paths []string) {
 		w.applyEditorConfigResults(seq, results, files)
 		return
 	}
-	go func() {
+	applog.Go(func() {
 		results, files := resolveEditorConfig(paths)
 		w.update(func() { w.applyEditorConfigResults(seq, results, files) })
-	}()
+	})
 }
 
 func (w *Workspace) applyEditorConfigResults(seq uint64, results []editorConfigResult, files map[string]fileStamp) {
@@ -109,14 +110,14 @@ func (w *Workspace) editorConfigChanged(dirs []string) {
 	if len(watched) == 0 {
 		return
 	}
-	go func() {
+	applog.Go(func() {
 		for _, f := range watched {
 			if s, _ := statFile(f); !s.same(old[f]) {
 				w.update(w.refreshAllEditorConfig)
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (w *Workspace) refreshAllEditorConfig() {

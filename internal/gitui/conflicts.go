@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -39,7 +40,7 @@ func (g *Git) loadConflicts() {
 	s.gen++
 	gen, r := s.gen, g.repo
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		items, err := r.Conflicts(g.ctx)
 		g.post(func() {
 			if gen != s.gen {
@@ -54,7 +55,7 @@ func (g *Git) loadConflicts() {
 				s.selected = min(max(s.selected, 0), len(items)-1)
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) openConflictsIfAny() {

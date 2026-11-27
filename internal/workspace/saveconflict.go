@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/egoist/mygo"
 )
@@ -33,7 +34,7 @@ func (w *Workspace) confirmOverwrite(docs []*document.Document, save func()) {
 	if len(conflicts) > 1 {
 		message = fmt.Sprintf("%d files are newer on disk.", len(conflicts))
 	}
-	go func() {
+	applog.Go(func() {
 		res, err := mygo.Dialog.Message(mygo.MessageOptions{
 			Parent:             w.win,
 			Type:               mygo.MessageWarning,
@@ -47,5 +48,5 @@ func (w *Workspace) confirmOverwrite(docs []*document.Document, save func()) {
 			return
 		}
 		w.update(save)
-	}()
+	})
 }

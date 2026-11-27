@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/github"
@@ -118,7 +119,7 @@ func (i *Issues) stopWorking() {
 	item := *active
 	local := i.local
 	i.working.busy = "Stopping work"
-	go func() {
+	applog.Go(func() {
 		var err error
 		if item.Base != "" {
 			err = switchBack(i.ctx, local, item)
@@ -132,7 +133,7 @@ func (i *Issues) stopWorking() {
 			}
 			i.h.Notify(fmt.Sprintf("Stopped working on #%d", item.Number))
 		})
-	}()
+	})
 }
 
 func switchBack(ctx context.Context, local Local, item workItem) error {
@@ -194,7 +195,7 @@ func (i *Issues) BranchChanged() {
 		return
 	}
 	local, active := i.local, *i.work.Active
-	go func() {
+	applog.Go(func() {
 		status, err := local.Status(i.ctx)
 		i.post(func() {
 			current := i.work.Active
@@ -204,7 +205,7 @@ func (i *Issues) BranchChanged() {
 			i.work.deactivate()
 			i.saveWork()
 		})
-	}()
+	})
 }
 
 func (i *Issues) CommitTemplate() string {
@@ -240,24 +241,24 @@ func (i *Issues) ensureCompletionData() {
 	if !i.mention.usersLoaded && !i.mention.usersLoading {
 		i.mention.usersLoading = true
 		be, repo := i.be, i.repo
-		go func() {
+		applog.Go(func() {
 			users, _ := collectUsers(i.ctx, func(ctx context.Context, after string) (github.UserPage, error) {
 				return be.MentionableUsers(ctx, repo, after)
 			})
 			i.post(func() {
 				i.mention.users, i.mention.usersLoading, i.mention.usersLoaded = users, false, true
 			})
-		}()
+		})
 	}
 	if !i.mention.issuesLoaded && !i.mention.issuesLoading {
 		i.mention.issuesLoading = true
 		be, query := i.be, i.expandQuery(recentIssuesQuery)
-		go func() {
+		applog.Go(func() {
 			page, _ := be.SearchIssues(i.ctx, query, 1)
 			i.post(func() {
 				i.mention.issues, i.mention.issuesLoading, i.mention.issuesLoaded = page.Issues, false, true
 			})
-		}()
+		})
 	}
 }
 

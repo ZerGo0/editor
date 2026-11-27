@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo"
@@ -81,7 +82,7 @@ func (u *UI) Record(path string, content []byte, label string) {
 
 func (u *UI) recordThen(path string, content []byte, label string, report func(error)) {
 	root := u.h.RootDir()
-	go func() {
+	applog.Go(func() {
 		err := u.store.Record(root, path, content, label)
 		u.h.Update(func() {
 			if err != nil {
@@ -89,7 +90,7 @@ func (u *UI) recordThen(path string, content []byte, label string, report func(e
 			}
 			u.markStale(path)
 		})
-	}()
+	})
 }
 
 func (u *UI) reportAuto(err error) {
@@ -120,11 +121,11 @@ func (u *UI) Renamed(from, to string) {
 			u.pages[moved] = p
 		}
 	}
-	go func() {
+	applog.Go(func() {
 		if err := u.store.Renamed(root, from, to); err != nil {
 			u.h.Update(func() { u.reportAuto(err) })
 		}
-	}()
+	})
 }
 
 func (u *UI) Run(id string) bool {
@@ -169,7 +170,7 @@ func (u *UI) PutLabel(path string) {
 			return nil
 		}
 		root := u.h.RootDir()
-		go func() {
+		applog.Go(func() {
 			content, err := os.ReadFile(path)
 			if err == nil {
 				err = u.store.Record(root, path, content, label)
@@ -181,7 +182,7 @@ func (u *UI) PutLabel(path string) {
 				}
 				u.markStale(path)
 			})
-		}()
+		})
 		return nil
 	})
 }
@@ -192,12 +193,12 @@ func (u *UI) revert(p *page) {
 		return
 	}
 	path, text, parent := p.path, p.oldText, u.h.Window()
-	go func() {
+	applog.Go(func() {
 		if !u.confirm(parent, filepath.Base(path), v.Time) {
 			return
 		}
 		u.h.Update(func() { u.applyRevert(path, text) })
-	}()
+	})
 }
 
 func (u *UI) applyRevert(path, text string) {
@@ -208,7 +209,7 @@ func (u *UI) applyRevert(path, text string) {
 		return
 	}
 	root := u.h.RootDir()
-	go func() {
+	applog.Go(func() {
 		err := u.revertOnDisk(root, path, text)
 		u.h.Update(func() {
 			if err != nil {
@@ -218,7 +219,7 @@ func (u *UI) applyRevert(path, text string) {
 			u.markStale(path)
 			u.h.Notify("Reverted " + filepath.Base(path))
 		})
-	}()
+	})
 }
 
 func (u *UI) revertOnDisk(root, path, text string) error {

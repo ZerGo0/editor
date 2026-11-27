@@ -3,6 +3,7 @@ package workspace
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -186,7 +187,7 @@ func (w *Workspace) updateProblems() {
 		}
 		e.running = true
 		lang, text := buf.Language(), buf.String()
-		go func() {
+		applog.Go(func() {
 			items := problems.Check(lang, path, text)
 			if items == nil {
 				items = []problems.Problem{}
@@ -196,7 +197,7 @@ func (w *Workspace) updateProblems() {
 				w.insights.problemsGen++
 				w.applyDiagnostics(path)
 			})
-		}()
+		})
 	}
 	for path := range w.insights.problems {
 		if _, ok := w.docs[path]; !ok {

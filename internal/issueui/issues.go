@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/host"
@@ -121,14 +122,14 @@ func (i *Issues) connect() {
 	gen := i.connGen
 	i.phase, i.phaseErr = phaseLoading, nil
 	root, dataDir, env := i.h.RootDir(), i.h.UserDataDir(), i.env
-	go func() {
+	applog.Go(func() {
 		conn := resolveConnection(i.ctx, env, root, dataDir)
 		i.post(func() {
 			if gen == i.connGen {
 				i.apply(conn)
 			}
 		})
-	}()
+	})
 }
 
 func resolveConnection(ctx context.Context, env Env, root, dataDir string) connection {
@@ -224,7 +225,7 @@ func (i *Issues) act(busy *string, status, failure string, work func(ctx context
 		return
 	}
 	*busy = status
-	go func() {
+	applog.Go(func() {
 		apply, err := work(i.ctx)
 		i.post(func() {
 			*busy = ""
@@ -237,7 +238,7 @@ func (i *Issues) act(busy *string, status, failure string, work func(ctx context
 				apply()
 			}
 		})
-	}()
+	})
 }
 
 func (i *Issues) allKnownIssues() []github.Issue {

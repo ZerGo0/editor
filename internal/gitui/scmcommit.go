@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/field"
@@ -232,14 +233,14 @@ func (g *Git) loadAmendMessage() {
 		return
 	}
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		msg, err := r.LastCommitMessage(g.ctx)
 		g.post(func() {
 			if err == nil && g.commit.amend && strings.TrimSpace(g.commit.message) == "" {
 				g.commit.message = msg
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) doCommit(mode commitMode, after afterCommit) {

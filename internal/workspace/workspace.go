@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/gitui"
@@ -35,6 +36,8 @@ type Workspace struct {
 	lastDiffPath  string
 	viewState     ViewState
 	OnViewState   func(ViewState)
+	OnPanicLoop   func()
+	failedBuilds  int
 	Root          string
 	Name          string
 	win           *mygo.Window
@@ -145,7 +148,7 @@ func (w *Workspace) Attach(win *mygo.Window) {
 	w.win = win
 	w.attachUpdates(win)
 	w.loadBackups()
-	go w.watch(w.ctx)
+	applog.Go(func() { w.watch(w.ctx) })
 	w.reindex()
 	w.refreshIgnored()
 	w.attachGit()

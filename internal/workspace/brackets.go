@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/bracketcolor"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/layout"
@@ -104,13 +105,13 @@ func (w *Workspace) startBracketScan(scan *bracketScan, buf *editor.Buffer, lang
 		return
 	}
 	scan.running = true
-	go func() {
+	applog.Go(func() {
 		bs, err := bracketcolor.Scan(w.ctx, snap, lang)
 		w.update(func() {
 			scan.running = false
 			w.bracketsScanned(scan, snap.Version(), lang, bs, err)
 		})
-	}()
+	})
 }
 
 func (w *Workspace) bracketsScanned(scan *bracketScan, version uint64, lang *editor.Language, bs []bracketcolor.Bracket, err error) {

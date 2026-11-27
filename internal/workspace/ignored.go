@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
 )
@@ -19,7 +20,7 @@ type ignoredState struct {
 func (w *Workspace) refreshIgnored() {
 	w.ignored.gen++
 	gen, ctx, root := w.ignored.gen, w.ctx, w.Root
-	go func() {
+	applog.Go(func() {
 		s, err := filetree.LoadIgnored(ctx, root)
 		files := gitFiles(ctx, root)
 		if ctx.Err() != nil {
@@ -36,7 +37,7 @@ func (w *Workspace) refreshIgnored() {
 			}
 			w.tree.SetIgnored(s)
 		})
-	}()
+	})
 }
 
 func (w *Workspace) scheduleIgnored() {

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/ZerGo0/editor/internal/applog"
 )
 
 const (
@@ -65,7 +67,7 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 	results := make(chan FileResult)
 	var scanned, skipped atomic.Int64
 
-	go func() {
+	applog.Go(func() {
 		defer close(paths)
 		for _, p := range o.Files {
 			select {
@@ -74,12 +76,12 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 				return
 			}
 		}
-	}()
+	})
 
 	var wg sync.WaitGroup
 	for range o.Workers {
 		wg.Add(1)
-		go func() {
+		applog.Go(func() {
 			defer wg.Done()
 			for p := range paths {
 				if runCtx.Err() != nil {
@@ -104,12 +106,12 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 					return
 				}
 			}
-		}()
+		})
 	}
-	go func() {
+	applog.Go(func() {
 		wg.Wait()
 		close(results)
-	}()
+	})
 
 	var st Stats
 	total := 0

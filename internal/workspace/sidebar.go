@@ -3,6 +3,7 @@ package workspace
 import (
 	"os/exec"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -145,9 +146,9 @@ func (w *Workspace) revealInFinder(p string) {
 }
 
 func (w *Workspace) openInTerminal(dir string) {
-	go func() {
+	applog.Go(func() {
 		if out, err := exec.Command("open", "-a", terminalApp, dir).CombinedOutput(); err != nil {
 			w.showError("Cannot open Terminal", errorWithOutput(err, out))
 		}
-	}()
+	})
 }

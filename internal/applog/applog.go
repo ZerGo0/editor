@@ -40,10 +40,12 @@ func Setup(dir string) error {
 	}
 	log.SetOutput(io.MultiWriter(os.Stderr, w))
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	crash, err := openCrash(filepath.Join(dir, crashFileName))
+	crashPath := filepath.Join(dir, crashFileName)
+	crash, err := openCrash(crashPath)
 	if err != nil {
 		return err
 	}
+	setCrashPath(crashPath)
 	defer crash.Close()
 	if err := debug.SetCrashOutput(crash, debug.CrashOptions{}); err != nil {
 		return fmt.Errorf("crash output: %w", err)

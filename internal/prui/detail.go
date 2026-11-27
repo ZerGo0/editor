@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -143,14 +144,14 @@ func fetchDetail(ctx context.Context, be Backend, repo github.Remote, number int
 	var runs []CheckRun
 	run := func(name string, fn func() error) {
 		wg.Add(1)
-		go func() {
+		applog.Go(func() {
 			defer wg.Done()
 			if err := fn(); err != nil {
 				mu.Lock()
 				res.partErrs = append(res.partErrs, fmt.Sprintf(checkNameFmt, name, errorText(err)))
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 	run("files", func() (err error) { res.files, err = be.Files(ctx, repo, number); return })
 	run("checks", func() (err error) { rest, err = be.Checks(ctx, repo, pr.HeadSHA); return })
@@ -203,14 +204,14 @@ func (p *PRs) loadDetail(d *prData) {
 	gen := d.gen
 	d.loading, d.stale = true, false
 	be, repo, number := p.be, p.repo, d.number
-	go func() {
+	applog.Go(func() {
 		res := fetchDetail(p.ctx, be, repo, number)
 		p.post(func() {
 			if gen == d.gen {
 				p.applyDetail(d, res)
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) applyDetail(d *prData, res detailResult) {
@@ -398,11 +399,11 @@ func defaultMergeIndex(methods []mergeChoice, def string) int {
 
 func (p *PRs) confirmThen(message, detail, action string, then func()) {
 	confirm, win := p.env.Confirm, p.h.Window()
-	go func() {
+	applog.Go(func() {
 		if confirm(win, ConfirmOptions{Message: message, Detail: detail, Action: action}) {
 			p.post(then)
 		}
-	}()
+	})
 }
 
 func (p *PRs) openMergeDialog(d *prData) {

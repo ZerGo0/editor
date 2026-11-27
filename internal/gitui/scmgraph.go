@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -91,7 +92,7 @@ func (g *Git) loadGraphPage() {
 	s.loading = true
 	gen, skip, r := s.gen, len(s.commits), g.repo
 	opts := g.graphOptions(skip)
-	go func() {
+	applog.Go(func() {
 		page, err := r.Log(g.ctx, opts)
 		var in, out map[string]bool
 		if err == nil && skip == 0 {
@@ -114,7 +115,7 @@ func (g *Git) loadGraphPage() {
 			s.done = len(page) < opts.Max
 			s.rows = git.Lanes(s.commits)
 		})
-	}()
+	})
 }
 
 func syncSets(g *Git, r repo) (in, out map[string]bool) {
@@ -163,14 +164,14 @@ func (g *Git) toggleCommitFiles(cm git.Commit) {
 	f := &graphFiles{loading: true}
 	s.expanded[cm.OID] = f
 	gen, r := s.gen, g.repo
-	go func() {
+	applog.Go(func() {
 		files, err := r.CommitFiles(g.ctx, cm.OID)
 		g.post(func() {
 			if gen == s.gen {
 				f.files, f.err, f.loading = files, err, false
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) graphPane(c *ui.Context) {

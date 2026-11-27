@@ -3,6 +3,7 @@ package gitui
 import (
 	"errors"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -57,7 +58,7 @@ func (g *Git) Base(path string) *editor.Buffer {
 	e := &baseEntry{oid: oid, loading: true}
 	g.bases[rel] = e
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		data, err := r.Show(g.ctx, oid, rel)
 		if err == nil {
 			err = checkText(data)
@@ -79,6 +80,6 @@ func (g *Git) Base(path string) *editor.Buffer {
 			buf.SetLanguage(g.h.Language(path, text))
 			e.buf = buf
 		})
-	}()
+	})
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -56,7 +57,7 @@ func (t *mergeTool) load() {
 	t.gen++
 	gen, r, rel := t.gen, g.repo, t.rel
 	t.loading, t.err = true, nil
-	go func() {
+	applog.Go(func() {
 		base, ours, theirs, err := r.MergeVersions(g.ctx, rel)
 		if err == nil {
 			for _, data := range [][]byte{base, ours, theirs} {
@@ -74,7 +75,7 @@ func (t *mergeTool) load() {
 				t.setup(string(base), string(ours), string(theirs))
 			}
 		})
-	}()
+	})
 }
 
 func (t *mergeTool) setup(base, ours, theirs string) {

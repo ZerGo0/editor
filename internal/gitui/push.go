@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
@@ -62,7 +63,7 @@ func (g *Git) loadOutgoing() {
 	s.gen++
 	gen, r := s.gen, g.repo
 	s.loading, s.err = true, nil
-	go func() {
+	applog.Go(func() {
 		commits, err := r.OutgoingCommits(g.ctx)
 		newBranch := errors.Is(err, git.ErrNoUpstream)
 		if newBranch {
@@ -78,21 +79,21 @@ func (g *Git) loadOutgoing() {
 				s.selected = 0
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) loadPushFiles(oid string) {
 	s := &g.push
 	s.filesFor, s.files, s.filesErr = oid, nil, nil
 	r := g.repo
-	go func() {
+	applog.Go(func() {
 		files, err := r.CommitFiles(g.ctx, oid)
 		g.post(func() {
 			if s.filesFor == oid {
 				s.files, s.filesErr = files, err
 			}
 		})
-	}()
+	})
 }
 
 func (g *Git) pushDialog(c *ui.Context) {

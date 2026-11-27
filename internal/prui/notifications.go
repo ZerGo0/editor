@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -53,7 +54,7 @@ func (p *PRs) loadNotifications() {
 	if !ns.loaded {
 		modified = ""
 	}
-	go func() {
+	applog.Go(func() {
 		page, err := be.Notifications(p.ctx, repo, modified)
 		p.post(func() {
 			if gen != p.notifs.gen {
@@ -76,7 +77,7 @@ func (p *PRs) loadNotifications() {
 				ns.items = page.Items
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) notificationsDue(c *ui.Context) {
@@ -103,7 +104,7 @@ func (p *PRs) notificationsDue(c *ui.Context) {
 func (p *PRs) markNotification(n Notification, done bool) {
 	be := p.be
 	id := n.ID
-	go func() {
+	applog.Go(func() {
 		err := be.MarkNotification(p.ctx, id, done)
 		p.post(func() {
 			if err != nil {
@@ -122,7 +123,7 @@ func (p *PRs) markNotification(n Notification, done bool) {
 				return
 			}
 		})
-	}()
+	})
 }
 
 func (p *PRs) openNotification(n Notification) {

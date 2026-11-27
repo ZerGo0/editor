@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -73,14 +74,14 @@ func (e *Engine) runMoves() {
 	ctx, cancel := context.WithCancel(e.ctx)
 	e.moveCancel = cancel
 	gen := e.moveGen
-	go func() {
+	applog.Go(func() {
 		moves := DetectMoves(ctx, hunks, oldText, newText)
 		e.Post(func() {
 			if gen == e.moveGen && ctx.Err() == nil {
 				e.setMoves(moves)
 			}
 		})
-	}()
+	})
 }
 
 func (e *Engine) setMoves(moves []Move) {

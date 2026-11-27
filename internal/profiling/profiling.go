@@ -12,6 +12,8 @@ import (
 	"slices"
 	"syscall"
 	"time"
+
+	"github.com/ZerGo0/editor/internal/applog"
 )
 
 const (
@@ -30,7 +32,7 @@ const (
 func Listen(logsDir string) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGUSR1)
-	go func() {
+	applog.Go(func() {
 		for range ch {
 			log.Printf("profile: capturing for %s", CPUDuration)
 			dir, err := Capture(filepath.Join(logsDir, DirName), time.Now(), CPUDuration)
@@ -40,7 +42,7 @@ func Listen(logsDir string) {
 			}
 			log.Printf("profile: written to %s", dir)
 		}
-	}()
+	})
 }
 
 func Capture(root string, now time.Time, cpu time.Duration) (string, error) {

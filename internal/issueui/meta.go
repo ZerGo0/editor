@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
@@ -60,10 +61,10 @@ func fetchMeta(ctx context.Context, be Backend, repo github.Remote) metaResult {
 	}
 	run := func(fn func() error) {
 		wg.Add(1)
-		go func() {
+		applog.Go(func() {
 			defer wg.Done()
 			fail(fn())
-		}()
+		})
 	}
 	run(func() (err error) { res.labels, err = be.Labels(ctx, repo); return })
 	run(func() (err error) { res.milestones, err = be.Milestones(ctx, repo); return })
@@ -88,7 +89,7 @@ func (i *Issues) loadMeta() {
 	gen := i.meta.gen
 	i.meta.loading, i.meta.err = true, nil
 	be, repo := i.be, i.repo
-	go func() {
+	applog.Go(func() {
 		res := fetchMeta(i.ctx, be, repo)
 		i.post(func() {
 			if gen != i.meta.gen {
@@ -98,7 +99,7 @@ func (i *Issues) loadMeta() {
 			i.meta.labels, i.meta.milestones, i.meta.users = res.labels, res.milestones, res.users
 			i.authFailure(res.err)
 		})
-	}()
+	})
 }
 
 func (m metaState) labelNames() []string {

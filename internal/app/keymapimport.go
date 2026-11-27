@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/keymap/vscodeimport"
@@ -26,16 +27,9 @@ var errNoVSCodeKeybindings = errors.New("no VS Code keybindings.json was found i
 func (a *App) registerKeymapCommands() {
 	a.keys.Settings = a.settings
 	a.keys.Reload()
-	inWorkspace := func(fn func(*workspace.Workspace)) func(*mygo.Window) {
-		return func(win *mygo.Window) {
-			if pw := a.workspaceFor(win); pw != nil {
-				pw.win.Update(func() { fn(pw.ws) })
-			}
-		}
-	}
 	a.commands.Add(
 		&command.Command{ID: importKeybindingsCommand, Category: categoryPreferences, Title: "Import VS Code Keybindings...", Run: a.importVSCodeKeybindings},
-		&command.Command{ID: replaceInFilesCommand, Category: categorySearch, Title: "Replace in Files", Run: inWorkspace((*workspace.Workspace).ReplaceInFiles)},
+		&command.Command{ID: replaceInFilesCommand, Category: categorySearch, Title: "Replace in Files", Run: a.inWorkspace((*workspace.Workspace).ReplaceInFiles)},
 	)
 }
 
@@ -56,7 +50,7 @@ func (a *App) importVSCodeKeybindings(win *mygo.Window) {
 
 func (a *App) showImportError(pw *projectWindow, err error) {
 	if pw != nil {
-		pw.win.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
+		pw.ws.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
 		return
 	}
 	go mygo.Dialog.Error(importErrorTitle, err.Error())
@@ -68,10 +62,10 @@ func (a *App) runImport(src vscodeimport.Source, pw *projectWindow) {
 		known[c.ID] = true
 	}
 	dst := a.keys.Path
-	go func() {
+	applog.Go(func() {
 		r, err := vscodeimport.Import(src, dst, func(id string) bool { return known[id] }, time.Now())
 		mygo.RunOnMain(func() { a.importDone(pw, r, err) })
-	}()
+	})
 }
 
 func (a *App) importDone(pw *projectWindow, r vscodeimport.Report, err error) {
@@ -84,18 +78,18 @@ func (a *App) importDone(pw *projectWindow, r vscodeimport.Report, err error) {
 	a.settingsChanged()
 	switch {
 	case pw != nil && err != nil:
-		pw.win.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
+		pw.ws.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
 	case pw != nil:
 		summary := &vscodeimport.Summary{Report: r, OpenKeybindings: pw.ws.OpenKeybindingsJSON}
 		show := func() { pw.ws.OpenView(importViewID, vscodeimport.ViewTitle, summary.View) }
-		pw.win.Update(func() {
+		pw.ws.Update(func() {
 			pw.ws.NotifyAction(r.Headline(), strings.Join(r.Details(), "\n"), showDetails, show)
 		})
 	case err != nil:
 		go mygo.Dialog.Error(importErrorTitle, err.Error())
 	default:
-		go func() {
+		applog.Go(func() {
 			_, _ = mygo.Dialog.Message(mygo.MessageOptions{Type: mygo.MessageInfo, Message: r.Headline(), Detail: strings.Join(r.Details(), "\n")})
-		}()
+		})
 	}
 }

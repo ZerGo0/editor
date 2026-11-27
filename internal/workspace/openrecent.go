@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/backup"
 	"github.com/egoist/mygo"
 
@@ -132,7 +133,7 @@ func (w *Workspace) reviewUnsaved(root string) {
 		return
 	}
 	w.palette.Close()
-	go func() {
+	applog.Go(func() {
 		res, err := mygo.Dialog.Message(mygo.MessageOptions{
 			Parent:       w.win,
 			Type:         mygo.MessageWarning,
@@ -144,5 +145,5 @@ func (w *Workspace) reviewUnsaved(root string) {
 		if err == nil && res.Button == 0 {
 			w.update(func() { w.openRecent(recentPick{path: root, folder: true}, true) })
 		}
-	}()
+	})
 }

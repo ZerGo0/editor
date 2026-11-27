@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/field"
@@ -78,7 +79,7 @@ func (p *hexPane) load() {
 	gen := p.gen
 	path := p.s.path
 	p.loading, p.err = true, nil
-	go func() {
+	applog.Go(func() {
 		f, err := os.Open(path)
 		var info os.FileInfo
 		if err == nil {
@@ -99,7 +100,7 @@ func (p *hexPane) load() {
 			}
 			p.finish(opened, err)
 		})
-	}()
+	})
 	p.s.redraw()
 }
 
@@ -531,7 +532,7 @@ func (p *hexPane) copySelection(asHex bool) {
 		return
 	}
 	file, gen := p.file, p.gen
-	go func() {
+	applog.Go(func() {
 		data, err := hexdump.ReadRange(file, start, end)
 		p.s.publish(func() {
 			if gen != p.gen {
@@ -548,5 +549,5 @@ func (p *hexPane) copySelection(asHex bool) {
 			p.s.svc.WriteClipboard(text)
 			p.s.h.Notify(fmt.Sprintf("Copied %s bytes as %s", formatCount(end-start), kind))
 		})
-	}()
+	})
 }

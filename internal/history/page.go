@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
@@ -75,7 +76,7 @@ func (u *UI) reload(p *page) {
 	p.loading, p.err, p.stale = true, nil, false
 	gen, root, path := p.gen, u.h.RootDir(), p.path
 	open := u.h.Buffer(path) != nil
-	go func() {
+	applog.Go(func() {
 		var d pageData
 		vs, err := u.store.Versions(root, path)
 		d.versions = vs
@@ -92,7 +93,7 @@ func (u *UI) reload(p *page) {
 				u.loadedPage(p, d, err)
 			}
 		})
-	}()
+	})
 }
 
 func (u *UI) loadedPage(p *page, d pageData, err error) {
@@ -146,7 +147,7 @@ func (u *UI) syncSelection(p *page) {
 }
 
 func (u *UI) loadVersion(p *page, hash string) {
-	go func() {
+	applog.Go(func() {
 		data, err := u.store.Read(hash)
 		u.h.Update(func() {
 			if p.wantHash != hash {
@@ -158,7 +159,7 @@ func (u *UI) loadVersion(p *page, hash string) {
 			}
 			p.oldText, p.loaded = string(data), true
 		})
-	}()
+	})
 }
 
 func (u *UI) pageView(c *ui.Context, p *page) {
