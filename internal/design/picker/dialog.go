@@ -17,7 +17,7 @@ type DialogOptions struct {
 	ID         string
 	Layout     *Layout
 	Shortcuts  []Shortcut
-	WindowKeys func(c *ui.Context)
+	WindowKeys focus.Keys
 }
 
 func Dialog(c *ui.Context, o DialogOptions, body func()) (closed bool) {
@@ -25,11 +25,10 @@ func Dialog(c *ui.Context, o DialogOptions, body func()) (closed bool) {
 	focus.Return(c, "picker-dialog:"+o.ID)
 	ui.Overlay(c, func() {
 		back := ui.Column(c.Key("picker-dialog:" + o.ID)).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Justify(ui.Center).Modal()
+		o.WindowKeys.Watch(back)
 		win := back.Bounds()
 		back.Children(func() {
-			if o.WindowKeys != nil {
-				o.WindowKeys(c)
-			}
+			o.WindowKeys.Run(c)
 			margin := token.GapControl.Px()
 			panel := ui.Column(c).Margin(margin).FillWidth().Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
 				Background(p.Layer.QuickInput).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).

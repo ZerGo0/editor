@@ -35,6 +35,7 @@ func SearchInput(c *ui.Context, label string, query *string, o SearchOptions) ui
 	}
 	in := f.build(c, p, false, func() ui.Element {
 		in := ui.TextInputBase(c.Key(keyOf(o.ID, label)), query).Placeholder(o.Placeholder).Search()
+		dropSwallowed(in, query)
 		if o.AutoFocus {
 			in.AutoFocus()
 		}

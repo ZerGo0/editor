@@ -1,6 +1,7 @@
 package finder
 
 import (
+	"github.com/ZerGo0/editor/internal/design/focus"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
@@ -43,7 +44,7 @@ type Env struct {
 	ToolWindows     func() []ToolWindow
 	BeforeWrite     func(path string)
 	ShowFindResults func(res FindResults)
-	WindowKeys      func(c *ui.Context)
+	WindowKeys      focus.Keys
 }
 
 func (e Env) openFiles() []string {

@@ -14,9 +14,10 @@ const plainTextLanguage = "plaintext"
 
 type keyState struct {
 	pending     keymap.Chord
+	code        codeKey
 	swallowText bool
-	byCode      bool
 	textFocus   bool
+	rootFocus   bool
 	cache       activeCache
 }
 
@@ -26,14 +27,10 @@ type activeCache struct {
 	active *keymap.Active
 }
 
-func (w *Workspace) shortcuts(c *ui.Context) {
+func (w *Workspace) shortcuts(c *ui.Context, call keyScope) {
 	km := w.env.Keys.Current
 	active := w.activeKeys(c)
-	byCode := w.keys.byCode
-	w.keys.byCode = false
-	shortcut := func(s keymap.Stroke) bool {
-		return !s.ByCode() && c.Shortcut(s.Mods, s.Key) && !byCode
-	}
+	shortcut := func(s keymap.Stroke) bool { return w.pressed(c, call, s) }
 	if len(w.keys.pending) > 0 {
 		for _, s := range active.Completions(w.keys.pending[0]) {
 			if shortcut(s) {
@@ -53,7 +50,7 @@ func (w *Workspace) shortcuts(c *ui.Context) {
 		}
 	}
 	for _, b := range active.Singles() {
-		if _, ok := keymap.EditorCommand(b.Command); ok {
+		if _, ok := keymap.EditorCommand(b.Command); ok && !b.Chord[0].ByCode() {
 			continue
 		}
 		if s, ok := km.MenuStroke(b.Command); ok && s == b.Chord[0] && w.env.Commands.InMenu(b.Command) {
@@ -142,6 +139,7 @@ func (w *Workspace) editorInput(ev ui.InputEvent) bool {
 		return false
 	}
 	w.keys.swallowText = true
+	w.keys.code.taken = true
 	w.runChord(append(w.keys.pending, keymap.StrokeFor(ev)))
 	return true
 }

@@ -3,6 +3,7 @@ package palette
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/focus"
 	"github.com/ZerGo0/editor/internal/design/quickinput"
 	"github.com/ZerGo0/editor/internal/fuzzy"
 	"github.com/egoist/mygo/ui"
@@ -39,7 +40,7 @@ type Mode struct {
 }
 
 type Palette struct {
-	WindowKeys func(c *ui.Context)
+	WindowKeys focus.Keys
 	open       bool
 	mode       *Mode
 	state      quickinput.State

@@ -45,7 +45,7 @@ type Options struct {
 	Placeholder string
 	Busy        bool
 	Empty       string
-	WindowKeys  func(c *ui.Context)
+	WindowKeys  focus.Keys
 }
 
 type Result struct {
@@ -62,11 +62,10 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 	focus.Return(c, quickInputKey)
 	ui.Overlay(c, func() {
 		back := ui.Column(c.Key("quick-input:" + label)).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Modal()
+		o.WindowKeys.Watch(back)
 		bar, below := anchored(chrome.CommandCenterBounds(c), back.Bounds())
 		back.Children(func() {
-			if o.WindowKeys != nil {
-				o.WindowKeys(c)
-			}
+			o.WindowKeys.Run(c)
 			panel := ui.Column(c).Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
 				Background(p.Layer.QuickInput).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).
 				ZIndex(token.LayerQuickInput.Z()).Role(ui.RoleDialog).Label(label)

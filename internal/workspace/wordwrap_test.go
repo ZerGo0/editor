@@ -75,7 +75,7 @@ func openWrapEditor(t *testing.T, set map[string]any) (*Workspace, *ui.Tester, *
 func newWrapDiff(w *Workspace, layout editor.DiffLayout, fit bool) (*editor.DiffState, *ui.Tester) {
 	d := &editor.DiffState{Old: editor.NewBuffer(wrapText), New: editor.NewBuffer(strings.Replace(wrapText, "end", "END", 1)), Layout: layout, FitContent: fit}
 	tt := ui.NewTester(func(c *ui.Context) {
-		w.shortcuts(c)
+		w.shortcuts(c, scopeMain)
 		w.ConfigureDiff(d, wrapFile)
 		editor.DiffView(c, d).Fill()
 	}, testWideW, testViewH)

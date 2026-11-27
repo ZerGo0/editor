@@ -29,15 +29,16 @@ func (w *Workspace) View(c *ui.Context) {
 	w.beginDragFrame()
 	w.codeTheme = p.CodeTheme()
 	root := c.Root().TabStop(false).FocusRing(false).Role(ui.RoleNone).ObserveInput(w.observeInput)
+	w.keys.rootFocus = root.Focused()
 	w.returnFocus(c)
 	if w.active.ActiveTab() == nil && !root.FocusWithin() {
 		root.Focus()
 	}
 	w.syncGoToLine()
-	w.shortcuts(c)
+	w.shortcuts(c, scopeMain)
 	w.focusedTab = nil
 	w.trackNavigation()
-	ui.Column(c).Fill().Children(func() {
+	ui.Column(c).Fill().ObserveInput(w.observeMainKey).Children(func() {
 		w.titleBar(c)
 		ui.Row(c).Grow(1).FillWidth().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
 			if w.sidebarHidden {
@@ -61,6 +62,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.releaseFocus(c)
 	w.showNotices(c)
 	feedback.ToastHost(c)
+	w.endKeyFrame()
 }
 
 func (w *Workspace) overlays(c *ui.Context) {

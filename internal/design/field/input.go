@@ -22,6 +22,7 @@ func TextInput(c *ui.Context, label string, value *string, o InputOptions) ui.El
 	f := frame{label: label, error: o.Error, leading: o.Icon, toggles: o.Toggles, actions: o.Actions, disabled: o.Disabled}
 	return f.build(c, p, false, func() ui.Element {
 		in := ui.TextInputBase(c.Key(keyOf(o.ID, label)), value).Placeholder(o.Placeholder).ReadOnly(o.ReadOnly)
+		dropSwallowed(in, value)
 		if o.AutoFocus {
 			in.AutoFocus()
 		}

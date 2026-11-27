@@ -19,7 +19,7 @@ func (w *Workspace) withKeys(label, command string) string {
 
 func (w *Workspace) commandItem(m *ui.Menu, label, command string) {
 	o := action.ItemOptions{ID: command}
-	if chords := w.env.Keys.Current.For(command); len(chords) > 0 && len(chords[0]) == 1 {
+	if chords := w.env.Keys.Current.For(command); len(chords) > 0 && len(chords[0]) == 1 && !chords[0][0].ByCode() {
 		o.Mods, o.Key = chords[0][0].Mods, chords[0][0].Key
 	} else if len(chords) > 0 {
 		o.Detail = chords[0].Label()
