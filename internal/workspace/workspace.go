@@ -21,6 +21,7 @@ import (
 	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 )
 
 const defaultSidebarWidth = 260
@@ -28,6 +29,7 @@ const defaultSidebarWidth = 260
 var TitleBarHeight = int(token.TitleBarHeight.Px())
 
 type Workspace struct {
+	codeTheme     *editor.Theme
 	Root          string
 	Name          string
 	win           *mygo.Window

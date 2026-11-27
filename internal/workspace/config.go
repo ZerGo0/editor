@@ -62,6 +62,9 @@ func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 	st.NoFolding = !s.Bool(settings.Folding)
 	st.NoActiveLine = !s.Bool(settings.LineHighlight)
 	st.CursorShape = cursorShapes[s.String(settings.CursorStyle)]
+	if w.codeTheme != nil {
+		st.Theme = w.codeTheme
+	}
 	w.applyEditorConfig(st, path)
 	w.applyOverrides(st, path)
 }
@@ -72,6 +75,9 @@ func (w *Workspace) ConfigureDiff(d *editor.DiffState, path string) {
 	w.ConfigureEditor(&st, path)
 	d.Font, d.LineHeight, d.TabSize = st.Font, st.LineHeight, st.TabSize
 	d.Wrap, d.ScrollPastEnd = st.SoftWrap, !st.NoScrollPastEnd
+	if st.Theme != nil {
+		d.Theme = st.Theme
+	}
 }
 
 func (w *Workspace) editorMenu(m *ui.Menu) {

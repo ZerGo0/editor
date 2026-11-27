@@ -32,6 +32,19 @@ func TestFor(t *testing.T) {
 		{"mygo extension", "main.go", "", "Go"},
 		{"mygo shebang", "tool", "#!/bin/bash\n", "Shell"},
 		{"mygo name wins over shebang", "run.sh", "#!/usr/bin/perl\n", "Shell"},
+		{"astro", "src/pages/index.astro", "", "Astro"},
+		{"svelte module", "store.svelte.ts", "", "TypeScript"},
+		{"tsx", "App.tsx", "", "TypeScript React"},
+		{"jsx", "App.jsx", "", "JavaScript"},
+		{"gettext", "locales/de.po", "", "Gettext"},
+		{"go mod", "backend/go.mod", "", "Go Module"},
+		{"go sum", "go.sum", "", "Go Module"},
+		{"go work", "go.work", "", "Go Module"},
+		{"prettierrc", ".prettierrc", "", "JSON"},
+		{"vscode settings", ".vscode/settings.json", "", "JSON"},
+		{"dockerfile suffix", "Dockerfile.dev", "", "Dockerfile"},
+		{"dockerfile", "docker/Dockerfile", "", "Dockerfile"},
+		{"mdx", "docs/a.mdx", "", "MDX"},
 		{"unknown", "notes.unknownext", "hello", ""},
 		{"empty", "", "", ""},
 	}
@@ -83,17 +96,17 @@ func TestRegistry(t *testing.T) {
 			if ext[0] != '.' {
 				t.Errorf("%s extension %q has no dot", l.Name, ext)
 			}
-			if mine := editor.LanguageFor("x" + ext); mine != nil {
+			if mine := editor.LanguageFor("x" + ext); mine != nil && !e.replaces {
 				t.Errorf("%s extension %q is already MyGo's %s", l.Name, ext, mine.Name)
 			}
 		}
 		for _, f := range l.Filenames {
-			if mine := editor.LanguageFor(f); mine != nil {
+			if mine := editor.LanguageFor(f); mine != nil && !e.replaces {
 				t.Errorf("%s filename %q is already MyGo's %s", l.Name, f, mine.Name)
 			}
 		}
 		for _, i := range l.Interpreters {
-			if mine := editor.LanguageForText("x", "#!/usr/bin/"+i+"\n"); mine != nil {
+			if mine := editor.LanguageForText("x", "#!/usr/bin/"+i+"\n"); mine != nil && !e.replaces {
 				t.Errorf("%s interpreter %q is already MyGo's %s", l.Name, i, mine.Name)
 			}
 		}

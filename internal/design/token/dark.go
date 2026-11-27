@@ -139,6 +139,7 @@ func darkPalette() Palette {
 		},
 		Shadow:   h("#0000005C"),
 		Avatar:   avatarPalette(),
+		Syntax:   darkSyntax(),
 		OnAvatar: h("#FFFFFF"),
 	}
 }

@@ -19,6 +19,7 @@ type Palette struct {
 	Severity Severities
 	Git      GitColors
 	Diff     DiffColors
+	Syntax   Syntax
 	Shadow   ui.Color
 	Avatar   [avatarColors]ui.Color
 	OnAvatar ui.Color

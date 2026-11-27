@@ -10,11 +10,18 @@ import (
 
 type entry struct {
 	lang           *editor.Language
+	replaces       bool
 	filenamePrefix string
 	aliases        []string
 }
 
 var entries = []entry{
+	{lang: javascript, replaces: true}, {lang: typescript, replaces: true, aliases: []string{"ts"}}, {lang: typescriptReact, replaces: true, aliases: []string{"tsx"}},
+	{lang: html, replaces: true}, {lang: svelte, replaces: true}, {lang: astro}, {lang: goLanguage, replaces: true, aliases: []string{"golang"}},
+	{lang: sql, replaces: true, aliases: []string{"postgres", "postgresql", "psql", "pgsql", "plpgsql"}},
+	{lang: markdownLang, replaces: true}, {lang: mdx, replaces: true}, {lang: json, replaces: true, aliases: []string{"jsonc", "json5"}},
+	{lang: dockerfile, replaces: true, filenamePrefix: "Dockerfile.", aliases: []string{"docker"}},
+	{lang: goMod, aliases: []string{"go.mod", "gomod"}}, {lang: gettext, aliases: []string{"po"}},
 	{lang: elixir}, {lang: erlang}, {lang: haskell}, {lang: ocaml}, {lang: fsharp, aliases: []string{"fsharp"}},
 	{lang: clojure}, {lang: lisp, aliases: []string{"scheme", "racket", "elisp", "commonlisp"}},
 	{lang: julia}, {lang: perl}, {lang: powershell, aliases: []string{"pwsh"}}, {lang: groovy}, {lang: elm},

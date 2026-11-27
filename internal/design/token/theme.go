@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 )
 
 const (
@@ -31,10 +32,12 @@ var registry = struct {
 	palettes map[paletteKey]*Palette
 	byTheme  map[*ui.Theme]*Palette
 	themes   map[*Palette]*ui.Theme
+	code     map[*Palette]*editor.Theme
 }{
 	palettes: map[paletteKey]*Palette{},
 	byTheme:  map[*ui.Theme]*Palette{},
 	themes:   map[*Palette]*ui.Theme{},
+	code:     map[*Palette]*editor.Theme{},
 }
 
 func Dark() *Palette  { return For(true, ui.Transparent, false) }
@@ -156,6 +159,7 @@ func (p *Palette) enforceContrast() {
 	surfaces := append([]ui.Color{p.Layer.Input, p.Layer.Widget, p.Layer.Menu, p.Layer.Panel, p.Layer.QuickInput}, rows...)
 	p.Text.Secondary = ensure(p.Text.Secondary, ContrastText, surfaces...)
 	p.Text.Link = ensure(p.Text.Link, ContrastText, rows...)
+	p.enforceSyntax()
 	p.List.Highlight = ensure(p.List.Highlight, ContrastText, rows...)
 	p.Accent.Focus = ensure(p.Accent.Focus, ContrastLarge, surfaces...)
 	p.Accent.Hover = ensure(p.Accent.Hover, ContrastText, p.Accent.Text)
@@ -172,4 +176,5 @@ func (p *Palette) withHighContrast() {
 	p.Text.Secondary = p.Text.Secondary.Mix(p.Text.Primary, contrastTextMix)
 	p.Text.Muted = p.Text.Muted.Mix(p.Text.Primary, contrastTextMix)
 	p.Tab.InactiveText = p.Tab.InactiveText.Mix(p.Text.Primary, contrastTextMix)
+	p.strengthenSyntax()
 }

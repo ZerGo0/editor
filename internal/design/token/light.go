@@ -138,6 +138,7 @@ func lightPalette() Palette {
 		},
 		Shadow:   h("#00000029"),
 		Avatar:   avatarPalette(),
+		Syntax:   lightSyntax(),
 		OnAvatar: h("#FFFFFF"),
 	}
 }

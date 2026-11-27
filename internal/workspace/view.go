@@ -26,6 +26,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.syncTitle()
 	w.updateProblems()
 	w.beginDragFrame()
+	w.codeTheme = token.Of(c).CodeTheme()
 	c.Root().ObserveInput(w.observeInput)
 	w.escape(c)
 	w.shortcuts(c)

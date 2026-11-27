@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 )
 
 type pair struct {
@@ -84,10 +85,59 @@ func pairs(p *Palette) []pair {
 		pair{"warning notice", p.Text.Primary, Over(p.Severity.WarningBackground, p.Layer.SideBar), ContrastText},
 		pair{"info notice", p.Text.Primary, Over(p.Severity.InfoBackground, p.Layer.SideBar), ContrastText},
 	)
+	for name, c := range syntaxColors(p) {
+		out = append(out, pair{"syntax " + name, c, p.Layer.Editor, ContrastText})
+	}
 	for i, c := range p.Avatar {
 		out = append(out, pair{"avatar " + string(rune('0'+i)), p.OnAvatar, c, ContrastText})
 	}
 	return out
+}
+
+func syntaxColors(p *Palette) map[string]ui.Color {
+	s := p.Syntax
+	return map[string]ui.Color{
+		"keyword": s.Keyword, "type": s.Type, "function": s.Function, "property": s.Property, "constant": s.Constant, "number": s.Number,
+		"string": s.String, "escape": s.Escape, "regexp": s.Regexp, "comment": s.Comment, "operator": s.Operator, "punctuation": s.Punctuation,
+		"tag": s.Tag, "attribute": s.Attribute, "meta": s.Meta, "heading": s.Heading,
+	}
+}
+
+func TestSyntaxColorsAreDistinct(t *testing.T) {
+	distinct := []string{"keyword", "type", "function", "property", "constant", "number", "string", "escape", "regexp", "comment", "tag", "meta"}
+	for theme, p := range palettes() {
+		colors := syntaxColors(p)
+		for i, a := range distinct {
+			for _, b := range distinct[i+1:] {
+				if colors[a] == colors[b] {
+					t.Errorf("%s: syntax %s and %s share a color", theme, a, b)
+				}
+			}
+		}
+	}
+}
+
+func TestCodeThemeColorsTokens(t *testing.T) {
+	for theme, p := range palettes() {
+		ct := p.CodeTheme()
+		if ct != p.CodeTheme() {
+			t.Errorf("%s: the code theme is not cached", theme)
+		}
+		if ct.Background != p.Layer.Editor {
+			t.Errorf("%s: the code theme background is not the editor layer", theme)
+		}
+		if got := ct.Tokens[editor.TokenKeyword].Color; got != p.Syntax.Keyword {
+			t.Errorf("%s: keyword color = %v, want %v", theme, got, p.Syntax.Keyword)
+		}
+		for kind := editor.TokenKeyword; kind <= editor.TokenInvalid; kind++ {
+			if kind == editor.TokenEmphasis || kind == editor.TokenStrong {
+				continue
+			}
+			if c := ct.TokenColor(kind); Contrast(c, ct.Background) < ContrastText {
+				t.Errorf("%s: token kind %d is %.2f:1 on the editor", theme, kind, Contrast(c, ct.Background))
+			}
+		}
+	}
 }
 
 func TestContrast(t *testing.T) {
