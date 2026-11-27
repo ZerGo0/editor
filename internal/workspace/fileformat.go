@@ -28,14 +28,14 @@ type languagePick struct {
 	lang *editor.Language
 }
 
-func (w *Workspace) applyOverrides(tab *layout.Tab) {
-	o, ok := w.indents[tab.Path]
-	if !ok || tab.Editor == nil {
+func (w *Workspace) applyOverrides(st *editor.State, path string) {
+	o, ok := w.indents[path]
+	if !ok {
 		return
 	}
-	tab.Editor.TabSize, tab.Editor.Indent = o.size, editor.IndentSpaces
+	st.TabSize, st.Indent = o.size, editor.IndentSpaces
 	if o.tabs {
-		tab.Editor.Indent = editor.IndentTabs
+		st.Indent = editor.IndentTabs
 	}
 }
 

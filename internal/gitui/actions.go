@@ -28,7 +28,7 @@ var Actions = []Action{
 	{ID: "git.checkoutRevision", Title: "Checkout Tag or Revision...", Category: category},
 	{ID: "git.merge", Title: "Merge Branch...", Category: category},
 	{ID: "git.rebase", Title: "Rebase Branch...", Category: category},
-	{ID: "git.newTag", Title: "Create Tag", Category: category},
+	{ID: "git.newTag", Title: "Create Tag...", Category: category},
 	{ID: "git.remotes", Title: "Manage Remotes...", Category: category},
 	{ID: "git.stash", Title: "Stash", Category: category},
 	{ID: "git.stashes", Title: "Pop Stash...", Category: category},

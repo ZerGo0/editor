@@ -86,7 +86,7 @@ func (w *Workspace) ensureEditor(t *layout.Tab) *docEntry {
 	t.Editor = &editor.State{Buffer: e.doc.Buffer, ReadOnly: e.doc.ReadOnly}
 	t.Editor.OnGutterClick = func(line int) { w.gutterClick(t, line) }
 	w.attachCompletions(t.Editor)
-	w.configure(t.Editor)
+	w.configure(t.Editor, t.Path)
 	defer w.applyDiagnostics(t.Path)
 	if r := t.Restore; r != nil && r.Line < e.doc.Buffer.LineCount() {
 		t.Editor.GoTo(editor.Pos{Line: r.Line, Col: min(r.Col, len(e.doc.Buffer.Line(r.Line)))})

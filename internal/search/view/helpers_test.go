@@ -31,6 +31,8 @@ type fakeHost struct {
 	errs    []error
 }
 
+func (h *fakeHost) ConfigureEditor(*editor.State, string)          {}
+func (h *fakeHost) ConfigureDiff(*editor.DiffState, string)        {}
 func (h *fakeHost) RootDir() string                                { return h.root }
 func (h *fakeHost) Window() *mygo.Window                           { return nil }
 func (h *fakeHost) OpenAt(string, int, int)                        {}

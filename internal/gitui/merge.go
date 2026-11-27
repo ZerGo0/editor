@@ -231,6 +231,7 @@ func (t *mergeTool) pane(c *ui.Context, title string, st *editor.State) {
 		ui.Row(c).Height(token.HeaderHeight.Px()).FillWidth().Padding(token.Space0.Px(), token.PadRow.Px()).AlignItems(ui.Center).Children(func() {
 			token.TextCaption.Apply(ui.Text(c, title)).FontWeight(token.WeightSemibold).TextColor(token.Of(c).Text.Secondary).SingleLine()
 		})
+		t.g.h.ConfigureEditor(st, t.g.paths.abs(t.rel))
 		editor.View(c.Key("editor"), st).Grow(1).FillWidth().MinHeight(0).Label(title)
 	})
 }

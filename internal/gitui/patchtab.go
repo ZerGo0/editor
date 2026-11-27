@@ -242,6 +242,7 @@ func (t *patchTab) patchView(c *ui.Context, it patchItem) {
 	t.engine.Refresh()
 	t.state.Layout = editor.DiffLayout(t.layout)
 	t.state.Annotations = t.engine.Annotations(nil)
+	t.g.h.ConfigureDiff(t.state, t.g.paths.abs(it.title))
 	t.g.diffOpts.apply(t.state)
 	ui.Column(c).Fill().Children(func() {
 		toolbarRow(c, "Diff Toolbar", func() {

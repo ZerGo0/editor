@@ -168,6 +168,7 @@ func (t *diffTab) body(c *ui.Context) {
 		loadingState(c, "Loading diff")
 	default:
 		t.state.Layout = editor.DiffLayout(t.layout)
+		t.g.h.ConfigureDiff(t.state, t.abs())
 		t.g.diffOpts.apply(t.state)
 		t.state.HunkActions = t.hasHunkActions() && !t.engine.Filtered()
 		t.state.Annotations = t.engine.Annotations(nil)

@@ -21,5 +21,7 @@ type Host interface {
 	ActivePath() string
 	ActiveEditor() *editor.State
 	Language(path, text string) *editor.Language
+	ConfigureEditor(st *editor.State, path string)
+	ConfigureDiff(d *editor.DiffState, path string)
 	UserDataDir() string
 }

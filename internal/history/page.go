@@ -222,6 +222,7 @@ func (u *UI) detail(c *ui.Context, p *page) {
 		case p.diffErr != nil:
 			u.failure(c, "Cannot read this version", p.diffErr, func() { p.wantHash = "" })
 		case p.diff != nil:
+			u.h.ConfigureDiff(p.diff, p.path)
 			editor.DiffView(c, p.diff).Grow(1).FillWidth()
 		case p.selected < 0:
 			u.centered(c, func() {

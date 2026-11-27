@@ -36,6 +36,7 @@ var appSources = []string{"commands.go", "keymapimport.go", "menu.go"}
 
 var strictRules = map[string]bool{
 	qa.RuleDoubleSpace:   true,
+	qa.RuleEllipsis:      true,
 	qa.RuleEdgeSpace:     true,
 	qa.RuleTrailingPunct: true,
 	qa.RuleTitleCase:     true,

@@ -9,7 +9,6 @@ import (
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/editorconfig"
 	"github.com/ZerGo0/editor/internal/fsutil"
-	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -129,12 +128,11 @@ func (w *Workspace) refreshAllEditorConfig() {
 	w.refreshEditorConfig(paths)
 }
 
-func (w *Workspace) applyEditorConfig(tab *layout.Tab) {
-	s, ok := w.ec.byPath[tab.Path]
-	if !ok || tab.Editor == nil {
+func (w *Workspace) applyEditorConfig(st *editor.State, path string) {
+	s, ok := w.ec.byPath[path]
+	if !ok {
 		return
 	}
-	st := tab.Editor
 	switch s.IndentStyle {
 	case editorconfig.IndentTabs:
 		st.Indent = editor.IndentTabs

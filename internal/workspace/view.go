@@ -30,6 +30,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.escape(c)
 	w.shortcuts(c)
 	w.focusedTab = nil
+	w.trackNavigation()
 	ui.Column(c).Fill().Children(func() {
 		w.titleBar(c)
 		ui.Row(c).Grow(1).FillWidth().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
@@ -43,7 +44,6 @@ func (w *Workspace) View(c *ui.Context) {
 		})
 		w.statusBar(c)
 	})
-	w.trackNavigation()
 	w.endViewerFrame()
 	w.gitFrame()
 	w.autoSave(w.focusedTab)

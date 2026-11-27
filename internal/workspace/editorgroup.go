@@ -122,9 +122,7 @@ func (w *Workspace) content(c *ui.Context, g *layout.Group, tab *layout.Tab) {
 		if tab.Preview && e.doc.Modified() {
 			tab.Preview = false
 		}
-		w.configure(tab.Editor)
-		w.applyEditorConfig(tab)
-		w.applyOverrides(tab)
+		w.configure(tab.Editor, tab.Path)
 		w.colorBrackets(c, tab)
 		w.applyDiffBase(tab)
 		editor.View(c.Key(tab.ID), tab.Editor).Grow(1).FillWidth().Bind(&tab.Handle)

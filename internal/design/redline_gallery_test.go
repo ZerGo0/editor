@@ -5,6 +5,7 @@ import (
 	"image"
 	"math"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"unicode"
@@ -21,6 +22,7 @@ const (
 	redlineUpdateEnv = "DESIGN_REDLINE_UPDATE"
 	redlineDetailEnv = "DESIGN_REDLINE_DETAIL"
 	stateMargin      = 4
+	pointerShards    = 4
 )
 
 var redlineScales = []float64{1, 2}
@@ -153,10 +155,10 @@ func slug(label string) string {
 	}, label)
 }
 
-func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64) {
+func sweepPointerStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64, shard int) {
 	t.Helper()
-	for _, b := range testerBoxes(tt) {
-		if !stateRoles[b.Role] || b.Disabled {
+	for i, b := range testerBoxes(tt) {
+		if i%pointerShards != shard || !stateRoles[b.Role] || b.Disabled {
 			continue
 		}
 		x, y := float32(b.Rect.CenterX()), float32(b.Rect.CenterY())
@@ -165,6 +167,18 @@ func sweepStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowl
 		tt.Press(x, y)
 		checkRedlines(t, analyzeState(t, tt, b, view+"-pressed-"+slug(b.Label), scale), allow)
 		tt.CancelPress()
+	}
+}
+
+func sweepFocusStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64) {
+	t.Helper()
+	boxes := testerBoxes(tt)
+	for _, b := range slices.Backward(boxes) {
+		if stateRoles[b.Role] && !b.Disabled {
+			tt.Press(float32(b.Rect.CenterX()), float32(b.Rect.CenterY()))
+			tt.CancelPress()
+			break
+		}
 	}
 	tt.Move(0, 0)
 	seen := map[redline.Rect]bool{}
@@ -194,15 +208,28 @@ func TestGalleryRedlines(t *testing.T) {
 		for _, th := range redlineThemes {
 			t.Run(fmt.Sprintf("%s@%gx", th.name, scale), func(t *testing.T) {
 				t.Parallel()
-				p, g := th.palette(), newGallery()
-				tt := ui.NewTester(func(c *ui.Context) {
-					ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { galleryColumn(c, g) })
-				}, redlineWidth, redlineHeight)
-				tt.SetScale(float32(scale))
-				tt.Frame()
 				view := fmt.Sprintf("gallery-%s@%gx", th.name, scale)
-				checkRedlines(t, analyzeTester(t, tt, view, scale), allow)
-				sweepStates(t, tt, view, allow, scale)
+				newTester := func() *ui.Tester {
+					p, g := th.palette(), newGallery()
+					tt := ui.NewTester(func(c *ui.Context) {
+						ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { galleryColumn(c, g) })
+					}, redlineWidth, redlineHeight)
+					tt.SetScale(float32(scale))
+					tt.Frame()
+					return tt
+				}
+				t.Run("static and focus", func(t *testing.T) {
+					t.Parallel()
+					tt := newTester()
+					checkRedlines(t, analyzeTester(t, tt, view, scale), allow)
+					sweepFocusStates(t, tt, view, allow, scale)
+				})
+				for shard := range pointerShards {
+					t.Run(fmt.Sprintf("pointer-%d", shard), func(t *testing.T) {
+						t.Parallel()
+						sweepPointerStates(t, newTester(), view, allow, scale, shard)
+					})
+				}
 			})
 		}
 	}

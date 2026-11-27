@@ -130,6 +130,7 @@ func (g *Git) changePopup(c *ui.Context) {
 						s.open = false
 					}
 				})
+				g.h.ConfigureDiff(s.diff, s.path)
 				editor.DiffView(c.Key("change"), s.diff).FillWidth().Height(token.PeekHeight.Px())
 			})
 			if panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape) {

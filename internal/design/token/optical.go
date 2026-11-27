@@ -16,6 +16,13 @@ func (t TextStyle) ApplyLine(el ui.Element) ui.Element {
 	return el
 }
 
+var GlyphDrop = Size{2}
+
+func (t TextStyle) WholeGlyphDropped(c *ui.Context, s string) ui.Element {
+	lower := 2 * GlyphDrop.Px()
+	return t.WholeText(c, s).FixedLineHeight(t.line-lower).Padding(lower, 0, 0, 0)
+}
+
 func (t TextStyle) WholeText(c *ui.Context, s string) ui.Element {
 	return t.ApplyLine(ui.Text(c, s)).MinWidth(t.wholeWidth(c, s)).TextAlign(ui.Center)
 }

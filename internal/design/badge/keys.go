@@ -7,7 +7,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const modifierGlyphs = "⌘⇧⌥⌃"
+const (
+	modifierGlyphs = "⌘⇧⌥⌃"
+	controlGlyph   = "⌃"
+)
 
 func KeyCaps(keys string) [][]string {
 	var chords [][]string
@@ -33,7 +36,11 @@ func Keys(c *ui.Context, keys string) ui.Element {
 					ui.Row(c).Height(token.KeyCapHeight.Px()).MinWidth(token.KeyCapMinWidth.Px()).Padding(0, token.PadKeyX.Px()).Radius(token.RadiusControl.Px()).
 						AlignItems(ui.Center).Justify(ui.Center).Background(p.Key.Background).Border(token.BorderWidth.Px(), p.Key.Border).
 						BorderWidth(token.BorderWidth.Px(), token.BorderWidth.Px(), token.KeyCapBottomWidth.Px(), token.BorderWidth.Px()).Children(func() {
-						token.TextCaption.WholeText(c, k).TextColor(p.Key.Text).SingleLine()
+						glyph := token.TextCaption.WholeText
+						if k == controlGlyph {
+							glyph = token.TextCaption.WholeGlyphDropped
+						}
+						glyph(c, k).TextColor(p.Key.Text).SingleLine()
 					})
 				}
 			})

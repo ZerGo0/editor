@@ -184,8 +184,7 @@ func TestEditorConfigOverridesSettings(t *testing.T) {
 	})
 	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
 	tab, e := openTab(t, w, filepath.Join(root, "a.go"))
-	w.configure(tab.Editor)
-	w.applyEditorConfig(tab)
+	w.ConfigureEditor(tab.Editor, tab.Path)
 	st := tab.Editor
 	if st.Indent != editor.IndentTabs || st.TabSize != 8 || !slices.Equal(st.WrapGuides, []int{100}) {
 		t.Fatalf("indent %v size %d guides %v", st.Indent, st.TabSize, st.WrapGuides)
@@ -198,8 +197,7 @@ func TestEditorConfigOverridesSettings(t *testing.T) {
 		t.Fatalf("saved %q", got)
 	}
 	other, _ := openTab(t, w, filepath.Join(root, "b.txt"))
-	w.configure(other.Editor)
-	w.applyEditorConfig(other)
+	w.ConfigureEditor(other.Editor, other.Path)
 	if other.Editor.Indent == editor.IndentTabs {
 		t.Fatal("the [*.go] section applied to b.txt")
 	}

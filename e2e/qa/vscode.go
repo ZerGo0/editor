@@ -72,7 +72,7 @@ var VSCodeTitles = map[string][]string{
 	"git.branches":                                        {"Checkout to..."},
 	"git.merge":                                           {"Merge Branch..."},
 	"git.rebase":                                          {"Rebase Branch..."},
-	"git.newTag":                                          {"Create Tag"},
+	"git.newTag":                                          {"Create Tag..."},
 	"git.rollback":                                        {"Discard Changes"},
 }
 

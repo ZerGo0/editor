@@ -71,7 +71,7 @@ func (g *Git) commitActions(c *ui.Context, m *ui.Menu, cm git.Commit) {
 	if m.Item("Create Branch...").Chosen() {
 		g.newBranch(cm.OID)
 	}
-	if m.Item("Create Tag").Chosen() {
+	if m.Item("Create Tag...").Chosen() {
 		g.newTag(cm.OID)
 	}
 }

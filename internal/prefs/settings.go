@@ -147,7 +147,13 @@ func (v *SettingsView) categories(c *ui.Context) {
 	ui.Column(c).Width(token.SettingsNavWidth.Px()).Shrink(0).FillHeight().Padding(token.GapStack.Px(), 0).
 		BorderWidth(0, token.BorderWidth.Px(), 0, 0).BorderColor(p.Border.Section).Children(func() {
 		list.View(c, &v.nav, len(settings.Categories), list.ViewOptions{Label: categoriesLabel}, func(i int) list.Item {
-			return list.Item{Label: settings.Categories[i], OnClick: func() { v.list.ScrollTo(0, ui.Start) }}
+			label := settings.Categories[i]
+			return list.Item{Label: label, OnClick: func() { v.list.ScrollTo(0, ui.Start) }, Rich: func(s list.Style) []ui.Span {
+				if s.Text == p.Text.Primary {
+					s.Text = p.Text.Strong
+				}
+				return list.Spans(label, nil, s.Text, s.Highlight)
+			}}
 		})
 	})
 }

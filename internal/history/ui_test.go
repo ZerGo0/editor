@@ -48,6 +48,8 @@ func (f *fakeHost) UserDataDir() string                      { return "" }
 func (f *fakeHost) ActivePath() string                       { return f.active }
 func (f *fakeHost) ActiveEditor() *editor.State              { return nil }
 func (f *fakeHost) Language(string, string) *editor.Language { return nil }
+func (f *fakeHost) ConfigureEditor(*editor.State, string)    {}
+func (f *fakeHost) ConfigureDiff(*editor.DiffState, string)  {}
 
 func (f *fakeHost) Update(fn func()) {
 	f.mu.Lock()

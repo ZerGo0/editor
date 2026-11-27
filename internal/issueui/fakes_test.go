@@ -61,6 +61,8 @@ func (h *fakeHost) ActivePath() string                       { return h.path }
 func (h *fakeHost) ActiveEditor() *editor.State              { return h.state }
 func (h *fakeHost) UserDataDir() string                      { return h.data }
 func (h *fakeHost) Language(string, string) *editor.Language { return nil }
+func (h *fakeHost) ConfigureEditor(*editor.State, string)    {}
+func (h *fakeHost) ConfigureDiff(*editor.DiffState, string)  {}
 
 func (h *fakeHost) OpenView(id, title string, view func(*ui.Context)) {
 	h.opened = append(h.opened, id)

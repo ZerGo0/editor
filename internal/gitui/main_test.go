@@ -126,6 +126,8 @@ func (h *fakeHost) Buffer(p string) *editor.Buffer { return h.buffers[p] }
 func (h *fakeHost) OpenView(id, title string, _ func(c *ui.Context)) { h.views[id] = title }
 
 func (h *fakeHost) Language(string, string) *editor.Language { return nil }
+func (h *fakeHost) ConfigureEditor(*editor.State, string)    {}
+func (h *fakeHost) ConfigureDiff(*editor.DiffState, string)  {}
 
 func (h *fakeHost) Notify(text string) {
 	h.mu.Lock()

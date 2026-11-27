@@ -469,6 +469,7 @@ func (p *PRs) diffView(c *ui.Context, t *diffTab) {
 				threads = buildAnnotations(d.threads, t.file.Path, t.expanded, st.Old.LineCount(), st.New.LineCount())
 			}
 			st.Annotations = t.engine.Annotations(threads)
+			p.h.ConfigureDiff(st, filepath.Join(p.h.RootDir(), t.file.Path))
 			editor.DiffView(c, st).Grow(1).FillWidth().Label("Diff of " + t.file.Path)
 		}
 	})

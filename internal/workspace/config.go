@@ -32,7 +32,15 @@ func (w *Workspace) zoom() float32 {
 	return float32(math.Pow(zoomFactor, float64(w.settings.Int(settings.ZoomLevel))))
 }
 
-func (w *Workspace) configure(st *editor.State) {
+func (w *Workspace) configure(st *editor.State, path string) {
+	w.ConfigureEditor(st, path)
+	st.Bindings = w.env.Keys.Current.EditorBindings()
+	st.OnInput = w.editorInput
+	st.ContextMenu = w.editorMenu
+	st.RenderFindBar = findwidget.ForEditor(st)
+}
+
+func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 	s := w.settings
 	st.Font = w.editorFont()
 	st.HoverDelay = token.EditorHover
@@ -54,10 +62,16 @@ func (w *Workspace) configure(st *editor.State) {
 	st.NoFolding = !s.Bool(settings.Folding)
 	st.NoActiveLine = !s.Bool(settings.LineHighlight)
 	st.CursorShape = cursorShapes[s.String(settings.CursorStyle)]
-	st.Bindings = w.env.Keys.Current.EditorBindings()
-	st.OnInput = w.editorInput
-	st.ContextMenu = w.editorMenu
-	st.RenderFindBar = findwidget.ForEditor(st)
+	w.applyEditorConfig(st, path)
+	w.applyOverrides(st, path)
+}
+
+// TECHDEBT: MyGo 0.10.0 DiffState has no bracket color, guide or hover delay option; add them here when it does.
+func (w *Workspace) ConfigureDiff(d *editor.DiffState, path string) {
+	var st editor.State
+	w.ConfigureEditor(&st, path)
+	d.Font, d.LineHeight, d.TabSize = st.Font, st.LineHeight, st.TabSize
+	d.Wrap, d.ScrollPastEnd = st.SoftWrap, !st.NoScrollPastEnd
 }
 
 func (w *Workspace) editorMenu(m *ui.Menu) {
