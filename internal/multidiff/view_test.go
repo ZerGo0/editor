@@ -456,3 +456,48 @@ func TestFilesFollowTheTreeOrderWithinEachSection(t *testing.T) {
 		t.Fatalf("tree rows = %v, want %v", rows, wantRows)
 	}
 }
+
+func TestChangedFileKeepsItsDiffWhileItReloads(t *testing.T) {
+	t.Parallel()
+	gate := make(chan struct{})
+	load := func(newText string, wait chan struct{}) func(context.Context, bool) (string, string, error) {
+		return func(context.Context, bool) (string, string, error) {
+			if wait != nil {
+				<-wait
+			}
+			return "old\n", newText, nil
+		}
+	}
+	entry := Entry{Key: testFileName, Path: testFileName, Status: token.GitModified, Adds: 1, Dels: 1, Fingerprint: "v1", Load: load("first\n", nil)}
+	r := newRig(t, []Entry{entry})
+	settled := func() {
+		for range 20 {
+			r.tt.Frame()
+		}
+	}
+	shows := func(text string) bool {
+		d := r.v.File(testFileName).State()
+		return d != nil && d.New != nil && d.New.String() == text
+	}
+	settled()
+	if !shows("first\n") {
+		t.Fatal("the first diff did not show")
+	}
+	entry.Fingerprint, entry.Load = "v2", load("second\n", gate)
+	r.v.SetEntries([]Entry{entry})
+	settled()
+	if _, loading := r.tt.AccessByRole(ui.RoleProgress, loadingLabel); loading {
+		t.Error("the reload replaced the diff with a loading state")
+	}
+	if !shows("first\n") {
+		t.Error("the old diff is gone while the new one loads")
+	}
+	close(gate)
+	for range 200 {
+		r.tt.Frame()
+		if shows("second\n") {
+			return
+		}
+	}
+	t.Error("the new diff did not show")
+}

@@ -169,7 +169,11 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	if !f.ready {
 		v.request(f, o)
 	}
-	if !f.ready {
+	if f.ready && f.stale {
+		f.engine.SetSource(f.source(o))
+		f.stale = false
+	}
+	if !f.ready && !f.stale {
 		ui.Column(c).FillWidth().Height(placeholderHeight(e)).Children(func() { feedback.Loading(c, loadingLabel) })
 		return
 	}

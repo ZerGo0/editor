@@ -73,9 +73,13 @@ func (v *View) SetEntries(entries []Entry) {
 		f := old[e.Key]
 		delete(old, e.Key)
 		if f != nil && f.entry.Fingerprint != e.Fingerprint {
-			f.drop()
 			delete(v.open, e.Key)
-			f = nil
+			if f.state != nil && f.engine != nil && e.Patch == nil {
+				f.reload()
+			} else {
+				f.drop()
+				f = nil
+			}
 		}
 		if f == nil {
 			f = &File{}

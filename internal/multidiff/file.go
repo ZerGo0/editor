@@ -20,6 +20,7 @@ type File struct {
 	mode    git.WhitespaceMode
 	used    uint64
 	forced  bool
+	stale   bool
 }
 
 func (f *File) State() *editor.DiffState { return f.state }
@@ -37,6 +38,20 @@ func (f *File) drop() {
 	f.gen++
 	f.state, f.engine, f.src, f.liveBuf = nil, nil, nil, nil
 	f.loading, f.ready, f.err = false, false, nil
+}
+
+func (f *File) reload() {
+	f.gen++
+	f.src = nil
+	f.loading, f.ready, f.err, f.stale = false, false, nil, true
+}
+
+func (f *File) source(o Options) diffmode.Source {
+	src := *f.src
+	if o.Language != nil {
+		src.Language = o.Language(f.entry.Path, src.New)
+	}
+	return src
 }
 
 func (f *File) build(o Options) {
@@ -59,11 +74,7 @@ func (f *File) build(o Options) {
 	} else {
 		f.engine = diffmode.NewEngine(o.Ctx, d, o.Post)
 		f.engine.Install(nil)
-		src := *f.src
-		if o.Language != nil {
-			src.Language = o.Language(e.Path, src.New)
-		}
-		f.engine.SetSource(src)
+		f.engine.SetSource(f.source(o))
 	}
 	f.state = d
 	if e.Setup != nil {
