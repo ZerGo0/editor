@@ -180,3 +180,42 @@ func TestPreviewShowsEditorMessageAndBusyStates(t *testing.T) {
 		t.Fatal("a busy preview shows no loading text")
 	}
 }
+
+func TestDialogClosesWhenTheWindowDeactivates(t *testing.T) {
+	h := newHarness()
+	tt := ui.NewTester(h.view, testWidth, testHeight)
+	tt.Frame()
+	tt.SetWindowActive(false)
+	tt.Frame()
+	if !h.closed {
+		t.Fatal("the dialog stays open in an inactive window")
+	}
+}
+
+func TestDialogGivesTheFocusBackToTheOpener(t *testing.T) {
+	const fieldLabel = "Notes"
+	var text string
+	h := newHarness()
+	open := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.TextInputBase(c.Key("notes"), &text).Label(fieldLabel)
+		if open {
+			h.view(c)
+			if h.closed {
+				open = false
+			}
+		}
+	}, testWidth, testHeight)
+	tt.Frame()
+	notes, _ := tt.Access(fieldLabel)
+	tt.ClickAt(notes.Bounds.X+notes.Bounds.W/2, notes.Bounds.Y+notes.Bounds.H/2)
+	tt.Frame()
+	open = true
+	tt.Frame()
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	tt.Frame()
+	if !tt.Focused(fieldLabel) {
+		t.Fatal("Escape did not give the focus back to the field that had it")
+	}
+}

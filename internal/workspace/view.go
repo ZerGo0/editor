@@ -29,11 +29,11 @@ func (w *Workspace) View(c *ui.Context) {
 	w.beginDragFrame()
 	w.codeTheme = p.CodeTheme()
 	root := c.Root().TabStop(false).FocusRing(false).Role(ui.RoleNone).ObserveInput(w.observeInput)
+	w.returnFocus(c)
 	if w.active.ActiveTab() == nil && !root.FocusWithin() {
 		root.Focus()
 	}
 	w.syncGoToLine()
-	w.escape(c)
 	w.shortcuts(c)
 	w.focusedTab = nil
 	w.trackNavigation()
@@ -55,8 +55,10 @@ func (w *Workspace) View(c *ui.Context) {
 	w.autoSave(w.focusedTab)
 	w.syncBackups()
 	w.overlays(c)
+	w.holdFocus()
 	w.quickInputView(c)
 	w.promptView(c)
+	w.releaseFocus(c)
 	w.showNotices(c)
 	feedback.ToastHost(c)
 }

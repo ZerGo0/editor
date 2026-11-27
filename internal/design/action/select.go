@@ -26,6 +26,9 @@ func Select[T comparable](c *ui.Context, label string, selected *T, options []Op
 			current = opt.Label
 		}
 	}
+	if sel.Open() && !c.WindowActive() {
+		sel.SetOpen(false)
+	}
 	border := p.Border.Input
 	if sel.Open() {
 		border = p.Accent.Focus

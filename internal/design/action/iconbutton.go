@@ -36,7 +36,7 @@ func IconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions) ui.Ele
 }
 
 func MenuIconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions, menu func(m *ui.Menu)) ui.Element {
-	return IconButton(c, icon, label, o).PopoverMenuButton(menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd})
+	return PopoverMenu(c, IconButton(c, icon, label, o), menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd})
 }
 
 func ToggleIconButton(c *ui.Context, icon *ui.SVG, label string, on *bool, o IconOptions) ui.Element {

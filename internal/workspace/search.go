@@ -48,6 +48,7 @@ type searchState struct {
 }
 
 func (w *Workspace) initSearch(saved session.Project) {
+	w.palette.WindowKeys = w.shortcuts
 	w.search.files = &files.Index{Root: w.Root}
 	syms := symbols.NewIndex()
 	w.search.scanner = &files.Scanner{Root: w.Root, Visitors: []files.Visitor{everywhere.SymbolVisitor{Index: syms}, w.insights.todos}}
@@ -71,6 +72,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 		ToolWindows:     w.toolWindows,
 		BeforeWrite:     w.beforeReplace,
 		ShowFindResults: w.showFindResults,
+		WindowKeys:      w.shortcuts,
 	}
 	w.search.engine = engine
 	w.search.dialog = finder.NewDialog(env)

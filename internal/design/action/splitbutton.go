@@ -62,7 +62,7 @@ func SplitButton(c *ui.Context, label string, o SplitOptions) ui.Element {
 			ui.Icon(c, icons.ChevronDown).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(fg)
 		})
 		if o.Menu != nil {
-			arrow.PopoverMenuButton(o.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd})
+			PopoverMenu(c, arrow, o.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd})
 		}
 	})
 	return button

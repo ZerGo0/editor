@@ -3,6 +3,7 @@ package chrome
 import (
 	"strconv"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
@@ -49,6 +50,6 @@ func crumb(c *ui.Context, p *token.Palette, i int, cr Crumb, last bool) {
 		token.TextBody.Apply(ui.Text(c, cr.Label)).TextColor(color).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
 	})
 	if cr.Menu != nil {
-		b.PopoverMenuButton(cr.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomStart, Self: ui.AnchorTopStart})
+		action.PopoverMenu(c, b, cr.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomStart, Self: ui.AnchorTopStart})
 	}
 }

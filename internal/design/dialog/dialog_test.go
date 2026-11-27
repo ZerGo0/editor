@@ -36,3 +36,30 @@ func TestModalOpensAndCloses(t *testing.T) {
 		t.Fatal("Escape does not close the dialog")
 	}
 }
+
+func TestModalGivesTheFocusBackToTheOpener(t *testing.T) {
+	const fieldLabel = "Notes"
+	var text, name string
+	open := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.TextInputBase(c.Key("notes"), &text).Label(fieldLabel)
+		Modal(c, &open, "Rename", Options{}, func() {
+			ui.TextInputBase(c.Key("name"), &name).Label("New name").AutoFocus()
+		})
+	}, testWidth, testHeight)
+	tt.Frame()
+	notes, _ := tt.Access(fieldLabel)
+	tt.ClickAt(notes.Bounds.X+notes.Bounds.W/2, notes.Bounds.Y+notes.Bounds.H/2)
+	tt.Frame()
+	open = true
+	tt.Frame()
+	if !tt.Focused("New name") {
+		t.Fatal("the dialog did not take the focus")
+	}
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	tt.Frame()
+	if !tt.Focused(fieldLabel) {
+		t.Fatal("Escape did not give the focus back to the field that had it")
+	}
+}

@@ -87,6 +87,7 @@ func (w *Workspace) syncGoToLine() {
 
 func (w *Workspace) finishGoToLine(g *goToLine, t gotoline.Target) {
 	w.endGoToLine(g)
+	w.focusTab = g.tab
 	column := 0
 	if t.ColumnOK {
 		column = gotoline.ByteColumn(g.buffer().Line(t.Line-1), t.Column)
@@ -104,5 +105,4 @@ func (w *Workspace) endGoToLine(g *goToLine) {
 		w.goTo = nil
 	}
 	g.tab.Editor.LineBackgrounds = g.backgrounds
-	w.focusTab = g.tab
 }

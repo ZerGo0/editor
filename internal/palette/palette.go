@@ -39,12 +39,13 @@ type Mode struct {
 }
 
 type Palette struct {
-	open     bool
-	mode     *Mode
-	state    quickinput.State
-	searched string
-	seq      int
-	items    []Item
+	WindowKeys func(c *ui.Context)
+	open       bool
+	mode       *Mode
+	state      quickinput.State
+	searched   string
+	seq        int
+	items      []Item
 }
 
 func Static(items []Item) func(string, func([]Item)) {
@@ -150,7 +151,7 @@ func (p *Palette) View(c *ui.Context) {
 	m := p.mode
 	label, o := "", quickinput.Options{}
 	if m != nil {
-		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty}
+		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty, WindowKeys: p.WindowKeys}
 	}
 	items := make([]quickinput.Item, len(p.items))
 	for i, it := range p.items {

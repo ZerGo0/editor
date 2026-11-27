@@ -47,7 +47,4 @@ func (w *Workspace) promptView(c *ui.Context) {
 			p.open = false
 		}
 	})
-	if !p.open {
-		w.focusTab = w.active.ActiveTab()
-	}
 }

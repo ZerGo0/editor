@@ -150,3 +150,64 @@ func TestLongLabelWithoutDescriptionIsNotCappedAtHalfThePanel(t *testing.T) {
 		t.Fatalf("label is %v wide, want more than half the panel (%v)", text.Bounds.W, half)
 	}
 }
+
+func TestClosesWhenTheWindowDeactivates(t *testing.T) {
+	closed := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		if View(c, "Go to File", &State{}, []Item{{Label: "a.go"}}, Options{}).Closed {
+			closed = true
+		}
+	}, testWidth, testHeight)
+	tt.Frame()
+	tt.SetWindowActive(false)
+	tt.Frame()
+	if !closed {
+		t.Fatal("a quick input stays open in an inactive window")
+	}
+}
+
+func TestFocusMovesInAtOnceAndReturnsToTheOpener(t *testing.T) {
+	const fieldLabel = "Notes"
+	var text string
+	open := false
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.TextInputBase(c.Key("notes"), &text).Label(fieldLabel)
+		if open && View(c, "Go to File", &State{}, []Item{{Label: "a.go"}}, Options{}).Closed {
+			open = false
+		}
+	}, testWidth, testHeight)
+	tt.Frame()
+	notes, _ := tt.Access(fieldLabel)
+	tt.ClickAt(notes.Bounds.X+notes.Bounds.W/2, notes.Bounds.Y+notes.Bounds.H/2)
+	tt.Frame()
+	open = true
+	tt.Frame()
+	tt.Type("x")
+	if text != "" {
+		t.Fatalf("typing went to the field behind the quick input: %q", text)
+	}
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	tt.Frame()
+	if !tt.Focused(fieldLabel) {
+		t.Fatal("Escape did not give the focus back to the field that had it")
+	}
+	tt.Type("y")
+	if text != "y" {
+		t.Fatalf("the field did not get the typing back: %q", text)
+	}
+}
+
+func TestClickingARowKeepsTheFocusInTheInput(t *testing.T) {
+	items := []Item{{Label: "a.go"}, {Label: "b.go"}}
+	s := &State{}
+	tt := ui.NewTester(func(c *ui.Context) { View(c, "Go to File", s, items, Options{}) }, testWidth, testHeight)
+	tt.Frame()
+	row, _ := tt.Access("b.go")
+	tt.ClickAt(row.Bounds.X+row.Bounds.W/2, row.Bounds.Y+row.Bounds.H/2)
+	tt.Frame()
+	tt.Type("z")
+	if s.Query != "z" {
+		t.Fatalf("the typing did not reach the input after a click on a row: %q", s.Query)
+	}
+}

@@ -43,6 +43,7 @@ type Env struct {
 	ToolWindows     func() []ToolWindow
 	BeforeWrite     func(path string)
 	ShowFindResults func(res FindResults)
+	WindowKeys      func(c *ui.Context)
 }
 
 func (e Env) openFiles() []string {

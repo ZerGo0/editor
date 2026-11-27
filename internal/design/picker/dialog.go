@@ -1,6 +1,7 @@
 package picker
 
 import (
+	"github.com/ZerGo0/editor/internal/design/focus"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -12,18 +13,23 @@ type Shortcut struct {
 }
 
 type DialogOptions struct {
-	Label     string
-	ID        string
-	Layout    *Layout
-	Shortcuts []Shortcut
+	Label      string
+	ID         string
+	Layout     *Layout
+	Shortcuts  []Shortcut
+	WindowKeys func(c *ui.Context)
 }
 
 func Dialog(c *ui.Context, o DialogOptions, body func()) (closed bool) {
 	p := token.Of(c)
+	focus.Return(c, "picker-dialog:"+o.ID)
 	ui.Overlay(c, func() {
 		back := ui.Column(c.Key("picker-dialog:" + o.ID)).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Justify(ui.Center).Modal()
 		win := back.Bounds()
 		back.Children(func() {
+			if o.WindowKeys != nil {
+				o.WindowKeys(c)
+			}
 			margin := token.GapControl.Px()
 			panel := ui.Column(c).Margin(margin).FillWidth().Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
 				Background(p.Layer.QuickInput).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).
@@ -49,7 +55,7 @@ func Dialog(c *ui.Context, o DialogOptions, body func()) (closed bool) {
 					s.Run()
 				}
 			}
-			if panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape) {
+			if panel.PressedOutside() || !c.WindowActive() || back.OverlayShortcut(0, ui.KeyEscape) {
 				closed = true
 			}
 		})

@@ -78,18 +78,31 @@ func (w *Workspace) notificationsStatus(c *ui.Context) {
 	}
 	anchor := chrome.StatusItem(c, text, chrome.StatusOptions{Icon: icons.Bell, ID: "notifications", Command: showNotificationsID,
 		Tooltip: notificationsTitle})
-	ui.Popover(c, anchor, &w.noteCenter, func() { w.notificationCenter(c) })
+	var first ui.Element
+	ui.Popover(c, anchor, &w.noteCenter, func() { first = w.notificationCenter(c) })
+	if w.noteCenter {
+		first.AutoFocus()
+		if !c.WindowActive() {
+			w.noteCenter = false
+		}
+	}
 }
 
-func (w *Workspace) notificationCenter(c *ui.Context) {
+func (w *Workspace) notificationCenter(c *ui.Context) (first ui.Element) {
 	p := token.Of(c)
 	list := w.notes.List()
 	ui.Column(c).Width(token.NotificationsWidth.Px()).Role(ui.RoleDialog).Label(notificationsTitle).Children(func() {
 		pane.ViewTitle(c, notificationsTitle, pane.TitleOptions{ShowActions: true, Actions: func(c *ui.Context) {
-			if action.IconButton(c, icons.ClearAll, clearNotifications, action.IconOptions{Disabled: len(list) == 0}).Clicked() {
+			clearAll := action.IconButton(c, icons.ClearAll, clearNotifications, action.IconOptions{Disabled: len(list) == 0})
+			hide := action.IconButton(c, icons.ChevronDown, hideNotifications, action.IconOptions{})
+			first = hide
+			if len(list) > 0 {
+				first = clearAll
+			}
+			if clearAll.Clicked() {
 				w.ClearNotifications()
 			}
-			if action.IconButton(c, icons.ChevronDown, hideNotifications, action.IconOptions{}).Clicked() {
+			if hide.Clicked() {
 				w.noteCenter = false
 			}
 		}})
@@ -103,6 +116,7 @@ func (w *Workspace) notificationCenter(c *ui.Context) {
 			}
 		})
 	})
+	return first
 }
 
 func (w *Workspace) noticeRow(c *ui.Context, p *token.Palette, n notices.Notice) {

@@ -57,6 +57,7 @@ type Workspace struct {
 	palette       palette.Palette
 	goTo          *goToLine
 	prompt        prompt
+	back          focusReturn
 	keys          keyState
 	notes         notices.Store
 	noteCenter    bool

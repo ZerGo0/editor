@@ -6,14 +6,16 @@ import (
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/design/focus"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	none         = -1
-	defaultEmpty = "No matching results"
+	none          = -1
+	quickInputKey = "quick-input"
+	defaultEmpty  = "No matching results"
 )
 
 type Action struct {
@@ -43,6 +45,7 @@ type Options struct {
 	Placeholder string
 	Busy        bool
 	Empty       string
+	WindowKeys  func(c *ui.Context)
 }
 
 type Result struct {
@@ -56,10 +59,14 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 	res := Result{Accepted: none, Pressed: none}
 	s.Selected = clamp(s.Selected, len(items))
 	p := token.Of(c)
+	focus.Return(c, quickInputKey)
 	ui.Overlay(c, func() {
 		back := ui.Column(c.Key("quick-input:" + label)).Absolute().Left(0).Top(0).Right(0).Bottom(0).AlignItems(ui.Center).Modal()
 		bar, below := anchored(chrome.CommandCenterBounds(c), back.Bounds())
 		back.Children(func() {
+			if o.WindowKeys != nil {
+				o.WindowKeys(c)
+			}
 			panel := ui.Column(c).Padding(token.PadPopover.Px()).Gap(token.PadPopover.Px()).
 				Background(p.Layer.QuickInput).Radius(token.RadiusPopover.Px()).Border(token.BorderWidth.Px(), p.Border.Widget).
 				ZIndex(token.LayerQuickInput.Z()).Role(ui.RoleDialog).Label(label)
@@ -91,7 +98,7 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 				}
 				rows(c, p, s, items, o, &res)
 			})
-			if panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape) {
+			if panel.PressedOutside() || !c.WindowActive() || back.OverlayShortcut(0, ui.KeyEscape) {
 				res.Closed = true
 			}
 		})
@@ -148,7 +155,7 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 		if row.Clicked() {
 			res.Accepted = i
 		}
-	}).FillWidth().MaxHeight(maxHeight).Shrink(1).Background(ui.Transparent)
+	}).FillWidth().MaxHeight(maxHeight).Shrink(1).Background(ui.Transparent).KeepFocus()
 	if s.scroll && s.Selected != none {
 		s.list.ScrollIntoView(s.Selected)
 		s.scroll = false

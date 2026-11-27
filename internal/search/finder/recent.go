@@ -116,7 +116,7 @@ func (r *RecentFiles) View(c *ui.Context) {
 	if r.query != r.listed {
 		r.refresh()
 	}
-	if picker.Dialog(c, picker.DialogOptions{Label: recentLabel, ID: recentID}, func() { r.body(c) }) {
+	if picker.Dialog(c, picker.DialogOptions{Label: recentLabel, ID: recentID, WindowKeys: r.env.WindowKeys}, func() { r.body(c) }) {
 		r.Close()
 	}
 }

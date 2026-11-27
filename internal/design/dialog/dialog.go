@@ -1,6 +1,7 @@
 package dialog
 
 import (
+	"github.com/ZerGo0/editor/internal/design/focus"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -15,6 +16,9 @@ func Modal(c *ui.Context, open *bool, title string, o Options, body func()) ui.E
 	width := o.Width
 	if width.Px() <= 0 {
 		width = token.DialogWidth
+	}
+	if *open {
+		focus.Return(c, title)
 	}
 	return ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
 		backdrop.Background(p.Shadow.Alpha(token.OpacityScrim.Value()))

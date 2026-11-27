@@ -108,7 +108,7 @@ func Results(c *ui.Context, s *ResultsState, rows []Row, o ResultsOptions) int {
 	if n <= 0 {
 		n = token.SearchPopupRows
 	}
-	l := ui.List(c, &s.list, len(rows)).FillWidth().Label(o.Label).Background(ui.Transparent)
+	l := ui.List(c, &s.list, len(rows)).FillWidth().Label(o.Label).Background(ui.Transparent).KeepFocus()
 	if o.Fill {
 		l.Grow(1).Basis(0).Shrink(1).MinHeight(token.PaneMinHeight.Px())
 	} else {

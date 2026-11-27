@@ -68,7 +68,7 @@ func StatusParts(c *ui.Context, label string, parts []StatusPart, o StatusOption
 	})
 	switch {
 	case o.Menu != nil:
-		b.PopoverMenuButton(o.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorTopStart, Self: ui.AnchorBottomStart})
+		action.PopoverMenu(c, b, o.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorTopStart, Self: ui.AnchorBottomStart})
 	case !b.Clicked():
 	case o.OnClick != nil:
 		o.OnClick()
