@@ -2,34 +2,40 @@ package workspace
 
 import (
 	"maps"
+	"strings"
 
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/keymap/when"
+	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/egoist/mygo/ui"
 )
+
+const plainTextLanguage = "plaintext"
 
 type keyState struct {
 	pending     keymap.Chord
 	swallowText bool
 	byCode      bool
-	cache       singlesCache
+	textFocus   bool
+	cache       activeCache
 }
 
-type singlesCache struct {
-	keymap  *keymap.Keymap
-	sig     uint32
-	singles []keymap.Binding
+type activeCache struct {
+	keymap *keymap.Keymap
+	ctx    when.Context
+	active *keymap.Active
 }
 
 func (w *Workspace) shortcuts(c *ui.Context) {
 	km := w.env.Keys.Current
+	active := w.activeKeys(c)
 	byCode := w.keys.byCode
 	w.keys.byCode = false
 	shortcut := func(s keymap.Stroke) bool {
 		return !s.ByCode() && c.Shortcut(s.Mods, s.Key) && !byCode
 	}
 	if len(w.keys.pending) > 0 {
-		for _, s := range km.Completions(w.keys.pending[0]) {
+		for _, s := range active.Completions(w.keys.pending[0]) {
 			if shortcut(s) {
 				w.runChord(append(w.keys.pending, s))
 				return
@@ -40,13 +46,13 @@ func (w *Workspace) shortcuts(c *ui.Context) {
 		}
 		return
 	}
-	for _, s := range km.Prefixes() {
+	for _, s := range active.Prefixes() {
 		if shortcut(s) {
 			w.keys.pending = keymap.Chord{s}
 			return
 		}
 	}
-	for _, b := range w.liveSingles(c) {
+	for _, b := range active.Singles() {
 		if _, ok := keymap.EditorCommand(b.Command); ok {
 			continue
 		}
@@ -60,72 +66,63 @@ func (w *Workspace) shortcuts(c *ui.Context) {
 	}
 }
 
-func (w *Workspace) liveSingles(c *ui.Context) []keymap.Binding {
+func (w *Workspace) activeKeys(c *ui.Context) *keymap.Active {
 	km := w.env.Keys.Current
-	ctx, sig := w.whenContext(c)
+	ctx := w.whenContext(c)
 	cache := &w.keys.cache
-	if cache.keymap == km && cache.sig == sig && cache.singles != nil {
-		return cache.singles
+	if cache.keymap != km || cache.active == nil || !maps.Equal(cache.ctx, ctx) {
+		*cache = activeCache{keymap: km, ctx: ctx, active: km.In(ctx)}
 	}
-	owners := map[keymap.Stroke]int{}
-	var order []keymap.Stroke
-	for i, b := range km.Bindings() {
-		if len(b.Chord) != 1 || !b.When.Eval(ctx) {
-			continue
-		}
-		if _, seen := owners[b.Chord[0]]; !seen {
-			order = append(order, b.Chord[0])
-		}
-		owners[b.Chord[0]] = i
-	}
-	singles := make([]keymap.Binding, 0, len(order))
-	for _, s := range order {
-		singles = append(singles, km.Bindings()[owners[s]])
-	}
-	*cache = singlesCache{keymap: km, sig: sig, singles: singles}
-	return singles
+	return cache.active
 }
 
-func (w *Workspace) whenContext(c *ui.Context) (when.Context, uint32) {
+func (w *Workspace) whenContext(c *ui.Context) when.Context {
 	editorFocus := w.focusedTab != nil && w.focusedTab.Editor != nil
-	textFocus := c != nil && c.FocusTakesText()
+	if c != nil {
+		w.keys.textFocus = c.FocusTakesText()
+	}
+	textFocus := w.keys.textFocus
 	t := w.active.ActiveTab()
-	flags := []struct {
-		key string
-		on  bool
-	}{
-		{"editorTextFocus", editorFocus},
-		{"editorFocus", editorFocus},
-		{"textInputFocus", textFocus},
-		{"inputFocus", textFocus && !editorFocus},
-		{"sideBarFocus", w.focus.side},
-		{"panelFocus", w.focus.panel},
-		{"explorerViewletFocus", w.focus.side && w.tools.side == ExplorerView},
-		{"filesExplorerFocus", w.focus.side && w.tools.side == ExplorerView},
-		{"listFocus", w.focus.side && !textFocus},
-		{"editorIsOpen", t != nil},
-		{"canNavigateBack", w.canNavigate(true)},
-		{"canNavigateForward", w.canNavigate(false)},
-		{"multipleEditorGroups", len(w.layout.Groups()) > 1},
-		{"activeEditorIsPinned", t != nil && t.Pinned},
-		{"inQuickOpen", w.palette.IsOpen() || w.searchOpen()},
-		{"notificationCenterVisible", w.noteCenter},
-	}
 	ctx := maps.Clone(keymap.DefaultContext())
-	var sig uint32
-	for i, f := range flags {
-		ctx[f.key] = f.on
-		if f.on {
-			sig |= 1 << i
-		}
+	for key, on := range map[string]bool{
+		"editorTextFocus":           editorFocus,
+		"editorFocus":               editorFocus,
+		"textInputFocus":            textFocus,
+		"inputFocus":                textFocus && !editorFocus,
+		"sideBarFocus":              w.focus.side,
+		"panelFocus":                w.focus.panel,
+		"explorerViewletFocus":      w.focus.side && w.tools.side == ExplorerView,
+		"filesExplorerFocus":        w.focus.side && w.tools.side == ExplorerView,
+		"listFocus":                 w.focus.side && !textFocus,
+		"editorIsOpen":              t != nil,
+		"canNavigateBack":           w.canNavigate(true),
+		"canNavigateForward":        w.canNavigate(false),
+		"multipleEditorGroups":      len(w.layout.Groups()) > 1,
+		"activeEditorIsPinned":      t != nil && t.Pinned,
+		"inQuickOpen":               w.palette.IsOpen() || w.searchOpen(),
+		"notificationCenterVisible": w.noteCenter,
+		"sideBarVisible":            !w.sidebarHidden,
+	} {
+		ctx[key] = on
 	}
-	return ctx, sig
+	ctx["editorLangId"] = w.languageID(t)
+	return ctx
+}
+
+func (w *Workspace) languageID(t *layout.Tab) string {
+	if t == nil || t.Editor == nil {
+		return ""
+	}
+	lang := t.Editor.Buffer.Language()
+	if lang == nil {
+		return plainTextLanguage
+	}
+	return strings.ReplaceAll(strings.ToLower(lang.Name), " ", "")
 }
 
 func (w *Workspace) runChord(chord keymap.Chord) {
 	w.keys.pending = nil
-	ctx, _ := w.whenContext(nil)
-	b, ok := w.env.Keys.Current.Resolve(chord, ctx)
+	b, ok := w.env.Keys.Current.Resolve(chord, w.whenContext(nil))
 	if !ok {
 		b, ok = w.env.Keys.Current.Lookup(chord)
 	}

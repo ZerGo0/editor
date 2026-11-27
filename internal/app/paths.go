@@ -71,15 +71,23 @@ func canonical(path string) (string, error) {
 }
 
 func (a *App) openFolderDialog(parent *mygo.Window) {
+	a.openDialog(parent, "Open Folder", true)
+}
+
+func (a *App) openFileDialog(parent *mygo.Window) {
+	a.openDialog(parent, "Open File", false)
+}
+
+func (a *App) openDialog(parent *mygo.Window, title string, directory bool) {
 	go func() {
 		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
 			Parent:            parent,
-			Title:             "Open Folder",
-			Directory:         true,
-			CreateDirectories: true,
+			Title:             title,
+			Directory:         directory,
+			CreateDirectories: directory,
 		})
 		if err != nil {
-			log.Printf("open folder: %v", err)
+			log.Printf("%s: %v", strings.ToLower(title), err)
 			return
 		}
 		if len(paths) > 0 {
@@ -88,12 +96,15 @@ func (a *App) openFolderDialog(parent *mygo.Window) {
 	}()
 }
 
-func displayPath(path string) string {
-	home, err := os.UserHomeDir()
-	if err == nil {
-		if r, err := filepath.Rel(home, path); err == nil && filepath.IsLocal(r) {
-			return filepath.Join("~", r)
-		}
+func (a *App) openRecentFolder(from *mygo.Window, root string, replace bool) {
+	source := a.workspaceFor(from)
+	if !a.openPath(root) {
+		return
 	}
-	return path
+	if !replace || source == nil {
+		return
+	}
+	if target := a.projectContaining(root); target != nil && target != source {
+		mygo.RunOnMain(source.win.Close)
+	}
 }

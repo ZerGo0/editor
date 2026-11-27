@@ -93,7 +93,7 @@ func (c *Clause) Eval(ctx Context) bool {
 	if c == nil {
 		return true
 	}
-	return len(c.Unknown(ctx)) == 0 && c.root.eval(ctx)
+	return c.root.eval(ctx)
 }
 
 func Normalize(s string) string {

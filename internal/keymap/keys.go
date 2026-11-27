@@ -10,13 +10,17 @@ import (
 )
 
 const (
-	maxStrokes   = 2
-	strokeSep    = " "
-	modifierSep  = "+"
-	letterCount  = 26
-	digitCount   = 10
-	functionKeys = 12
-	shortcutMods = ui.Ctrl | ui.Alt | ui.Super
+	scanCodeOpen   = "["
+	scanCodeClose  = "]"
+	scanCodeLetter = "key"
+	scanCodeDigit  = "digit"
+	maxStrokes     = 2
+	strokeSep      = " "
+	modifierSep    = "+"
+	letterCount    = 26
+	digitCount     = 10
+	functionKeys   = 12
+	shortcutMods   = ui.Ctrl | ui.Alt | ui.Super
 )
 
 type Stroke struct {
@@ -57,6 +61,20 @@ var modifierAliases = map[string]ui.Modifiers{
 	"option": ui.Alt,
 	"shift":  ui.Shift,
 	"win":    ui.Super,
+}
+
+var scanCodeKeys = map[string]string{
+	"minus":        "-",
+	"equal":        "=",
+	"bracketleft":  "[",
+	"bracketright": "]",
+	"backslash":    "\\",
+	"semicolon":    ";",
+	"quote":        "'",
+	"comma":        ",",
+	"period":       ".",
+	"slash":        "/",
+	"backquote":    "`",
 }
 
 var keyNameAliases = map[string]string{
@@ -159,11 +177,33 @@ func ParseChord(s string) (Chord, error) {
 	return chord, nil
 }
 
+func scanCodeKey(s string) (string, bool) {
+	name, ok := strings.CutPrefix(s, scanCodeOpen)
+	if !ok {
+		return "", false
+	}
+	if name, ok = strings.CutSuffix(name, scanCodeClose); !ok || name == "" {
+		return "", false
+	}
+	if key, ok := scanCodeKeys[name]; ok {
+		return key, true
+	}
+	for _, prefix := range []string{scanCodeLetter, scanCodeDigit} {
+		if key, ok := strings.CutPrefix(name, prefix); ok && len(key) == 1 {
+			return key, true
+		}
+	}
+	return "", false
+}
+
 func parseStroke(s string) (Stroke, error) {
 	parts := strings.Split(strings.ToLower(s), modifierSep)
 	keyName := parts[len(parts)-1]
 	if alias, ok := keyNameAliases[keyName]; ok {
 		keyName = alias
+	}
+	if name, ok := scanCodeKey(keyName); ok {
+		keyName = name
 	}
 	key, isKey := keysByName[keyName]
 	code, isCode := codesByName[keyName]

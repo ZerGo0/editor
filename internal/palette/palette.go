@@ -8,6 +8,12 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+type Action struct {
+	Icon  *ui.SVG
+	Label string
+	Run   func()
+}
+
 type Item struct {
 	ID        string
 	Label     string
@@ -17,6 +23,8 @@ type Item struct {
 	Value     any
 	Icon      *ui.SVG
 	Leading   func(c *ui.Context)
+	Action    *Action
+	Group     string
 }
 
 type Mode struct {
@@ -25,6 +33,7 @@ type Mode struct {
 	Empty       string
 	Search      func(query string, done func([]Item))
 	Accept      func(Item)
+	AcceptAlt   func(Item)
 }
 
 type Palette struct {
@@ -82,13 +91,17 @@ func (p *Palette) Accept() {
 	if !p.open || p.state.Selected < 0 || p.state.Selected >= len(p.items) {
 		return
 	}
-	p.accept(p.items[p.state.Selected])
+	p.accept(p.items[p.state.Selected], false)
 }
 
-func (p *Palette) accept(it Item) {
+func (p *Palette) accept(it Item, alt bool) {
 	m := p.mode
 	p.Close()
-	if m != nil && m.Accept != nil {
+	switch {
+	case m == nil:
+	case alt && m.AcceptAlt != nil:
+		m.AcceptAlt(it)
+	case m.Accept != nil:
 		m.Accept(it)
 	}
 }
@@ -124,14 +137,23 @@ func (p *Palette) View(c *ui.Context) {
 	items := make([]quickinput.Item, len(p.items))
 	for i, it := range p.items {
 		items[i] = quickinput.Item{Label: it.Label, Matches: it.Positions, Description: it.Detail, Icon: it.Icon, Leading: it.Leading, Keys: it.Keys}
+		items[i].Group = it.Group
+		if it.Action != nil {
+			items[i].Action = &quickinput.Action{Icon: it.Action.Icon, Label: it.Action.Label}
+		}
 	}
 	res := quickinput.View(c, label, &p.state, items, o)
 	if p.state.Query != p.searched {
 		c.Invalidate()
 	}
 	switch {
+	case res.Pressed >= 0 && res.Pressed < len(p.items):
+		if a := p.items[res.Pressed].Action; a != nil && a.Run != nil {
+			a.Run()
+		}
+		p.refresh()
 	case res.Accepted >= 0 && res.Accepted < len(p.items):
-		p.accept(p.items[res.Accepted])
+		p.accept(p.items[res.Accepted], res.Alt)
 	case res.Closed:
 		p.Close()
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/workspace"
 	"github.com/ZerGo0/editor/resources"
@@ -75,7 +76,7 @@ func (a *App) welcomeView(c *ui.Context) {
 			name := filepath.Base(root)
 			return list.Item{
 				Label:       name,
-				Description: displayPath(root),
+				Description: fsutil.DisplayPath(root),
 				Icon:        icons.Folder,
 				Tooltip:     "Open " + name,
 				OnClick:     func() { a.openPath(root) },

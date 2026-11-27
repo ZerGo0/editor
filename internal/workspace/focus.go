@@ -67,6 +67,10 @@ func (w *Workspace) focusPart(p part) {
 	}
 }
 
+func (w *Workspace) FocusSideBar() {
+	w.FocusSideView(w.tools.side)
+}
+
 func (w *Workspace) FocusSideView(id string) {
 	w.ShowSideView(id)
 	w.focusPart(partSide)

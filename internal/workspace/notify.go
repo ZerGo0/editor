@@ -38,6 +38,10 @@ func (w *Workspace) setNotice(text string) {
 	w.notify(notices.Notice{Tone: token.ToneInfo, Title: text})
 }
 
+func (w *Workspace) NotifyAction(title, detail, action string, onAction func()) {
+	w.notify(notices.Notice{Tone: token.ToneInfo, Title: title, Detail: detail, Action: action, OnAction: onAction, Sticky: true})
+}
+
 func (w *Workspace) showError(title string, err error) {
 	w.notify(notices.Notice{Tone: token.ToneError, Title: title, Detail: err.Error(), Sticky: true})
 }

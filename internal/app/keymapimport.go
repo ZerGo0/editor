@@ -17,7 +17,8 @@ const (
 	importKeybindingsCommand = "workbench.action.importVSCodeKeybindings"
 	replaceInFilesCommand    = "workbench.action.replaceInFiles"
 	importViewID             = "vscode-keybindings-import"
-	importViewTitle          = "VS Code Keybindings Import"
+	importErrorTitle         = "Cannot import VS Code keybindings"
+	showDetails              = "Show Details"
 )
 
 var errNoVSCodeKeybindings = errors.New("no VS Code keybindings.json was found in Code, Code - Insiders or VSCodium")
@@ -55,10 +56,10 @@ func (a *App) importVSCodeKeybindings(win *mygo.Window) {
 
 func (a *App) showImportError(pw *projectWindow, err error) {
 	if pw != nil {
-		pw.win.Update(func() { pw.ws.ShowError("Cannot import VS Code keybindings", err) })
+		pw.win.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
 		return
 	}
-	go mygo.Dialog.Error("Cannot import VS Code keybindings", err.Error())
+	go mygo.Dialog.Error(importErrorTitle, err.Error())
 }
 
 func (a *App) runImport(src vscodeimport.Source, pw *projectWindow) {
@@ -67,24 +68,13 @@ func (a *App) runImport(src vscodeimport.Source, pw *projectWindow) {
 		known[c.ID] = true
 	}
 	dst := a.keys.Path
-	summary := &vscodeimport.Summary{Loading: true}
-	var start func()
-	start = func() {
-		summary.Loading, summary.Err = true, nil
-		go func() {
-			r, err := vscodeimport.Import(src, dst, func(id string) bool { return known[id] }, time.Now())
-			mygo.RunOnMain(func() { a.importDone(pw, summary, r, err) })
-		}()
-	}
-	summary.Retry = start
-	if pw != nil {
-		summary.OpenKeybindings = pw.ws.OpenKeybindingsJSON
-		pw.win.Update(func() { pw.ws.OpenView(importViewID, importViewTitle, summary.View) })
-	}
-	start()
+	go func() {
+		r, err := vscodeimport.Import(src, dst, func(id string) bool { return known[id] }, time.Now())
+		mygo.RunOnMain(func() { a.importDone(pw, r, err) })
+	}()
 }
 
-func (a *App) importDone(pw *projectWindow, summary *vscodeimport.Summary, r vscodeimport.Report, err error) {
+func (a *App) importDone(pw *projectWindow, r vscodeimport.Report, err error) {
 	if err == nil && r.DispatchFound {
 		if setErr := a.settings.Set(keymap.SettingDispatch, string(r.Dispatch)); setErr != nil {
 			r.DispatchError = setErr
@@ -92,15 +82,20 @@ func (a *App) importDone(pw *projectWindow, summary *vscodeimport.Summary, r vsc
 	}
 	a.keys.Reload()
 	a.settingsChanged()
-	if pw != nil {
-		pw.win.Update(func() { summary.Loading, summary.Report, summary.Err = false, r, err })
-		return
+	switch {
+	case pw != nil && err != nil:
+		pw.win.Update(func() { pw.ws.ShowError(importErrorTitle, err) })
+	case pw != nil:
+		summary := &vscodeimport.Summary{Report: r, OpenKeybindings: pw.ws.OpenKeybindingsJSON}
+		show := func() { pw.ws.OpenView(importViewID, vscodeimport.ViewTitle, summary.View) }
+		pw.win.Update(func() {
+			pw.ws.NotifyAction(r.Headline(), strings.Join(r.Details(), "\n"), showDetails, show)
+		})
+	case err != nil:
+		go mygo.Dialog.Error(importErrorTitle, err.Error())
+	default:
+		go func() {
+			_, _ = mygo.Dialog.Message(mygo.MessageOptions{Type: mygo.MessageInfo, Message: r.Headline(), Detail: strings.Join(r.Details(), "\n")})
+		}()
 	}
-	if err != nil {
-		go mygo.Dialog.Error("Cannot import VS Code keybindings", err.Error())
-		return
-	}
-	go func() {
-		_, _ = mygo.Dialog.Message(mygo.MessageOptions{Type: mygo.MessageInfo, Message: r.Headline(), Detail: strings.Join(r.Details(), "\n")})
-	}()
 }

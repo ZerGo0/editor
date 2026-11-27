@@ -114,3 +114,18 @@ func TestWindowsKeymapCtrlHShowsReplace(t *testing.T) {
 	app.Key(win, "Ctrl+H")
 	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
 }
+
+func TestBindingWithoutWhenRunsWithTheExplorerFocused(t *testing.T) {
+	t.Parallel()
+	userData := t.TempDir()
+	writeFile(t, filepath.Join(userData, "keybindings.json"), "[{\"key\": \"f9\", \"command\": \"workbench.action.findInFiles\"}]\n")
+	root := Project(t, map[string]string{"a.txt": "alpha\n"})
+	app := LaunchWith(t, userData, root)
+	win := app.WaitWindow(filepath.Base(root))
+	app.Idle(win)
+	app.Menu(win, "View", "Explorer")
+	app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt"))
+	app.Key(win, "F9")
+	waitQuickOpen(app, win, findInFilesTitle)
+	waitTab(app, win, "Text", true)
+}

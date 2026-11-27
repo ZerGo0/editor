@@ -35,16 +35,21 @@ type Binding struct {
 type chordKey [maxStrokes]Stroke
 
 type Keymap struct {
+	*Active
 	bindings    []Binding
 	ctx         when.Context
-	owners      map[chordKey]int
-	singles     []Binding
-	prefixes    []Stroke
-	completions map[Stroke][]Stroke
 	byCommand   map[string][]Chord
 	editor      []editor.Binding
 	editorReady bool
 	Errors      []string
+}
+
+type Active struct {
+	bindings    []Binding
+	owners      map[chordKey]int
+	singles     []Binding
+	prefixes    []Stroke
+	completions map[Stroke][]Stroke
 }
 
 func keyOf(c Chord) chordKey {
@@ -121,31 +126,8 @@ func removeDefaults(base *[]Binding, id string, e Entry) error {
 }
 
 func (k *Keymap) index() {
-	k.owners = map[chordKey]int{}
-	for i, b := range k.bindings {
-		if b.When.Eval(k.ctx) {
-			k.owners[keyOf(b.Chord)] = i
-		}
-	}
-	k.completions = map[Stroke][]Stroke{}
+	k.Active = k.In(k.ctx)
 	k.byCommand = map[string][]Chord{}
-	for i, b := range k.bindings {
-		if k.owner(b.Chord) != i {
-			continue
-		}
-		switch len(b.Chord) {
-		case 1:
-			k.singles = append(k.singles, b)
-		default:
-			first, second := b.Chord[0], b.Chord[1]
-			if !slices.Contains(k.prefixes, first) {
-				k.prefixes = append(k.prefixes, first)
-			}
-			if !slices.Contains(k.completions[first], second) {
-				k.completions[first] = append(k.completions[first], second)
-			}
-		}
-	}
 	for i := len(k.bindings) - 1; i >= 0; i-- {
 		if b := k.bindings[i]; k.owner(b.Chord) == i {
 			k.byCommand[b.Command] = append(k.byCommand[b.Command], b.Chord)
@@ -153,8 +135,35 @@ func (k *Keymap) index() {
 	}
 }
 
-func (k *Keymap) owner(c Chord) int {
-	if i, ok := k.owners[keyOf(c)]; ok && len(c) <= maxStrokes {
+func (k *Keymap) In(ctx when.Context) *Active {
+	a := &Active{bindings: k.bindings, owners: map[chordKey]int{}, completions: map[Stroke][]Stroke{}}
+	for i, b := range k.bindings {
+		if b.When.Eval(ctx) {
+			a.owners[keyOf(b.Chord)] = i
+		}
+	}
+	for i, b := range k.bindings {
+		if a.owner(b.Chord) != i {
+			continue
+		}
+		switch len(b.Chord) {
+		case 1:
+			a.singles = append(a.singles, b)
+		default:
+			first, second := b.Chord[0], b.Chord[1]
+			if !slices.Contains(a.prefixes, first) {
+				a.prefixes = append(a.prefixes, first)
+			}
+			if !slices.Contains(a.completions[first], second) {
+				a.completions[first] = append(a.completions[first], second)
+			}
+		}
+	}
+	return a
+}
+
+func (a *Active) owner(c Chord) int {
+	if i, ok := a.owners[keyOf(c)]; ok && len(c) <= maxStrokes {
 		return i
 	}
 	return -1
@@ -168,9 +177,9 @@ func (k *Keymap) For(command string) []Chord {
 	return k.byCommand[CanonicalID(command)]
 }
 
-func (k *Keymap) Lookup(c Chord) (Binding, bool) {
-	if i := k.owner(c); i >= 0 {
-		return k.bindings[i], true
+func (a *Active) Lookup(c Chord) (Binding, bool) {
+	if i := a.owner(c); i >= 0 {
+		return a.bindings[i], true
 	}
 	return Binding{}, false
 }
@@ -184,16 +193,16 @@ func (k *Keymap) Resolve(c Chord, ctx when.Context) (Binding, bool) {
 	return Binding{}, false
 }
 
-func (k *Keymap) Prefixes() []Stroke {
-	return k.prefixes
+func (a *Active) Prefixes() []Stroke {
+	return a.prefixes
 }
 
-func (k *Keymap) Completions(first Stroke) []Stroke {
-	return k.completions[first]
+func (a *Active) Completions(first Stroke) []Stroke {
+	return a.completions[first]
 }
 
-func (k *Keymap) Singles() []Binding {
-	return k.singles
+func (a *Active) Singles() []Binding {
+	return a.singles
 }
 
 func (k *Keymap) EditorBindings() []editor.Binding {
@@ -222,7 +231,7 @@ func (k *Keymap) editorBindings() []editor.Binding {
 		}
 		strokes = append(strokes, s)
 	}
-	for _, b := range k.singles {
+	for _, b := range k.Singles() {
 		if !b.Chord[0].ByCode() {
 			strokes = append(strokes, b.Chord[0])
 		}

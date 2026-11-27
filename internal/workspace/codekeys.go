@@ -19,14 +19,14 @@ func (w *Workspace) observeCodeKey(ev ui.InputEvent) {
 		return
 	}
 	w.keys.byCode = true
-	km := w.env.Keys.Current
+	active := w.activeKeys(nil)
 	switch {
 	case len(w.keys.pending) > 0:
 		w.runChord(append(w.keys.pending, s))
-	case slices.Contains(km.Prefixes(), s):
+	case slices.Contains(active.Prefixes(), s):
 		w.keys.pending = keymap.Chord{s}
 	default:
-		b, ok := km.Lookup(keymap.Chord{s})
+		b, ok := active.Lookup(keymap.Chord{s})
 		if !ok {
 			return
 		}

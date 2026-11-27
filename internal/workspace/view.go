@@ -26,8 +26,11 @@ func (w *Workspace) View(c *ui.Context) {
 	w.syncTitle()
 	w.updateProblems()
 	w.beginDragFrame()
-	w.codeTheme = token.Of(c).CodeTheme()
-	c.Root().ObserveInput(w.observeInput)
+	w.codeTheme = p.CodeTheme()
+	root := c.Root().TabStop(false).FocusRing(false).Role(ui.RoleNone).ObserveInput(w.observeInput)
+	if w.active.ActiveTab() == nil && !root.FocusWithin() {
+		root.Focus()
+	}
 	w.escape(c)
 	w.shortcuts(c)
 	w.focusedTab = nil

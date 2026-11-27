@@ -113,6 +113,13 @@ func DefaultContext() when.Context {
 		"listFocus":                                     false,
 		"inputFocus":                                    false,
 		"terminalFocus":                                 false,
+		"explorerViewletFocus":                          false,
+		"filesExplorerFocus":                            false,
+		"notificationCenterVisible":                     false,
+		"sideBarVisible":                                true,
+		"editorLangId":                                  "",
+		"workbenchState":                                "folder",
+		"emptyWorkspaceSupport":                         true,
 	}
 }
 

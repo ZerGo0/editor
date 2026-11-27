@@ -38,7 +38,15 @@ func (a *App) loadConfig() {
 	a.keys = keymap.Load(filepath.Join(dir, keybindingsFile))
 	a.commands = command.NewRegistry()
 	a.commands.SetRecent(a.store.State.Commands)
-	a.env = &workspace.Env{Settings: a.settings, Keys: a.keys, Commands: a.commands, UserData: dir}
+	a.env = &workspace.Env{
+		Settings:      a.settings,
+		Keys:          a.keys,
+		Commands:      a.commands,
+		UserData:      dir,
+		RecentFolders: func() []string { return a.store.State.Recent },
+		OpenFolder:    a.openRecentFolder,
+		ForgetFolder:  a.removeRecent,
+	}
 	if !a.options.NoBackups {
 		a.env.BackupDir = filepath.Join(dir, dataDir, backupsDir)
 	}

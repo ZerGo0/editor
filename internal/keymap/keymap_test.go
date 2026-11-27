@@ -160,3 +160,36 @@ func TestParseEntries(t *testing.T) {
 		t.Error("ParseEntries accepted an object, want an error")
 	}
 }
+
+func TestActiveFollowsTheContextOutsideTheEditor(t *testing.T) {
+	k := keymap.New(nil, []keymap.Entry{
+		{Key: "f20", Command: "workbench.action.findInFiles"},
+		{Key: "f19", Command: "workbench.action.quickOpen", When: "editorTextFocus"},
+		{Key: "f19", Command: "workbench.action.showCommands", When: "!editorTextFocus && !isInEmbeddedEditor"},
+		{Key: "cmd+k cmd+x", Command: "workbench.action.closeAllEditors", When: "sideBarFocus"},
+	})
+	outside := k.In(when.Context{"editorTextFocus": false, "sideBarFocus": true})
+	inside := k.In(when.Context{"editorTextFocus": true, "sideBarFocus": false})
+	for _, tc := range []struct {
+		name   string
+		active *keymap.Active
+		key    string
+		want   string
+	}{
+		{"unconditional outside", outside, "f20", "workbench.action.findInFiles"},
+		{"unconditional inside", inside, "f20", "workbench.action.findInFiles"},
+		{"negated outside, unknown key is unset", outside, "f19", "workbench.action.showCommands"},
+		{"editor only inside", inside, "f19", "workbench.action.quickOpen"},
+	} {
+		b, ok := tc.active.Lookup(chord(t, tc.key))
+		if !ok || b.Command != tc.want {
+			t.Errorf("%s: %s runs %q, want %q", tc.name, tc.key, b.Command, tc.want)
+		}
+	}
+	if got := outside.Prefixes(); len(got) != 1 || got[0] != chord(t, "cmd+k")[0] {
+		t.Errorf("outside prefixes = %v, want cmd+k", got)
+	}
+	if got := inside.Prefixes(); len(got) != 0 {
+		t.Errorf("inside prefixes = %v, want none", got)
+	}
+}

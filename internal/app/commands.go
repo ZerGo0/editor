@@ -62,17 +62,22 @@ func (a *App) registerCommands() {
 	add("workbench.action.closeWindow", categoryView, "Close Window", func(win *mygo.Window) { a.closeWindow(nil, win) })
 	add("workbench.action.newWindow", categoryFile, "New Window", app(a.showWelcome))
 	add("workbench.action.files.openFolder", categoryFile, "Open Folder...", a.openFolderDialog)
+	add("workbench.action.files.openFile", categoryFile, "Open File...", a.openFileDialog)
+	add("workbench.action.quit", categoryFile, "Quit", app(mygo.App.Quit))
+	add("workbench.action.openRecent", categoryFile, "Open Recent...", ws((*workspace.Workspace).ShowOpenRecent))
 	add("workbench.action.files.newUntitledFile", categoryFile, "New Text File", ws((*workspace.Workspace).NewUntitled))
 	add("explorer.newFile", categoryFile, "New File...", ws((*workspace.Workspace).NewFile))
 	add("explorer.newFolder", categoryFile, "New Folder...", ws((*workspace.Workspace).NewFolder))
 	add("workbench.action.toggleSidebarVisibility", categoryView, "Toggle Primary Side Bar Visibility", ws((*workspace.Workspace).ToggleSidebar))
 	add("workbench.view.explorer", categoryView, "Show Explorer", ws((*workspace.Workspace).FocusExplorer))
+	add("workbench.action.focusSideBar", categoryView, "Focus into Primary Side Bar", ws((*workspace.Workspace).FocusSideBar))
+	add("workbench.action.editor.changeLanguageMode", categoryView, "Change Language Mode", ws((*workspace.Workspace).ChangeLanguage))
 	add("workbench.files.action.showActiveFileInExplorer", categoryExplorer, "Reveal Active File in Explorer View", ws((*workspace.Workspace).RevealInSidebar))
 	add("workbench.action.splitEditorRight", categoryView, "Split Editor Right", ws(func(w *workspace.Workspace) { w.Split(false) }))
 	add("workbench.action.splitEditorDown", categoryView, "Split Editor Down", ws(func(w *workspace.Workspace) { w.Split(true) }))
 	add("workbench.action.nextEditor", categoryView, "Open Next Editor", ws(func(w *workspace.Workspace) { w.CycleTab(1) }))
 	add("workbench.action.previousEditor", categoryView, "Open Previous Editor", ws(func(w *workspace.Workspace) { w.CycleTab(-1) }))
-	for i, name := range []string{"First", "Second", "Third"} {
+	for i, name := range []string{"First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth"} {
 		add("workbench.action.focus"+name+"EditorGroup", categoryView, "Focus "+name+" Editor Group", ws(func(w *workspace.Workspace) { w.FocusGroup(i) }))
 	}
 	add("workbench.action.focusPreviousGroup", categoryView, "Focus Previous Editor Group", ws(func(w *workspace.Workspace) { w.FocusRelativeGroup(-1) }))

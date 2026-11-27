@@ -3,6 +3,7 @@ package app
 import (
 	"path/filepath"
 
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/shellcmd"
 	"github.com/egoist/mygo"
 )
@@ -163,7 +164,7 @@ func (a *App) recentItems() []*mygo.MenuItem {
 	for _, root := range a.store.State.Recent[:min(len(a.store.State.Recent), maxRecentMenuItems)] {
 		items = append(items, &mygo.MenuItem{
 			Label:    filepath.Base(root),
-			Subtitle: displayPath(root),
+			Subtitle: fsutil.DisplayPath(root),
 			Click:    func(*mygo.MenuItem, *mygo.Window) { a.openPath(root) },
 		})
 	}

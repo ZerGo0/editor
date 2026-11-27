@@ -257,3 +257,26 @@ func TestCodeKeyLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestScanCodeKeysParseAsTheirKeys(t *testing.T) {
+	for in, want := range map[string]string{
+		"ctrl+[Period]":       "ctrl+.",
+		"cmd+[KeyK] [Digit1]": "cmd+k 1",
+		"[Backquote]":         "`",
+		"shift+[BracketLeft]": "shift+[",
+	} {
+		c, err := ParseChord(in)
+		if err != nil {
+			t.Errorf("ParseChord(%q) error: %v", in, err)
+			continue
+		}
+		if got := c.String(); got != want {
+			t.Errorf("ParseChord(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for _, in := range []string{"[Nope]", "[Period", "ctrl+[]", "[KeyAB]"} {
+		if _, err := ParseChord(in); err == nil {
+			t.Errorf("ParseChord(%q) succeeded, want an error", in)
+		}
+	}
+}

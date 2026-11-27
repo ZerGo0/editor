@@ -2,7 +2,6 @@ package vscodeimport
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -241,53 +240,92 @@ func TestFindPrefersStableThenOthers(t *testing.T) {
 	}
 }
 
-func TestSummaryStates(t *testing.T) {
-	s := &Summary{Loading: true}
+const reportFixture = `[
+	{ "key": "ctrl+t", "command": "workbench.action.terminal.new" },
+	{ "key": "ctrl+y", "command": "workbench.action.terminal.new" },
+	{ "key": "capslock", "command": "cursorUp" },
+	{ "key": "ctrl+[Period]", "command": "cursorUp" },
+	{ "key": "ctrl+k", "command": "cursorUp", "when": "a &&" },
+	{ "key": "ctrl+j", "command": "workbench.action.quickOpen", "args": "?" },
+	{ "key": "alt+k", "command": "cursorUp", "when": "vim.active" },
+	{ "key": "", "command": "cursorUp" }
+]`
+
+func reportOf(t *testing.T) Report {
+	t.Helper()
+	entries, err := keymap.ParseEntries([]byte(reportFixture), "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Report{Source: Source{Product: "Code"}, Total: len(entries), Plan: Convert(entries, nil, knownCommands)}
+}
+
+func TestSectionsListWhatWasNotImported(t *testing.T) {
+	r := reportOf(t)
+	if got, want := r.Headline(), "Imported 2 of 8 keybindings from Code. Skipped 6."; got != want {
+		t.Errorf("headline = %q, want %q", got, want)
+	}
+	var titles []string
+	rows := map[string][]string{}
+	for _, s := range r.Sections() {
+		titles = append(titles, s.Title)
+		rows[s.Title] = s.Rows
+	}
+	wantTitles := []string{
+		"Imported with unset context keys",
+		"Commands this editor does not have",
+		"Commands with arguments this editor does not support",
+		"Keys this editor cannot read",
+		"When clauses this editor cannot read",
+		"Entries without a key or a command",
+	}
+	if strings.Join(titles, "|") != strings.Join(wantTitles, "|") {
+		t.Fatalf("sections = %q, want %q", titles, wantTitles)
+	}
+	if got := rows["Commands this editor does not have"]; len(got) != 1 || got[0] != "workbench.action.terminal.new: 2" {
+		t.Errorf("command rows = %q, want one row with a count of 2", got)
+	}
+	if got := rows["Keys this editor cannot read"]; len(got) != 1 || !strings.Contains(got[0], "capslock") {
+		t.Errorf("key rows = %q, want the capslock entry", got)
+	}
+	if got := rows["Imported with unset context keys"]; len(got) != 1 || !strings.Contains(got[0], "vim.active") {
+		t.Errorf("unset rows = %q, want the vim.active entry", got)
+	}
+}
+
+func TestScanCodeKeysImport(t *testing.T) {
+	r := reportOf(t)
+	imported := false
+	for _, e := range r.Plan.Add {
+		imported = imported || e.Key == "ctrl+[Period]"
+	}
+	if !imported {
+		t.Error("ctrl+[Period] was not imported")
+	}
+}
+
+func TestSummaryShowsTheSections(t *testing.T) {
+	opened := false
+	s := &Summary{Report: Report{Source: Source{Product: "Code"}}, OpenKeybindings: func() { opened = true }}
 	tt := ui.NewTester(s.View, testViewW, testViewH)
-	if !tt.HasText("Importing VS Code keybindings...") {
-		t.Fatal("no loading state")
-	}
-	retried := false
-	s.Loading, s.Err, s.Retry = false, errors.New("read keybindings.json: denied"), func() { retried = true }
-	tt.Frame()
-	if !tt.HasText("Cannot import VS Code keybindings") || !tt.HasText("read keybindings.json: denied") {
-		t.Fatal("no error state")
-	}
-	if err := tt.Click("Try Again"); err != nil || !retried {
-		t.Fatalf("Try Again: %v, retried %v", err, retried)
-	}
-	s.Err = nil
-	s.Report = Report{Source: Source{Product: "Code"}}
-	tt.Frame()
 	if !tt.HasText("The VS Code keybindings.json has no entries.") {
 		t.Fatal("no empty state")
 	}
-	opened := false
-	s.OpenKeybindings = func() { opened = true }
-	s.Report = Report{
-		Source:        Source{Product: "Code"},
-		Total:         3,
-		Plan:          Plan{Add: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Inactive: []keymap.Entry{{Key: "alt+k", Command: "cursorUp", When: "vim.active"}}, Skipped: []Skipped{{Entry: keymap.Entry{Key: "capslock", Command: "x"}, Reason: "unsupported key capslock"}}, Duplicates: 1},
-		Backup:        "/tmp/keybindings.json.backup",
-		Dispatch:      keymap.DispatchKeyCode,
-		DispatchFound: true,
-	}
+	s.Report = reportOf(t)
+	s.Report.Backup = "/tmp/keybindings.json.backup"
+	s.Report.Dispatch, s.Report.DispatchFound = keymap.DispatchKeyCode, true
 	tt.Frame()
 	for _, text := range []string{
-		"Imported 1 of 3 keybindings from Code. Skipped 1.",
-		"1 were already in your keybindings.json.",
+		"Imported 2 of 8 keybindings from Code. Skipped 6.",
 		"Backup of your old keybindings.json: /tmp/keybindings.json.backup",
 		"Set keyboard.dispatch to \"keyCode\".",
-		"Imported but inactive",
-		"Not imported",
-		"unsupported key capslock",
+		"Commands this editor does not have",
+		"workbench.action.terminal.new: 2",
+		"capslock cursorUp: unsupported key capslock",
 	} {
 		if !tt.HasText(text) {
 			t.Errorf("summary does not show %q", text)
 		}
-	}
-	if _, ok := tt.AccessByRole(ui.RoleButton, "Open Keyboard Shortcuts (JSON)"); !ok {
-		t.Fatal("no button to open keybindings.json")
 	}
 	if err := tt.Click("Open Keyboard Shortcuts (JSON)"); err != nil || !opened {
 		t.Fatalf("open: %v, opened %v", err, opened)

@@ -1,6 +1,7 @@
 package quickinput
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
@@ -14,6 +15,11 @@ const (
 	defaultEmpty = "No matching results"
 )
 
+type Action struct {
+	Icon  *ui.SVG
+	Label string
+}
+
 type Item struct {
 	Label       string
 	Matches     []int
@@ -22,6 +28,7 @@ type Item struct {
 	Leading     func(c *ui.Context)
 	Keys        string
 	Group       string
+	Action      *Action
 }
 
 type State struct {
@@ -39,11 +46,13 @@ type Options struct {
 
 type Result struct {
 	Accepted int
+	Pressed  int
+	Alt      bool
 	Closed   bool
 }
 
 func View(c *ui.Context, label string, s *State, items []Item, o Options) Result {
-	res := Result{Accepted: none}
+	res := Result{Accepted: none, Pressed: none}
 	s.Selected = clamp(s.Selected, len(items))
 	p := token.Of(c)
 	ui.Overlay(c, func() {
@@ -63,6 +72,8 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 				case up:
 					s.move(-1, len(items))
 				case s.Selected == none:
+				case in.Shortcut(ui.Super, ui.KeyEnter):
+					res.Accepted, res.Alt = s.Selected, true
 				case in.Submitted():
 					res.Accepted = s.Selected
 				}
@@ -115,6 +126,10 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 			}
 			if it.Keys != "" {
 				badge.Keys(c, it.Keys)
+			}
+			if it.Action != nil && (selected || row.Hovered() || row.FocusWithin()) &&
+				action.IconButton(c, it.Action.Icon, it.Action.Label, action.IconOptions{ID: it.Action.Label + ":" + it.Label}).Clicked() {
+				res.Pressed = i
 			}
 		})
 		if it.Keys != "" {

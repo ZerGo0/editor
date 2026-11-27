@@ -54,18 +54,30 @@ func TestEval(t *testing.T) {
 	}
 }
 
-func TestUnknownKeysMakeTheClauseFalse(t *testing.T) {
+func TestUnknownKeysAreUndefined(t *testing.T) {
 	ctx := Context{"editorTextFocus": true}
-	for _, in := range []string{"terminalFocus", "!terminalFocus", "editorTextFocus && !terminalFocus", "editorTextFocus || terminalFocus", "neverMatch =~ /doesNotMatch/"} {
-		c, err := Parse(in)
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"terminalFocus", false},
+		{"!terminalFocus", true},
+		{"editorTextFocus && !terminalFocus", true},
+		{"editorTextFocus || terminalFocus", true},
+		{"terminalFocus && editorTextFocus", false},
+		{"debugState == 'running'", false},
+		{"debugState != 'running'", true},
+		{"neverMatch =~ /doesNotMatch/", false},
+	} {
+		c, err := Parse(tt.in)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c.Eval(ctx) {
-			t.Errorf("Eval(%q) = true with an unknown key", in)
+		if got := c.Eval(ctx); got != tt.want {
+			t.Errorf("Eval(%q) = %v, want %v", tt.in, got, tt.want)
 		}
 		if len(c.Unknown(ctx)) == 0 {
-			t.Errorf("Unknown(%q) is empty", in)
+			t.Errorf("Unknown(%q) is empty", tt.in)
 		}
 	}
 }

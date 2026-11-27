@@ -10,8 +10,19 @@ import (
 	"github.com/ZerGo0/editor/internal/keymap/when"
 )
 
+type SkipKind int
+
+const (
+	SkipCommand SkipKind = iota
+	SkipArguments
+	SkipKey
+	SkipWhen
+	SkipIncomplete
+)
+
 type Skipped struct {
 	Entry  keymap.Entry
+	Kind   SkipKind
 	Reason string
 }
 
@@ -36,14 +47,14 @@ func Convert(entries, ours []keymap.Entry, known func(id string) bool) Plan {
 	}
 	ctx := keymap.DefaultContext()
 	for _, e := range entries {
-		clause, reason := check(e, known)
-		if reason != "" {
-			p.Skipped = append(p.Skipped, Skipped{Entry: e, Reason: reason})
+		clause, skip := check(e, known)
+		if skip != nil {
+			p.Skipped = append(p.Skipped, *skip)
 			continue
 		}
 		k, err := keyOf(e)
 		if err != nil {
-			p.Skipped = append(p.Skipped, Skipped{Entry: e, Reason: err.Error()})
+			p.Skipped = append(p.Skipped, Skipped{Entry: e, Kind: SkipArguments, Reason: err.Error()})
 			continue
 		}
 		if seen[k] {
@@ -59,33 +70,36 @@ func Convert(entries, ours []keymap.Entry, known func(id string) bool) Plan {
 	return p
 }
 
-func check(e keymap.Entry, known func(string) bool) (*when.Clause, string) {
+func check(e keymap.Entry, known func(string) bool) (*when.Clause, *Skipped) {
+	skip := func(kind SkipKind, reason string) (*when.Clause, *Skipped) {
+		return nil, &Skipped{Entry: e, Kind: kind, Reason: reason}
+	}
 	id, removal := strings.CutPrefix(e.Command, keymap.RemovePrefix)
 	if id == "" {
-		return nil, "no command"
+		return skip(SkipIncomplete, "no command")
 	}
 	if e.Key == "" && !removal {
-		return nil, "no key"
+		return skip(SkipIncomplete, "no key")
 	}
 	if e.Key != "" {
 		if _, err := keymap.ParseChord(e.Key); err != nil {
-			return nil, "unsupported key " + e.Key
+			return skip(SkipKey, "unsupported key "+e.Key)
 		}
 	}
 	clause, err := when.Parse(e.When)
 	if err != nil {
-		return nil, "unsupported when clause: " + err.Error()
+		return skip(SkipWhen, "unsupported when clause: "+err.Error())
 	}
 	resolved := keymap.CanonicalID(id)
 	if !removal {
 		if resolved, err = keymap.ResolveCommand(id, e.Args); err != nil {
-			return nil, err.Error()
+			return skip(SkipArguments, err.Error())
 		}
 	}
 	if !known(resolved) {
-		return nil, "unsupported command " + id
+		return skip(SkipCommand, "unsupported command "+id)
 	}
-	return clause, ""
+	return clause, nil
 }
 
 func keyOf(e keymap.Entry) (entryKey, error) {

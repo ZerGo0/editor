@@ -126,14 +126,16 @@ var EditorCommands = []EditorCommand{
 }
 
 var EditorAliases = map[string]editor.Command{
-	"cursorWordRight":         editor.MoveWordRight,
-	"cursorWordRightSelect":   editor.SelectWordRight,
-	"cursorLineStart":         editor.MoveLineStart,
-	"cursorLineEnd":           editor.MoveLineEnd,
-	"cursorLineStartSelect":   editor.SelectLineStart,
-	"cursorLineEndSelect":     editor.SelectLineEnd,
-	"removeSecondaryCursors":  editor.Cancel,
-	"editor.action.changeAll": editor.SelectAllMatches,
+	"cursorWordRight":                editor.MoveWordRight,
+	"cursorWordRightSelect":          editor.SelectWordRight,
+	"cursorLineStart":                editor.MoveLineStart,
+	"cursorLineEnd":                  editor.MoveLineEnd,
+	"cursorLineStartSelect":          editor.SelectLineStart,
+	"cursorLineEndSelect":            editor.SelectLineEnd,
+	"removeSecondaryCursors":         editor.Cancel,
+	"editor.action.changeAll":        editor.SelectAllMatches,
+	"editor.action.selectAllMatches": editor.SelectAllMatches,
+	"toggleFindInSelection":          editor.FindInSelection,
 }
 
 var WorkbenchAliases = map[string]string{
@@ -147,4 +149,8 @@ var WorkbenchAliases = map[string]string{
 	"revealFileInOS":                                   "workbench.action.files.revealActiveFileInFinder",
 	"copyFilePath":                                     "workbench.action.files.copyPathOfActiveFile",
 	"copyRelativeFilePath":                             "workbench.action.files.copyRelativePathOfActiveFile",
+	"workbench.action.closeAllGroups":                  "workbench.action.closeAllEditors",
+	"workbench.action.nextEditorInGroup":               "workbench.action.nextEditor",
+	"workbench.action.previousEditorInGroup":           "workbench.action.previousEditor",
+	"workbench.action.closeFolder":                     "workbench.action.closeWindow",
 }
