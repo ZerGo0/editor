@@ -257,6 +257,23 @@ func newSplitBed(t *testing.T) *mouseBed {
 	return b
 }
 
+func TestClosingTheOnlyTabOfAGroupWithItsButtonRendersCleanly(t *testing.T) {
+	for _, tc := range []struct{ closing, want string }{{"b.txt", "c.txt"}, {"c.txt", "b.txt"}} {
+		t.Run(tc.closing, func(t *testing.T) {
+			b := newSplitBed(t)
+			if err := b.tt.Click("Close " + tc.closing); err != nil {
+				t.Fatal(err)
+			}
+			b.tt.Frame()
+			b.w.runPendingUpdates()
+			b.tt.Frame()
+			if got := strings.Join(b.groupTabs(), "|"); got != tc.want {
+				t.Fatalf("groups after the close: %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDroppingTheOnlyTabOfAGroupOnAnotherGroupRendersCleanly(t *testing.T) {
 	tests := []struct {
 		name       string

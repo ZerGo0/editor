@@ -95,8 +95,9 @@ func (w *Workspace) node(c *ui.Context, n *layout.Node) {
 		w.group(c, n.Group)
 		return
 	}
-	first := func() { w.node(c, n.First) }
-	second := func() { w.node(c, n.Second) }
+	firstNode, secondNode := n.First, n.Second
+	first := func() { w.node(c, firstNode) }
+	second := func() { w.node(c, secondNode) }
 	if n.Vertical {
 		ui.SplitVerticalPercent(c, &n.Percent, first, second).SplitReset(halfPercent).Fill()
 		return
