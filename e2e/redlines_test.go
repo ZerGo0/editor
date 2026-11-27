@@ -25,7 +25,8 @@ const (
 	stateDisabled    = "disabled"
 	stateOffscreen   = "offscreen"
 	pointerMoveEvent = "pointerMove"
-	tooltipShowWait  = 700 * time.Millisecond
+	tooltipRole      = "tooltip"
+	tooltipShowWait  = 5 * time.Second
 	captureTries     = 5
 )
 
@@ -84,11 +85,16 @@ func (q *QAApp) stableCapture() (image.Image, *qa.Tree, error) {
 	return nil, nil, fmt.Errorf("the accessibility tree changed during each of %d captures", captureTries)
 }
 
-func (q *QAApp) hover(n qa.Node) {
+func (q *QAApp) hover(n qa.Node, wantTooltip bool) error {
 	q.Send(map[string]any{"type": pointerMoveEvent, "x": n.Bounds.CenterX(), "y": n.Bounds.CenterY()})
 	q.Settle()
-	time.Sleep(tooltipShowWait)
+	if wantTooltip {
+		if _, err := q.TryWait(func(t qa.Node) bool { return t.Role == tooltipRole }, tooltipShowWait); err != nil {
+			return fmt.Errorf("tooltip after hover on %q: %w", n.Label, err)
+		}
+	}
 	q.Settle()
+	return nil
 }
 
 var redlineAllowMu sync.Mutex
@@ -111,6 +117,8 @@ func checkViewRedlines(t *testing.T, q *QAApp, allow *redline.Allowlist, view, s
 			len(bad), res.Name, redlineAllowFile, res.Describe(bad))
 	}
 }
+
+var redlineTooltipViews = map[string]bool{"tabs": true, "search-text": true}
 
 var redlineHoverTargets = map[string]func(qa.Node) bool{
 	"tabs":        func(n qa.Node) bool { return n.Role == "tab" },
@@ -150,7 +158,10 @@ func TestViewRedlines(t *testing.T) {
 					return
 				}
 				if n, found := q.Snapshot().Find(target); found {
-					q.hover(n)
+					if err := q.hover(n, redlineTooltipViews[view]); err != nil {
+						t.Errorf("%s: %v", view, err)
+						return
+					}
 					checkViewRedlines(t, q, allow, view, stateHover, theme)
 					q.Send(map[string]any{"type": pointerMoveEvent, "x": 0, "y": 0})
 					q.Settle()

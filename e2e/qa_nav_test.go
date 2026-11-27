@@ -27,6 +27,8 @@ const (
 	scrollToTop      = 1000000
 )
 
+const graphLoadingLabel = "Loading commits"
+
 func (q *QAApp) TryWait(match func(qa.Node) bool, timeout time.Duration) (qa.Node, error) {
 	deadline := time.Now().Add(timeout)
 	for {
@@ -38,6 +40,17 @@ func (q *QAApp) TryWait(match func(qa.Node) bool, timeout time.Duration) (qa.Nod
 		}
 		time.Sleep(navPoll)
 	}
+}
+
+func (q *QAApp) TryWaitGone(match func(qa.Node) bool, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for q.Has(match) {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("still present after %s", timeout)
+		}
+		time.Sleep(navPoll)
+	}
+	return nil
 }
 
 func (q *QAApp) TryMenu(path ...string) error {
@@ -194,7 +207,10 @@ func demoViewSteps() []viewStep {
 			_, err := q.TryWait(func(n qa.Node) bool {
 				return strings.Contains(n.Label, "feat(") || strings.Contains(n.Label, "Merge branch")
 			}, navTimeout)
-			return err
+			if err != nil {
+				return err
+			}
+			return q.TryWaitGone(hasLabel(graphLoadingLabel), navTimeout)
 		}},
 		{"github", func(q *QAApp, d DemoProject) error {
 			return q.Command("Show GitHub", viewMenu, "GitHub")
