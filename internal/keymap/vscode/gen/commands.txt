@@ -48,6 +48,7 @@ workbench.action.openFolderSettings
 workbench.action.openFolderSettingsFile
 workbench.action.openGlobalKeybindings
 workbench.action.openGlobalKeybindingsFile
+workbench.action.openRecent
 workbench.action.openSettings
 workbench.action.openSettingsJson
 workbench.action.pinEditor
