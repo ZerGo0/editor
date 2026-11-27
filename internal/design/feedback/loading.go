@@ -25,12 +25,14 @@ func Loading(c *ui.Context, text string) ui.Element {
 	p := token.Of(c)
 	rowH := token.RowHeight.Px()
 	box := ui.Box(c).FillWidth().Height(skeletonRows * rowH).MinHeight(rowH).Role(ui.RoleProgress).Busy(true).Label(text)
-	if !pastDelay(c, box) {
-		return box
-	}
+	since := *loadingSince(c, box)
 	base := p.Text.Primary
 	pad, dot, gap, bar := token.PadRow.Px(), token.IconSizeSmall.Px(), token.GapRowIcon.Px(), token.Space8.Px()
 	return box.Draw(func(pt *ui.Painter, r ui.Rect) {
+		if wait := token.SpinnerDelay - pt.Now().Sub(since); wait > 0 {
+			pt.After(wait)
+			return
+		}
 		pt.After(skeletonStep)
 		now := float64(pt.Now().UnixMilli()%skeletonPulse.Milliseconds()) / float64(skeletonPulse.Milliseconds())
 		for i := range skeletonRows {
@@ -60,9 +62,12 @@ func LoadingPane(c *ui.Context, text string) ui.Element {
 	})
 }
 
+func loadingSince(c *ui.Context, e ui.Element) *time.Time {
+	return ui.Local(e, "loading-since", c.Now)
+}
+
 func pastDelay(c *ui.Context, e ui.Element) bool {
-	since := ui.Local(e, "loading-since", c.Now)
-	if wait := token.SpinnerDelay - c.Now().Sub(*since); wait > 0 {
+	if wait := token.SpinnerDelay - c.Now().Sub(*loadingSince(c, e)); wait > 0 {
 		c.After(wait)
 		return false
 	}
