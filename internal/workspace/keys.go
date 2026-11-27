@@ -13,12 +13,13 @@ import (
 const plainTextLanguage = "plaintext"
 
 type keyState struct {
-	pending     keymap.Chord
-	code        codeKey
-	swallowText bool
-	textFocus   bool
-	rootFocus   bool
-	cache       activeCache
+	pending        keymap.Chord
+	code           codeKey
+	swallowText    bool
+	dropEditorText bool
+	textFocus      bool
+	rootFocus      bool
+	cache          activeCache
 }
 
 type activeCache struct {
@@ -132,8 +133,8 @@ func (w *Workspace) runChord(chord keymap.Chord) {
 
 func (w *Workspace) editorInput(ev ui.InputEvent) bool {
 	switch {
-	case ev.Kind == ui.InputText && w.keys.swallowText:
-		w.keys.swallowText = false
+	case ev.Kind == ui.InputText && (w.keys.swallowText || w.keys.dropEditorText):
+		w.keys.swallowText, w.keys.dropEditorText = false, false
 		return true
 	case ev.Kind != ui.InputKeyDown || len(w.keys.pending) == 0 || ev.Key == ui.KeyUnknown:
 		return false

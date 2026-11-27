@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/command"
@@ -359,5 +360,51 @@ func TestCodeKeyBoundToAnEditorCommandRuns(t *testing.T) {
 	pressCode(tt, ui.CodeF13)
 	if ran[editorCommand] != 1 {
 		t.Fatalf("F13 bound to %s ran %d times, want 1", editorCommand, ran[editorCommand])
+	}
+}
+
+func TestBoundKeyRunsOrTypesButNeverBoth(t *testing.T) {
+	w, tt, ran := codeKeyHarness(t, []string{logicalCommand}, []keymap.Entry{{Key: "alt+j", Command: logicalCommand}})
+	tab, _ := openTab(t, w, filepath.Join(w.Root, "a.go"))
+	for _, name := range []string{"search everywhere", "go to line", "recent files", "command palette", "find widget"} {
+		for _, kc := range keyContexts() {
+			if kc.name != name {
+				continue
+			}
+			tt.Key(0, ui.KeyEscape)
+			w.closeSearchPopups()
+			w.palette.Close()
+			kc.open(w, tt)
+			tt.Frame()
+			tt.Frame()
+			before := ran[logicalCommand]
+			start, _ := focusedText(tt)
+			tt.TypeKey(ui.Alt, ui.KeyJ, "∆")
+			tt.Frame()
+			w.runPendingUpdates()
+			text, _ := focusedText(tt)
+			typed, runs := text == start+"∆", ran[logicalCommand]-before
+			if typed == (runs == 1) || runs > 1 {
+				t.Errorf("%s: Alt+J typed %v (field %q) and ran %d times; want one of them", name, typed, text, runs)
+			}
+		}
+	}
+	tt.Key(0, ui.KeyEscape)
+	w.closeSearchPopups()
+	w.palette.Close()
+	tt.ClickAt(editorX, editorY)
+	tt.Frame()
+	tt.Frame()
+	before, ranBefore := tab.Editor.Buffer.String(), ran[logicalCommand]
+	tt.TypeKey(ui.Alt, ui.KeyJ, "∆")
+	tt.Frame()
+	w.runPendingUpdates()
+	if got := tab.Editor.Buffer.String(); got != before || ran[logicalCommand] != ranBefore+1 {
+		t.Errorf("the editor typed the bound Alt+J (ran %d): %q", ran[logicalCommand]-ranBefore, got)
+	}
+	tt.TypeKey(ui.Alt, ui.KeyL, "¬")
+	tt.Frame()
+	if got := tab.Editor.Buffer.String(); !strings.Contains(got, "¬") {
+		t.Errorf("an unbound Alt+L must still type its character, got %q", got)
 	}
 }

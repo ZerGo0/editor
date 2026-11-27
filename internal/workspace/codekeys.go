@@ -47,7 +47,7 @@ func (w *Workspace) observeScope(scope keyScope, ev ui.InputEvent) {
 func (w *Workspace) observeKey(ev ui.InputEvent) {
 	switch ev.Kind {
 	case ui.InputKeyUp:
-		w.keys.swallowText = false
+		w.keys.swallowText, w.keys.dropEditorText = false, false
 	case ui.InputText:
 		if w.keys.swallowText {
 			field.Swallow(ev.Text)
@@ -62,6 +62,7 @@ func (w *Workspace) recordKey(ev ui.InputEvent) {
 	w.keys.code = codeKey{}
 	s := keymap.StrokeFor(ev)
 	if !s.ByCode() {
+		w.keys.dropEditorText = ev.Mods&noTextMods == 0 && w.takesKey(s)
 		return
 	}
 	w.keys.code = codeKey{stroke: s, typesText: ev.Mods&noTextMods == 0 && w.takesKey(s)}
