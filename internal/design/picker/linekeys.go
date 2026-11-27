@@ -3,6 +3,7 @@ package picker
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -11,18 +12,17 @@ const lineBreak = "\n"
 type lineKeysID struct{}
 
 type lineKeyState struct {
-	pending             Keys
-	newline             bool
-	firstLine, lastLine bool
+	pending                    Keys
+	newline                    bool
+	upToResults, downToResults bool
 }
 
 func lineKeys(in ui.Element, query string, k *Keys) {
 	st := *ui.Local(in, lineKeysID{}, func() *lineKeyState { return &lineKeyState{} })
-	runes := []rune(query)
-	_, caret := in.TextAnchorCaret()
-	caret = min(max(caret, 0), len(runes))
-	st.firstLine = !strings.Contains(string(runes[:caret]), lineBreak)
-	st.lastLine = !strings.Contains(string(runes[caret:]), lineBreak)
+	start, end := in.TextSelection()
+	lines := strings.Contains(query, lineBreak) || in.Bounds().H > token.ControlHeight.Px()
+	st.upToResults = !lines || start <= 0
+	st.downToResults = !lines || end >= len([]rune(query))
 	in.OnTextKey(st.take)
 	got, newline := st.pending, st.newline
 	st.pending, st.newline = Keys{}, false
@@ -43,9 +43,9 @@ func (st *lineKeyState) take(k ui.TextKey) bool {
 		p.Side = true
 	case k.Key == ui.KeyEnter && k.Mods == ui.Ctrl:
 		st.newline = true
-	case k.Key == ui.KeyUp && k.Mods == 0 && st.firstLine:
+	case k.Key == ui.KeyUp && k.Mods == 0 && st.upToResults:
 		p.Up = true
-	case k.Key == ui.KeyDown && k.Mods == 0 && st.lastLine:
+	case k.Key == ui.KeyDown && k.Mods == 0 && st.downToResults:
 		p.Down = true
 	case k.Key == ui.KeyPageUp && k.Mods == 0:
 		p.PageUp = true

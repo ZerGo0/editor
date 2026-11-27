@@ -7,6 +7,8 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+const wrapWords = 60
+
 func TestTextQueryTakesSeveralLines(t *testing.T) {
 	f := newFixture(t, map[string]string{"a.txt": "x alpha\nbeta y\n", "b.txt": "alpha\n"})
 	f.dialog.Open(TabText, "")
@@ -22,21 +24,40 @@ func TestTextQueryTakesSeveralLines(t *testing.T) {
 	}
 }
 
-func TestTextQueryArrowsLeaveTheResultsForInnerLines(t *testing.T) {
-	f := newFixture(t, map[string]string{"a.txt": "alpha\nbeta\n", "b.txt": "alpha\nbeta\n"})
-	f.dialog.Open(TabText, "alpha\nbeta")
+func TestTextQueryArrowsMoveTheCaretUntilTheEdgeLikeVSCode(t *testing.T) {
+	long := strings.TrimSpace(strings.Repeat("word ", wrapWords))
+	for name, query := range map[string]string{"two lines": "alpha\nbeta", "wrapped line": long} {
+		f := newFixture(t, map[string]string{"a.txt": query + "\n", "b.txt": query + "\n"})
+		f.dialog.Open(TabText, query)
+		f.settle()
+		start := f.dialog.results.Selected
+		f.key(ui.Cmd, ui.KeyUp)
+		f.key(0, ui.KeyDown)
+		if f.dialog.results.Selected != start {
+			t.Fatalf("%s: Down with the caret at the start moved the results from %d to %d", name, start, f.dialog.results.Selected)
+		}
+		f.key(ui.Cmd, ui.KeyDown)
+		f.key(0, ui.KeyUp)
+		if f.dialog.results.Selected != start {
+			t.Fatalf("%s: Up with the caret at the end moved the results from %d to %d", name, start, f.dialog.results.Selected)
+		}
+		f.key(ui.Cmd, ui.KeyDown)
+		f.key(0, ui.KeyDown)
+		if f.dialog.results.Selected == start {
+			t.Fatalf("%s: Down with the caret at the end did not move the results from %d", name, start)
+		}
+	}
+}
+
+func TestShortTextQueryArrowsMoveTheResults(t *testing.T) {
+	f := newFixture(t, map[string]string{"a.txt": "alpha\n", "b.txt": "alpha\n"})
+	f.dialog.Open(TabText, "alpha")
 	f.settle()
 	start := f.dialog.results.Selected
-	f.key(0, ui.KeyEnd)
-	f.key(ui.Cmd, ui.KeyDown)
-	f.key(0, ui.KeyUp)
-	if f.dialog.results.Selected != start {
-		t.Fatalf("Up on the last line of a two-line query moved the results from %d to %d", start, f.dialog.results.Selected)
-	}
-	f.key(0, ui.KeyDown)
+	f.key(ui.Cmd, ui.KeyUp)
 	f.key(0, ui.KeyDown)
 	if f.dialog.results.Selected == start {
-		t.Fatalf("Down on the last line did not move the results from %d", start)
+		t.Fatalf("Down in a one-line query did not move the results from %d", start)
 	}
 }
 
