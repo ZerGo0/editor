@@ -22,6 +22,8 @@ func openRecentHarness(t *testing.T) (*Workspace, *ui.Tester, *[]string, *[]open
 	folders := []string{filepath.Join(parent, "current"), filepath.Join(parent, "alpha"), filepath.Join(parent, "beta")}
 	var opened []openedFolder
 	env.RecentFolders = func() []string { return folders }
+	open := []string{folders[0], folders[2]}
+	env.OpenFolders = func() []string { return open }
 	env.OpenFolder = func(_ *mygo.Window, root string, replace bool) { opened = append(opened, openedFolder{root, replace}) }
 	env.ForgetFolder = func(root string) { folders = slices.DeleteFunc(folders, func(f string) bool { return f == root }) }
 	w := newTestWorkspace(t, folders[0], env, session.Project{})
@@ -32,18 +34,24 @@ func openRecentHarness(t *testing.T) (*Workspace, *ui.Tester, *[]string, *[]open
 	return w, tt, &folders, &opened
 }
 
-func TestOpenRecentListsFoldersThenFilesWithoutTheCurrentFolder(t *testing.T) {
+func TestOpenRecentListsTheCurrentFolderLikeVSCode(t *testing.T) {
 	w, _, _, _ := openRecentHarness(t)
 	var labels []string
 	for _, it := range w.recentEntries() {
-		labels = append(labels, it.Group+":"+it.Label)
+		labels = append(labels, it.Group+":"+it.Label+":"+it.Action.Label)
 	}
-	if want := []string{"folders:alpha", "folders:beta", "files:notes.txt"}; !slices.Equal(labels, want) {
+	want := []string{
+		"folders:current:" + openedHereLabel,
+		"folders:alpha:Remove alpha from Recently Opened",
+		"folders:beta:" + openedElsewhereLabel,
+		"files:notes.txt:Remove notes.txt from Recently Opened",
+	}
+	if !slices.Equal(labels, want) {
 		t.Fatalf("entries = %v, want %v", labels, want)
 	}
 }
 
-func TestOpenRecentEnterReplacesAndCmdEnterOpensANewWindow(t *testing.T) {
+func TestOpenRecentStartsOnTheEntryAfterTheCurrentFolder(t *testing.T) {
 	w, tt, _, opened := openRecentHarness(t)
 	alpha := filepath.Join(filepath.Dir(w.Root), "alpha")
 	w.ShowOpenRecent()

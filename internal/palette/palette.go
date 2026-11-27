@@ -33,6 +33,7 @@ type Mode struct {
 	Label       string
 	Placeholder string
 	Empty       string
+	Selected    int
 	Search      func(query string, done func([]Item))
 	Accept      func(Item)
 	AcceptAlt   func(Item)
@@ -68,6 +69,9 @@ func (p *Palette) Show(m Mode) {
 	p.open, p.mode = true, &m
 	p.state.Reset("")
 	p.refresh()
+	if m.Selected > 0 && m.Selected < len(p.items) {
+		p.state.Selected = m.Selected
+	}
 }
 
 func (p *Palette) IsOpen() bool {

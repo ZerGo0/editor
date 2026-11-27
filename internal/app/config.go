@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"log"
+	"maps"
 	"path/filepath"
+	"slices"
 
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/git"
@@ -44,6 +46,7 @@ func (a *App) loadConfig() {
 		Commands:      a.commands,
 		UserData:      dir,
 		RecentFolders: func() []string { return a.store.State.Recent },
+		OpenFolders:   func() []string { return slices.Collect(maps.Keys(a.projects)) },
 		OpenFolder:    a.openRecentFolder,
 		ForgetFolder:  a.removeRecent,
 	}

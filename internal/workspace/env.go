@@ -16,6 +16,7 @@ type Env struct {
 	BackupDir     string
 	History       *history.Store
 	RecentFolders func() []string
+	OpenFolders   func() []string
 	OpenFolder    func(from *mygo.Window, root string, replace bool)
 	ForgetFolder  func(root string)
 }
