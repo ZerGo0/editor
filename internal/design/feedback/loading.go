@@ -7,7 +7,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const captionTrim = ".… "
+const (
+	captionTrim     = ".… "
+	loadingSinceKey = "loading-since"
+)
 
 func LoadingPane(c *ui.Context, text string) ui.Element {
 	p := token.Of(c)
@@ -22,10 +25,17 @@ func LoadingPane(c *ui.Context, text string) ui.Element {
 }
 
 func pastDelay(c *ui.Context, e ui.Element) bool {
-	since := ui.Local(e, "loading-since", c.Now)
-	if wait := token.SpinnerDelay - c.Now().Sub(*since); wait > 0 {
-		c.After(wait)
-		return false
+	since := *ui.Local(e, loadingSinceKey, c.Now)
+	if c.Now().Sub(since) >= token.SpinnerDelay {
+		return true
 	}
-	return true
+	svc := c.Services()
+	e.Draw(func(pt *ui.Painter, _ ui.Rect) {
+		if wait := token.SpinnerDelay - pt.Now().Sub(since); wait > 0 {
+			pt.After(wait)
+			return
+		}
+		svc.Invalidate()
+	})
+	return false
 }

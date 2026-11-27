@@ -19,9 +19,14 @@ var placeholderWords = []int{7, 4, 9, 3, 6, 11, 5, 8, 2, 6, 10, 4}
 func Skeleton(c *ui.Context, label string, body func()) ui.Element {
 	sk := token.Of(c).Skeleton()
 	wrap := ui.Column(c).FillWidth().MinHeight(0).Clip().Role(ui.RoleProgress).Busy(true).Label(label)
+	shown := pastDelay(c, wrap)
 	wrap.Children(func() {
-		ui.Themed(c.Key(skeletonKey), sk.Theme()).Background(ui.Transparent).FillWidth().Font(token.FontSkeleton).
-			IgnoreInput(true).AccessHidden(true).Children(body)
+		inner := ui.Themed(c.Key(skeletonKey), sk.Theme()).Background(ui.Transparent).FillWidth().Font(token.FontSkeleton).
+			IgnoreInput(true).AccessHidden(true)
+		if !shown {
+			inner.Invisible()
+		}
+		inner.Children(body)
 	})
 	return wrap
 }
