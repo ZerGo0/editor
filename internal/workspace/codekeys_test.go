@@ -363,8 +363,12 @@ func TestCodeKeyBoundToAnEditorCommandRuns(t *testing.T) {
 	}
 }
 
-func TestBoundKeyRunsOrTypesButNeverBoth(t *testing.T) {
-	w, tt, ran := codeKeyHarness(t, []string{logicalCommand}, []keymap.Entry{{Key: "alt+j", Command: logicalCommand}})
+func TestBoundTypingKeyRunsInsteadOfTyping(t *testing.T) {
+	entries := []keymap.Entry{
+		{Key: "alt+j", Command: logicalCommand},
+		{Key: "shift+alt+k", Command: codeCommand, When: "!inputFocus"},
+	}
+	w, tt, ran := codeKeyHarness(t, []string{logicalCommand, codeCommand}, entries)
 	tab, _ := openTab(t, w, filepath.Join(w.Root, "a.go"))
 	for _, name := range []string{"search everywhere", "go to line", "recent files", "command palette", "find widget"} {
 		for _, kc := range keyContexts() {
@@ -382,10 +386,17 @@ func TestBoundKeyRunsOrTypesButNeverBoth(t *testing.T) {
 			tt.TypeKey(ui.Alt, ui.KeyJ, "∆")
 			tt.Frame()
 			w.runPendingUpdates()
-			text, _ := focusedText(tt)
-			typed, runs := text == start+"∆", ran[logicalCommand]-before
-			if typed == (runs == 1) || runs > 1 {
-				t.Errorf("%s: Alt+J typed %v (field %q) and ran %d times; want one of them", name, typed, text, runs)
+			if text, _ := focusedText(tt); text != start || ran[logicalCommand] != before+1 {
+				t.Errorf("%s: the bound Alt+J left the field at %q and ran %d times; want no text and 1 run", name, text, ran[logicalCommand]-before)
+			}
+			if name == "find widget" {
+				continue
+			}
+			tt.TypeKey(ui.Shift|ui.Alt, ui.KeyK, "Ω")
+			tt.Frame()
+			w.runPendingUpdates()
+			if text, _ := focusedText(tt); text != start+"Ω" || ran[codeCommand] != 0 {
+				t.Errorf("%s: Shift+Alt+K is bound only outside inputs; field %q, ran %d", name, text, ran[codeCommand])
 			}
 		}
 	}

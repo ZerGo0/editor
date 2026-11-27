@@ -22,11 +22,24 @@ const (
 type codeKey struct {
 	stroke    keymap.Stroke
 	scope     keyScope
+	manual    bool
 	taken     bool
 	typesText bool
 }
 
-func (k codeKey) active() bool { return k.stroke.ByCode() }
+var characterKeys = map[ui.Key]bool{
+	ui.KeySpace: true, ui.KeyMinus: true, ui.KeyEqual: true, ui.KeyComma: true, ui.KeyPeriod: true, ui.KeySlash: true,
+	ui.KeySemicolon: true, ui.KeyQuote: true, ui.KeyBracketLeft: true, ui.KeyBracketRight: true, ui.KeyBackslash: true, ui.KeyBackquote: true,
+}
+
+func (k codeKey) active() bool { return k.manual }
+
+func typesCharacter(s keymap.Stroke) bool {
+	if s.Mods&^(ui.Shift|ui.Alt) != 0 {
+		return false
+	}
+	return characterKeys[s.Key] || s.Key >= ui.Key0 && s.Key <= ui.Key9 || s.Key >= ui.KeyA && s.Key <= ui.KeyZ
+}
 
 func (w *Workspace) modalKeys() focus.Keys {
 	return focus.Keys{
@@ -47,7 +60,7 @@ func (w *Workspace) observeScope(scope keyScope, ev ui.InputEvent) {
 func (w *Workspace) observeKey(ev ui.InputEvent) {
 	switch ev.Kind {
 	case ui.InputKeyUp:
-		w.keys.swallowText, w.keys.dropEditorText = false, false
+		w.keys.swallowText = false
 	case ui.InputText:
 		if w.keys.swallowText {
 			field.Swallow(ev.Text)
@@ -61,11 +74,11 @@ func (w *Workspace) recordKey(ev ui.InputEvent) {
 	w.keys.swallowText = false
 	w.keys.code = codeKey{}
 	s := keymap.StrokeFor(ev)
-	if !s.ByCode() {
-		w.keys.dropEditorText = ev.Mods&noTextMods == 0 && w.takesKey(s)
+	typesText := ev.Mods&noTextMods == 0 && w.takesKey(s)
+	if !s.ByCode() && !(typesText && typesCharacter(s)) {
 		return
 	}
-	w.keys.code = codeKey{stroke: s, typesText: ev.Mods&noTextMods == 0 && w.takesKey(s)}
+	w.keys.code = codeKey{stroke: s, manual: true, typesText: typesText}
 	w.keys.swallowText = w.keys.code.typesText && w.keys.rootFocus
 }
 
@@ -83,10 +96,11 @@ func (w *Workspace) takesKey(s keymap.Stroke) bool {
 
 func (w *Workspace) pressed(c *ui.Context, call keyScope, s keymap.Stroke) bool {
 	code := &w.keys.code
-	if !s.ByCode() {
-		return c.Shortcut(s.Mods, s.Key) && !code.active()
+	fired := !s.ByCode() && c.Shortcut(s.Mods, s.Key)
+	if !code.active() || code.stroke != s {
+		return fired && !code.active()
 	}
-	if code.taken || code.stroke != s || !w.codeReaches(call) {
+	if code.taken || !w.codeReaches(call) {
 		return false
 	}
 	code.taken = true
