@@ -7,26 +7,11 @@ import (
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/largefile"
 	"github.com/ZerGo0/editor/internal/layout"
-	"github.com/ZerGo0/editor/internal/workspace/filetree"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
 const loadingLabel = "Loading"
-
-type dropZone struct {
-	key              string
-	vertical, before bool
-	center           bool
-}
-
-var (
-	leftZone   = dropZone{key: "drop-left", before: true}
-	rightZone  = dropZone{key: "drop-right"}
-	topZone    = dropZone{key: "drop-top", vertical: true, before: true}
-	bottomZone = dropZone{key: "drop-bottom", vertical: true}
-	centerZone = dropZone{key: "drop-center", center: true}
-)
 
 func (w *Workspace) group(c *ui.Context, g *layout.Group) {
 	ui.Column(c.Key(g.ID)).Fill().MinWidth(0).Children(func() {
@@ -42,50 +27,9 @@ func (w *Workspace) group(c *ui.Context, g *layout.Group) {
 			} else {
 				w.content(c, g, tab)
 			}
-			if w.drag.shown {
-				w.dropZones(c, g)
-			} else if dragging(area) {
-				dropHighlight(c)
-			}
+			w.areaDrop(c, area, g)
 		})
-		w.dropTarget(area, g, len(g.Tabs))
 	})
-}
-
-func (w *Workspace) dropZones(c *ui.Context, g *layout.Group) {
-	ui.Row(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Children(func() {
-		w.dropZone(c, g, leftZone)
-		ui.Column(c).Grow(2).Basis(0).FillHeight().Children(func() {
-			w.dropZone(c, g, topZone)
-			w.dropZone(c, g, centerZone)
-			w.dropZone(c, g, bottomZone)
-		})
-		w.dropZone(c, g, rightZone)
-	})
-}
-
-func (w *Workspace) dropZone(c *ui.Context, g *layout.Group, z dropZone) {
-	el := ui.Box(c.Key(z.key)).Grow(1).Basis(0).Fill()
-	if z.center {
-		el.Grow(2)
-	}
-	switch v := droppedValue(el).(type) {
-	case tabDrag:
-		if z.center {
-			w.moveTab(v, g, len(g.Tabs))
-		} else {
-			w.splitWith(v, g, z.vertical, z.before)
-		}
-	case filetree.Paths:
-		w.openDropped(g, v)
-	}
-	if dragging(el) {
-		el.Children(func() { dropHighlight(c) })
-	}
-}
-
-func dropHighlight(c *ui.Context) {
-	ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Background(token.Of(c).List.Drop).PassThrough()
 }
 
 func (w *Workspace) content(c *ui.Context, g *layout.Group, tab *layout.Tab) {

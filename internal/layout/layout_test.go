@@ -336,3 +336,84 @@ func TestMoveAcrossPinnedBoundary(t *testing.T) {
 		t.Fatal("insert into an empty group")
 	}
 }
+
+func TestInsertAfterActive(t *testing.T) {
+	g := groupWith(1, "a", "b", "c")
+	g.Insert(&Tab{ID: 9, Path: "x"}, AfterActive)
+	if !slices.Equal(paths(g), []string{"a", "b", "x", "c"}) || g.ActiveTab().Path != "b" {
+		t.Fatalf("paths %v active %d", paths(g), g.Active)
+	}
+}
+
+func TestInsertAfterActiveStaysBehindPinned(t *testing.T) {
+	g := groupWith(0, "a", "b")
+	g.SetPinned(g.Tabs[0], true)
+	g.SetPinned(g.Tabs[1], true)
+	g.Active = 0
+	loose := &Tab{ID: 9, Path: "x"}
+	g.Insert(loose, AfterActive)
+	if loose.Pinned || !slices.Equal(paths(g), []string{"a", "b", "x"}) {
+		t.Fatalf("paths %v pinned %v", paths(g), loose.Pinned)
+	}
+}
+
+func TestInsertAfterActiveKeepsPin(t *testing.T) {
+	g := groupWith(2, "a", "b", "c")
+	g.SetPinned(g.Tabs[0], true)
+	pinned := &Tab{ID: 9, Path: "x", Pinned: true}
+	g.Insert(pinned, AfterActive)
+	if !pinned.Pinned || !slices.Equal(paths(g), []string{"a", "x", "b", "c"}) || g.ActiveTab().Path != "c" {
+		t.Fatalf("paths %v pinned %v active %d", paths(g), pinned.Pinned, g.Active)
+	}
+}
+
+func TestAddPlacesTheGroupBySide(t *testing.T) {
+	for _, tt := range []struct {
+		d                  Direction
+		vertical, addFirst bool
+	}{
+		{Left, false, true},
+		{Right, false, false},
+		{Up, true, true},
+		{Down, true, false},
+	} {
+		a, b := &Group{ID: 1}, &Group{ID: 2}
+		root := Leaf(a)
+		if !root.Add(a, b, tt.d) {
+			t.Fatalf("%v: add failed", tt.d)
+		}
+		first := root.First.Group
+		if root.Vertical != tt.vertical || (first == b) != tt.addFirst {
+			t.Fatalf("%v: vertical %v first %v", tt.d, root.Vertical, first.ID)
+		}
+	}
+}
+
+func TestNeighbor(t *testing.T) {
+	a, b, c := &Group{ID: 1}, &Group{ID: 2}, &Group{ID: 3}
+	root := Leaf(a)
+	root.Split(a, b, false)
+	root.Split(b, c, true)
+	for _, tt := range []struct {
+		from *Group
+		d    Direction
+		want *Group
+	}{
+		{a, Right, b},
+		{b, Left, a},
+		{c, Left, a},
+		{b, Down, c},
+		{c, Up, b},
+		{a, Left, nil},
+		{a, Up, nil},
+		{b, Right, nil},
+		{c, Down, nil},
+	} {
+		if got := root.Neighbor(tt.from, tt.d); got != tt.want {
+			t.Errorf("neighbor of %d towards %d: got %v want %v", tt.from.ID, tt.d, got, tt.want)
+		}
+	}
+	if root.Neighbor(&Group{ID: 9}, Left) != nil {
+		t.Fatal("unknown group has no neighbor")
+	}
+}

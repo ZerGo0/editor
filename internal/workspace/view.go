@@ -26,7 +26,6 @@ func (w *Workspace) View(c *ui.Context) {
 	w.syncEdited()
 	w.syncTitle()
 	w.updateProblems()
-	w.beginDragFrame()
 	w.codeTheme = p.CodeTheme()
 	root := c.Root().TabStop(false).FocusRing(false).Role(ui.RoleNone).ObserveInput(w.observeInput)
 	w.keys.rootFocus = root.Focused()

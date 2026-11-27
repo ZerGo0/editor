@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/history"
 	"github.com/ZerGo0/editor/internal/issueui"
 	"github.com/ZerGo0/editor/internal/keymap"
+	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/prui"
 	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/settings"
@@ -74,8 +75,34 @@ func (a *App) registerCommands() {
 	add("workbench.action.focusSideBar", categoryView, "Focus into Primary Side Bar", ws((*workspace.Workspace).FocusSideBar))
 	add("workbench.action.editor.changeLanguageMode", categoryView, "Change Language Mode", ws((*workspace.Workspace).ChangeLanguage))
 	add("workbench.files.action.showActiveFileInExplorer", categoryExplorer, "Reveal Active File in Explorer View", ws((*workspace.Workspace).RevealInSidebar))
-	add("workbench.action.splitEditorRight", categoryView, "Split Editor Right", ws(func(w *workspace.Workspace) { w.Split(false) }))
-	add("workbench.action.splitEditorDown", categoryView, "Split Editor Down", ws(func(w *workspace.Workspace) { w.Split(true) }))
+	for _, split := range []struct {
+		id, title string
+		side      layout.Direction
+	}{
+		{"workbench.action.splitEditorRight", "Split Editor Right", layout.Right},
+		{"workbench.action.splitEditorDown", "Split Editor Down", layout.Down},
+		{"workbench.action.splitEditorLeft", "Split Editor Left", layout.Left},
+		{"workbench.action.splitEditorUp", "Split Editor Up", layout.Up},
+	} {
+		add(split.id, categoryView, split.title, ws(func(w *workspace.Workspace) { w.SplitEditor(split.side) }))
+	}
+	for _, move := range []struct {
+		id, title string
+		side      layout.Direction
+	}{
+		{"workbench.action.moveEditorToLeftGroup", "Move Editor into Left Group", layout.Left},
+		{"workbench.action.moveEditorToRightGroup", "Move Editor into Right Group", layout.Right},
+		{"workbench.action.moveEditorToAboveGroup", "Move Editor into Group Above", layout.Up},
+		{"workbench.action.moveEditorToBelowGroup", "Move Editor into Group Below", layout.Down},
+	} {
+		add(move.id, categoryView, move.title, ws(func(w *workspace.Workspace) { w.MoveEditorToSide(move.side) }))
+	}
+	add("workbench.action.moveEditorToNextGroup", categoryView, "Move Editor into Next Group", ws(func(w *workspace.Workspace) { w.MoveEditorToAdjacentGroup(1) }))
+	add("workbench.action.moveEditorToPreviousGroup", categoryView, "Move Editor into Previous Group", ws(func(w *workspace.Workspace) { w.MoveEditorToAdjacentGroup(-1) }))
+	add("workbench.action.moveEditorToFirstGroup", categoryView, "Move Editor into First Group", ws(func(w *workspace.Workspace) { w.MoveEditorToEdgeGroup(false) }))
+	add("workbench.action.moveEditorToLastGroup", categoryView, "Move Editor into Last Group", ws(func(w *workspace.Workspace) { w.MoveEditorToEdgeGroup(true) }))
+	add("workbench.action.moveEditorLeftInGroup", categoryView, "Move Editor Left", ws(func(w *workspace.Workspace) { w.MoveEditorInGroup(-1) }))
+	add("workbench.action.moveEditorRightInGroup", categoryView, "Move Editor Right", ws(func(w *workspace.Workspace) { w.MoveEditorInGroup(1) }))
 	add("workbench.action.nextEditor", categoryView, "Open Next Editor", ws(func(w *workspace.Workspace) { w.CycleTab(1) }))
 	add("workbench.action.previousEditor", categoryView, "Open Previous Editor", ws(func(w *workspace.Workspace) { w.CycleTab(-1) }))
 	for i, name := range []string{"First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth"} {

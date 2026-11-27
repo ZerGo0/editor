@@ -135,18 +135,6 @@ func (w *Workspace) TogglePinActive() {
 	}
 }
 
-func (w *Workspace) Split(vertical bool) {
-	t := w.active.ActiveTab()
-	if t == nil {
-		return
-	}
-	added := w.newGroup()
-	w.focusTab = added.Open(t.Path, false, w.newID())
-	if w.layout.Split(w.active, added, vertical) {
-		w.active = added
-	}
-}
-
 func (w *Workspace) CycleTab(delta int) {
 	w.active.Cycle(delta)
 	w.focusTab = w.active.ActiveTab()

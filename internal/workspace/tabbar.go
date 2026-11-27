@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"os"
 	"slices"
 
 	"github.com/ZerGo0/editor/internal/design/action"
@@ -11,7 +10,6 @@ import (
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/viewer"
-	"github.com/ZerGo0/editor/internal/workspace/filetree"
 	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo/ui"
 )
@@ -21,19 +19,6 @@ const (
 	moreActionsLabel = "More Actions..."
 	previewToSideID  = "markdown.showPreviewToSide"
 )
-
-type tabDrag struct {
-	group *layout.Group
-	tab   *layout.Tab
-}
-
-type dragState struct {
-	seen, shown bool
-}
-
-func (w *Workspace) beginDragFrame() {
-	w.drag.shown, w.drag.seen = w.drag.seen, false
-}
 
 func (w *Workspace) tabLabels() map[string]string {
 	var paths []string
@@ -64,19 +49,15 @@ func (w *Workspace) tabBar(c *ui.Context, g *layout.Group) {
 	selected := g.Active
 	closeTab := func(i int) { w.requestClose(g, []*layout.Tab{tabs[i]}) }
 	chrome.TabStrip(c, &selected, items, chrome.TabStripOptions{
-		Label:         tabStripLabel,
-		OnSelect:      func(i int) { w.activate(g, tabs[i]) },
-		OnClose:       closeTab,
-		OnAuxClick:    closeTab,
-		OnUnpin:       func(i int) { g.SetPinned(tabs[i], false) },
-		OnDoubleClick: func(i int) { tabs[i].Preview = false },
-		Menu:          func(i int, m *ui.Menu) { w.tabMenu(m, g, tabs[i]) },
-		Drag:          func(i int) any { return tabDrag{g, tabs[i]} },
-		Dragging:      func(int) { w.drag.seen = true },
-		Drop: func(at int, el ui.Element) bool {
-			w.dropTarget(el, g, at)
-			return dragging(el)
-		},
+		Label:              tabStripLabel,
+		OnSelect:           func(i int) { w.activate(g, tabs[i]) },
+		OnClose:            closeTab,
+		OnAuxClick:         closeTab,
+		OnUnpin:            func(i int) { g.SetPinned(tabs[i], false) },
+		OnDoubleClick:      func(i int) { tabs[i].Preview = false },
+		Menu:               func(i int, m *ui.Menu) { w.tabMenu(m, g, tabs[i]) },
+		Drag:               func(i int) any { return tabDrag{g, tabs[i]} },
+		Drop:               func(at int, el ui.Element) chrome.DropMark { return w.tabStripDrop(c, el, g, at) },
 		EmptyMenu:          func(m *ui.Menu) { w.groupMenu(m, g) },
 		OnEmptyDoubleClick: func() { w.active = g; w.NewUntitled() },
 		Actions:            func(c *ui.Context) { w.editorActions(c, g) },
@@ -93,41 +74,9 @@ func (w *Workspace) editorActions(c *ui.Context, g *layout.Group) {
 	}
 	if action.IconButton(c, icons.Split, splitRightLabel, action.IconOptions{Keys: w.keyLabel(splitRightID), ID: "split-group"}).Clicked() {
 		w.active = g
-		w.Split(false)
+		w.SplitEditor(layout.Right)
 	}
 	action.MenuIconButton(c, icons.More, moreActionsLabel, action.IconOptions{}, func(m *ui.Menu) { w.groupMenu(m, g) })
-}
-
-func (w *Workspace) dropTarget(el ui.Element, g *layout.Group, at int) {
-	switch v := droppedValue(el).(type) {
-	case tabDrag:
-		w.moveTab(v, g, at)
-	case filetree.Paths:
-		w.openDropped(g, v)
-	}
-	if files := el.DroppedFiles(); len(files) > 0 {
-		w.openDropped(g, files)
-	}
-}
-
-func droppedValue(el ui.Element) any {
-	if v, ok := ui.Drop[any](el); ok && isWorkbenchDrag(v) {
-		return v
-	}
-	return nil
-}
-
-func isWorkbenchDrag(v any) bool {
-	switch v.(type) {
-	case tabDrag, filetree.Paths:
-		return true
-	}
-	return false
-}
-
-func dragging(el ui.Element) bool {
-	v, ok := ui.DragOver[any](el)
-	return ok && isWorkbenchDrag(v)
 }
 
 func (w *Workspace) tabIcon(c *ui.Context, p string) {
@@ -184,11 +133,11 @@ func (w *Workspace) tabMenu(m *ui.Menu, g *layout.Group, tab *layout.Tab) {
 	m.Separator()
 	if m.Item("Split Right").Chosen() {
 		w.activate(g, tab)
-		w.Split(false)
+		w.SplitEditor(layout.Right)
 	}
 	if m.Item("Split Down").Chosen() {
 		w.activate(g, tab)
-		w.Split(true)
+		w.SplitEditor(layout.Down)
 	}
 }
 
@@ -206,72 +155,11 @@ func (w *Workspace) groupMenu(m *ui.Menu, g *layout.Group) {
 	m.Separator()
 	if m.Item("Split Right").Disabled(g.ActiveTab() == nil).Chosen() {
 		w.active = g
-		w.Split(false)
+		w.SplitEditor(layout.Right)
 	}
 	if m.Item("Split Down").Disabled(g.ActiveTab() == nil).Chosen() {
 		w.active = g
-		w.Split(true)
-	}
-}
-
-func (w *Workspace) moveTab(d tabDrag, to *layout.Group, at int) {
-	from, tab := d.group, d.tab
-	i := from.Index(tab)
-	if i < 0 {
-		return
-	}
-	if from == to {
-		to.Move(tab, at)
-		w.activate(to, tab)
-		return
-	}
-	from.Close(i)
-	if j := to.Find(tab.Path); j >= 0 {
-		tab = to.Tabs[j]
-	} else {
-		keepPin := tab.Pinned && at >= len(to.Tabs)
-		to.Insert(tab, at)
-		if keepPin {
-			to.SetPinned(tab, true)
-		}
-	}
-	if len(from.Tabs) == 0 {
-		w.layout.Remove(from)
-	}
-	w.activate(to, tab)
-}
-
-func (w *Workspace) splitWith(d tabDrag, g *layout.Group, vertical, before bool) {
-	if d.group == g && len(g.Tabs) == 1 {
-		return
-	}
-	added := w.newGroup()
-	if !w.layout.Split(g, added, vertical) {
-		return
-	}
-	if before {
-		swapSplit(w.layout, g, added)
-	}
-	w.moveTab(d, added, 0)
-}
-
-func swapSplit(n *layout.Node, first, second *layout.Group) bool {
-	if n.Group != nil {
-		return false
-	}
-	if n.First.Group == first && n.Second.Group == second {
-		n.First, n.Second = n.Second, n.First
-		return true
-	}
-	return swapSplit(n.First, first, second) || swapSplit(n.Second, first, second)
-}
-
-func (w *Workspace) openDropped(g *layout.Group, paths []string) {
-	w.active = g
-	for _, p := range paths {
-		if info, err := os.Stat(p); err == nil && !info.IsDir() {
-			w.OpenFile(p, false, true)
-		}
+		w.SplitEditor(layout.Down)
 	}
 }
 

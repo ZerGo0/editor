@@ -33,6 +33,12 @@ workbench.action.gotoSymbol
 workbench.action.importVSCodeKeybindings
 workbench.action.installCommandLine
 workbench.action.keepEditor
+workbench.action.moveEditorLeftInGroup
+workbench.action.moveEditorRightInGroup
+workbench.action.moveEditorToFirstGroup
+workbench.action.moveEditorToLastGroup
+workbench.action.moveEditorToNextGroup
+workbench.action.moveEditorToPreviousGroup
 workbench.action.navigateBack
 workbench.action.navigateForward
 workbench.action.navigateToLastEditLocation

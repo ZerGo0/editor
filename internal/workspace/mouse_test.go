@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/command"
+	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -215,6 +216,78 @@ func TestDraggingATabToTheEdgeSplitsTheEditor(t *testing.T) {
 	groups := b.w.layout.Groups()
 	if len(groups) != 2 || len(groups[1].Tabs) != 1 || filepath.Base(groups[1].Tabs[0].Path) != "a.txt" {
 		t.Fatalf("after dragging a tab to the right edge: %d groups", len(groups))
+	}
+}
+
+func (b *mouseBed) editorRects() []ui.Rect {
+	var out []ui.Rect
+	for _, a := range b.tt.AccessAll() {
+		if a.Name == "Code editor" {
+			out = append(out, a.Bounds)
+		}
+	}
+	return out
+}
+
+func (b *mouseBed) groupTabs() []string {
+	var out []string
+	for _, g := range b.w.layout.Groups() {
+		var names []string
+		for _, tab := range g.Tabs {
+			names = append(names, filepath.Base(tab.Path))
+		}
+		out = append(out, strings.Join(names, ","))
+	}
+	return out
+}
+
+func newSplitBed(t *testing.T) *mouseBed {
+	t.Helper()
+	b := newMouseBed(t, map[string]string{"b.txt": "b\n", "c.txt": "c\n"})
+	b.open("b.txt")
+	b.w.SplitEditor(layout.Right)
+	second := b.w.layout.Groups()[1]
+	second.Close(0)
+	b.w.openIn(second, filepath.Join(b.root, "c.txt"), false, true)
+	b.tt.Frame()
+	b.tt.Frame()
+	if got := strings.Join(b.groupTabs(), "|"); got != "b.txt|c.txt" {
+		t.Fatalf("setup groups: %s", got)
+	}
+	return b
+}
+
+func TestDroppingTheOnlyTabOfAGroupOnAnotherGroupRendersCleanly(t *testing.T) {
+	tests := []struct {
+		name       string
+		from, onto int
+		x, y       float32
+		want       string
+	}{
+		{"second to the left edge of the first", 1, 0, 0.02, 0.5, "c.txt|b.txt"},
+		{"second to the right edge of the first", 1, 0, 0.98, 0.5, "b.txt|c.txt"},
+		{"second to the top edge of the first", 1, 0, 0.5, 0.02, "c.txt|b.txt"},
+		{"second to the bottom edge of the first", 1, 0, 0.5, 0.98, "b.txt|c.txt"},
+		{"second to the center of the first", 1, 0, 0.5, 0.5, "b.txt,c.txt"},
+		{"first to the left edge of the second", 0, 1, 0.02, 0.5, "b.txt|c.txt"},
+		{"first to the right edge of the second", 0, 1, 0.98, 0.5, "c.txt|b.txt"},
+		{"first to the center of the second", 0, 1, 0.5, 0.5, "c.txt,b.txt"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newSplitBed(t)
+			name := []string{"b.txt", "c.txt"}[tt.from]
+			fx, fy := center(b.tab(name))
+			to := b.editorRects()[tt.onto]
+			b.drag(fx, fy, to.X+to.W*tt.x, to.Y+to.H*tt.y)
+			b.tt.Frame()
+			if got := strings.Join(b.groupTabs(), "|"); got != tt.want {
+				t.Fatalf("groups after the drop: %s, want %s", got, tt.want)
+			}
+			if got := b.w.active.ActiveTab(); filepath.Base(got.Path) != name {
+				t.Fatalf("active tab is %s, want %s", filepath.Base(got.Path), name)
+			}
+		})
 	}
 }
 

@@ -15,6 +15,14 @@ const (
 	noTab        = -1
 )
 
+type DropMark int
+
+const (
+	DropNone DropMark = iota
+	DropBefore
+	DropAfter
+)
+
 type stripState struct {
 	scroll ui.ScrollState
 	middle int
@@ -42,10 +50,16 @@ type TabStripOptions struct {
 	OnAuxClick         func(i int)
 	OnDoubleClick      func(i int)
 	Drag               func(i int) any
-	Drop               func(at int, target ui.Element) bool
+	Drop               func(at int, target ui.Element) DropMark
 	EmptyMenu          func(m *ui.Menu)
 	OnEmptyDoubleClick func()
-	Dragging           func(i int)
+}
+
+func DropSide(target ui.Element) DropMark {
+	if x, _, _ := target.PointerPosition(); x > target.Bounds().W/2 {
+		return DropAfter
+	}
+	return DropBefore
 }
 
 func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.Element {
@@ -72,8 +86,10 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 		})
 		*shown = *selected
 		rest := ui.Box(c.Key("rest")).Grow(1).FillHeight().MinWidth(token.TabMinWidth.Px() / 2)
-		if o.Drop != nil && o.Drop(len(tabs), rest) {
-			dropMark(c, p)
+		if o.Drop != nil {
+			if mark := o.Drop(len(tabs), rest); mark != DropNone {
+				rest.Children(func() { dropMark(c, p, mark) })
+			}
 		}
 		if o.EmptyMenu != nil {
 			rest.ContextMenu(o.EmptyMenu)
@@ -89,9 +105,14 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 	return strip
 }
 
-func dropMark(c *ui.Context, p *token.Palette) {
-	ui.Box(c).Absolute().Left(0).Top(token.GapInline.Px()).Bottom(token.GapInline.Px()).Width(token.Stroke2.Px()).
+func dropMark(c *ui.Context, p *token.Palette, mark DropMark) {
+	line := ui.Box(c).Absolute().Top(token.GapInline.Px()).Bottom(token.GapInline.Px()).Width(token.Stroke2.Px()).
 		Background(p.Accent.Base).PassThrough()
+	if mark == DropAfter {
+		line.Right(0)
+		return
+	}
+	line.Left(0)
 }
 
 func (s *stripState) wheel(ev ui.InputEvent) bool {
@@ -132,12 +153,11 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 			tab.Drag(data)
 		}
 	}
-	if o.Dragging != nil && tab.Dragging() {
-		o.Dragging(i)
-	}
 	tab.Children(func() {
-		if o.Drop != nil && o.Drop(i, tab) {
-			dropMark(c, p)
+		if o.Drop != nil {
+			if mark := o.Drop(i, tab); mark != DropNone {
+				dropMark(c, p, mark)
+			}
 		}
 		switch {
 		case t.Leading != nil:

@@ -122,7 +122,7 @@ func (w *Workspace) FocusGroup(i int) {
 	groups := w.layout.Groups()
 	if i >= len(groups) {
 		if t := w.active.ActiveTab(); t != nil {
-			w.Split(false)
+			w.SplitEditor(layout.Right)
 		}
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -49,7 +50,7 @@ func (w *Workspace) titleBar(c *ui.Context) {
 			Role(ui.RoleToolbar).Label("Layout Controls").Children(func() {
 			w.iconButton(c, icons.Sidebar, sidebarLabel, toggleSidebarID, !w.sidebarHidden, w.ToggleSidebar)
 			w.iconButton(c, icons.Panel, panelToggleLabel, togglePanelID, w.tools.panelOpen, w.TogglePanel)
-			w.iconButton(c, icons.Split, splitRightLabel, splitRightID, false, func() { w.Split(false) })
+			w.iconButton(c, icons.Split, splitRightLabel, splitRightID, false, func() { w.SplitEditor(layout.Right) })
 		})
 	})
 }

@@ -322,7 +322,7 @@ func TestGoToLineWithoutEditorShowsVSCodeMessage(t *testing.T) {
 
 func TestGoToLineTargetsTheActiveSplitEditor(t *testing.T) {
 	b := newGoToLineBed(t)
-	b.w.Split(false)
+	b.w.SplitEditor(layout.Right)
 	b.settle()
 	second := b.w.active.ActiveTab()
 	if second == b.tab || second.Editor == nil {

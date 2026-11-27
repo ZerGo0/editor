@@ -24,6 +24,8 @@ type Tab struct {
 	Pinned  bool
 }
 
+const AfterActive = -1
+
 type Group struct {
 	ID     int
 	Tabs   []*Tab
@@ -61,10 +63,14 @@ func (g *Group) Open(path string, preview bool, id int) *Tab {
 			return t
 		}
 	}
-	at := max(min(g.Active+1, len(g.Tabs)), g.PinnedCount())
+	at := g.afterActive()
 	g.Tabs = slices.Insert(g.Tabs, at, t)
 	g.Active = at
 	return t
+}
+
+func (g *Group) afterActive() int {
+	return max(min(g.Active+1, len(g.Tabs)), g.PinnedCount())
 }
 
 func (g *Group) Close(i int) {
@@ -115,8 +121,15 @@ func (g *Group) SetPinned(t *Tab, pinned bool) {
 
 func (g *Group) Insert(t *Tab, at int) {
 	active := g.ActiveTab()
+	keepPin := at == AfterActive && t.Pinned
+	switch {
+	case keepPin:
+		at = g.PinnedCount()
+	case at == AfterActive:
+		at = g.afterActive()
+	}
 	at = min(max(at, 0), len(g.Tabs))
-	t.Pinned = at < g.PinnedCount()
+	t.Pinned = keepPin || at < g.PinnedCount()
 	if t.Pinned {
 		t.Preview = false
 	}

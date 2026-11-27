@@ -92,6 +92,22 @@ func TestMacPresetMatchesVSCode(t *testing.T) {
 	}
 }
 
+func TestMacPresetMovesEditorsBetweenGroupsLikeVSCode(t *testing.T) {
+	k := keymap.New(keymap.Defaults(keymap.PresetVSCode), nil)
+	for key, want := range map[string]string{
+		"ctrl+cmd+right":        "workbench.action.moveEditorToNextGroup",
+		"ctrl+cmd+left":         "workbench.action.moveEditorToPreviousGroup",
+		"ctrl+cmd+1":            "workbench.action.moveEditorToFirstGroup",
+		"ctrl+cmd+9":            "workbench.action.moveEditorToLastGroup",
+		"cmd+k shift+cmd+left":  "workbench.action.moveEditorLeftInGroup",
+		"cmd+k shift+cmd+right": "workbench.action.moveEditorRightInGroup",
+	} {
+		if got := lookup(t, k, key); got != want {
+			t.Errorf("%s runs %q, want %q", key, got, want)
+		}
+	}
+}
+
 func TestWindowsPresetMatchesVSCode(t *testing.T) {
 	k := keymap.New(keymap.Defaults(keymap.PresetVSCodeWindows), nil)
 	for key, want := range map[string]string{

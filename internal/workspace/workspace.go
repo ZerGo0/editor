@@ -69,7 +69,6 @@ type Workspace struct {
 	nav           navState
 	focus         focusFlags
 	title         titleState
-	drag          dragState
 	gutter        *gutterDrag
 	closed        []string
 	settingsView  *prefs.SettingsView
