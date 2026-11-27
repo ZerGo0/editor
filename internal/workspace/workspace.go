@@ -33,6 +33,7 @@ type Workspace struct {
 	Root          string
 	Name          string
 	win           *mygo.Window
+	updates       updateQueue
 	env           *Env
 	docs          map[string]*docEntry
 	layout        *layout.Node
@@ -131,6 +132,7 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 
 func (w *Workspace) Attach(win *mygo.Window) {
 	w.win = win
+	w.attachUpdates(win)
 	w.loadBackups()
 	go w.watch(w.ctx)
 	w.reindex()
@@ -158,14 +160,6 @@ func (w *Workspace) Close() {
 		w.issues.Close()
 	}
 	w.closeViewers()
-}
-
-func (w *Workspace) update(fn func()) {
-	if w.win == nil {
-		fn()
-		return
-	}
-	w.win.Update(fn)
 }
 
 func (w *Workspace) excluded(p string) bool {

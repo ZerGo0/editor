@@ -26,6 +26,7 @@ func TestCodeKeysRunBindings(t *testing.T) {
 	w := newTestWorkspace(t, t.TempDir(), env, session.Project{})
 	down := func(mods ui.Modifiers, key ui.Key, code ui.KeyCode) {
 		w.observeCodeKey(ui.InputEvent{Kind: ui.InputKeyDown, Mods: mods, Key: key, Code: code})
+		w.runPendingUpdates()
 	}
 
 	down(0, ui.KeyUnknown, ui.CodeF13)

@@ -19,6 +19,7 @@ func ApplyTheme(c *ui.Context, s *settings.Store) *token.Palette {
 }
 
 func (w *Workspace) View(c *ui.Context) {
+	w.runPendingUpdates()
 	c.SetZoom(w.zoom())
 	p := ApplyTheme(c, w.env.Settings)
 	c.Root().Background(p.Layer.Editor)
