@@ -5,12 +5,14 @@ import (
 
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/shellcmd"
+	"github.com/ZerGo0/editor/internal/workspace"
 	"github.com/egoist/mygo"
 )
 
 const (
 	maxRecentMenuItems = 10
 	goToLineCommand    = "workbench.action.gotoLine"
+	wordWrapCommand    = "editor.action.toggleWordWrap"
 )
 
 func (a *App) refreshMenu() {
@@ -42,6 +44,34 @@ func (a *App) item(id, label string) *mygo.MenuItem {
 		item.Accelerator = s.Accelerator()
 	}
 	return item
+}
+
+func (a *App) checkItem(id, label string, checked bool) *mygo.MenuItem {
+	item := a.item(id, label)
+	item.Type, item.Checked = mygo.MenuItemCheckbox, checked
+	run := item.Click
+	item.Click = func(it *mygo.MenuItem, win *mygo.Window) {
+		run(it, win)
+		a.syncViewMenu()
+	}
+	return item
+}
+
+func (a *App) viewState() workspace.ViewState {
+	if pw := a.workspaceFor(nil); pw != nil {
+		return pw.ws.ViewState()
+	}
+	return workspace.ViewState{}
+}
+
+func (a *App) syncViewMenu() {
+	a.applyViewState(a.viewState())
+}
+
+func (a *App) applyViewState(s workspace.ViewState) {
+	if a.wordWrapItem != nil {
+		a.wordWrapItem.SetChecked(s.WordWrap)
+	}
 }
 
 func (a *App) appMenu() *mygo.MenuItem {
@@ -87,6 +117,7 @@ func (a *App) fileMenu() *mygo.MenuItem {
 }
 
 func (a *App) viewMenu() *mygo.MenuItem {
+	a.wordWrapItem = a.checkItem(wordWrapCommand, "Word Wrap", a.viewState().WordWrap)
 	return &mygo.MenuItem{Label: "View", Submenu: []*mygo.MenuItem{
 		a.item("workbench.action.showCommands", "Command Palette..."),
 		mygo.Separator(),
@@ -110,6 +141,8 @@ func (a *App) viewMenu() *mygo.MenuItem {
 		a.item("workbench.action.zoomIn", ""),
 		a.item("workbench.action.zoomOut", ""),
 		a.item("workbench.action.zoomReset", ""),
+		mygo.Separator(),
+		a.wordWrapItem,
 		mygo.Separator(),
 		{Role: mygo.RoleToggleFullScreen},
 	}}

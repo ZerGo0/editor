@@ -16,6 +16,7 @@ import (
 const (
 	toggleWordWrapID = "editor.action.toggleWordWrap"
 	wrapFile         = "long.txt"
+	otherWrapFile    = "other.txt"
 	wrapLineRepeats  = 200
 	wrapFramesAfter  = 5
 )
@@ -33,7 +34,7 @@ func newWrapWorkspace(t *testing.T, set map[string]any) *Workspace {
 	var w *Workspace
 	env.Commands.Add(&command.Command{ID: toggleWordWrapID, Title: "Toggle Word Wrap", Run: func(*mygo.Window) { w.RunEditor(editor.ToggleSoftWrap) }})
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{wrapFile: wrapText})
+	writeFiles(t, root, map[string]string{wrapFile: wrapText, otherWrapFile: wrapText})
 	w = newTestWorkspace(t, root, env, session.Project{})
 	return w
 }
@@ -73,10 +74,14 @@ func openWrapEditor(t *testing.T, set map[string]any) (*Workspace, *ui.Tester, *
 }
 
 func newWrapDiff(w *Workspace, layout editor.DiffLayout, fit bool) (*editor.DiffState, *ui.Tester) {
+	return newWrapDiffOf(w, wrapFile, layout, fit)
+}
+
+func newWrapDiffOf(w *Workspace, file string, layout editor.DiffLayout, fit bool) (*editor.DiffState, *ui.Tester) {
 	d := &editor.DiffState{Old: editor.NewBuffer(wrapText), New: editor.NewBuffer(strings.Replace(wrapText, "end", "END", 1)), Layout: layout, FitContent: fit}
 	tt := ui.NewTester(func(c *ui.Context) {
 		w.shortcuts(c, scopeMain)
-		w.ConfigureDiff(d, wrapFile)
+		w.ConfigureDiff(d, filepath.Join(w.Root, file))
 		editor.DiffView(c, d).Fill()
 	}, testWideW, testViewH)
 	frames(tt, wrapFramesAfter)
@@ -174,5 +179,91 @@ func TestAltZTogglesADiffAndStaysToggled(t *testing.T) {
 				t.Fatalf("%s fit %v: the diff unwrapped on later frames", name, fit)
 			}
 		}
+	}
+}
+
+func toggleWrap(w *Workspace, tt *ui.Tester) {
+	tt.Key(ui.Alt, ui.KeyZ)
+	w.runPendingUpdates()
+	frames(tt, wrapFramesAfter)
+}
+
+func TestAltZWrapsOnlyTheFocusedFile(t *testing.T) {
+	t.Parallel()
+	w, tt, first := openWrapEditor(t, nil)
+	toggleWrap(w, tt)
+	if !editorWraps(first) {
+		t.Fatal("Alt+Z did not wrap the focused file")
+	}
+	second, _ := openTab(t, w, filepath.Join(w.Root, otherWrapFile))
+	w.focusTab = second
+	frames(tt, wrapFramesAfter)
+	if editorWraps(second.Editor) {
+		t.Fatal("Alt+Z in one file wrapped another file")
+	}
+	toggleWrap(w, tt)
+	if !editorWraps(second.Editor) {
+		t.Fatal("Alt+Z did not wrap the second file")
+	}
+	w.OpenFile(filepath.Join(w.Root, wrapFile), false, true)
+	frames(tt, wrapFramesAfter)
+	if !editorWraps(first) {
+		t.Fatal("the first file lost its wrap override")
+	}
+}
+
+func TestWrapOverrideFollowsTheFileIntoADiffAndEndsWhenItCloses(t *testing.T) {
+	t.Parallel()
+	w, tt, st := openWrapEditor(t, nil)
+	toggleWrap(w, tt)
+	if !editorWraps(st) {
+		t.Fatal("Alt+Z did not wrap the file")
+	}
+	same, _ := newWrapDiffOf(w, wrapFile, editor.DiffSplit, false)
+	other, _ := newWrapDiffOf(w, otherWrapFile, editor.DiffSplit, false)
+	if !diffWraps(same) {
+		t.Error("a diff of the toggled file does not wrap on both sides")
+	}
+	if diffWraps(other) {
+		t.Error("a diff of another file wraps")
+	}
+	w.CloseActiveTab()
+	w.dropUnused()
+	if _, ok := w.wrapOverrides[filepath.Join(w.Root, wrapFile)]; ok {
+		t.Fatal("the override outlived the closed file")
+	}
+}
+
+func TestAltZInADiffWrapsOnlyThatFile(t *testing.T) {
+	t.Parallel()
+	w := newWrapWorkspace(t, nil)
+	d, tt := newWrapDiffOf(w, wrapFile, editor.DiffSplit, false)
+	other, _ := newWrapDiffOf(w, otherWrapFile, editor.DiffSplit, false)
+	d.Focus()
+	frames(tt, wrapFramesAfter)
+	toggleWrap(w, tt)
+	if !diffWraps(d) {
+		t.Fatal("Alt+Z did not wrap both sides of the diff")
+	}
+	if diffWraps(other) {
+		t.Fatal("Alt+Z wrapped a diff of another file")
+	}
+}
+
+func TestViewStateFollowsTheFocusedFileAndIsPublishedOnChange(t *testing.T) {
+	t.Parallel()
+	w, tt, _ := openWrapEditor(t, nil)
+	var published []ViewState
+	w.OnViewState = func(s ViewState) { published = append(published, s) }
+	toggleWrap(w, tt)
+	w.publishViewState()
+	w.publishViewState()
+	if !w.ViewState().WordWrap || len(published) != 1 || !published[0].WordWrap {
+		t.Fatalf("after Alt+Z state %v, published %v", w.ViewState(), published)
+	}
+	openTab(t, w, filepath.Join(w.Root, otherWrapFile))
+	w.publishViewState()
+	if w.ViewState().WordWrap || len(published) != 2 || published[1].WordWrap {
+		t.Fatalf("on the other file state %v, published %v", w.ViewState(), published)
 	}
 }

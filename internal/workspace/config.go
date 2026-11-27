@@ -53,7 +53,7 @@ func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 			st.Indent = editor.IndentSpaces
 		}
 	}
-	w.applyWrapping(st)
+	w.applyWrapping(st, path)
 	st.LineNumbers = lineNumberModes[s.String(settings.LineNumbers)]
 	st.Whitespace = whitespaceModes[s.String(settings.RenderWhitespace)]
 	st.WrapGuides = s.Ints(settings.Rulers)
@@ -75,7 +75,8 @@ func (w *Workspace) ConfigureDiff(d *editor.DiffState, path string) {
 	var st editor.State
 	w.ConfigureEditor(&st, path)
 	d.Font, d.LineHeight, d.TabSize = st.Font, st.LineHeight, st.TabSize
-	d.Wrap, _ = w.wrapping(true)
+	d.Wrap, _ = w.wrapping(true, path)
+	w.trackDiff(path)
 	d.ScrollPastEnd = !st.NoScrollPastEnd
 	d.Bindings = withoutHostCommands
 	if st.Theme != nil {

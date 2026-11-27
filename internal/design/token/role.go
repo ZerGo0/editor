@@ -62,27 +62,28 @@ var (
 )
 
 var (
-	IconButtonSize  = Size{22}
-	ToggleSize      = Size{22}
-	CheckboxSize    = Size{16}
-	SwitchWidth     = Size{28}
-	SwitchHeight    = Size{16}
-	SwitchKnob      = Size{12}
-	SplitArrowWidth = Size{24}
-	ActivityItem    = Size{32}
-	AvatarSize      = Size{20}
-	BadgeHeight     = Size{18}
-	BadgeSmall      = Size{14}
-	TagHeight       = Size{18}
-	KeyCapHeight    = Size{18}
-	KeyCapMinWidth  = Size{18}
-	DecorationWidth = Size{16}
-	DirtyDotSize    = Size{8}
-	TwistieWidth    = Size{16}
-	SashSize        = Size{4}
-	SashCorner      = Size{12}
-	ScrollbarSize   = Size{10}
-	ProgressHeight  = Size{2}
+	IconButtonSize     = Size{22}
+	ToggleSize         = Size{22}
+	CheckboxSize       = Size{16}
+	SwitchWidth        = Size{28}
+	SwitchHeight       = Size{16}
+	SwitchKnob         = Size{12}
+	SplitArrowWidth    = Size{24}
+	ActivityItem       = Size{32}
+	AvatarSize         = Size{20}
+	BadgeHeight        = Size{18}
+	BadgeSmall         = Size{14}
+	TagHeight          = Size{18}
+	KeyCapHeight       = Size{18}
+	KeyCapMinWidth     = Size{18}
+	DecorationWidth    = Size{16}
+	DirtyDotSize       = Size{8}
+	PinnedDirtyDotSize = Size{6}
+	TwistieWidth       = Size{16}
+	SashSize           = Size{4}
+	SashCorner         = Size{12}
+	ScrollbarSize      = Size{10}
+	ProgressHeight     = Size{2}
 )
 
 var (

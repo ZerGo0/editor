@@ -172,6 +172,10 @@ func tabEnd(c *ui.Context, p *token.Palette, active, hovered bool, i int, t Tab,
 	slot.Children(func() {
 		pointed := hovered || slot.Hovered()
 		switch {
+		case t.Dirty && t.Pinned && !pointed:
+			ui.Icon(c, icons.Pin).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Icon).AccessHidden(true)
+			ui.Box(c).Absolute().Right(token.GapInline.Px()).Bottom(token.GapInline.Px()).Size(token.PinnedDirtyDotSize.Px(), token.PinnedDirtyDotSize.Px()).
+				Radius(token.RadiusPill.Px()).Background(p.Text.Primary).AccessHidden(true)
 		case t.Dirty && !pointed:
 			ui.Box(c).Size(token.DirtyDotSize.Px(), token.DirtyDotSize.Px()).Radius(token.RadiusPill.Px()).Background(p.Text.Primary).
 				AccessHidden(true)

@@ -1,11 +1,13 @@
 package workspace
 
 import (
+	"cmp"
+
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui/editor"
 )
 
-func (w *Workspace) wrapping(diff bool) (on bool, column int) {
+func (w *Workspace) wrapping(diff bool, path string) (on bool, column int) {
 	s := w.settings
 	mode := s.String(settings.WordWrap)
 	if diff {
@@ -13,8 +15,8 @@ func (w *Workspace) wrapping(diff bool) (on bool, column int) {
 			mode = m
 		}
 	}
-	if w.wrapOverride != nil {
-		return *w.wrapOverride, 0
+	if override, ok := w.wrapOverrides[path]; ok {
+		return override, 0
 	}
 	if mode == settings.WrapColumn || mode == settings.WrapBounded {
 		column = s.Int(settings.WordWrapColumn)
@@ -22,13 +24,43 @@ func (w *Workspace) wrapping(diff bool) (on bool, column int) {
 	return mode != settings.WrapOff, column
 }
 
-// TECHDEBT: The toggle overrides wrapping in every editor and diff at once; VS Code overrides it per model. Track the focused editor's path to narrow it.
-func (w *Workspace) ToggleWordWrap() {
-	on, _ := w.wrapping(false)
-	next := !on
-	w.wrapOverride = &next
+func (w *Workspace) wrapTarget() (path string, diff bool) {
+	if t := w.active.ActiveTab(); t != nil && t.Editor != nil {
+		return t.Path, false
+	}
+	return cmp.Or(w.diffPath, w.lastDiffPath), true
 }
 
-func (w *Workspace) applyWrapping(st *editor.State) {
-	st.SoftWrap, st.WrapColumn = w.wrapping(false)
+func (w *Workspace) ToggleWordWrap() {
+	path, diff := w.wrapTarget()
+	if path == "" {
+		return
+	}
+	on, _ := w.wrapping(diff, path)
+	if w.wrapOverrides == nil {
+		w.wrapOverrides = map[string]bool{}
+	}
+	w.wrapOverrides[path] = !on
+}
+
+func (w *Workspace) trackDiff(path string) {
+	if w.diffPath == "" {
+		w.diffPath = path
+	}
+}
+
+func (w *Workspace) nextDiffFrame() {
+	w.lastDiffPath, w.diffPath = w.diffPath, ""
+}
+
+func (w *Workspace) dropUnusedWrapping(open map[string]bool) {
+	for path := range w.wrapOverrides {
+		if !open[path] {
+			delete(w.wrapOverrides, path)
+		}
+	}
+}
+
+func (w *Workspace) applyWrapping(st *editor.State, path string) {
+	st.SoftWrap, st.WrapColumn = w.wrapping(false, path)
 }

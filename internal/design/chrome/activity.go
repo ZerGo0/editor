@@ -7,11 +7,14 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+const tipSeparator = " - "
+
 type Activity struct {
-	Icon  *ui.SVG
-	Label string
-	Keys  string
-	Badge int
+	Icon     *ui.SVG
+	Label    string
+	Keys     string
+	Badge    int
+	BadgeTip string
 }
 
 func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) ui.Element {
@@ -24,7 +27,7 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 			active := i == *selected
 			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ActivityBarHeight.Px()).Center().Shrink(0).Label(it.Label).
 				FocusRingOffset(-token.FocusRingWidth.Px())
-			action.Tooltip(c, tab, action.Hint(it.Label, it.Keys))
+			action.Tooltip(c, tab, activityTip(it))
 			if active && forward {
 				tab.Focus()
 			}
@@ -44,4 +47,12 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 		}
 	})
 	return parts.List
+}
+
+func activityTip(it Activity) string {
+	tip := action.Hint(it.Label, it.Keys)
+	if it.BadgeTip == "" {
+		return tip
+	}
+	return tip + tipSeparator + it.BadgeTip
 }

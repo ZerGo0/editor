@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -91,5 +92,42 @@ func TestActivityBarKeepsSearchWhenExplorerIsHidden(t *testing.T) {
 	}
 	if selected < 0 || selected >= len(entries) {
 		t.Fatalf("selected %d out of range", selected)
+	}
+}
+
+func explorerEntry(t *testing.T, w *Workspace) activityEntry {
+	t.Helper()
+	entries, _ := w.activityEntries()
+	for _, e := range entries {
+		if e.view == ExplorerView {
+			return e
+		}
+	}
+	t.Fatal("no Explorer entry")
+	return activityEntry{}
+}
+
+func TestExplorerBadgeCountsUnsavedFilesAndUntitled(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{"a.txt": "a", "b.txt": "b"})
+	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
+	if e := explorerEntry(t, w); e.item.Badge != 0 || e.item.BadgeTip != "" {
+		t.Fatalf("clean workspace shows badge %d %q", e.item.Badge, e.item.BadgeTip)
+	}
+	_, a := openTab(t, w, filepath.Join(root, "a.txt"))
+	_, b := openTab(t, w, filepath.Join(root, "b.txt"))
+	a.doc.Buffer.Set("edited")
+	if e := explorerEntry(t, w); e.item.Badge != 1 || e.item.BadgeTip != "1 unsaved file" {
+		t.Fatalf("one dirty file shows badge %d %q", e.item.Badge, e.item.BadgeTip)
+	}
+	b.doc.Buffer.Set("edited")
+	w.NewUntitled()
+	w.entry(w.active.ActiveTab().Path).doc.Buffer.Set("draft")
+	if e := explorerEntry(t, w); e.item.Badge != 3 || e.item.BadgeTip != "3 unsaved files" {
+		t.Fatalf("two files and an untitled show badge %d %q", e.item.Badge, e.item.BadgeTip)
+	}
+	w.SaveAll()
+	if e := explorerEntry(t, w); e.item.Badge != 1 {
+		t.Fatalf("after Save All the untitled draft stays: badge %d", e.item.Badge)
 	}
 }

@@ -30,6 +30,7 @@ type toolView struct {
 	icon      *ui.SVG
 	view      func(c *ui.Context)
 	badge     func() int
+	badgeTip  func(n int) string
 	actions   func(c *ui.Context)
 }
 
@@ -52,7 +53,7 @@ type toolState struct {
 }
 
 func (w *Workspace) initTools(saved session.Project) {
-	w.tools.sideViews = []toolView{{id: ExplorerView, title: "Explorer", command: "workbench.view.explorer", icon: icons.Explorer, view: w.explorerView}}
+	w.tools.sideViews = []toolView{{id: ExplorerView, title: "Explorer", command: "workbench.view.explorer", icon: icons.Explorer, view: w.explorerView, badge: w.unsavedCount, badgeTip: unsavedTip}}
 	w.tools.side = cmpOr(saved.SideView, ExplorerView)
 	w.tools.collapsed = map[string]bool{}
 	for _, id := range saved.Collapsed {

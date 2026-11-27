@@ -141,6 +141,7 @@ func (w *Workspace) dropUnused() {
 	w.dropPendingBackups(open)
 	w.dropUnusedBrackets(open)
 	w.dropUnusedEditorConfig(open)
+	w.dropUnusedWrapping(open)
 	w.dropUnusedViews(open)
 	w.dropUnusedViewers(open)
 	for path := range w.symbols {

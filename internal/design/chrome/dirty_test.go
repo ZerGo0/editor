@@ -35,3 +35,11 @@ func TestPinnedDirtyTabPaintsDot(t *testing.T) {
 		t.Fatal("pinned dirty tab paints no dot")
 	}
 }
+
+func TestPinnedDirtyTabKeepsThePinBesideTheDot(t *testing.T) {
+	dirty := tabStripPixels([]Tab{{Label: "a.go", Dirty: true}, {Label: "b.go"}}, 1)
+	pinnedDirty := tabStripPixels([]Tab{{Label: "a.go", Pinned: true, Dirty: true}, {Label: "b.go"}}, 1)
+	if bytes.Equal(dirty, pinnedDirty) {
+		t.Fatal("pinned dirty tab paints the same as a dirty tab, so the pin is missing")
+	}
+}

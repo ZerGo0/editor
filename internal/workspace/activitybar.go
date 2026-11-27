@@ -34,6 +34,9 @@ func (w *Workspace) activityEntries() (entries []activityEntry, selected int) {
 		item := chrome.Activity{Icon: v.icon, Label: v.title, Keys: w.keyLabel(v.command)}
 		if v.badge != nil {
 			item.Badge = v.badge()
+			if v.badgeTip != nil && item.Badge > 0 {
+				item.BadgeTip = v.badgeTip(item.Badge)
+			}
 		}
 		if v.id == w.tools.side && !searching {
 			selected = len(entries)

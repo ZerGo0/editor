@@ -39,17 +39,18 @@ type projectWindow struct {
 }
 
 type App struct {
-	options    Options
-	store      *session.Store
-	settings   *settings.Store
-	keys       *keymap.Store
-	commands   *command.Registry
-	env        *workspace.Env
-	projects   map[string]*projectWindow
-	welcome    *mygo.Window
-	recentList ui.ListState
-	quitting   bool
-	drawing    *workspace.Workspace
+	options      Options
+	store        *session.Store
+	settings     *settings.Store
+	keys         *keymap.Store
+	commands     *command.Registry
+	env          *workspace.Env
+	projects     map[string]*projectWindow
+	welcome      *mygo.Window
+	recentList   ui.ListState
+	quitting     bool
+	drawing      *workspace.Workspace
+	wordWrapItem *mygo.MenuItem
 }
 
 func New(options Options) *App {
@@ -170,6 +171,12 @@ func (a *App) openProject(root string) *projectWindow {
 	})
 	ws.Attach(win)
 	pw := &projectWindow{win: win, ws: ws}
+	ws.OnViewState = func(s workspace.ViewState) {
+		if a.workspaceFor(nil) == pw {
+			a.applyViewState(s)
+		}
+	}
+	win.OnFocus(a.syncViewMenu)
 	a.projects[root] = pw
 	win.OnClose(func(e *mygo.CloseEvent) { a.confirmClose(pw, e) })
 	win.OnClosed(func() { a.projectClosed(root, pw) })

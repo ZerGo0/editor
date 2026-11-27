@@ -35,6 +35,7 @@ func (w *Workspace) View(c *ui.Context) {
 		root.Focus()
 	}
 	w.syncGoToLine()
+	w.nextDiffFrame()
 	w.shortcuts(c, scopeMain)
 	w.focusedTab = nil
 	w.trackNavigation()
@@ -54,6 +55,7 @@ func (w *Workspace) View(c *ui.Context) {
 	w.endViewerFrame()
 	w.gitFrame()
 	w.autoSave(w.focusedTab)
+	w.publishViewState()
 	w.syncBackups()
 	w.overlays(c)
 	w.holdFocus()
