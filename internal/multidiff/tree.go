@@ -19,12 +19,15 @@ const (
 )
 
 type treeRow struct {
-	name  string
-	path  string
-	depth int
-	dir   bool
-	entry int
+	name    string
+	path    string
+	depth   int
+	dir     bool
+	section bool
+	entry   int
 }
+
+const sectionPathPrefix = "\x00"
 
 type treeState struct {
 	shown   bool
@@ -69,14 +72,47 @@ func (v *View) buildTree() {
 	}
 	t.rows = t.rows[:0]
 	t.fileRow = map[string]int{}
-	needle := strings.ToLower(t.filter)
-	root := &treeNode{}
+	groups := v.treeGroups(strings.ToLower(t.filter))
+	for _, g := range groups {
+		depth := 0
+		if len(groups) > 1 && g.section >= 0 {
+			s := &v.entries[g.section]
+			p := sectionPathPrefix + s.Key
+			t.rows = append(t.rows, treeRow{name: s.Title, path: p, dir: true, section: true, entry: g.section})
+			if t.closed[p] {
+				continue
+			}
+			depth = 1
+		}
+		v.flattenTree(g.root, depth)
+	}
+	t.dirty, t.built = false, t.filter
+}
+
+type treeGroup struct {
+	section int
+	root    *treeNode
+}
+
+func (v *View) treeGroups(needle string) []treeGroup {
+	var groups []treeGroup
+	cur := treeGroup{section: -1, root: &treeNode{}}
+	flush := func() {
+		if len(cur.root.dirs) > 0 || len(cur.root.files) > 0 {
+			groups = append(groups, cur)
+		}
+	}
 	for i := range v.entries {
 		e := &v.entries[i]
-		if !e.isFile() || needle != "" && !strings.Contains(strings.ToLower(e.Path), needle) {
+		if !e.isFile() {
+			flush()
+			cur = treeGroup{section: i, root: &treeNode{}}
 			continue
 		}
-		n := root
+		if needle != "" && !strings.Contains(strings.ToLower(e.Path), needle) {
+			continue
+		}
+		n := cur.root
 		if dir := path.Dir(e.Path); dir != "." {
 			for _, part := range strings.Split(dir, "/") {
 				n = n.dir(part)
@@ -84,8 +120,8 @@ func (v *View) buildTree() {
 		}
 		n.files = append(n.files, i)
 	}
-	v.flattenTree(root, 0)
-	t.dirty, t.built = false, t.filter
+	flush()
+	return groups
 }
 
 func (v *View) flattenTree(n *treeNode, depth int) {
@@ -136,12 +172,20 @@ func (v *View) sidebar(c *ui.Context) {
 	})
 }
 
+func (v *View) toggleTreeRow(p string) {
+	v.tree.closed[p] = !v.tree.closed[p]
+	v.tree.dirty = true
+}
+
 func (v *View) treeItem(r treeRow) list.Item {
 	if r.dir {
 		open := !v.tree.closed[r.path]
+		if r.section {
+			return list.Item{Label: r.name, Depth: r.depth, Branch: true, Open: open, Strong: true, Tooltip: r.name, OnClick: func() { v.toggleTreeRow(r.path) }}
+		}
 		return list.Item{Label: r.name, Depth: r.depth, Branch: true, Open: open, Tooltip: r.path,
 			Leading: func(c *ui.Context) { icons.FileIcon(c, path.Base(r.path), true, open, token.IconSize.Px()) },
-			OnClick: func() { v.tree.closed[r.path] = !v.tree.closed[r.path]; v.tree.dirty = true }}
+			OnClick: func() { v.toggleTreeRow(r.path) }}
 	}
 	e := &v.entries[r.entry]
 	it := list.Item{

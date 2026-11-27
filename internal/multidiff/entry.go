@@ -17,6 +17,7 @@ const (
 
 type Entry struct {
 	Key         string
+	Title       string
 	Path        string
 	OldPath     string
 	Status      token.GitStatus

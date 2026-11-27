@@ -63,6 +63,7 @@ func (v *View) Entries() []Entry { return v.entries }
 func (v *View) SetEntries(entries []Entry) {
 	old := v.files
 	v.files = make(map[string]*File, len(entries))
+	sortTreeOrder(entries)
 	v.entries = entries
 	for i := range entries {
 		e := &entries[i]

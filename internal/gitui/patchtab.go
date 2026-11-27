@@ -170,10 +170,12 @@ func (t *patchTab) entries(r repo) []multidiff.Entry {
 		var e multidiff.Entry
 		switch {
 		case it.header:
+			e.Title = it.title
 			e.Section = func(c *ui.Context) {
 				list.Row(c, list.State{}, list.Item{Label: it.title, Strong: true, Description: it.detail, Icon: icons.Commit})
 			}
 		case it.commit != nil:
+			e.Title = it.commit.Subject
 			e.Section = g.commitSection(*it.commit, it.full)
 		default:
 			e = t.fileEntry(r, it)

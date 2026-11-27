@@ -433,3 +433,26 @@ func TestCurrentPathIsTheTopFile(t *testing.T) {
 		t.Errorf("CurrentPath = %q, %v, want %q", got, ok, entries[20].Path)
 	}
 }
+
+func TestFilesFollowTheTreeOrderWithinEachSection(t *testing.T) {
+	file := func(p string) Entry { return Entry{Key: p, Path: p, Fingerprint: "v1", Patch: patchFor(t, p, 1)} }
+	section := Entry{Key: "section", Title: "Second", Section: func(*ui.Context) {}}
+	r := newRig(t, []Entry{file("c.go"), file("a/x.go"), file("b.go"), file("a/b/y.go"), section, file("z.go"), file("d/e.go")})
+	var got []string
+	for _, e := range r.v.Entries() {
+		got = append(got, e.Key)
+	}
+	want := []string{"a/b/y.go", "a/x.go", "b.go", "c.go", "section", "d/e.go", "z.go"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("entries = %v, want %v", got, want)
+	}
+	r.tt.Frame()
+	var rows []string
+	for _, row := range r.v.tree.rows {
+		rows = append(rows, row.name)
+	}
+	wantRows := []string{"a", "b", "y.go", "x.go", "b.go", "c.go", "Second", "d", "e.go", "z.go"}
+	if strings.Join(rows, " ") != strings.Join(wantRows, " ") {
+		t.Fatalf("tree rows = %v, want %v", rows, wantRows)
+	}
+}
