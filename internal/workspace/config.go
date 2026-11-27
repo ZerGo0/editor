@@ -34,7 +34,6 @@ func (w *Workspace) zoom() float32 {
 
 func (w *Workspace) configure(st *editor.State, path string) {
 	w.ConfigureEditor(st, path)
-	st.Bindings = w.env.Keys.Current.EditorBindings()
 	st.OnInput = w.editorInput
 	st.ContextMenu = w.editorMenu
 	st.RenderFindBar = findwidget.ForEditor(st)
@@ -44,6 +43,7 @@ func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 	s := w.settings
 	st.Font = w.editorFont()
 	st.HoverDelay = token.EditorHover
+	st.Bindings = w.env.Keys.Current.EditorBindings()
 	st.LineHeight = float32(s.Number(settings.LineHeight))
 	st.TabSize, st.Indent = 0, editor.IndentAuto
 	if !s.Bool(settings.DetectIndentation) {
@@ -52,7 +52,7 @@ func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 			st.Indent = editor.IndentSpaces
 		}
 	}
-	st.SoftWrap = s.String(settings.WordWrap) == settings.WrapOn
+	w.applyWrapping(st)
 	st.LineNumbers = lineNumberModes[s.String(settings.LineNumbers)]
 	st.Whitespace = whitespaceModes[s.String(settings.RenderWhitespace)]
 	st.WrapGuides = s.Ints(settings.Rulers)
@@ -69,24 +69,25 @@ func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
 	w.applyOverrides(st, path)
 }
 
-// TECHDEBT: MyGo 0.10.0 DiffState has no bracket color, guide or hover delay option; add them here when it does.
+// TECHDEBT: MyGo 0.10.0 DiffState has no bracket color, guide, hover delay or wrap column option; add them here when it does.
 func (w *Workspace) ConfigureDiff(d *editor.DiffState, path string) {
 	var st editor.State
 	w.ConfigureEditor(&st, path)
 	d.Font, d.LineHeight, d.TabSize = st.Font, st.LineHeight, st.TabSize
-	d.Wrap, d.ScrollPastEnd = st.SoftWrap, !st.NoScrollPastEnd
-	d.Bindings = withoutGoToLine
+	d.Wrap, _ = w.wrapping(true)
+	d.ScrollPastEnd = !st.NoScrollPastEnd
+	d.Bindings = withoutHostCommands
 	if st.Theme != nil {
 		d.Theme = st.Theme
 	}
 }
 
-var withoutGoToLine = goToLineOff()
+var withoutHostCommands = hostCommandsOff()
 
-func goToLineOff() []editor.Binding {
+func hostCommandsOff() []editor.Binding {
 	var out []editor.Binding
 	for _, b := range editor.DefaultBindings() {
-		if b.Command == editor.GoToLine {
+		if b.Command == editor.GoToLine || b.Command == editor.ToggleSoftWrap {
 			out = append(out, editor.Binding{Mods: b.Mods, Key: b.Key, ThenKey: b.ThenKey, Command: editor.NoCommand})
 		}
 	}

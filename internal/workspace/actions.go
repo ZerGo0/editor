@@ -14,6 +14,10 @@ import (
 const maxClosed = 30
 
 func (w *Workspace) RunEditor(cmd editor.Command) {
+	if cmd == editor.ToggleSoftWrap {
+		w.ToggleWordWrap()
+		return
+	}
 	t := w.active.ActiveTab()
 	if t == nil || t.Editor == nil {
 		return

@@ -51,6 +51,8 @@ const (
 	InsertSpaces         = "editor.insertSpaces"
 	DetectIndentation    = "editor.detectIndentation"
 	WordWrap             = "editor.wordWrap"
+	WordWrapColumn       = "editor.wordWrapColumn"
+	DiffWordWrap         = "diffEditor.wordWrap"
 	LineNumbers          = "editor.lineNumbers"
 	RenderWhitespace     = "editor.renderWhitespace"
 	Rulers               = "editor.rulers"
@@ -94,6 +96,10 @@ const (
 	WrapOff = "off"
 	WrapOn  = "on"
 
+	WrapColumn  = "wordWrapColumn"
+	WrapBounded = "bounded"
+	WrapInherit = "inherit"
+
 	NumbersOn       = "on"
 	NumbersOff      = "off"
 	NumbersRelative = "relative"
@@ -132,6 +138,9 @@ const (
 	minLineHeight        = 1
 	maxLineHeight        = 3
 	defaultTabSize       = 4
+	defaultWrapColumn    = 80
+	minWrapColumn        = 1
+	maxWrapColumn        = 1000
 	maxTabSize           = 16
 	defaultAutoSaveDelay = 1000
 	minAutoSaveDelay     = 100
@@ -150,7 +159,9 @@ var Defs = []Def{
 	{Key: DetectIndentation, Title: "Detect Indentation", Description: "Use the indentation of the language and the file. When off, Tab Size and Insert Spaces apply.", Category: CategoryEditor, Kind: Bool, Default: true},
 	{Key: TabSize, Title: "Tab Size", Description: "The number of columns a tab takes.", Category: CategoryEditor, Kind: Int, Default: defaultTabSize, Min: 1, Max: maxTabSize},
 	{Key: InsertSpaces, Title: "Insert Spaces", Description: "Insert spaces when Tab is pressed.", Category: CategoryEditor, Kind: Bool, Default: true},
-	{Key: WordWrap, Title: "Word Wrap", Description: "Wrap long lines at the width of the editor.", Category: CategoryEditor, Kind: Enum, Default: WrapOff, Options: []string{WrapOff, WrapOn}},
+	{Key: WordWrap, Title: "Word Wrap", Description: "Wrap long lines: off, at the width of the editor, at Word Wrap Column, or at the narrower of the two (bounded).", Category: CategoryEditor, Kind: Enum, Default: WrapOff, Options: []string{WrapOff, WrapOn, WrapColumn, WrapBounded}},
+	{Key: WordWrapColumn, Title: "Word Wrap Column", Description: "The column at which lines wrap when Word Wrap is wordWrapColumn or bounded.", Category: CategoryEditor, Kind: Int, Default: defaultWrapColumn, Min: minWrapColumn, Max: maxWrapColumn},
+	{Key: DiffWordWrap, Title: "Diff Editor Word Wrap", Description: "Wrap long lines in diff editors: off, on, or inherit the Word Wrap setting.", Category: CategoryEditor, Kind: Enum, Default: WrapInherit, Options: []string{WrapOff, WrapOn, WrapInherit}},
 	{Key: LineNumbers, Title: "Line Numbers", Description: "Show line numbers in the gutter.", Category: CategoryEditor, Kind: Enum, Default: NumbersOn, Options: []string{NumbersOn, NumbersRelative, NumbersOff}},
 	{Key: RenderWhitespace, Title: "Render Whitespace", Description: "Where spaces and tabs show as dots and arrows.", Category: CategoryEditor, Kind: Enum, Default: WhitespaceSelection, Options: []string{WhitespaceNone, WhitespaceSelection, WhitespaceTrailing, WhitespaceAll}},
 	{Key: Rulers, Title: "Rulers", Description: "Columns at which vertical guides show, for example 80, 120.", Category: CategoryEditor, Kind: IntList, Default: []int{}},

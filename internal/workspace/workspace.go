@@ -30,6 +30,7 @@ var TitleBarHeight = int(token.TitleBarHeight.Px())
 
 type Workspace struct {
 	codeTheme     *editor.Theme
+	wrapOverride  *bool
 	Root          string
 	Name          string
 	win           *mygo.Window

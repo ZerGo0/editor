@@ -12,7 +12,7 @@ import (
 func TestEveryEditorCommandHasOneID(t *testing.T) {
 	seen := map[string]editor.Command{}
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
-		if cmd == editor.GoToLine {
+		if cmd == editor.GoToLine || cmd == editor.ToggleSoftWrap {
 			continue
 		}
 		id := keymap.EditorCommandID(cmd)

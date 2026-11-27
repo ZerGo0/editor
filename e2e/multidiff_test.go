@@ -13,11 +13,12 @@ import (
 )
 
 const (
-	stackFiles     = 30
-	stackLines     = 40
-	stackTarget    = 5
-	stackListLabel = "Diffs of Changes"
-	headerSlack    = 2
+	stackFiles       = 30
+	stackLines       = 40
+	stackTarget      = 5
+	stackListLabel   = "Diffs of Changes"
+	headerSlack      = 2
+	stackWrapRepeats = 300
 )
 
 func stackLinesOf(word string) string {
@@ -58,4 +59,34 @@ func TestSourceControlFileOpensStackedDiffAtItsHeader(t *testing.T) {
 		return top >= -headerSlack && top <= float64(token.HeaderHeight.Px())+headerSlack
 	})
 	app.WaitNode(win, "file tree", RoleLabel("list", "Changed Files"))
+}
+
+func TestAltZWrapsTheStackedDiff(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("word ", stackWrapRepeats)
+	files := map[string]string{"a.txt": "old " + long + "\n", "b.txt": "old " + long + "\n"}
+	root := gitProject(t, files)
+	for name := range files {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("new "+long+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app := Launch(t, root)
+	win := app.WaitWindow(filepath.Base(root))
+	app.Idle(win)
+	app.Menu(win, "View", "Source Control")
+	row := app.WaitNode(win, "changed file", func(n Node) bool { return n.Label == "a.txt" && n.Role != "treeItem" })
+	app.Click(win, row, 1)
+	app.WaitNode(win, "stacked diff toolbar", Label("Diff Toolbar"))
+	second := func() float64 {
+		header, ok := app.Find(win, RoleLabel("group", "b.txt"))
+		if !ok {
+			return -1
+		}
+		return header.Bounds.Y
+	}
+	var before float64
+	app.Eventually("the second file header", func() bool { before = second(); return before >= 0 })
+	app.Key(win, "Alt+Z")
+	app.Eventually("the first file grows when wrapped", func() bool { return second() > before })
 }

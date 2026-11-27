@@ -65,6 +65,9 @@ func buildEditorTables() (map[editor.Command]string, map[string]editor.Command) 
 	}
 	byID := map[string]editor.Command{}
 	for cmd := editor.NoCommand + 1; cmd.String() != unknownCommandName; cmd++ {
+		if cmd == editor.ToggleSoftWrap {
+			continue
+		}
 		id, ok := ids[cmd]
 		if !ok {
 			id = legacyEditorPrefix + cmd.String()
