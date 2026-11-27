@@ -180,6 +180,7 @@ func tabItem(c *ui.Context, p *token.Palette, tab ui.Element, active bool, i int
 		s.middle = noTab
 		if hovered && o.OnAuxClick != nil {
 			o.OnAuxClick(i)
+			c.Invalidate()
 		}
 	}
 	if o.OnDoubleClick != nil && tab.DoubleClicked() {

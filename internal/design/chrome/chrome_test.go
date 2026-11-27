@@ -1,6 +1,7 @@
 package chrome
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/action"
@@ -93,5 +94,24 @@ func TestTabStrip(t *testing.T) {
 	}
 	if closed != 0 {
 		t.Fatalf("closed %d, want 0", closed)
+	}
+}
+
+func TestTabStripMiddleClickClosesTabAtOnce(t *testing.T) {
+	selected := 0
+	tabs := []Tab{{Label: "a.go"}, {Label: "b.go"}}
+	tt := ui.NewTester(func(c *ui.Context) {
+		TabStrip(c, &selected, tabs, TabStripOptions{Label: "Editors", OnAuxClick: func(i int) { tabs = slices.Delete(tabs, i, i+1) }})
+	}, testWidth, testHeight)
+	at, ok := tt.Find("a.go")
+	if !ok {
+		t.Fatal("no a.go tab")
+	}
+	x, y := at.X+at.W/2, at.Y+at.H/2
+	tt.Move(x, y)
+	tt.PressButton(middleButton, x, y)
+	tt.ReleaseButton(middleButton, x, y)
+	if _, open := tt.AccessByRole(ui.RoleTab, "a.go"); open {
+		t.Fatal("a.go tab still shows after a middle click")
 	}
 }
