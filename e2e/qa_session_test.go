@@ -120,11 +120,11 @@ func writeJSON(t *testing.T, path string, v any) {
 
 func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 	t.Helper()
-	frameStats := ""
+	env := []string{frameStatsEnv + "="}
 	if o.FrameStats {
-		frameStats = frameStatsAll
+		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1"}
 	}
-	app := LaunchEnv(t, seedUserData(t, root, o), []string{frameStatsEnv + "=" + frameStats}, root)
+	app := LaunchEnv(t, seedUserData(t, root, o), env, root)
 	var win int
 	app.Eventually("project window", func() bool {
 		for _, w := range app.Windows() {

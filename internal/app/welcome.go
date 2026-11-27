@@ -29,13 +29,12 @@ func (a *App) showWelcome() {
 		a.raise(a.welcome)
 		return
 	}
-	a.welcome = mygo.NewWindow(mygo.WindowOptions{
+	a.welcome = a.newWindow(mygo.WindowOptions{
 		Title:     welcomeTitle,
 		Width:     welcomeWidth,
 		Height:    welcomeHeight,
 		MinWidth:  welcomeWidth,
 		MinHeight: welcomeHeight,
-		Hidden:    a.options.Hidden,
 		Content:   ui.View(a.welcomeView),
 	})
 	win := a.welcome

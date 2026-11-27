@@ -28,6 +28,7 @@ const (
 
 type Options struct {
 	Hidden             bool
+	ShowUnfocused      bool
 	DiscardOnClose     bool
 	NoBackups          bool
 	NoMenuAccelerators bool
@@ -152,9 +153,21 @@ func (a *App) restore() {
 
 func (a *App) raise(win *mygo.Window) {
 	win.Restore()
-	if !a.options.Hidden {
+	switch {
+	case !a.options.Hidden:
 		win.Focus()
+	case a.options.ShowUnfocused:
+		win.ShowInactive()
 	}
+}
+
+func (a *App) newWindow(o mygo.WindowOptions) *mygo.Window {
+	o.Hidden = a.options.Hidden
+	win := mygo.NewWindow(o)
+	if a.options.ShowUnfocused {
+		win.ShowInactive()
+	}
+	return win
 }
 
 func (a *App) raiseProject(pw *projectWindow) {
@@ -176,7 +189,7 @@ func (a *App) openProject(root string) *projectWindow {
 		return pw
 	}
 	ws := workspace.New(root, a.store.State.Projects[root], a.env)
-	win := mygo.NewWindow(mygo.WindowOptions{
+	win := a.newWindow(mygo.WindowOptions{
 		Title:                ws.Name,
 		Width:                projectWidth,
 		Height:               projectHeight,
@@ -186,7 +199,6 @@ func (a *App) openProject(root string) *projectWindow {
 		TitleBarStyle:        mygo.TitleBarHiddenInset,
 		TitleBarHeight:       workspace.TitleBarHeight,
 		TrafficLightPosition: workspace.TrafficLightPosition(),
-		Hidden:               a.options.Hidden,
 		Content:              ui.View(a.projectView(ws)),
 	})
 	ws.Attach(win)

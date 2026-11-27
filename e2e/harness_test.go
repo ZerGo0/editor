@@ -26,6 +26,7 @@ const (
 	binaryName         = "editor-e2e"
 	socketEnv          = "MYGO_AUTOMATION"
 	userDataEnv        = "EDITOR_E2E_USER_DATA"
+	showUnfocusedEnv   = "EDITOR_E2E_SHOW_UNFOCUSED"
 	artifactsEnv       = "EDITOR_E2E_ARTIFACTS"
 	startTimeout       = 20 * time.Second
 	quitTimeout        = 10 * time.Second
