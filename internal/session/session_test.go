@@ -193,3 +193,24 @@ func TestRemoveRecent(t *testing.T) {
 		t.Fatalf("recent %v", s.State.Recent)
 	}
 }
+
+func TestRecentFilesRoundTripNewestFirst(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.json")
+	s, _ := Load(path)
+	for i := range maxRecentFiles + 1 {
+		s.AddRecentFile(fmt.Sprintf("/p/f%d", i))
+	}
+	s.AddRecentFile("/p/f1")
+	s.RemoveRecentFile("/p/f2")
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := got.State.Files
+	if len(files) != maxRecentFiles-1 || files[0] != "/p/f1" || files[1] != fmt.Sprintf("/p/f%d", maxRecentFiles) || slices.Contains(files, "/p/f2") || slices.Contains(files, "/p/f0") {
+		t.Fatalf("files = %v", files)
+	}
+}

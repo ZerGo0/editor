@@ -47,6 +47,9 @@ func (a *App) loadConfig() {
 		UserData:      dir,
 		RecentFolders: func() []string { return a.store.State.Recent },
 		OpenFolders:   func() []string { return slices.Collect(maps.Keys(a.projects)) },
+		RecentFiles:   func() []string { return slices.Clone(a.store.State.Files) },
+		TouchFile:     a.store.AddRecentFile,
+		ForgetFile:    a.store.RemoveRecentFile,
 		OpenFolder:    a.openRecentFolder,
 		ForgetFolder:  a.removeRecent,
 	}

@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	maxRecent = 20
-	filePerm  = 0o600
+	maxRecent      = 20
+	maxRecentFiles = 50
+	filePerm       = 0o600
 )
 
 type Tab struct {
@@ -67,6 +68,7 @@ type Project struct {
 
 type State struct {
 	Recent   []string           `json:"recent"`
+	Files    []string           `json:"recentFiles,omitempty"`
 	Open     []string           `json:"open"`
 	Projects map[string]Project `json:"projects"`
 	Commands []string           `json:"commands,omitempty"`
@@ -113,13 +115,22 @@ func (s *Store) prune() {
 }
 
 func (s *Store) AddRecent(root string) {
-	recent := slices.DeleteFunc(s.State.Recent, func(r string) bool { return r == root })
-	s.State.Recent = slices.Insert(recent, 0, root)
-	if len(s.State.Recent) > maxRecent {
-		s.State.Recent = s.State.Recent[:maxRecent]
-	}
+	s.State.Recent = pushFront(s.State.Recent, root, maxRecent)
 }
 
 func (s *Store) RemoveRecent(root string) {
 	s.State.Recent = slices.DeleteFunc(s.State.Recent, func(r string) bool { return r == root })
+}
+
+func (s *Store) AddRecentFile(path string) {
+	s.State.Files = pushFront(s.State.Files, path, maxRecentFiles)
+}
+
+func (s *Store) RemoveRecentFile(path string) {
+	s.State.Files = slices.DeleteFunc(s.State.Files, func(p string) bool { return p == path })
+}
+
+func pushFront(list []string, item string, limit int) []string {
+	list = slices.Insert(slices.DeleteFunc(list, func(s string) bool { return s == item }), 0, item)
+	return list[:min(len(list), limit)]
 }

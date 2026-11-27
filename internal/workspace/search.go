@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 	"unicode"
@@ -131,6 +132,21 @@ func (w *Workspace) touchRecent(p string) {
 	}
 	r := append([]string{p}, slices.DeleteFunc(w.search.recent, func(q string) bool { return q == p })...)
 	w.search.recent = r[:min(len(r), maxRecentFiles)]
+	if w.env.TouchFile != nil {
+		w.env.TouchFile(p)
+	}
+}
+
+func (w *Workspace) loadRecentFiles() {
+	if w.env.RecentFiles == nil {
+		return
+	}
+	for _, p := range w.env.RecentFiles() {
+		if r, err := filepath.Rel(w.Root, p); err == nil && filepath.IsLocal(r) && !slices.Contains(w.search.recent, p) {
+			w.search.recent = append(w.search.recent, p)
+		}
+	}
+	w.search.recent = w.search.recent[:min(len(w.search.recent), maxRecentFiles)]
 }
 
 func (w *Workspace) openPaths() []string {
@@ -245,6 +261,9 @@ func (w *Workspace) runCommand(id string) {
 
 func (w *Workspace) forgetRecent(path string) {
 	w.search.recent = slices.DeleteFunc(w.search.recent, func(p string) bool { return p == path })
+	if w.env.ForgetFile != nil {
+		w.env.ForgetFile(path)
+	}
 }
 
 func (w *Workspace) toolWindows() []finder.ToolWindow {

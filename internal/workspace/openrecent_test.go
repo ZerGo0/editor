@@ -3,7 +3,10 @@ package workspace
 import (
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/backup"
 
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/egoist/mygo"
@@ -97,5 +100,55 @@ func TestOpenRecentRemoveButtonForgetsTheEntry(t *testing.T) {
 	tt.Key(0, ui.KeyDown)
 	if err := tt.Click("Remove notes.txt from Recently Opened"); err != nil || len(w.search.recent) != 0 {
 		t.Fatalf("remove file: %v, recent %v", err, w.search.recent)
+	}
+}
+
+func TestOpenRecentShowsRecentFilesFromEveryProject(t *testing.T) {
+	env := newTestEnv(t)
+	root := t.TempDir()
+	other := filepath.Join(t.TempDir(), "elsewhere.go")
+	writeFiles(t, root, map[string]string{"mine.go": "package a\n"})
+	global := []string{other, filepath.Join(root, "mine.go")}
+	var touched, forgot []string
+	env.RecentFiles = func() []string { return global }
+	env.TouchFile = func(p string) { touched = append(touched, p) }
+	env.ForgetFile = func(p string) { forgot = append(forgot, p) }
+	w := newTestWorkspace(t, root, env, session.Project{})
+	if !slices.Equal(w.search.recent, []string{filepath.Join(root, "mine.go")}) {
+		t.Fatalf("project recent files = %v, want only the file inside the project", w.search.recent)
+	}
+	var files []string
+	for _, it := range w.recentEntries() {
+		if it.Group == recentFilesGroup {
+			files = append(files, it.Label)
+		}
+	}
+	if !slices.Equal(files, []string{"elsewhere.go", "mine.go"}) {
+		t.Fatalf("Open Recent files = %v, want both projects", files)
+	}
+	w.OpenFile(filepath.Join(root, "mine.go"), false, true)
+	w.forgetRecent(other)
+	if !slices.Contains(touched, filepath.Join(root, "mine.go")) || !slices.Equal(forgot, []string{other}) {
+		t.Fatalf("touched %v, forgot %v", touched, forgot)
+	}
+}
+
+func TestOpenRecentMarksFoldersWithUnsavedFiles(t *testing.T) {
+	w, _, folders, _ := openRecentHarness(t)
+	w.env.BackupDir = t.TempDir()
+	alpha := (*folders)[1]
+	store := backup.Open(filepath.Join(w.env.BackupDir, projectKey(alpha)), backup.DefaultLimit)
+	body := "unsaved"
+	if err := store.Write(1, backup.Meta{Path: filepath.Join(alpha, "a.go"), Size: int64(len(body))}, strings.NewReader(body), int64(len(body))); err != nil {
+		t.Fatal(err)
+	}
+	_, e := openTab(t, w, filepath.Join(w.Root, "notes.txt"))
+	e.doc.Buffer.Set("edited\n")
+	labels := map[string]string{}
+	for _, it := range w.recentEntries() {
+		labels[it.Label] = it.Action.Label
+	}
+	if labels["current"] != unsavedFolderLabel || labels["alpha"] != unsavedFolderLabel || labels["beta"] != openedElsewhereLabel {
+		t.Fatalf("buttons = %v", labels)
 	}
 }

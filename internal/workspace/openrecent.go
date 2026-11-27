@@ -4,6 +4,9 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/backup"
+	"github.com/egoist/mygo"
+
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/palette"
@@ -16,6 +19,11 @@ const (
 	openRecentEmpty       = "No recent folders or files"
 	recentFoldersGroup    = "folders"
 	recentFilesGroup      = "files"
+	unsavedFolderLabel    = "Folder With Unsaved Files"
+	reviewUnsavedMessage  = "Do you want to open the folder to review the unsaved files?"
+	reviewUnsavedDetail   = "Folders with unsaved files cannot be removed until all unsaved files have been saved or reverted."
+	reviewUnsavedButton   = "Open Folder"
+	cancelButton          = "Cancel"
 	openedHereLabel       = "Folder Opened in Active Window"
 	openedElsewhereLabel  = "Folder Opened in a Window"
 )
@@ -59,7 +67,11 @@ func (w *Workspace) recentEntries() []palette.Item {
 			})
 		}
 	}
-	for _, path := range w.search.recent {
+	files := w.search.recent
+	if w.env.RecentFiles != nil {
+		files = w.env.RecentFiles()
+	}
+	for _, path := range files {
 		item := palette.Item{
 			Label:   filepath.Base(path),
 			Leading: func(c *ui.Context) { w.tabIcon(c, path) },
@@ -82,6 +94,8 @@ func removeAction(name string, run func()) *palette.Action {
 func (w *Workspace) folderAction(root string, open []string) *palette.Action {
 	forget := func() { w.forgetRecentFolder(root) }
 	switch {
+	case w.folderHasUnsaved(root):
+		return &palette.Action{Icon: icons.Dot, Label: unsavedFolderLabel, Run: func() { w.reviewUnsaved(root) }}
 	case root == w.Root:
 		return &palette.Action{Icon: icons.FolderOpen, Label: openedHereLabel, Run: forget}
 	case slices.Contains(open, root):
@@ -103,4 +117,32 @@ func (w *Workspace) openRecent(p recentPick, sameWindow bool) {
 	case w.env.OpenFolder != nil:
 		w.env.OpenFolder(w.win, p.path, sameWindow)
 	}
+}
+
+func (w *Workspace) folderHasUnsaved(root string) bool {
+	if root == w.Root {
+		return len(w.modified()) > 0
+	}
+	return w.env.BackupDir != "" && len(backup.Open(filepath.Join(w.env.BackupDir, projectKey(root)), backup.DefaultLimit).Entries()) > 0
+}
+
+func (w *Workspace) reviewUnsaved(root string) {
+	if w.win == nil {
+		w.openRecent(recentPick{path: root, folder: true}, true)
+		return
+	}
+	w.palette.Close()
+	go func() {
+		res, err := mygo.Dialog.Message(mygo.MessageOptions{
+			Parent:       w.win,
+			Type:         mygo.MessageWarning,
+			Message:      reviewUnsavedMessage,
+			Detail:       reviewUnsavedDetail,
+			Buttons:      []string{reviewUnsavedButton, cancelButton},
+			CancelButton: 1,
+		})
+		if err == nil && res.Button == 0 {
+			w.update(func() { w.openRecent(recentPick{path: root, folder: true}, true) })
+		}
+	}()
 }

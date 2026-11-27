@@ -128,6 +128,7 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	w.initGit()
 	w.initGitHub()
 	w.layout = w.restoreNode(saved.Layout)
+	w.loadRecentFiles()
 	if l := saved.LastEdit; l != nil {
 		w.nav.lastEdit = &session.Location{Path: w.abs(l.Path), Line: l.Line, Col: l.Col}
 	}
