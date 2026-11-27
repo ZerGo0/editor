@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -127,4 +128,56 @@ func TestClosingFirstTabKeepsOthers(t *testing.T) {
 	}
 	app.Menu(win, "File", "New Text File")
 	app.WaitNode(win, "Untitled-1 tab", RoleLabel("tab", "Untitled-1"))
+}
+
+func TestOpenRecentFocusesAFolderOpenInAnotherWindow(t *testing.T) {
+	t.Parallel()
+	for name, choose := range map[string]func(app *App, win int, label string){
+		"list": func(app *App, win int, label string) {
+			app.Key(win, "Ctrl+R")
+			app.WaitNode(win, "Open Recent entry", RoleLabel("listItem", label))
+			app.Type(win, label)
+			app.Key(win, "Enter")
+		},
+		"menu": func(app *App, win int, label string) { app.Menu(win, "File", "Open Recent", label) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			first := Project(t, map[string]string{"a.txt": "a\n"})
+			second := Project(t, map[string]string{"b.txt": "b\n"})
+			app := LaunchWith(t, t.TempDir(), first, second)
+			win := app.WaitWindow(filepath.Base(first))
+			other := app.WaitWindow(filepath.Base(second))
+			app.Idle(win)
+			choose(app, win, filepath.Base(second))
+			app.Eventually("the other window comes to the front", func() bool {
+				return slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.ID == other && w.Visible })
+			})
+			if !slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.ID == win }) {
+				t.Fatalf("the window that opened the folder closed; windows %v", app.Windows())
+			}
+		})
+	}
+}
+
+func TestOpenRecentMenuReplacesTheCurrentWindow(t *testing.T) {
+	t.Parallel()
+	first := Project(t, map[string]string{"a.txt": "a\n"})
+	second := Project(t, map[string]string{"b.txt": "b\n"})
+	userData := t.TempDir()
+	recent, err := json.Marshal(map[string][]string{"recent": {second}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(userData, "session.json"), recent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := LaunchWith(t, userData, first)
+	win := app.WaitWindow(filepath.Base(first))
+	app.Idle(win)
+	app.must("menu", map[string]any{"window": win, "path": []string{"File", "Open Recent", filepath.Base(second)}})
+	app.WaitWindow(filepath.Base(second))
+	app.Eventually("the current window is replaced", func() bool {
+		return !slices.ContainsFunc(app.Windows(), func(w Window) bool { return w.ID == win })
+	})
 }

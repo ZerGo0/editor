@@ -50,7 +50,7 @@ func (a *App) loadConfig() {
 		RecentFiles:   func() []string { return slices.Clone(a.store.State.Files) },
 		TouchFile:     a.store.AddRecentFile,
 		ForgetFile:    a.store.RemoveRecentFile,
-		OpenFolder:    a.openRecentFolder,
+		OpenFolder:    a.openFolder,
 		ForgetFolder:  a.removeRecent,
 	}
 	if !a.options.NoBackups {

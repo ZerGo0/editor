@@ -90,18 +90,24 @@ func (a *App) openDialog(parent *mygo.Window, title string, directory bool) {
 			log.Printf("%s: %v", strings.ToLower(title), err)
 			return
 		}
-		if len(paths) > 0 {
-			mygo.RunOnMain(func() { a.openPath(paths[0]) })
+		if len(paths) == 0 {
+			return
 		}
+		if directory {
+			mygo.RunOnMain(func() { a.openFolder(parent, paths[0], true) })
+			return
+		}
+		mygo.RunOnMain(func() { a.openPath(paths[0]) })
 	}()
 }
 
-func (a *App) openRecentFolder(from *mygo.Window, root string, replace bool) {
+func (a *App) openFolder(from *mygo.Window, root string, replace bool) {
 	source := a.workspaceFor(from)
-	if !a.openPath(root) {
-		return
+	if c, err := canonical(root); err == nil {
+		root = c
 	}
-	if !replace || source == nil {
+	_, openElsewhere := a.projects[root]
+	if !a.openPath(root) || !replace || source == nil || openElsewhere {
 		return
 	}
 	if target := a.projectContaining(root); target != nil && target != source {

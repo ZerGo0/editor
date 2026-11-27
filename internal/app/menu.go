@@ -198,7 +198,7 @@ func (a *App) recentItems() []*mygo.MenuItem {
 		items = append(items, &mygo.MenuItem{
 			Label:    filepath.Base(root),
 			Subtitle: fsutil.DisplayPath(root),
-			Click:    func(*mygo.MenuItem, *mygo.Window) { a.openPath(root) },
+			Click:    func(_ *mygo.MenuItem, win *mygo.Window) { a.openFolder(win, root, true) },
 		})
 	}
 	if len(items) > 0 {
