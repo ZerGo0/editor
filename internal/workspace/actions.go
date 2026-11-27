@@ -23,7 +23,9 @@ func (w *Workspace) RunEditor(cmd editor.Command) {
 		return
 	}
 	t.Editor.Run(cmd)
-	w.focusTab = t
+	if w.focusedTab != t {
+		w.focusTab = t
+	}
 }
 
 func (w *Workspace) OpenSettings() {

@@ -50,7 +50,7 @@ func (w *Workspace) shortcuts(c *ui.Context, call keyScope) {
 		}
 	}
 	for _, b := range active.Singles() {
-		if _, ok := keymap.EditorCommand(b.Command); ok && !b.Chord[0].ByCode() {
+		if _, ok := keymap.EditorCommand(b.Command); ok && !b.Chord[0].ByCode() && w.editorRunsItsKeys() {
 			continue
 		}
 		if s, ok := km.MenuStroke(b.Command); ok && s == b.Chord[0] && w.env.Commands.InMenu(b.Command) {
@@ -61,6 +61,11 @@ func (w *Workspace) shortcuts(c *ui.Context, call keyScope) {
 			return
 		}
 	}
+}
+
+func (w *Workspace) editorRunsItsKeys() bool {
+	t := w.focusedTab
+	return t == nil || t.Editor == nil || t.Editor.Focused()
 }
 
 func (w *Workspace) activeKeys(c *ui.Context) *keymap.Active {
@@ -75,6 +80,7 @@ func (w *Workspace) activeKeys(c *ui.Context) *keymap.Active {
 
 func (w *Workspace) whenContext(c *ui.Context) when.Context {
 	editorFocus := w.focusedTab != nil && w.focusedTab.Editor != nil
+	editorText := editorFocus && w.focusedTab.Editor.Focused()
 	if c != nil {
 		w.keys.textFocus = c.FocusTakesText()
 	}
@@ -82,8 +88,9 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 	t := w.active.ActiveTab()
 	ctx := maps.Clone(keymap.DefaultContext())
 	for key, on := range map[string]bool{
-		"editorTextFocus":           editorFocus,
+		"editorTextFocus":           editorText,
 		"editorFocus":               editorFocus,
+		"findInputFocussed":         editorFocus && !editorText && textFocus,
 		"textInputFocus":            textFocus,
 		"inputFocus":                textFocus && !editorFocus,
 		"sideBarFocus":              w.focus.side,
