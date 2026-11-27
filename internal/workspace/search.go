@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"github.com/ZerGo0/editor/internal/command"
-	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/history"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -18,8 +17,8 @@ import (
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/search/files"
+	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/search/symbols"
-	searchview "github.com/ZerGo0/editor/internal/search/view"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
@@ -27,7 +26,8 @@ import (
 )
 
 const (
-	SearchView         = "search"
+	FindPanel          = "find"
+	showFindWindowID   = "search.showFindWindow"
 	reindexDelay       = time.Second
 	maxRecentFiles     = 50
 	doubleShiftWindow  = 400 * time.Millisecond
@@ -35,14 +35,17 @@ const (
 )
 
 type searchState struct {
-	files   *files.Index
-	scanner *files.Scanner
-	view    *searchview.View
-	recent  []string
-	timer   *time.Timer
-	cancel  context.CancelFunc
-	shiftAt time.Time
-	engine  *everywhere.Search
+	files       *files.Index
+	scanner     *files.Scanner
+	dialog      *finder.Dialog
+	recentFiles *finder.RecentFiles
+	replace     *finder.ReplacePopup
+	find        *finder.FindWindow
+	recent      []string
+	timer       *time.Timer
+	cancel      context.CancelFunc
+	shiftAt     time.Time
+	engine      *everywhere.Search
 }
 
 func (w *Workspace) initSearch(saved session.Project) {
@@ -50,54 +53,50 @@ func (w *Workspace) initSearch(saved session.Project) {
 	syms := symbols.NewIndex()
 	w.search.scanner = &files.Scanner{Root: w.Root, Visitors: []files.Visitor{everywhere.SymbolVisitor{Index: syms}, w.insights.todos}}
 	engine := everywhere.New(&everywhere.Env{
-		Root:     w.Root,
-		Files:    w.search.files,
-		Symbols:  syms,
-		Actions:  w.commandList,
-		Recent:   func() []string { return slices.Clone(w.search.recent) },
-		Modified: w.modifiedTexts,
-		Repo:     w.openRepo,
+		Root:    w.Root,
+		Files:   w.search.files,
+		Symbols: syms,
+		Actions: w.commandList,
+		Recent:  func() []string { return slices.Clone(w.search.recent) },
 	})
-	w.search.view = searchview.New(searchview.Env{
-		Host:        w,
-		Providers:   engine,
-		Files:       w.search.files,
-		Settings:    w.settings,
-		OpenFiles:   w.openPaths,
-		Open:        w.openLocation,
-		Reveal:      func(p string) { w.revealPath(p, false) },
-		RunAction:   w.run,
-		GitRef:      w.checkoutRef,
-		GitCommit:   w.showCommit,
-		BeforeWrite: w.beforeReplace,
-		FocusEditor: w.focusEditor,
-	})
-	if len(saved.Search) > 0 {
-		var st searchview.State
-		if err := json.Unmarshal(saved.Search, &st); err == nil {
-			w.search.view.Restore(st)
-		}
+	env := finder.Env{
+		Host:            w,
+		Engine:          engine,
+		Files:           w.search.files,
+		Settings:        w.settings,
+		OpenFiles:       w.openPaths,
+		Open:            w.openLocation,
+		Commands:        w.commandItems,
+		RunAction:       w.runCommand,
+		ForgetRecent:    w.forgetRecent,
+		ToolWindows:     w.toolWindows,
+		BeforeWrite:     w.beforeReplace,
+		ShowFindResults: w.showFindResults,
 	}
 	w.search.engine = engine
-	w.addSideView(toolView{id: SearchView, title: "Search", command: "workbench.view.search", icon: icons.Search, view: w.search.view.View, badge: w.search.view.Count, actions: w.search.view.TitleActions})
-	w.initQuickOpen()
+	w.search.dialog = finder.NewDialog(env)
+	w.search.recentFiles = finder.NewRecentFiles(env)
+	w.search.replace = finder.NewReplacePopup(env)
+	w.search.find = finder.NewFindWindow(env)
+	if len(saved.Search) > 0 {
+		var st finder.State
+		if err := json.Unmarshal(saved.Search, &st); err == nil {
+			w.search.dialog.Restore(st)
+			w.search.replace.Restore(st.Replace)
+		}
+	}
+	w.addPanel(toolView{id: FindPanel, title: "Find", command: showFindWindowID, icon: icons.Search, view: w.search.find.View, badge: w.search.find.Count, actions: w.search.find.Actions})
 }
 
 func (w *Workspace) snapshotSearch(p *session.Project) {
-	data, err := json.Marshal(w.search.view.Snapshot())
+	st := w.search.dialog.Snapshot()
+	st.Replace = w.search.replace.Snapshot()
+	data, err := json.Marshal(st)
 	if err != nil {
 		log.Printf("save search state: %v", err)
 		return
 	}
 	p.Search = data
-}
-
-func (w *Workspace) openRepo() *git.Repo {
-	repo, err := git.Open(w.ctx, w.Root)
-	if err != nil {
-		return nil
-	}
-	return repo
 }
 
 func (w *Workspace) reindex() {
@@ -112,10 +111,10 @@ func (w *Workspace) reindex() {
 		if err := w.search.files.Refresh(ctx, excluded); err != nil {
 			return
 		}
-		w.update(w.search.view.IndexChanged)
+		w.update(w.search.dialog.IndexChanged)
 		paths, _ := w.search.files.Paths()
 		w.search.scanner.Scan(ctx, paths)
-		w.update(w.search.view.IndexChanged)
+		w.update(w.search.dialog.IndexChanged)
 	}()
 }
 
@@ -132,17 +131,6 @@ func (w *Workspace) touchRecent(p string) {
 	}
 	r := append([]string{p}, slices.DeleteFunc(w.search.recent, func(q string) bool { return q == p })...)
 	w.search.recent = r[:min(len(r), maxRecentFiles)]
-}
-
-func (w *Workspace) modifiedTexts() map[string]string {
-	out := map[string]string{}
-	for _, d := range w.modified() {
-		if !onDisk(d.Path) {
-			continue
-		}
-		out[d.Path] = d.Buffer.String()
-	}
-	return out
 }
 
 func (w *Workspace) openPaths() []string {
@@ -180,38 +168,91 @@ func (w *Workspace) commandItems() (recent, other []palette.Item) {
 	return recent, other
 }
 
+func (w *Workspace) OpenSearch(tab finder.Tab) {
+	w.openSearch(tab, "")
+}
+
+func (w *Workspace) openSearch(tab finder.Tab, seed string) {
+	w.closeSearchPopups()
+	w.search.dialog.Open(tab, seed)
+}
+
+func (w *Workspace) closeSearchPopups() {
+	w.palette.Close()
+	w.search.dialog.Close()
+	w.search.recentFiles.Close()
+	w.search.replace.Close()
+}
+
+func (w *Workspace) searchOpen() bool {
+	return w.search.dialog.IsOpen() || w.search.recentFiles.IsOpen() || w.search.replace.IsOpen()
+}
+
 func (w *Workspace) ShowCommands() {
-	w.QuickOpen(commandsPrefix)
+	w.openSearch(finder.TabActions, "")
 }
 
 func (w *Workspace) ShowSearch() {
-	w.ShowSideView(SearchView)
+	w.openSearch(finder.TabText, "")
 }
 
-func (w *Workspace) FocusSearch(scope searchview.Scope) {
-	w.ShowSideView(SearchView)
-	w.search.view.Focus(scope, "")
+func (w *Workspace) QuickOpen() {
+	w.openSearch(finder.TabFiles, "")
 }
 
 func (w *Workspace) FindInFiles() {
-	w.ShowSideView(SearchView)
-	w.search.view.Focus(searchview.ScopeText, w.searchSeed())
+	w.openSearch(finder.TabText, w.searchSeed())
+}
+
+func (w *Workspace) ReplaceInFiles() {
+	w.closeSearchPopups()
+	w.search.replace.Open(w.searchSeed())
+}
+
+func (w *Workspace) ShowRecentFiles() {
+	w.closeSearchPopups()
+	w.search.recentFiles.Open()
 }
 
 func (w *Workspace) GoToSymbolInEditor() {
-	w.QuickOpen(editorSymPrefix)
+	w.openSearch(finder.TabFiles, "@")
 }
 
 func (w *Workspace) GoToSymbolInWorkspace() {
-	w.QuickOpen(projectSymPrefix)
+	w.openSearch(finder.TabFiles, "#")
 }
 
 func (w *Workspace) NextSearchResult() {
-	w.search.view.Next()
+	w.search.find.Next()
 }
 
 func (w *Workspace) PreviousSearchResult() {
-	w.search.view.Prev()
+	w.search.find.Prev()
+}
+
+func (w *Workspace) showFindResults(res finder.FindResults) {
+	w.search.find.Show(res)
+	w.ShowPanel(FindPanel)
+}
+
+func (w *Workspace) runCommand(id string) {
+	w.env.Commands.MarkUsed(id)
+	w.run(id)
+}
+
+func (w *Workspace) forgetRecent(path string) {
+	w.search.recent = slices.DeleteFunc(w.search.recent, func(p string) bool { return p == path })
+}
+
+func (w *Workspace) toolWindows() []finder.ToolWindow {
+	var out []finder.ToolWindow
+	for _, v := range w.tools.sideViews {
+		out = append(out, finder.ToolWindow{Title: v.title, Keys: w.keyLabel(v.command), Icon: v.icon, Show: func() { w.FocusSideView(v.id) }})
+	}
+	for _, v := range w.tools.panels {
+		out = append(out, finder.ToolWindow{Title: v.title, Keys: w.keyLabel(v.command), Icon: v.icon, Show: func() { w.ShowPanel(v.id) }})
+	}
+	return out
 }
 
 func (w *Workspace) searchSeed() string {
@@ -239,7 +280,7 @@ func wordAt(line string, col int) string {
 	return string(runes[start:end])
 }
 
-func (w *Workspace) openLocation(loc searchview.Location, o searchview.OpenOptions) {
+func (w *Workspace) openLocation(loc finder.Location, o finder.OpenOptions) {
 	g := w.active
 	if o.Side {
 		g = w.sideGroup()
@@ -288,10 +329,6 @@ func (w *Workspace) beforeReplace(path string) {
 	})
 }
 
-func (w *Workspace) focusEditor() {
-	w.focusTab = w.active.ActiveTab()
-}
-
 func (w *Workspace) observeShift(ev ui.InputEvent) {
 	if ev.Kind != ui.InputKeyDown || ev.Repeat {
 		return
@@ -303,7 +340,7 @@ func (w *Workspace) observeShift(ev ui.InputEvent) {
 	now := time.Now()
 	if !w.search.shiftAt.IsZero() && now.Sub(w.search.shiftAt) < doubleShiftWindow {
 		w.search.shiftAt = time.Time{}
-		w.FocusSearch(searchview.ScopeAll)
+		w.openSearch(finder.TabAll, "")
 		return
 	}
 	w.search.shiftAt = now

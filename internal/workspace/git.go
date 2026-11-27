@@ -6,9 +6,7 @@ import (
 	"github.com/ZerGo0/editor/internal/gitui"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
-	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/settings"
-	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -17,8 +15,6 @@ const (
 	SourceControlView = "scm"
 	GitPanel          = "git"
 	annotateLabel     = "Annotate with Git Blame"
-	confirmChoice     = 0
-	cancelChoice      = 1
 )
 
 var pullModes = map[string]gitui.PullMode{
@@ -172,35 +168,5 @@ func (w *Workspace) headChanged() {
 	}
 	if w.issues != nil {
 		w.issues.BranchChanged()
-	}
-}
-
-func (w *Workspace) checkoutRef(ref everywhere.GitRef) {
-	if w.git == nil {
-		return
-	}
-	if w.win == nil {
-		w.git.CheckoutRef(ref.Name, ref.Remote)
-		return
-	}
-	go func() {
-		res, err := mygo.Dialog.Message(mygo.MessageOptions{
-			Parent:       w.win,
-			Type:         mygo.MessageQuestion,
-			Message:      "Check out " + ref.Name + "?",
-			Detail:       "The work tree switches to " + ref.Name + ". Local changes stay if they do not conflict.",
-			Buttons:      []string{"Checkout", "Cancel"},
-			CancelButton: cancelChoice,
-		})
-		if err != nil || res.Button != confirmChoice {
-			return
-		}
-		w.update(func() { w.git.CheckoutRef(ref.Name, ref.Remote) })
-	}()
-}
-
-func (w *Workspace) showCommit(oid string) {
-	if w.git != nil {
-		w.git.ShowCommit(oid)
 	}
 }

@@ -2,6 +2,7 @@ package keymap
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/ZerGo0/editor/internal/keymap/vscode"
 	"github.com/ZerGo0/editor/internal/keymap/when"
@@ -11,6 +12,8 @@ const (
 	newlineCommand       = "editor.newline"
 	someQuickDiffChanges = "1"
 	findActionCommand    = "workbench.action.findAction"
+	replaceCommand       = "workbench.action.replaceInFiles"
+	recentFilesCommand   = "workbench.action.showRecentFiles"
 	previewCommand       = "markdown.showPreview"
 	previewToSideCommand = "markdown.showPreviewToSide"
 	amendCommand         = "git.amend"
@@ -46,6 +49,19 @@ var appDefaults = map[string][]Entry{
 		{Key: amendKey, Command: amendCommand},
 		{Key: branchesKey, Command: branchesCommand},
 		{Key: newBranchKey, Command: newBranchCommand},
+	},
+}
+
+var jetBrainsDefaults = map[string][]Entry{
+	PresetVSCode: {
+		{Key: "cmd+shift+o", Command: quickOpenCommand},
+		{Key: "cmd+shift+r", Command: replaceCommand},
+		{Key: "cmd+e", Command: recentFilesCommand},
+	},
+	PresetVSCodeWindows: {
+		{Key: "ctrl+shift+o", Command: quickOpenCommand},
+		{Key: "ctrl+shift+r", Command: replaceCommand},
+		{Key: "ctrl+e", Command: recentFilesCommand},
 	},
 }
 
@@ -106,7 +122,18 @@ func Defaults(preset string) []Binding {
 		preset, table = PresetVSCode, presetTables[PresetVSCode]
 	}
 	var out []Binding
+	var taken []Chord
+	for _, e := range jetBrainsDefaults[preset] {
+		b, err := newBinding(e)
+		if err != nil {
+			panic("keymap: default " + e.Key + ": " + err.Error())
+		}
+		out, taken = append(out, b), append(taken, b.Chord)
+	}
 	for _, e := range table {
+		if chord, err := ParseChord(e.Key); err == nil && slices.ContainsFunc(taken, chord.Equal) {
+			continue
+		}
 		entry := Entry{Key: e.Key, Command: e.Command, When: e.When}
 		if e.Args != "" {
 			entry.Args = json.RawMessage(e.Args)

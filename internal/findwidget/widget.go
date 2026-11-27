@@ -25,7 +25,22 @@ var (
 	matchCase = field.Toggle{Icon: icons.CaseSensitive, Label: "Match Case", Keys: "⌥⌘C"}
 	wholeWord = field.Toggle{Icon: icons.WholeWord, Label: "Match Whole Word", Keys: "⌥⌘W"}
 	useRegexp = field.Toggle{Icon: icons.Regex, Label: "Use Regular Expression", Keys: "⌥⌘R"}
+	keepCase  = field.Toggle{Icon: icons.PreserveCase, Label: "Preserve Case", Keys: "⌥⌘P"}
 )
+
+func Toggles(caseOn, wordOn, regexOn *bool) []field.Toggle {
+	toggles := []field.Toggle{matchCase, wholeWord, useRegexp}
+	for i, on := range []*bool{caseOn, wordOn, regexOn} {
+		toggles[i].On = on
+	}
+	return toggles
+}
+
+func PreserveCase(on *bool) field.Toggle {
+	t := keepCase
+	t.On = on
+	return t
+}
 
 func Render(c *ui.Context, bar ui.Element, f *editor.FindBar) { build(c, bar, f, nil) }
 
@@ -69,11 +84,7 @@ func toggleShortcuts(bar ui.Element, f *editor.FindBar) {
 func findRow(c *ui.Context, p *token.Palette, f *editor.FindBar, st *editor.State) {
 	count, _ := f.Matches()
 	fieldRow(c, func() {
-		toggles := []field.Toggle{matchCase, wholeWord, useRegexp}
-		for i, on := range []*bool{f.CaseSensitive(), f.WholeWord(), f.Regexp()} {
-			toggles[i].On = on
-		}
-		in, submit := Field(c, findLabel, f.Query(), FieldOptions{Error: regexpError(f.Err()), Toggles: toggles})
+		in, submit := Field(c, findLabel, f.Query(), FieldOptions{Error: regexpError(f.Err()), Toggles: Toggles(f.CaseSensitive(), f.WholeWord(), f.Regexp())})
 		was := in.Focused()
 		f.QueryInput(in)
 		if st != nil && !was && in.Focused() {

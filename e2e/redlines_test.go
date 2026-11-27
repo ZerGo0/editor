@@ -113,10 +113,10 @@ func checkViewRedlines(t *testing.T, q *QAApp, allow *redline.Allowlist, view, s
 }
 
 var redlineHoverTargets = map[string]func(qa.Node) bool{
-	"tabs":     func(n qa.Node) bool { return n.Role == "tab" },
-	"explorer": func(n qa.Node) bool { return n.Role == "treeItem" },
-	"scm":      func(n qa.Node) bool { return n.Role == "treeItem" || n.Role == "listItem" },
-	"search":   func(n qa.Node) bool { return strings.HasPrefix(n.Label, "line ") },
+	"tabs":        func(n qa.Node) bool { return n.Role == "tab" },
+	"explorer":    func(n qa.Node) bool { return n.Role == "treeItem" },
+	"scm":         func(n qa.Node) bool { return n.Role == "treeItem" || n.Role == "listItem" },
+	"search-text": func(n qa.Node) bool { return strings.HasPrefix(n.Label, matchRowPrefix) },
 }
 
 func TestViewRedlines(t *testing.T) {

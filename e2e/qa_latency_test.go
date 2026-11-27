@@ -141,12 +141,12 @@ func latencyActions() []latencyAction {
 			Do:      func(q *QAApp, d DemoProject, i int) { q.Send(TextEvent(typedChar)) },
 		},
 		{
-			Name: "open Go to File", Owner: qa.OwnerPalette, Budget: budgetQuickOpen, Samples: latencySamples, Quiet: burstQuietShort,
+			Name: "open Go to File", Owner: qa.OwnerSearch, Budget: budgetQuickOpen, Samples: latencySamples, Quiet: burstQuietShort,
 			Reset: func(q *QAApp, d DemoProject, i int) { q.Escape() },
 			Do:    func(q *QAApp, d DemoProject, i int) { menuOrFail(q, goMenu, "Go to File...") },
 		},
 		{
-			Name: "type a query in Go to File", Owner: qa.OwnerPalette, Budget: budgetQuickQuery, Samples: latencySamples, Quiet: burstQuietShort,
+			Name: "type a query in Go to File", Owner: qa.OwnerSearch, Budget: budgetQuickQuery, Samples: latencySamples, Quiet: burstQuietShort,
 			Prepare: func(q *QAApp, d DemoProject) error { return q.TryMenu(goMenu, "Go to File...") },
 			Reset: func(q *QAApp, d DemoProject, i int) {
 				q.Send(KeyEvent("Cmd+A"))

@@ -32,7 +32,10 @@ var overflowConfigs = []overflowConfig{
 
 var overflowThemes = []string{themeDark, themeLight}
 
-var overflowAllow = []qa.Allow{}
+var overflowAllow = []qa.Allow{
+	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "notes-with-a-rather-long-name", Reason: "internal/search/finder: at the 640 px smallest window a file row's name and directory share about 580 px of text that needs 1030 px, so both cannot keep 60% of their width; the row cuts both with an ellipsis as Go to File does"},
+	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "internal/a-very-long-directory-name", Reason: "internal/search/finder: the directory of the same file row, see above"},
+}
 
 func themeSuffix(theme string) string { return strings.ToLower(theme) }
 

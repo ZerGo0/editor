@@ -20,9 +20,10 @@ const (
 const lineBreak = "\n"
 
 type FieldOptions struct {
-	Error    string
-	Toggles  []field.Toggle
-	Disabled bool
+	Error     string
+	Toggles   []field.Toggle
+	Disabled  bool
+	AutoFocus bool
 }
 
 type fieldKeys struct{}
@@ -33,7 +34,7 @@ type fieldState struct {
 
 func Field(c *ui.Context, label string, value *string, o FieldOptions) (ui.Element, Submit) {
 	in := field.TextArea(c, label, value, field.AreaOptions{Placeholder: label, Error: o.Error, MaxLines: token.FindInputMaxLines,
-		Toggles: o.Toggles, Disabled: o.Disabled}).FixedLineHeight(token.FindLineHeight.Px())
+		Toggles: o.Toggles, Disabled: o.Disabled, AutoFocus: o.AutoFocus}).FixedLineHeight(token.FindLineHeight.Px())
 	st := *ui.Local(in, fieldKeys{}, func() *fieldState { return &fieldState{} })
 	in.OnTextKey(st.take)
 	got := st.pending

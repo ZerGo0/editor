@@ -1,10 +1,12 @@
-package searchview
+package finder
 
 import (
 	"github.com/ZerGo0/editor/internal/host"
+	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/search/files"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -21,19 +23,26 @@ type OpenOptions struct {
 	Side    bool
 }
 
+type ToolWindow struct {
+	Title string
+	Keys  string
+	Icon  *ui.SVG
+	Show  func()
+}
+
 type Env struct {
-	Host        host.Host
-	Providers   *everywhere.Search
-	Files       *files.Index
-	Settings    *settings.Store
-	OpenFiles   func() []string
-	Open        func(loc Location, opts OpenOptions)
-	Reveal      func(path string)
-	RunAction   func(id string)
-	GitRef      func(ref everywhere.GitRef)
-	GitCommit   func(oid string)
-	BeforeWrite func(path string)
-	FocusEditor func()
+	Host            host.Host
+	Engine          *everywhere.Search
+	Files           *files.Index
+	Settings        *settings.Store
+	OpenFiles       func() []string
+	Open            func(loc Location, opts OpenOptions)
+	Commands        func() (recent, other []palette.Item)
+	RunAction       func(id string)
+	ForgetRecent    func(path string)
+	ToolWindows     func() []ToolWindow
+	BeforeWrite     func(path string)
+	ShowFindResults func(res FindResults)
 }
 
 func (e Env) openFiles() []string {

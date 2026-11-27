@@ -15,7 +15,7 @@ const (
 	titleSeparator   = " - "
 	navigateBackID   = "workbench.action.navigateBack"
 	navigateFwdID    = "workbench.action.navigateForward"
-	quickOpenID      = "workbench.action.quickOpen"
+	searchID         = "workbench.action.searchEverywhere"
 	toggleSidebarID  = "workbench.action.toggleSidebarVisibility"
 	togglePanelID    = "workbench.action.togglePanel"
 	splitRightID     = "workbench.action.splitEditorRight"
@@ -43,7 +43,7 @@ func (w *Workspace) titleBar(c *ui.Context) {
 			Gap(token.GapInline.Px()).Children(func() {
 			chrome.NavButton(c, icons.ArrowLeft, navigateBackID, func(m *ui.Menu) { w.historyMenu(m, true) })
 			chrome.NavButton(c, icons.ArrowRight, navigateFwdID, func(m *ui.Menu) { w.historyMenu(m, false) })
-			chrome.CommandCenter(c, w.Name, quickOpenID)
+			chrome.CommandCenter(c, w.Name, searchID)
 		})
 		ui.Row(c).Grow(1).Basis(max(left-right, 0)).Justify(ui.End).AlignItems(ui.Center).Gap(token.GapTight.Px()).
 			Role(ui.RoleToolbar).Label("Layout Controls").Children(func() {

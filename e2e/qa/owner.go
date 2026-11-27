@@ -8,7 +8,6 @@ const (
 	OwnerGit       = "internal/gitui"
 	OwnerGitHub    = "internal/prui, internal/issueui"
 	OwnerPrefs     = "internal/prefs"
-	OwnerPalette   = "internal/palette"
 	OwnerViewer    = "internal/viewer"
 	OwnerLargeFile = "internal/largefile"
 	OwnerHistory   = "internal/history"
@@ -16,23 +15,25 @@ const (
 )
 
 var viewOwners = map[string]string{
-	"explorer":    OwnerWorkspace,
-	"tabs":        OwnerWorkspace,
-	"statusbar":   OwnerWorkspace,
-	"panel":       OwnerWorkspace,
-	"titlebar":    OwnerWorkspace,
-	"editor":      OwnerWorkspace,
-	"search":      OwnerSearch,
-	"scm":         OwnerGit,
-	"graph":       OwnerGit,
-	"github":      OwnerGitHub,
-	"settings":    OwnerPrefs,
-	"keybindings": OwnerPrefs,
-	"quickinput":  OwnerPalette,
-	"viewer":      OwnerViewer,
-	"largefile":   OwnerLargeFile,
-	"history":     OwnerHistory,
-	"welcome":     OwnerApp,
+	"explorer":         OwnerWorkspace,
+	"tabs":             OwnerWorkspace,
+	"statusbar":        OwnerWorkspace,
+	"panel":            OwnerWorkspace,
+	"titlebar":         OwnerWorkspace,
+	"editor":           OwnerWorkspace,
+	"search-all":       OwnerSearch,
+	"search-text":      OwnerSearch,
+	"replace-in-files": OwnerSearch,
+	"scm":              OwnerGit,
+	"graph":            OwnerGit,
+	"github":           OwnerGitHub,
+	"settings":         OwnerPrefs,
+	"keybindings":      OwnerPrefs,
+	"quickinput":       OwnerSearch,
+	"viewer":           OwnerViewer,
+	"largefile":        OwnerLargeFile,
+	"history":          OwnerHistory,
+	"welcome":          OwnerApp,
 }
 
 const (

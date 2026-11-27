@@ -80,7 +80,7 @@ func (w *Workspace) takeFocus(p part, el ui.Element) {
 }
 
 func (w *Workspace) escape(c *ui.Context) {
-	if w.noteCenter && !w.palette.IsOpen() && !w.prompt.open && c.Shortcut(0, ui.KeyEscape) {
+	if w.noteCenter && !w.palette.IsOpen() && !w.searchOpen() && !w.prompt.open && c.Shortcut(0, ui.KeyEscape) {
 		w.noteCenter = false
 		w.focusTab = w.active.ActiveTab()
 	}

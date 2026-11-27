@@ -29,11 +29,14 @@ func (a *App) item(id, label string) *mygo.MenuItem {
 	if cmd == nil {
 		panic("menu: unknown command " + id)
 	}
-	a.commands.SetInMenu(id)
 	if label == "" {
 		label = cmd.Title
 	}
 	item := &mygo.MenuItem{Label: label, Click: func(_ *mygo.MenuItem, win *mygo.Window) { a.commands.Run(id, win) }}
+	if a.options.NoMenuAccelerators {
+		return item
+	}
+	a.commands.SetInMenu(id)
 	if s, ok := a.keys.Current.MenuStroke(id); ok {
 		item.Accelerator = s.Accelerator()
 	}
@@ -88,7 +91,6 @@ func (a *App) viewMenu() *mygo.MenuItem {
 		mygo.Separator(),
 		a.item("workbench.action.toggleSidebarVisibility", ""),
 		a.item("workbench.view.explorer", "Explorer"),
-		a.item("workbench.view.search", "Search"),
 		a.item("workbench.view.scm", "Source Control"),
 		a.item("workbench.view.github", "GitHub"),
 		a.item("workbench.action.togglePanel", ""),
@@ -120,11 +122,13 @@ func (a *App) goMenu() *mygo.MenuItem {
 		mygo.Separator(),
 		a.item("workbench.action.searchEverywhere", ""),
 		a.item("workbench.action.quickOpen", ""),
+		a.item("workbench.action.showRecentFiles", ""),
 		a.item("workbench.action.showAllSymbols", ""),
 		a.item("workbench.action.gotoSymbol", ""),
 		a.item(goToLineCommand, ""),
 		mygo.Separator(),
 		a.item("workbench.action.findInFiles", ""),
+		a.item("workbench.action.replaceInFiles", ""),
 		a.item("workbench.action.findAction", ""),
 	}}
 }

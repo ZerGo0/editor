@@ -3,7 +3,6 @@ package everywhere
 import (
 	"path/filepath"
 
-	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/files"
 	"github.com/ZerGo0/editor/internal/search/symbols"
@@ -11,13 +10,11 @@ import (
 )
 
 type Env struct {
-	Root     string
-	Files    *files.Index
-	Symbols  *symbols.Index
-	Actions  func() []palette.Item
-	Recent   func() []string
-	Modified func() map[string]string
-	Repo     func() *git.Repo
+	Root    string
+	Files   *files.Index
+	Symbols *symbols.Index
+	Actions func() []palette.Item
+	Recent  func() []string
 }
 
 type Search struct {

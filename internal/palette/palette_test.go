@@ -1,10 +1,8 @@
 package palette
 
 import (
-	"slices"
 	"testing"
 
-	"github.com/ZerGo0/editor/internal/design/quickinput"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -21,63 +19,10 @@ func items(labels ...string) []Item {
 	return out
 }
 
-func TestPrefixPicksMode(t *testing.T) {
-	var got string
-	p := Palette{Modes: []Mode{
-		{Label: "Files", Search: Static(items("main.go")), Accept: func(it Item) { got = "file " + it.ID }},
-		{Prefix: ">", Label: "Commands", Search: Static(items("Save", "Close")), Accept: func(it Item) { got = "cmd " + it.ID }},
-	}}
-	p.Open(">clo")
-	if p.Label() != "Commands" || len(p.items) != 1 {
-		t.Fatalf("mode %q, items %v", p.Label(), p.items)
-	}
-	p.Accept()
-	if got != "cmd Close" || p.IsOpen() {
-		t.Fatalf("accepted %q, open %v", got, p.IsOpen())
-	}
-	p.Open("")
-	if p.Label() != "Files" {
-		t.Fatalf("empty query mode = %q", p.Label())
-	}
-}
-
-func TestAcceptVariants(t *testing.T) {
-	var got []string
-	files := items("a.go", "b.go")
-	p := Palette{Modes: []Mode{{
-		Label:      "Files",
-		Search:     func(_ string, done func([]Item)) { done(files) },
-		Accept:     func(it Item) { got = append(got, "open "+it.ID) },
-		AcceptSide: func(it Item) { got = append(got, "side "+it.ID) },
-		Background: func(it Item) { got = append(got, "background "+it.ID) },
-	}}}
-	p.Open("")
-	p.acceptWith(p.items[0], quickinput.Result{Background: true})
-	if !p.IsOpen() {
-		t.Fatal("opening in the background closed the palette")
-	}
-	p.acceptWith(p.items[1], quickinput.Result{Side: true})
-	if p.IsOpen() || !slices.Equal(got, []string{"background a.go", "side b.go"}) {
-		t.Fatalf("open %v, got %v", p.IsOpen(), got)
-	}
-}
-
-func TestQueryItemKeepsPaletteOpen(t *testing.T) {
-	p := Palette{Modes: []Mode{
-		{Prefix: "?", Label: "Help", Search: Static([]Item{{Label: "Commands", Query: ">"}})},
-		{Prefix: ">", Label: "Commands", Search: Static(items("Save"))},
-	}}
-	p.Open("?")
-	p.Accept()
-	if !p.IsOpen() || p.Label() != "Commands" || p.state.Query != ">" {
-		t.Fatalf("open %v, mode %q, query %q", p.IsOpen(), p.Label(), p.state.Query)
-	}
-}
-
 func TestLateResultsOfOldQueryAreDropped(t *testing.T) {
 	var pending []func([]Item)
-	p := Palette{Modes: []Mode{{Label: "Files", Search: func(_ string, done func([]Item)) { pending = append(pending, done) }}}}
-	p.Open("a")
+	var p Palette
+	p.Show(Mode{Label: "Files", Search: func(_ string, done func([]Item)) { pending = append(pending, done) }})
 	p.state.Query = "ab"
 	p.refresh()
 	pending[0](items("old"))
@@ -99,5 +44,12 @@ func TestShowListMovesAndRenders(t *testing.T) {
 	p.Accept()
 	if accepted != "two" || p.IsOpen() {
 		t.Fatalf("accepted %q, open %v", accepted, p.IsOpen())
+	}
+}
+
+func TestFilterMarksMatches(t *testing.T) {
+	got := Filter(items("Save File", "Close Editor"), "sf")
+	if len(got) != 1 || got[0].Label != "Save File" || len(got[0].Positions) != 2 {
+		t.Fatalf("filtered %+v", got)
 	}
 }

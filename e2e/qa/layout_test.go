@@ -59,7 +59,7 @@ func TestLayoutAllowsScrolledRowsPartiallyHidden(t *testing.T) {
 		Node{ID: "1", Role: "list", Bounds: Rect{0, 40, 300, 100}},
 		Node{ID: "2", Parent: "1", Role: "listItem", Label: "half", Bounds: Rect{0, 120, 300, testRowHeight}},
 	)
-	if flags := CheckLayout(tree, LayoutOptions{View: "search"}); hasRule(flags, RuleOutsideParent) || hasRule(flags, RuleOutsideWindow) {
+	if flags := CheckLayout(tree, LayoutOptions{View: "search-text"}); hasRule(flags, RuleOutsideParent) || hasRule(flags, RuleOutsideWindow) {
 		t.Fatalf("scroll clip flagged: %v", flags)
 	}
 }

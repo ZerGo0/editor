@@ -179,7 +179,7 @@ func TestKeyboardFocusWalk(t *testing.T) {
 		q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Tabs: demo.TabFiles, Theme: themeDark})
 		var flags []qa.Flag
 		for _, step := range demoViewSteps() {
-			if step.Name == "quickinput" || step.Name == "explorer-big-folder" {
+			if modalSteps[step.Name] || step.Name == "explorer-big-folder" {
 				continue
 			}
 			if err := step.Enter(q, demo); err != nil {

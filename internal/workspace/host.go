@@ -3,7 +3,7 @@ package workspace
 import (
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/layout"
-	searchview "github.com/ZerGo0/editor/internal/search/view"
+	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/syntax"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui/editor"
@@ -25,7 +25,7 @@ func (w *Workspace) Update(fn func()) {
 
 func (w *Workspace) OpenAt(path string, line, col int) {
 	pos := editor.Pos{Line: line, Col: col}
-	w.openLocation(searchview.Location{Path: path, Start: pos, End: pos, HasRange: line >= 0}, searchview.OpenOptions{Preview: true, Focus: true})
+	w.openLocation(finder.Location{Path: path, Start: pos, End: pos, HasRange: line >= 0}, finder.OpenOptions{Preview: true, Focus: true})
 }
 
 func (w *Workspace) CloseView(id string) {

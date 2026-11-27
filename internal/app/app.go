@@ -26,9 +26,10 @@ const (
 )
 
 type Options struct {
-	Hidden         bool
-	DiscardOnClose bool
-	NoBackups      bool
+	Hidden             bool
+	DiscardOnClose     bool
+	NoBackups          bool
+	NoMenuAccelerators bool
 }
 
 type projectWindow struct {

@@ -10,8 +10,6 @@ const (
 	KindFile Kind = iota
 	KindSymbol
 	KindAction
-	KindGitRef
-	KindGitCommit
 )
 
 type Result struct {
@@ -28,8 +26,6 @@ type Result struct {
 	Symbol          symbols.Kind
 	Container       string
 	ActionID        string
-	Ref             GitRef
-	OID             string
 	Open            bool
 	Recent          bool
 	score           int

@@ -32,12 +32,42 @@ func TestCmdAltFShowsReplace(t *testing.T) {
 	app.WaitNode(win, "replace field", func(n Node) bool { return n.Role == "textField" && strings.HasPrefix(n.Label, "Replace") })
 }
 
-func TestCmdShiftHOpensSearchView(t *testing.T) {
+func TestCmdShiftHAndCmdShiftROpenReplaceInFiles(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	openInEditor(t, app, win, "a.txt")
-	app.Key(win, "Cmd+Shift+H")
-	app.WaitNode(win, "search field", RoleLabel("textField", "Search"))
+	for _, key := range []string{"Cmd+Shift+H", "Cmd+Shift+R"} {
+		app.Key(win, key)
+		app.WaitNode(win, key+" replace popup", RoleLabel("dialog", replaceInFilesTitle))
+		app.Key(win, "Escape")
+		app.Eventually("popup closed", func() bool {
+			_, open := app.Find(win, RoleLabel("dialog", replaceInFilesTitle))
+			return !open
+		})
+	}
+}
+
+func TestCmdPAndCmdShiftOOpenFilesAndCmdShiftAOpensActions(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
+	openInEditor(t, app, win, "a.txt")
+	for _, key := range []string{"Cmd+P", "Cmd+Shift+O"} {
+		app.Key(win, key)
+		waitQuickOpen(app, win, "Go to File")
+		waitTab(app, win, "Files", true)
+		app.Key(win, "Escape")
+	}
+	app.Key(win, "Cmd+Shift+A")
+	waitQuickOpen(app, win, commandPaletteTitle)
+}
+
+func TestCmdEOpensRecentFiles(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
+	openInEditor(t, app, win, "a.txt")
+	app.Key(win, "Cmd+E")
+	waitQuickOpen(app, win, "Recent Files")
+	app.WaitNode(win, "tool windows", Label("Tool Windows"))
 }
 
 func TestCmdSlashCommentsLine(t *testing.T) {
@@ -69,8 +99,9 @@ func TestWindowsKeymapBindsCtrlPToGoToFile(t *testing.T) {
 	app.Menu(win, "View", "Command Palette...")
 	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
 	app.Type(win, "go to file")
+	row := app.WaitNode(win, "Go to File row", RoleLabel("listItem", "Go: Go to File..."))
 	app.WaitNode(win, "Go to File with Ctrl+P", func(n Node) bool {
-		return n.Label == "Go: Go to File..." && n.Description == "⌃P"
+		return n.Label == "⌃P" && n.Bounds.Y >= row.Bounds.Y && n.Bounds.Y < row.Bounds.Y+row.Bounds.Height
 	})
 	app.Key(win, "Enter")
 	waitQuickOpen(app, win, "Go to File")

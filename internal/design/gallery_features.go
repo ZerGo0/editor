@@ -6,17 +6,24 @@ import (
 	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/picker"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
+const galleryPickerRowCount = 5
+
 var galleryScopes = []string{"All", "Files", "Symbols", "Text", "Actions"}
+
+var galleryPickerTabs = []string{"All", "Actions", "Files", "Text"}
 
 type featureState struct {
 	scope, layout int
 	rows          ui.ListState
 	row           int
+	pickerTab     int
+	pickerRows    picker.ResultsState
 }
 
 func galleryFeatures(c *ui.Context, g *gallery) {
@@ -62,6 +69,18 @@ func galleryFeatures(c *ui.Context, g *gallery) {
 		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Github, Title: "Sign in to GitHub", Message: "Run this command in a terminal, then check again:",
 			Code: "gh auth login", Action: "Check Again", OnAction: func() {}, Link: "Copy Command", OnLink: func() {}})
 	})
+	gallerySection(c, "Search popup parts", func() {
+		picker.Tabs(c, "Search scope", &f.pickerTab, galleryPickerTabs)
+		picker.Results(c, &f.pickerRows, galleryPickerRows, picker.ResultsOptions{Label: "Gallery results", Rows: galleryPickerRowCount})
+	})
+}
+
+var galleryPickerRows = []picker.Row{
+	{Kind: picker.RowHeader, Title: "Files"},
+	{Item: list.Item{Label: "gallery.go", Description: "internal/design", Icon: icons.File, Matches: []int{0, 1}}},
+	{Kind: picker.RowMore, Title: "More files (4)"},
+	{Kind: picker.RowHeader, Title: "Actions"},
+	{Item: list.Item{Label: "Go Back", Icon: icons.ArrowLeft}, Keys: "⌃-"},
 }
 
 func galleryPRIcon(c *ui.Context) {

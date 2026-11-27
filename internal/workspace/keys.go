@@ -100,7 +100,6 @@ func (w *Workspace) whenContext(c *ui.Context) (when.Context, uint32) {
 		{"inputFocus", textFocus && !editorFocus},
 		{"sideBarFocus", w.focus.side},
 		{"panelFocus", w.focus.panel},
-		{"searchViewletFocus", w.focus.side && w.tools.side == SearchView},
 		{"explorerViewletFocus", w.focus.side && w.tools.side == ExplorerView},
 		{"filesExplorerFocus", w.focus.side && w.tools.side == ExplorerView},
 		{"listFocus", w.focus.side && !textFocus},
@@ -109,7 +108,7 @@ func (w *Workspace) whenContext(c *ui.Context) (when.Context, uint32) {
 		{"canNavigateForward", w.canNavigate(false)},
 		{"multipleEditorGroups", len(w.layout.Groups()) > 1},
 		{"activeEditorIsPinned", t != nil && t.Pinned},
-		{"inQuickOpen", w.palette.IsOpen()},
+		{"inQuickOpen", w.palette.IsOpen() || w.searchOpen()},
 		{"notificationCenterVisible", w.noteCenter},
 	}
 	ctx := maps.Clone(keymap.DefaultContext())

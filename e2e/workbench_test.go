@@ -112,7 +112,7 @@ func TestTitleBarContentCentresOnTrafficLights(t *testing.T) {
 	const tolerance = 0.01
 	centre := float64(token.TitleBarHeight.Px()) / 2
 	app, win, _ := openProject(t, map[string]string{"main.go": "package main\n"})
-	for _, what := range []string{"Layout Controls", "Go to File"} {
+	for _, what := range []string{"Layout Controls", "Search Everywhere"} {
 		n := app.WaitNode(win, what, func(n Node) bool { return strings.HasPrefix(n.Label, what) })
 		if got := n.Bounds.Y + n.Bounds.Height/2; got < centre-tolerance || got > centre+tolerance {
 			t.Errorf("%s centre y = %v, want %v, the traffic lights' centre", what, got, centre)

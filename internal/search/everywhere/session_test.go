@@ -106,13 +106,32 @@ func TestSymbolsRankedAndTyped(t *testing.T) {
 	}
 }
 
-func TestFilterRefs(t *testing.T) {
-	refs := []Result{{Kind: KindGitRef, Label: "main"}, {Kind: KindGitRef, Label: "feature/login"}, {Kind: KindGitRef, Label: "v1.0", Ref: GitRef{Name: "v1.0", Tag: true}}}
-	got := filterRefs("log", refs)
-	if len(got) != 1 || got[0].Label != "feature/login" || len(got[0].Positions) == 0 {
-		t.Fatalf("got %+v", got)
+func TestSessionFilterNarrowsFilesAndRecentToProjectTypes(t *testing.T) {
+	root := t.TempDir()
+	idx := &files.Index{Root: root}
+	writeTestFile(t, root, "a.go")
+	writeTestFile(t, root, "b.md")
+	if err := idx.Refresh(context.Background(), func(string) bool { return false }); err != nil {
+		t.Fatal(err)
 	}
-	if all := filterRefs("", refs); len(all) != 3 {
-		t.Fatalf("empty query: %+v", all)
+	outside := filepath.Join(t.TempDir(), "outside.go")
+	s := New(&Env{Root: root, Files: idx, Recent: func() []string { return []string{outside, filepath.Join(root, "a.go")} }}).Session()
+	if rs := s.Recent(10); len(rs) != 2 {
+		t.Fatalf("no filter: %+v", rs)
+	}
+	s.SetFilter(Filter{ProjectOnly: true})
+	if rs := s.Recent(10); len(rs) != 1 || rs[0].Label != "a.go" {
+		t.Fatalf("project only: %+v", rs)
+	}
+	s.SetFilter(Filter{Globs: []string{"*.md"}})
+	if rs, _ := s.Files(".", 10); len(rs) != 1 || rs[0].Label != "b.md" {
+		t.Fatalf("*.md: %+v", rs)
+	}
+}
+
+func writeTestFile(t *testing.T, root, name string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, name), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

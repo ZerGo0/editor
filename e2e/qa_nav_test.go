@@ -16,6 +16,8 @@ const (
 	paletteKey       = "Cmd+Shift+P"
 	paletteRole      = "dialog"
 	findInFilesQuery = "func"
+	matchRowPrefix   = "line "
+	matchRowInfix    = " line "
 	commandMenuPath  = "Command Palette..."
 	escapeKey        = "Escape"
 	viewMenu         = "View"
@@ -103,6 +105,24 @@ func (q *QAApp) FocusNode(n qa.Node) {
 	q.Settle()
 }
 
+func (q *QAApp) searchDialog(name string, menu ...string) error {
+	q.Escape()
+	if err := q.TryMenu(menu...); err != nil {
+		return err
+	}
+	if _, err := q.TryWait(hasRoleLabel(paletteRole, name), navTimeout); err != nil {
+		return err
+	}
+	q.Send(TextEvent(findInFilesQuery))
+	q.Settle()
+	_, err := q.TryWait(func(n qa.Node) bool {
+		return strings.HasPrefix(n.Label, matchRowPrefix) || strings.Contains(n.Label, matchRowInfix)
+	}, navTimeout)
+	return err
+}
+
+var modalSteps = map[string]bool{"quickinput": true, "search-all": true, "search-text": true, "replace-in-files": true}
+
 type viewStep struct {
 	Name  string
 	Enter func(q *QAApp, d DemoProject) error
@@ -133,18 +153,17 @@ func demoViewSteps() []viewStep {
 			_, err = q.TryWait(labelPrefix("entry-"), navTimeout)
 			return err
 		}},
-		{"search", func(q *QAApp, d DemoProject) error {
-			if err := q.Command("Find in Files", goMenu, "Find in Files"); err != nil {
-				return err
-			}
-			q.Send(TextEvent(findInFilesQuery))
-			q.Settle()
-			q.Send(KeyEvent("Enter"))
-			q.Settle()
-			_, err := q.TryWait(func(n qa.Node) bool { return strings.HasPrefix(n.Label, "line ") }, navTimeout)
-			return err
+		{"search-all", func(q *QAApp, d DemoProject) error {
+			return q.searchDialog("Search Everywhere", goMenu, "Search Everywhere")
+		}},
+		{"search-text", func(q *QAApp, d DemoProject) error {
+			return q.searchDialog("Find in Files", goMenu, "Find in Files")
+		}},
+		{"replace-in-files", func(q *QAApp, d DemoProject) error {
+			return q.searchDialog("Replace in Files", goMenu, "Replace in Files")
 		}},
 		{"scm", func(q *QAApp, d DemoProject) error {
+			q.Escape()
 			if err := q.Command("Show Source Control", viewMenu, "Source Control"); err != nil {
 				return err
 			}

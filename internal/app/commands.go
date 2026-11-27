@@ -10,7 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/issueui"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/prui"
-	searchview "github.com/ZerGo0/editor/internal/search/view"
+	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/shellcmd"
 	"github.com/ZerGo0/editor/internal/workspace"
@@ -80,13 +80,15 @@ func (a *App) registerCommands() {
 	add("workbench.action.files.revealActiveFileInFinder", categoryFile, "Reveal Active File in Finder", ws((*workspace.Workspace).RevealActiveInFinder))
 	add("workbench.action.files.copyPathOfActiveFile", categoryFile, "Copy Path of Active File", ws(func(w *workspace.Workspace) { w.CopyActivePath(false) }))
 	add("workbench.action.files.copyRelativePathOfActiveFile", categoryFile, "Copy Relative Path of Active File", ws(func(w *workspace.Workspace) { w.CopyActivePath(true) }))
-	search := func(scope searchview.Scope) func(*mygo.Window) {
-		return ws(func(w *workspace.Workspace) { w.FocusSearch(scope) })
+	search := func(tab finder.Tab) func(*mygo.Window) {
+		return ws(func(w *workspace.Workspace) { w.OpenSearch(tab) })
 	}
 	add("workbench.view.search", categoryView, "Show Search", ws((*workspace.Workspace).ShowSearch))
-	add("workbench.action.searchEverywhere", categoryGo, "Search Everywhere", search(searchview.ScopeAll))
-	add("workbench.action.quickOpen", categoryGo, "Go to File...", ws(func(w *workspace.Workspace) { w.QuickOpen("") }))
-	add("workbench.action.findAction", categoryGo, "Find Action...", search(searchview.ScopeActions))
+	add("workbench.action.searchEverywhere", categoryGo, "Search Everywhere", search(finder.TabAll))
+	add("workbench.action.quickOpen", categoryGo, "Go to File...", search(finder.TabFiles))
+	add("workbench.action.findAction", categoryGo, "Find Action...", search(finder.TabActions))
+	add("workbench.action.showRecentFiles", categoryGo, "Recent Files", ws((*workspace.Workspace).ShowRecentFiles))
+	add("search.showFindWindow", categorySearch, "Show Find Window", ws(func(w *workspace.Workspace) { w.ShowPanel(workspace.FindPanel) }))
 	add("workbench.action.showAllSymbols", categoryGo, "Go to Symbol in Workspace...", ws((*workspace.Workspace).GoToSymbolInWorkspace))
 	add("workbench.action.findInFiles", categoryGo, "Find in Files", ws((*workspace.Workspace).FindInFiles))
 	add("workbench.action.gotoSymbol", categoryGo, "Go to Symbol in Editor...", ws((*workspace.Workspace).GoToSymbolInEditor))

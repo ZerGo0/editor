@@ -44,7 +44,7 @@ func (w *Workspace) diskChanged(dirs []string) {
 	if w.git != nil {
 		w.git.DiskChanged()
 	}
-	w.search.view.Changed(dirs)
+	w.search.dialog.Changed()
 	w.scheduleReindex()
 	w.scheduleIgnored()
 	w.folderSettingsChanged(dirs)

@@ -1,15 +1,11 @@
 package quickinput
 
 import (
-	"unicode/utf8"
-
-	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
-	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -26,7 +22,6 @@ type Item struct {
 	Leading     func(c *ui.Context)
 	Keys        string
 	Group       string
-	Remove      string
 }
 
 type State struct {
@@ -34,27 +29,21 @@ type State struct {
 	Selected int
 	list     ui.ListState
 	scroll   bool
-	behind   bool
 }
 
 type Options struct {
 	Placeholder string
 	Busy        bool
 	Empty       string
-	Side        bool
-	Background  bool
 }
 
 type Result struct {
-	Accepted   int
-	Side       bool
-	Background bool
-	Removed    int
-	Closed     bool
+	Accepted int
+	Closed   bool
 }
 
 func View(c *ui.Context, label string, s *State, items []Item, o Options) Result {
-	res := Result{Accepted: none, Removed: none}
+	res := Result{Accepted: none}
 	s.Selected = clamp(s.Selected, len(items))
 	p := token.Of(c)
 	ui.Overlay(c, func() {
@@ -67,25 +56,13 @@ func View(c *ui.Context, label string, s *State, items []Item, o Options) Result
 			token.ElevationDialog.Apply(panel, p)
 			panel.Children(func() {
 				in := field.TextInput(c, label, &s.Query, field.InputOptions{Placeholder: o.Placeholder, AutoFocus: true})
-				start, end := in.TextSelection()
-				atEnd := start == end && end == utf8.RuneCountInString(s.Query)
 				down, up := in.Shortcut(0, ui.KeyDown), in.Shortcut(0, ui.KeyUp)
-				side := o.Side && in.Shortcut(ui.Cmd, ui.KeyEnter)
-				if o.Background && atEnd {
-					in.OnTextKey(s.openBehind)
-				}
-				background := s.behind
-				s.behind = false
 				switch {
 				case down:
 					s.move(1, len(items))
 				case up:
 					s.move(-1, len(items))
 				case s.Selected == none:
-				case side:
-					res.Accepted, res.Side = s.Selected, true
-				case background:
-					res.Accepted, res.Background = s.Selected, true
 				case in.Submitted():
 					res.Accepted = s.Selected
 				}
@@ -139,14 +116,11 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 			if it.Keys != "" {
 				badge.Keys(c, it.Keys)
 			}
-			if it.Remove != "" && (selected || row.Hovered()) && action.IconButton(c, icons.Close, it.Remove, action.IconOptions{}).Clicked() {
-				res.Removed = i
-			}
 		})
 		if it.Keys != "" {
 			row.Description(it.Keys)
 		}
-		if row.Clicked() && res.Removed == none {
+		if row.Clicked() {
 			res.Accepted = i
 		}
 	}).FillWidth().MaxHeight(maxHeight).Shrink(1).Background(ui.Transparent)
@@ -163,14 +137,6 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 			token.TextBody.Apply(ui.Text(c, empty)).TextColor(p.Text.Secondary).Padding(token.PadInputY.Px(), token.PadRow.Px())
 		})
 	}
-}
-
-func (s *State) openBehind(k ui.TextKey) bool {
-	if k.Key != ui.KeyRight || k.Mods != 0 {
-		return false
-	}
-	s.behind = true
-	return true
 }
 
 func (s *State) move(delta, n int) {

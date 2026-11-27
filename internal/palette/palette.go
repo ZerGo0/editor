@@ -17,31 +17,21 @@ type Item struct {
 	Value     any
 	Icon      *ui.SVG
 	Leading   func(c *ui.Context)
-	Group     string
-	Query     string
-	Removable bool
 }
 
 type Mode struct {
-	Prefix      string
 	Label       string
 	Placeholder string
 	Empty       string
 	Search      func(query string, done func([]Item))
 	Accept      func(Item)
-	AcceptSide  func(Item)
-	Background  func(Item)
-	RemoveLabel string
-	Remove      func(Item)
 }
 
 type Palette struct {
-	Modes    []Mode
 	open     bool
-	single   *Mode
+	mode     *Mode
 	state    quickinput.State
 	searched string
-	mode     *Mode
 	seq      int
 	items    []Item
 }
@@ -60,14 +50,8 @@ func Filter(items []Item, query string) []Item {
 	return out
 }
 
-func (p *Palette) Open(query string) {
-	p.open, p.single = true, nil
-	p.state.Reset(query)
-	p.refresh()
-}
-
 func (p *Palette) Show(m Mode) {
-	p.open, p.single = true, &m
+	p.open, p.mode = true, &m
 	p.state.Reset("")
 	p.refresh()
 }
@@ -77,14 +61,14 @@ func (p *Palette) IsOpen() bool {
 }
 
 func (p *Palette) Label() string {
-	if m := p.current(); p.open && m != nil {
-		return m.Label
+	if p.open && p.mode != nil {
+		return p.mode.Label
 	}
 	return ""
 }
 
 func (p *Palette) Close() {
-	p.open, p.single, p.mode, p.items = false, nil, nil, nil
+	p.open, p.mode, p.items = false, nil, nil
 	p.seq++
 }
 
@@ -103,56 +87,21 @@ func (p *Palette) Accept() {
 
 func (p *Palette) accept(it Item) {
 	m := p.mode
-	if it.Query != "" {
-		p.state.Reset(it.Query)
-		p.refresh()
-		return
-	}
 	p.Close()
 	if m != nil && m.Accept != nil {
 		m.Accept(it)
 	}
 }
 
-func (p *Palette) acceptWith(it Item, res quickinput.Result) {
-	m := p.mode
-	switch {
-	case it.Query != "" || m == nil:
-		p.accept(it)
-	case res.Background && m.Background != nil:
-		m.Background(it)
-	case res.Side && m.AcceptSide != nil:
-		p.Close()
-		m.AcceptSide(it)
-	default:
-		p.accept(it)
-	}
-}
-
-func (p *Palette) current() *Mode {
-	if p.single != nil {
-		return p.single
-	}
-	var best *Mode
-	for i := range p.Modes {
-		m := &p.Modes[i]
-		if strings.HasPrefix(p.state.Query, m.Prefix) && (best == nil || len(m.Prefix) > len(best.Prefix)) {
-			best = m
-		}
-	}
-	return best
-}
-
 func (p *Palette) refresh() {
 	p.searched = p.state.Query
-	p.mode = p.current()
 	p.seq++
 	if p.mode == nil || p.mode.Search == nil {
 		p.items = nil
 		return
 	}
 	seq := p.seq
-	query := strings.TrimLeft(strings.TrimPrefix(p.state.Query, p.mode.Prefix), " ")
+	query := strings.TrimLeft(p.state.Query, " ")
 	p.mode.Search(query, func(items []Item) {
 		if seq == p.seq && p.open {
 			p.items = items
@@ -170,25 +119,19 @@ func (p *Palette) View(c *ui.Context) {
 	m := p.mode
 	label, o := "", quickinput.Options{}
 	if m != nil {
-		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty, Side: m.AcceptSide != nil, Background: m.Background != nil}
+		label, o = m.Label, quickinput.Options{Placeholder: m.Placeholder, Empty: m.Empty}
 	}
 	items := make([]quickinput.Item, len(p.items))
 	for i, it := range p.items {
-		items[i] = quickinput.Item{Label: it.Label, Matches: it.Positions, Description: it.Detail, Icon: it.Icon, Leading: it.Leading, Keys: it.Keys, Group: it.Group}
-		if it.Removable && m.Remove != nil {
-			items[i].Remove = m.RemoveLabel
-		}
+		items[i] = quickinput.Item{Label: it.Label, Matches: it.Positions, Description: it.Detail, Icon: it.Icon, Leading: it.Leading, Keys: it.Keys}
 	}
 	res := quickinput.View(c, label, &p.state, items, o)
 	if p.state.Query != p.searched {
 		c.Invalidate()
 	}
 	switch {
-	case res.Removed >= 0 && res.Removed < len(p.items):
-		m.Remove(p.items[res.Removed])
-		p.refresh()
 	case res.Accepted >= 0 && res.Accepted < len(p.items):
-		p.acceptWith(p.items[res.Accepted], res)
+		p.accept(p.items[res.Accepted])
 	case res.Closed:
 		p.Close()
 	}

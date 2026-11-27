@@ -114,6 +114,60 @@ func TestWindowsPresetMatchesVSCode(t *testing.T) {
 	}
 }
 
+func TestSearchKeysWorkInBothKeymaps(t *testing.T) {
+	tests := []struct {
+		preset string
+		want   map[string]string
+	}{
+		{keymap.PresetVSCode, map[string]string{
+			"cmd+shift+p": "workbench.action.showCommands",
+			"cmd+shift+a": "workbench.action.findAction",
+			"cmd+p":       "workbench.action.quickOpen",
+			"cmd+shift+o": "workbench.action.quickOpen",
+			"cmd+shift+f": "workbench.action.findInFiles",
+			"cmd+shift+h": "workbench.action.replaceInFiles",
+			"cmd+shift+r": "workbench.action.replaceInFiles",
+			"cmd+e":       "workbench.action.showRecentFiles",
+		}},
+		{keymap.PresetVSCodeWindows, map[string]string{
+			"ctrl+shift+p": "workbench.action.showCommands",
+			"ctrl+shift+a": "workbench.action.findAction",
+			"ctrl+p":       "workbench.action.quickOpen",
+			"ctrl+shift+o": "workbench.action.quickOpen",
+			"ctrl+shift+f": "workbench.action.findInFiles",
+			"ctrl+shift+h": "workbench.action.replaceInFiles",
+			"ctrl+shift+r": "workbench.action.replaceInFiles",
+			"ctrl+e":       "workbench.action.showRecentFiles",
+		}},
+	}
+	for _, tt := range tests {
+		k := keymap.New(keymap.Defaults(tt.preset), nil)
+		for key, want := range tt.want {
+			if got := lookup(t, k, key); got != want {
+				t.Errorf("%s: %s runs %q, want %q", tt.preset, key, got, want)
+			}
+		}
+	}
+}
+
+func TestSearchKeysKeepVSCodeKeysAsTheShownOnes(t *testing.T) {
+	for preset, want := range map[string]map[string]string{
+		keymap.PresetVSCode:        {"workbench.action.quickOpen": "cmd+p", "workbench.action.replaceInFiles": "cmd+shift+h"},
+		keymap.PresetVSCodeWindows: {"workbench.action.quickOpen": "ctrl+p", "workbench.action.replaceInFiles": "ctrl+shift+h"},
+	} {
+		k := keymap.New(keymap.Defaults(preset), nil)
+		for id, key := range want {
+			chord, err := keymap.ParseChord(key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := k.For(id); len(got) == 0 || !got[0].Equal(chord) {
+				t.Errorf("%s: %s shows %v first, want %s", preset, id, got, key)
+			}
+		}
+	}
+}
+
 func TestPresetTablesParse(t *testing.T) {
 	unrepresentable := []string{"capslock"}
 	for name, table := range map[string][]vscode.Entry{"macOS": vscode.MacOS, "Windows": vscode.Windows} {
@@ -160,6 +214,8 @@ func TestEditorBindingsFollowThePreset(t *testing.T) {
 		{keymap.PresetVSCode, cmd | sh, ui.KeyH, editor.NoCommand},
 		{keymap.PresetVSCode, ctrl, ui.KeyH, editor.Backspace},
 		{keymap.PresetVSCode, cmd, ui.KeySlash, editor.ToggleComment},
+		{keymap.PresetVSCode, cmd, ui.KeyE, editor.NoCommand},
+		{keymap.PresetVSCodeWindows, ctrl, ui.KeyE, editor.NoCommand},
 		{keymap.PresetVSCode, 0, ui.KeyEnter, editor.Newline},
 		{keymap.PresetVSCode, ctrl, ui.KeyL, editor.NoCommand},
 		{keymap.PresetVSCode, cmd, ui.KeyK, editor.NoCommand},

@@ -1,7 +1,6 @@
-package searchview
+package finder
 
 import (
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -11,7 +10,12 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-func itoa(n int) string { return strconv.Itoa(n) }
+const (
+	beforeContext = 24
+	ellipsis      = "…"
+	multilineMark = " …"
+	trimSet       = " \t"
+)
 
 type matchParts struct {
 	before string
@@ -24,8 +28,7 @@ func splitMatch(m textsearch.Match) matchParts {
 	start, end := min(m.PreviewStart, len(line)), min(m.PreviewEnd, len(line))
 	start = max(start, 0)
 	end = max(end, start)
-	before := strings.TrimLeft(line[:start], " \t")
-	before = tailRunes(before, beforeContext)
+	before := tailRunes(strings.TrimLeft(line[:start], trimSet), beforeContext)
 	return matchParts{before: before, hit: line[start:end], after: line[end:]}
 }
 
@@ -34,16 +37,16 @@ func tailRunes(s string, n int) string {
 		return s
 	}
 	runes := []rune(s)
-	return "…" + string(runes[len(runes)-n:])
+	return ellipsis + string(runes[len(runes)-n:])
 }
 
 func matchSpans(p *token.Palette, s list.Style, m textsearch.Match, replacement string, replacing bool) []ui.Span {
 	parts := splitMatch(m)
 	spans := []ui.Span{{Text: parts.before, Color: s.Text}}
-	hit := ui.Span{Text: parts.hit, Weight: token.WeightBold, Color: s.Text, Background: p.Severity.Warning.Alpha(token.OpacityMatchFill.Value()), Radius: token.RadiusInline.Px()}
+	hit := ui.Span{Text: parts.hit, Weight: token.WeightBold, Color: s.Highlight}
 	if replacing {
-		hit.Strikethrough = true
-		hit.Background = p.Diff.RemovedText
+		hit.Strikethrough, hit.Color = true, s.Text
+		hit.Background, hit.Radius = p.Diff.RemovedText, token.RadiusInline.Px()
 		spans = append(spans, hit)
 		if replacement != "" {
 			spans = append(spans, ui.Span{Text: replacement, Weight: token.WeightBold, Color: s.Text, Background: p.Diff.InsertedText, Radius: token.RadiusInline.Px()})
@@ -53,7 +56,7 @@ func matchSpans(p *token.Palette, s list.Style, m textsearch.Match, replacement 
 	}
 	spans = append(spans, ui.Span{Text: parts.after, Color: s.Text})
 	if m.Multiline() {
-		spans = append(spans, ui.Span{Text: " …", Weight: token.WeightBold, Color: s.Text})
+		spans = append(spans, ui.Span{Text: multilineMark, Weight: token.WeightBold, Color: s.Text})
 	}
 	return spans
 }

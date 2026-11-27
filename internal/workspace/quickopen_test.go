@@ -1,24 +1,30 @@
 package workspace
 
 import (
-	"context"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/command"
-	"github.com/ZerGo0/editor/internal/palette"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
 )
 
-func commandResults(w *Workspace, q string) []palette.Item {
-	var got []palette.Item
-	w.searchCommands(q, func(items []palette.Item) { got = items })
-	return got
+func itemLabels(w *Workspace) (recent, other []string) {
+	r, o := w.commandItems()
+	for _, it := range r {
+		recent = append(recent, it.Label)
+	}
+	for _, it := range o {
+		other = append(other, it.Label)
+	}
+	return recent, other
 }
 
-func TestCommandPaletteListsRecentlyUsedFirst(t *testing.T) {
+func TestCommandItemsListRecentlyUsedFirst(t *testing.T) {
 	env := newTestEnv(t)
 	noop := func(*mygo.Window) {}
 	env.Commands.Add(
@@ -28,64 +34,139 @@ func TestCommandPaletteListsRecentlyUsedFirst(t *testing.T) {
 	)
 	w := newTestWorkspace(t, t.TempDir(), env, session.Project{})
 
-	labels, groups := itemLabels(commandResults(w, ""))
-	if !slices.Equal(labels, []string{"Edit: Add Cursor", "Edit: Build", "View: Close Editor"}) || slices.ContainsFunc(groups, func(g string) bool { return g != "" }) {
-		t.Fatalf("no history: labels %v groups %v", labels, groups)
+	recent, other := itemLabels(w)
+	if len(recent) != 0 || !slices.Equal(other, []string{"Edit: Add Cursor", "Edit: Build", "View: Close Editor"}) {
+		t.Fatalf("no history: recent %v other %v", recent, other)
 	}
-
-	w.runFromPalette(palette.Item{ID: "c"})
-	w.runFromPalette(palette.Item{ID: "b"})
-	labels, groups = itemLabels(commandResults(w, ""))
-	if !slices.Equal(labels, []string{"Edit: Build", "View: Close Editor", "Edit: Add Cursor"}) {
-		t.Fatalf("labels %v; want recent Build, Close Editor, then Add Cursor", labels)
-	}
-	if !slices.Equal(groups, []string{recentlyUsedGroup, recentlyUsedGroup, otherCommandsGroup}) {
-		t.Fatalf("groups %v", groups)
-	}
-
-	labels, groups = itemLabels(commandResults(w, "close"))
-	if !slices.Equal(labels, []string{"View: Close Editor"}) || !slices.Equal(groups, []string{recentlyUsedGroup}) {
-		t.Fatalf("typed query: labels %v groups %v", labels, groups)
+	w.runCommand("c")
+	w.runCommand("b")
+	recent, other = itemLabels(w)
+	if !slices.Equal(recent, []string{"Edit: Build", "View: Close Editor"}) || !slices.Equal(other, []string{"Edit: Add Cursor"}) {
+		t.Fatalf("history: recent %v other %v", recent, other)
 	}
 }
 
-func fileResults(w *Workspace, q string) []palette.Item {
-	var got []palette.Item
-	w.searchFiles(q, func(items []palette.Item) { got = items })
-	return got
-}
-
-func TestQuickOpenListsRecentlyOpenedFirst(t *testing.T) {
+func TestForgetRecentRemovesFile(t *testing.T) {
 	root := t.TempDir()
-	writeFiles(t, root, map[string]string{"a.go": "a\n", "b.go": "b\n", "lib/c.go": "c\n"})
+	writeFiles(t, root, map[string]string{"a.go": "a\n", "b.go": "b\n"})
 	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
-	if err := w.search.files.Refresh(context.Background(), func(string) bool { return false }); err != nil {
-		t.Fatal(err)
-	}
 	openTab(t, w, filepath.Join(root, "a.go"))
 	openTab(t, w, filepath.Join(root, "b.go"))
-
-	got := fileResults(w, "")
-	labels, groups := itemLabels(got)
-	if !slices.Equal(labels, []string{"a.go"}) || !slices.Equal(groups, []string{recentlyOpenedGroup}) || !got[0].Removable {
-		t.Fatalf("empty query: labels %v groups %v; want a.go only, the active b.go left out", labels, groups)
-	}
-
-	labels, groups = itemLabels(fileResults(w, "go"))
-	if len(labels) != 3 || labels[2] != "c.go" || !slices.Equal(groups, []string{recentlyOpenedGroup, recentlyOpenedGroup, fileResultsGroup}) {
-		t.Fatalf("typed query: labels %v groups %v", labels, groups)
-	}
-
-	w.forgetRecent(got[0])
-	if labels, _ = itemLabels(fileResults(w, "")); len(labels) != 0 {
-		t.Fatalf("removed file still listed: %v", labels)
+	w.forgetRecent(filepath.Join(root, "a.go"))
+	if !slices.Equal(w.search.recent, []string{filepath.Join(root, "b.go")}) {
+		t.Fatalf("recent %v", w.search.recent)
 	}
 }
 
-func itemLabels(items []palette.Item) (labels, groups []string) {
-	for _, it := range items {
-		labels = append(labels, it.Label)
-		groups = append(groups, it.Group)
+func TestSearchEntryPointsOpenTheirTabs(t *testing.T) {
+	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
+	d := w.search.dialog
+	for _, tt := range []struct {
+		name string
+		open func()
+		tab  finder.Tab
+		seed string
+	}{
+		{"command palette", w.ShowCommands, finder.TabActions, ""},
+		{"go to file", w.QuickOpen, finder.TabFiles, ""},
+		{"find in files", w.FindInFiles, finder.TabText, ""},
+		{"show search", w.ShowSearch, finder.TabText, ""},
+		{"symbols in editor", w.GoToSymbolInEditor, finder.TabFiles, "@"},
+		{"symbols in workspace", w.GoToSymbolInWorkspace, finder.TabFiles, "#"},
+		{"search everywhere", func() { w.OpenSearch(finder.TabAll) }, finder.TabAll, ""},
+	} {
+		tt.open()
+		if !d.IsOpen() || d.Tab() != tt.tab || (tt.seed != "" && d.Query() != tt.seed) {
+			t.Errorf("%s: open %v tab %v query %q; want tab %v", tt.name, d.IsOpen(), d.Tab(), d.Query(), tt.tab)
+		}
 	}
-	return labels, groups
+	w.ReplaceInFiles()
+	if d.IsOpen() || !w.search.replace.IsOpen() {
+		t.Fatal("Replace in Files did not replace the dialog with its own popup")
+	}
+	w.ShowRecentFiles()
+	if w.search.replace.IsOpen() || !w.search.recentFiles.IsOpen() {
+		t.Fatal("Recent Files did not replace the Replace in Files popup")
+	}
+	w.OpenSearch(finder.TabAll)
+	if w.search.recentFiles.IsOpen() || !d.IsOpen() {
+		t.Fatal("Search Everywhere did not replace Recent Files")
+	}
+}
+
+func TestDoubleShiftOpensSearchEverywhere(t *testing.T) {
+	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
+	shift := ui.InputEvent{Kind: ui.InputKeyDown, Code: ui.CodeShiftLeft, Mods: ui.Shift}
+	w.observeShift(shift)
+	if w.search.dialog.IsOpen() {
+		t.Fatal("one Shift opened the dialog")
+	}
+	w.observeShift(shift)
+	if !w.search.dialog.IsOpen() || w.search.dialog.Tab() != finder.TabAll {
+		t.Fatal("Double Shift did not open the All tab")
+	}
+}
+
+func TestToolWindowsListViewsAndPanels(t *testing.T) {
+	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
+	var titles []string
+	for _, tw := range w.toolWindows() {
+		titles = append(titles, tw.Title)
+	}
+	for _, want := range []string{"Explorer", "Problems", "TODO", "Find"} {
+		if !slices.Contains(titles, want) {
+			t.Errorf("tool windows %v lack %s", titles, want)
+		}
+	}
+	if slices.Contains(titles, "Search") {
+		t.Error("the Search view is still a tool window")
+	}
+}
+
+func TestFindResultsOpenTheFindPanel(t *testing.T) {
+	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
+	w.showFindResults(finder.FindResults{Title: "Text matches for \"x\"", Total: 0})
+	if !w.tools.panelOpen || w.tools.panel != FindPanel {
+		t.Fatalf("panel open %v showing %q", w.tools.panelOpen, w.tools.panel)
+	}
+}
+
+func TestSearchDialogStateIsSavedWithTheSession(t *testing.T) {
+	root := t.TempDir()
+	w := newTestWorkspace(t, root, newTestEnv(t), session.Project{})
+	w.OpenSearch(finder.TabText)
+	w.search.dialog.Close()
+	var p session.Project
+	w.snapshotSearch(&p)
+	again := newTestWorkspace(t, root, newTestEnv(t), p)
+	if again.search.dialog.Tab() != finder.TabText {
+		t.Fatalf("restored tab %v", again.search.dialog.Tab())
+	}
+}
+
+type searchCommands struct{ run func() }
+
+func (s searchCommands) Lookup(id string) (action.CommandInfo, bool) {
+	return action.CommandInfo{Title: "Search Everywhere", Keys: "Double ⇧"}, id == searchID
+}
+
+func (s searchCommands) Run(id string) {
+	if id == searchID {
+		s.run()
+	}
+}
+
+func TestTitleBarCommandCenterOpensSearchEverywhere(t *testing.T) {
+	w := newTestWorkspace(t, t.TempDir(), newTestEnv(t), session.Project{})
+	action.SetCommands(searchCommands{run: func() { w.OpenSearch(finder.TabAll) }})
+	t.Cleanup(func() { action.SetCommands(nil) })
+	tt := ui.NewTester(w.View, testWideW, testViewH)
+	tt.Frame()
+	if err := tt.Click("Search Everywhere"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !w.search.dialog.IsOpen() || w.search.dialog.Tab() != finder.TabAll {
+		t.Fatal("the command center did not open the All tab")
+	}
 }

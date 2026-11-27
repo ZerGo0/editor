@@ -18,18 +18,6 @@ func (g *Git) ShowCommit(oid string) {
 	g.showCommit(oid)
 }
 
-func (g *Git) CheckoutRef(name string, remote bool) {
-	if !g.ready() {
-		g.notReady()
-		return
-	}
-	if remote {
-		g.checkoutRemote(name)
-		return
-	}
-	g.checkout(name, name)
-}
-
 func (g *Git) HasChangeAt(path string, buf *editor.Buffer, line int) bool {
 	base := g.Base(path)
 	if base == nil || buf == nil {

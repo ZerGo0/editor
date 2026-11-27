@@ -42,15 +42,17 @@ func TestCommandPaletteListsRecentlyUsedFirst(t *testing.T) {
 	app.Eventually("two editors", func() bool { return countRole(app.Tree(win), "textField") == 2 })
 	app.Menu(win, "View", "Command Palette...")
 	app.WaitNode(win, "palette", RoleLabel("dialog", "Command Palette"))
-	group := app.WaitNode(win, "recently used label", Label("recently used"))
+	app.WaitNode(win, "kept query", func(n Node) bool {
+		return n.Role == "textField" && n.Label == "Command Palette" && n.Value == "split right"
+	})
+	app.Key(win, "Cmd+A")
+	app.Key(win, "Backspace")
+	group := app.WaitNode(win, "recently used label", Label("Recently Used"))
 	split := app.WaitNode(win, "split command", func(n Node) bool { return strings.HasPrefix(n.Label, "View: Split Editor Right") })
-	if split.Bounds.Y > group.Bounds.Y || group.Bounds.Y >= split.Bounds.Y+split.Bounds.Height {
-		t.Fatalf("recently used label %+v is not on the first row %+v", group.Bounds, split.Bounds)
+	if split.Bounds.Y != group.Bounds.Y+group.Bounds.Height {
+		t.Fatalf("recently used label %+v does not head the first row %+v", group.Bounds, split.Bounds)
 	}
-	app.WaitNode(win, "other commands label", Label("other commands"))
-	if input, ok := app.Find(win, RoleLabel("textField", "Command Palette")); ok && input.Value != ">" {
-		t.Fatalf("palette kept the last query %q", input.Value)
-	}
+	app.WaitNode(win, "other commands label", Label("Other Commands"))
 }
 
 func TestQuickOpenRecentlyOpenedOpensToSide(t *testing.T) {
@@ -62,7 +64,7 @@ func TestQuickOpenRecentlyOpenedOpensToSide(t *testing.T) {
 	app.WaitNode(win, "b.txt tab", RoleLabel("tab", "b.txt"))
 	app.Menu(win, "Go", "Go to File...")
 	dialog := app.WaitNode(win, "quick open", RoleLabel("dialog", "Go to File"))
-	app.WaitNode(win, "recently opened label", Label("recently opened"))
+	app.WaitNode(win, "recently opened label", Label("Recently Opened"))
 	app.WaitNode(win, "remove button", RoleLabel("button", "Remove from Recently Opened"))
 	for _, n := range app.Tree(win) {
 		if n.Label == "b.txt" && n.Role != "tab" && n.Role != "treeItem" && n.Bounds.Y > dialog.Bounds.Y {

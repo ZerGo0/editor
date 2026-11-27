@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/ZerGo0/editor/internal/fuzzy"
+	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/search/symbols"
 )
 
@@ -20,12 +20,16 @@ const (
 	recentBonusStep = 1
 )
 
+type Filter struct {
+	Globs       []string
+	ProjectOnly bool
+}
+
 type Session struct {
 	*Search
-	recent   []string
-	open     map[string]bool
-	refsOnce sync.Once
-	refs     []Result
+	filter Filter
+	recent []string
+	open   map[string]bool
 }
 
 func (x *Search) Session() *Session {
@@ -34,6 +38,17 @@ func (x *Search) Session() *Session {
 		s.recent = x.env.Recent()
 	}
 	return s
+}
+
+func (s *Session) SetFilter(f Filter) {
+	s.filter = f
+}
+
+func (s *Session) allowed(rel string) bool {
+	if s.filter.ProjectOnly && !filepath.IsLocal(rel) {
+		return false
+	}
+	return len(s.filter.Globs) == 0 || glob.MatchAny(s.filter.Globs, rel)
 }
 
 func (s *Session) MarkOpen(paths []string) {
@@ -48,6 +63,9 @@ func (s *Session) Recent(limit int) []Result {
 	for _, p := range s.recent {
 		if len(out) == limit {
 			break
+		}
+		if !s.allowed(s.rel(p)) {
+			continue
 		}
 		r := fileResult(s.rel(p), p, nil)
 		r.Recent, r.Open = true, s.open[p]
@@ -66,6 +84,7 @@ func (s *Session) Files(q string, limit int) ([]Result, int) {
 	}
 	paths, _ := s.env.Files.Paths()
 	rs := fuzzy.Filter(q, len(paths), func(i int) string { return paths[i] })
+	rs = slices.DeleteFunc(rs, func(r fuzzy.Result) bool { return !s.allowed(paths[r.Index]) })
 	rank := make(map[string]int, len(s.recent))
 	for i, p := range s.recent {
 		rank[p] = i

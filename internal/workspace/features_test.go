@@ -21,6 +21,7 @@ const (
 	testFilePerm = 0o644
 	testViewW    = 400
 	testViewH    = 600
+	testWideW    = 1000
 )
 
 func writeFiles(t *testing.T, root string, files map[string]string) {

@@ -29,5 +29,5 @@ func e2eOptions() app.Options {
 		document.EditLimit = n
 	}
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
-	return app.Options{Hidden: true, DiscardOnClose: true, NoBackups: dir == ""}
+	return app.Options{Hidden: true, DiscardOnClose: true, NoBackups: dir == "", NoMenuAccelerators: true}
 }
