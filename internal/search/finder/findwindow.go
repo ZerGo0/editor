@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/search/textsearch"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -17,6 +18,7 @@ const (
 	expandAllLabel = "Expand All"
 	collapseLabel  = "Collapse All"
 	clearLabel     = "Clear Results"
+	searchingLabel = "Searching..."
 )
 
 type findRow struct {
@@ -144,6 +146,10 @@ func plural(n int, noun string) string {
 }
 
 func (f *FindWindow) empty(c *ui.Context) {
+	if f.res.Busy {
+		feedback.Loading(c, searchingLabel)
+		return
+	}
 	feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No results to show", Message: "Choose Open in Find Window in Search Everywhere to keep its results here."})
 }
 
@@ -169,7 +175,8 @@ func (f *FindWindow) item(c *ui.Context, p *token.Palette, i int) list.Item {
 	r := f.rows[i]
 	if r.match < 0 {
 		file := r.file
-		it := list.Item{Label: file.Name, Description: file.Dir, Leading: fileIcon(file.Name), Count: len(file.Matches), Strong: true, Menu: f.rowMenu(c, r)}
+		it := FileItem(file)
+		it.Menu = f.rowMenu(c, r)
 		if len(file.Matches) > 0 {
 			it.Branch, it.Open = true, !f.collapsed[file.Path]
 			it.OnClick = func() { f.toggle(file) }
@@ -179,9 +186,19 @@ func (f *FindWindow) item(c *ui.Context, p *token.Palette, i int) list.Item {
 		it.OnClick = func() { f.openRow(r) }
 		return it
 	}
-	m := r.file.Matches[r.match]
+	it := MatchItem(p, r.file.Matches[r.match])
+	it.OnClick = func() { f.openRow(r) }
+	it.Menu = f.rowMenu(c, r)
+	return it
+}
+
+func FileItem(file *FileNode) list.Item {
+	return list.Item{Label: file.Name, Description: file.Dir, Leading: fileIcon(file.Name), Count: len(file.Matches), Strong: true}
+}
+
+func MatchItem(p *token.Palette, m textsearch.Match) list.Item {
 	return list.Item{Label: lineLabel(m), Depth: 1, Description: "line " + strconv.Itoa(m.Start.Line+1),
-		Rich: func(s list.Style) []ui.Span { return matchSpans(p, s, m, "", false) }, OnClick: func() { f.openRow(r) }, Menu: f.rowMenu(c, r)}
+		Rich: func(s list.Style) []ui.Span { return matchSpans(p, s, m, "", false) }}
 }
 
 func (f *FindWindow) targets() []findRow {

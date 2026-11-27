@@ -10,6 +10,7 @@ const (
 	langPython     = "Python"
 	langJavaScript = "JavaScript"
 	langTypeScript = "TypeScript"
+	langTSX        = "TypeScript React"
 	langJava       = "Java"
 	langKotlin     = "Kotlin"
 	langC          = "C"
@@ -138,6 +139,7 @@ var languages = map[string]*lang{
 	langPython:     {rules: pythonRules(), indent: true, blocks: []delim{{`"""`, `"""`}, {"'''", "'''"}}},
 	langJavaScript: jsLang(jsRules(false)),
 	langTypeScript: jsLang(jsRules(true)),
+	langTSX:        jsLang(jsRules(true)),
 	langJava:       braceLang(javaRules(), cBlocks),
 	langKotlin:     braceLang(kotlinRules(), cBlocks),
 	langScala:      braceLang(scalaRules(), cBlocks),

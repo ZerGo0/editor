@@ -16,6 +16,7 @@ import (
 	"github.com/ZerGo0/editor/internal/issueui"
 	"github.com/ZerGo0/editor/internal/prui"
 	"github.com/ZerGo0/editor/internal/shellcmd"
+	"github.com/ZerGo0/editor/internal/workspace/symbolnav"
 )
 
 const (
@@ -192,6 +193,9 @@ func tableEntries() []entry {
 	}
 	for _, a := range issueui.Actions {
 		out = append(out, entry{ID: a.ID, Title: a.Title, Source: "issueui/actions.go"})
+	}
+	for _, a := range symbolnav.Actions {
+		out = append(out, entry{ID: a.ID, Title: a.Title, Source: "workspace/symbolnav/actions.go"})
 	}
 	return out
 }

@@ -142,6 +142,7 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 | EmptyStateWidth | 280 | NoticeMaxWidth | 480 |
 | TooltipMaxWidth | 300 | QuickInputRows (count) | 20 |
 | TagMaxWidth | 160 | | |
+| ReferencePeekHeight | 360 | PeekListMinWidth / PeekPreviewMinWidth | 100 / 200 |
 
 ### Radii, strokes, opacity
 

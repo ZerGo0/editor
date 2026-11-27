@@ -17,7 +17,7 @@ type FileNode struct {
 	Matches []textsearch.Match
 }
 
-func newFileNode(abs, rel string, matches []textsearch.Match) *FileNode {
+func NewFileNode(abs, rel string, matches []textsearch.Match) *FileNode {
 	dir := ""
 	if i := strings.LastIndexByte(rel, '/'); i >= 0 {
 		dir = rel[:i]

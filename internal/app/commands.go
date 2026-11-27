@@ -15,6 +15,7 @@ import (
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/shellcmd"
 	"github.com/ZerGo0/editor/internal/workspace"
+	"github.com/ZerGo0/editor/internal/workspace/symbolnav"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -161,8 +162,11 @@ func (a *App) registerCommands() {
 	add("workbench.action.installCommandLine", categoryFile, "Install '"+shellcmd.Name+"' Command in PATH", func(win *mygo.Window) { a.installCommand(nil, win) })
 	add("workbench.action.uninstallCommandLine", categoryFile, "Uninstall '"+shellcmd.Name+"' Command", func(win *mygo.Window) { a.uninstallCommand(nil, win) })
 	add("workbench.action.gotoLine", categoryGo, "Go to Line/Column...", ws((*workspace.Workspace).GoToLine))
+	for _, act := range symbolnav.Actions {
+		add(act.ID, "", act.Title, ws(func(w *workspace.Workspace) { w.RunSymbolNav(act) }))
+	}
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
-		if cmd == editor.GoToLine {
+		if cmd == editor.GoToLine || cmd == editor.GoToDefinition {
 			continue
 		}
 		add(keymap.EditorCommandID(cmd), categoryEditor, humanize(cmd.String()), ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))

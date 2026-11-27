@@ -107,9 +107,17 @@ var (
 	TooltipMaxWidth       = Size{300}
 	TagMaxWidth           = Size{160}
 	PillNameMaxWidth      = Size{100}
+	ReferencePeekHeight   = Size{360}
+	PeekListMinWidth      = Size{100}
+	PeekPreviewMinWidth   = Size{200}
 )
 
 const AsideMaxPercent float32 = 40
+
+const (
+	PeekPreviewShare float32 = 7
+	PeekListShare    float32 = 3
+)
 
 const (
 	QuickInputRows  = 20

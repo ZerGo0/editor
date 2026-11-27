@@ -86,6 +86,8 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 	}
 	textFocus := w.keys.textFocus
 	t := w.active.ActiveTab()
+	providers := t != nil && w.hasSymbolProviders(t.Editor)
+	peekOpen := w.referenceSearchVisible()
 	ctx := maps.Clone(keymap.DefaultContext())
 	for key, on := range map[string]bool{
 		"editorTextFocus":           editorText,
@@ -106,6 +108,13 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 		"inQuickOpen":               w.palette.IsOpen() || w.searchOpen(),
 		"notificationCenterVisible": w.noteCenter,
 		"sideBarVisible":            !w.sidebarHidden,
+
+		"editorHasDefinitionProvider":     providers,
+		"editorHasReferenceProvider":      providers,
+		"editorHasImplementationProvider": providers,
+		"editorHasTypeDefinitionProvider": providers,
+		"referenceSearchVisible":          peekOpen,
+		"hasSearchResult":                 !peekOpen,
 	} {
 		ctx[key] = on
 	}
@@ -139,6 +148,9 @@ func (w *Workspace) runChord(chord keymap.Chord) {
 
 func (w *Workspace) editorInput(ev ui.InputEvent) bool {
 	switch {
+	case ev.Kind == ui.InputKeyDown && ev.Key == ui.KeyEscape && w.referenceSearchVisible():
+		w.peek.view.Dismiss()
+		return true
 	case ev.Kind == ui.InputText && w.keys.swallowText:
 		w.keys.swallowText = false
 		return true

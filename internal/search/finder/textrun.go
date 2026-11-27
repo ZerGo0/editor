@@ -249,7 +249,7 @@ func (r *textRun) flush(gen int) {
 	r.replaceIfFresh()
 	slices.SortFunc(batch, func(a, b textsearch.FileResult) int { return strings.Compare(a.Path, b.Path) })
 	for _, fr := range batch {
-		r.files = append(r.files, newFileNode(fr.Path, r.relPath(fr.Path), fr.Matches))
+		r.files = append(r.files, NewFileNode(fr.Path, r.relPath(fr.Path), fr.Matches))
 		r.total += len(fr.Matches)
 	}
 	r.version++

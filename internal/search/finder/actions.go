@@ -58,7 +58,7 @@ func (d *Dialog) openInFindWindow() {
 		res = FindResults{Title: "Files matching " + quote(d.st.Query)}
 		for _, e := range d.entries {
 			if e.kind == kindFile {
-				res.Files = append(res.Files, newFileNode(e.path, relTo(d.env.Host.RootDir(), e.path), nil))
+				res.Files = append(res.Files, NewFileNode(e.path, relTo(d.env.Host.RootDir(), e.path), nil))
 			}
 		}
 		res.Total = len(res.Files)

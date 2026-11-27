@@ -97,7 +97,7 @@ func (p *preview) show(loc Location) {
 		return
 	}
 	go func() {
-		text, message := readPreview(loc.Path)
+		text, message := ReadPreview(loc.Path)
 		p.env.Host.Update(func() { p.build(gen, loc, text, message) })
 	}()
 }
@@ -141,7 +141,7 @@ func (p *preview) reveal(loc Location) {
 	p.st.Select(buf.Offset(loc.Start), buf.Offset(end))
 }
 
-func readPreview(path string) (text, message string) {
+func ReadPreview(path string) (text, message string) {
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
 		return "", msgUnreadable

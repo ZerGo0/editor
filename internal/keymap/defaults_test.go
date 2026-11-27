@@ -260,3 +260,43 @@ func TestEditorBindingsFollowThePreset(t *testing.T) {
 		}
 	}
 }
+
+func TestSymbolNavigationKeysFollowVSCode(t *testing.T) {
+	k := keymap.New(keymap.Defaults(keymap.PresetVSCode), nil)
+	ctx := keymap.DefaultContext()
+	for _, key := range []string{"editorHasDefinitionProvider", "editorHasReferenceProvider", "editorHasImplementationProvider"} {
+		ctx[key] = true
+	}
+	editorKeys := k.In(ctx)
+	for key, want := range map[string]string{
+		"f12":           "editor.action.revealDefinition",
+		"alt+f12":       "editor.action.peekDefinition",
+		"shift+f12":     "editor.action.goToReferences",
+		"cmd+f12":       "editor.action.goToImplementation",
+		"shift+cmd+f12": "editor.action.peekImplementation",
+		"shift+alt+f12": "references-view.findReferences",
+		"cmd+k f12":     "editor.action.revealDefinitionAside",
+	} {
+		chord, err := keymap.ParseChord(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := editorKeys.Lookup(chord); b.Command != want {
+			t.Errorf("%s runs %q, want %s", key, b.Command, want)
+		}
+	}
+	ctx["referenceSearchVisible"], ctx["hasSearchResult"], ctx["editorTextFocus"] = true, false, false
+	peekKeys := k.In(ctx)
+	for key, want := range map[string]string{
+		"f4": "goToNextReference", "f12": "goToNextReference", "shift+f4": "goToPreviousReference", "shift+f12": "goToPreviousReference",
+		"escape": "closeReferenceSearch",
+	} {
+		chord, err := keymap.ParseChord(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := peekKeys.Lookup(chord); b.Command != want {
+			t.Errorf("with a peek open %s runs %q, want %s", key, b.Command, want)
+		}
+	}
+}

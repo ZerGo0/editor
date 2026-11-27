@@ -74,6 +74,7 @@ func (w *Workspace) overlays(c *ui.Context) {
 	if w.prs != nil {
 		w.prs.Overlay(c)
 	}
+	w.peekView(c)
 }
 
 func (w *Workspace) syncEdited() {

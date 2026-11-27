@@ -90,6 +90,7 @@ type Workspace struct {
 	outside       map[string]context.CancelFunc
 	ec            editorConfigState
 	brackets      bracketState
+	peek          peekState
 }
 
 func New(root string, saved session.Project, env *Env) *Workspace {
@@ -125,6 +126,7 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	w.initTools(saved)
 	w.initInsights()
 	w.initSearch(saved)
+	w.initPeek()
 	w.initGit()
 	w.initGitHub()
 	w.layout = w.restoreNode(saved.Layout)

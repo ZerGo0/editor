@@ -278,4 +278,5 @@ type FindResults struct {
 	Title string
 	Files []*FileNode
 	Total int
+	Busy  bool
 }

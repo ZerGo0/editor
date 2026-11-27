@@ -116,7 +116,6 @@ var EditorCommands = []EditorCommand{
 	{editor.FindInSelection, "editor.action.toggleFindInSelection"},
 	{editor.ScrollLineUp, "scrollLineUp"},
 	{editor.ScrollLineDown, "scrollLineDown"},
-	{editor.GoToDefinition, "editor.action.revealDefinition"},
 	{editor.ShowCompletions, "editor.action.triggerSuggest"},
 	{editor.ShowHover, "editor.action.showHover"},
 	{editor.NextHunk, "workbench.action.editor.nextChange"},
