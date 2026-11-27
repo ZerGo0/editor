@@ -92,6 +92,8 @@ var (
 	PopoverMaxWidth       = Size{320}
 	DialogWidth           = Size{440}
 	QuickInputWidth       = Size{600}
+	SearchPopupWidth      = Size{800}
+	SearchPreviewHeight   = Size{220}
 	CommandCenterWidth    = Size{600}
 	CommandCenterMinWidth = Size{160}
 	EmptyStateWidth       = Size{280}
@@ -100,7 +102,11 @@ var (
 	TagMaxWidth           = Size{160}
 )
 
-const QuickInputRows = 20
+const (
+	QuickInputRows             = 20
+	SearchPopupRows            = 12
+	SearchPopupRowsWithPreview = 6
+)
 
 var (
 	RadiusNone    = Radius0

@@ -263,6 +263,13 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 - `View(c, label, &State{}, []Item{...}, Options{Placeholder, Busy, Empty}) Result{Accepted, Closed}`: 600 px under the title bar; Up, Down, Enter, Escape and click outside.
 
+### picker
+
+- `Dialog(c, DialogOptions{Label, ID}, body) closed`: a modal popup 800 px wide under the title bar (it shrinks with the window and keeps inside it); Escape and a click outside report `closed`. `Header(c, left, right)` lays out tabs on the left and header actions on the right.
+- `Tabs(c, label, &selected, titles)`: popup tabs. `Query(c, label, &query, QueryOptions{Placeholder, Toggles, Actions, Error, Busy, Handle}) Keys`: the input; it reports Up, Down, Page Up, Page Down, Tab, Shift+Tab, Cmd+Enter, Enter and changes, so the focus stays in the input.
+- `Results(c, &ResultsState{}, []Row{...}, ResultsOptions{Label, Rows, Empty}) clicked`: rows of kind `RowItem` (a `list.Item` and key caps), `RowHeader` (a sticky section title) and `RowMore` (a muted "Show 12 more files" row). `ResultsState.Move` skips headers.
+- `Preview(c, *editor.State, PreviewOptions{Label, Message, Busy})`: a read-only code pane under the results; it shrinks first when the window is short.
+
 ### design (root)
 
 - `Apply(c, Settings{Appearance, SystemAccent}) *token.Palette`: sets the theme each frame.
@@ -361,7 +368,6 @@ Files with violations today (count in parentheses):
 - internal/gitui: commitview.go (42), widgets.go (38), branches.go (31), logview.go (29), push.go (19), worktrees.go (19), merge.go (17), conflicts.go (16), patchtab.go (16), statusbar.go (16), logdetails.go (15), stash.go (14), diffview.go (12), rebase.go (12), changes.go (11), remotes.go (11), submodules.go (11), linechange.go (10), shelf.go (10), namedialogs.go (9)
 - internal/prui: detailview.go (95), diff.go (43), create.go (36), widgets.go (34), sideview.go (33), dialog.go (23), stateview.go (14), notifications.go (12), status.go (7), logs.go (5)
 - internal/issueui: detailview.go (57), widgets.go (36), side.go (20), create.go (19), stateview.go (14), working.go (7), format.go (3)
-- internal/search/view: ui.go (61), uirows.go (30), widgets.go (30), uirows2.go (12)
 - internal/viewer: chrome.go (29), hex.go (16), media.go (16), image.go (10), pdf.go (5), markdown.go (1)
 - internal/history: page.go (33)
 - internal/insights: list.go (28)
