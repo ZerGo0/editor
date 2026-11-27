@@ -25,6 +25,21 @@ tasks:
     cmds:
       - go tool mygo build
 
+  install:app:
+    desc: Build the app and install it to /Applications
+    vars:
+      SRC: build/darwin-{{ARCH}}/Editor.app
+      DEST: /Applications/Editor.app
+    preconditions:
+      - sh: "! pgrep -x Editor"
+        msg: Quit Editor, then run the install again.
+    cmds:
+      - task: build
+      - rm -rf "{{.DEST}}.new"
+      - cp -R "{{.SRC}}" "{{.DEST}}.new"
+      - rm -rf "{{.DEST}}"
+      - mv "{{.DEST}}.new" "{{.DEST}}"
+
   icons:
     desc: Generate the Hugeicons SVG files listed in internal/icons/icons.txt
     dir: internal/icons
