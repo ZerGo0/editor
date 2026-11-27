@@ -55,6 +55,7 @@ type Workspace struct {
 	insights      insightState
 	history       *history.UI
 	palette       palette.Palette
+	goTo          *goToLine
 	prompt        prompt
 	keys          keyState
 	notes         notices.Store

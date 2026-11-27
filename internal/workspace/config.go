@@ -75,9 +75,22 @@ func (w *Workspace) ConfigureDiff(d *editor.DiffState, path string) {
 	w.ConfigureEditor(&st, path)
 	d.Font, d.LineHeight, d.TabSize = st.Font, st.LineHeight, st.TabSize
 	d.Wrap, d.ScrollPastEnd = st.SoftWrap, !st.NoScrollPastEnd
+	d.Bindings = withoutGoToLine
 	if st.Theme != nil {
 		d.Theme = st.Theme
 	}
+}
+
+var withoutGoToLine = goToLineOff()
+
+func goToLineOff() []editor.Binding {
+	var out []editor.Binding
+	for _, b := range editor.DefaultBindings() {
+		if b.Command == editor.GoToLine {
+			out = append(out, editor.Binding{Mods: b.Mods, Key: b.Key, ThenKey: b.ThenKey, Command: editor.NoCommand})
+		}
+	}
+	return out
 }
 
 func (w *Workspace) editorMenu(m *ui.Menu) {

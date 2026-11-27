@@ -32,6 +32,7 @@ func (w *Workspace) View(c *ui.Context) {
 	if w.active.ActiveTab() == nil && !root.FocusWithin() {
 		root.Focus()
 	}
+	w.syncGoToLine()
 	w.escape(c)
 	w.shortcuts(c)
 	w.focusedTab = nil

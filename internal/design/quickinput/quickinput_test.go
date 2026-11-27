@@ -137,3 +137,16 @@ func TestAnchoredPanelStaysInsideTheWindow(t *testing.T) {
 		t.Fatal("a missing bar anchors the panel")
 	}
 }
+
+func TestLongLabelWithoutDescriptionIsNotCappedAtHalfThePanel(t *testing.T) {
+	const long = "Current Line: 1, Character: 1. Type a line number between 1 and 101 to navigate to."
+	tt := ui.NewTester(func(c *ui.Context) { View(c, "Go to Line", &State{}, []Item{{Label: long}}, Options{}) }, testWidth, testHeight)
+	tt.Frame()
+	text, ok := tt.AccessByRole(ui.RoleText, long)
+	if !ok {
+		t.Fatal("the label is not shown")
+	}
+	if half := token.QuickInputWidth.Px() / 2; text.Bounds.W <= half {
+		t.Fatalf("label is %v wide, want more than half the panel (%v)", text.Bounds.W, half)
+	}
+}

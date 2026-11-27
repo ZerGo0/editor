@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+const goToLineTitle = "Go to Line/Column"
+
 func openInEditor(t *testing.T, app *App, win int, name string) Node {
 	t.Helper()
 	app.Click(win, app.WaitNode(win, name+" row", RoleLabel("treeItem", name)), 2)
@@ -21,7 +23,32 @@ func TestCtrlGOpensGoToLine(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\n"})
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Ctrl+G")
-	app.WaitNode(win, "go to line", RoleLabel("dialog", "Go to line"))
+	app.WaitNode(win, "go to line", RoleLabel("dialog", goToLineTitle))
+	app.Type(win, "2")
+	app.Key(win, "Enter")
+	app.WaitNode(win, "caret on line 2", func(n Node) bool { return strings.HasPrefix(n.Label, "Ln 2, Col 1") })
+	app.Eventually("quick input closed", func() bool {
+		_, open := app.Find(win, RoleLabel("dialog", goToLineTitle))
+		return !open
+	})
+}
+
+func TestStatusBarPositionOpensGoToLineAndTypingStaysOutOfTheDocument(t *testing.T) {
+	t.Parallel()
+	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\nbeta\ngamma\n"})
+	field := openInEditor(t, app, win, "a.txt")
+	app.Click(win, app.WaitNode(win, "position item", func(n Node) bool { return n.Role == "button" && strings.HasPrefix(n.Label, "Ln 1, Col 1") }), 1)
+	app.WaitNode(win, "go to line", RoleLabel("dialog", goToLineTitle))
+	app.Type(win, "3")
+	app.Key(win, "Escape")
+	app.Eventually("quick input closed", func() bool {
+		_, open := app.Find(win, RoleLabel("dialog", goToLineTitle))
+		return !open
+	})
+	app.Eventually("document untouched", func() bool {
+		n, ok := app.Find(win, RoleLabel("textField", "Code editor"))
+		return ok && n.ID == field.ID && !strings.Contains(n.Value, "3")
+	})
 }
 
 func TestCmdAltFShowsReplace(t *testing.T) {

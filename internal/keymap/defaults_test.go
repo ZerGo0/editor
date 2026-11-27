@@ -209,7 +209,7 @@ func TestEditorBindingsFollowThePreset(t *testing.T) {
 		key    ui.Key
 		want   editor.Command
 	}{
-		{keymap.PresetVSCode, ctrl, ui.KeyG, editor.GoToLine},
+		{keymap.PresetVSCode, ctrl, ui.KeyG, editor.NoCommand},
 		{keymap.PresetVSCode, cmd | alt, ui.KeyF, editor.FindReplace},
 		{keymap.PresetVSCode, cmd | sh, ui.KeyH, editor.NoCommand},
 		{keymap.PresetVSCode, ctrl, ui.KeyH, editor.Backspace},

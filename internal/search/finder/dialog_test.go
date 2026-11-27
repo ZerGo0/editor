@@ -106,12 +106,21 @@ func TestFilesTabPrefixModes(t *testing.T) {
 	f.host.buffers[main] = buf
 
 	f.open(TabFiles, ":2")
-	if got := f.labels(); !slices.Equal(got, []string{"Go to line 2"}) {
+	if got := f.labels(); !slices.Equal(got, []string{"Go to line 2."}) {
 		t.Fatalf("line mode: %v", got)
 	}
 	f.key(0, ui.KeyEnter)
 	if len(f.opened) != 1 || f.opened[0].Start.Line != 1 || f.opened[0].Path != main {
 		t.Fatalf("opened %+v", f.opened)
+	}
+
+	f.open(TabFiles, ":-2")
+	if got := f.labels(); !slices.Equal(got, []string{"Go to line 5."}) {
+		t.Fatalf("line counted from the end: %v", got)
+	}
+	f.open(TabFiles, ":3,2")
+	if got := f.labels(); !slices.Equal(got, []string{"Go to line 3 and character 2."}) {
+		t.Fatalf("line and character: %v", got)
 	}
 
 	f.open(TabFiles, "@help")

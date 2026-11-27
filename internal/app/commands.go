@@ -132,7 +132,11 @@ func (a *App) registerCommands() {
 	add("workbench.action.openLogsFolder", categoryDeveloper, "Open Logs Folder", app(openLogsFolder))
 	add("workbench.action.installCommandLine", categoryFile, "Install '"+shellcmd.Name+"' Command in PATH", func(win *mygo.Window) { a.installCommand(nil, win) })
 	add("workbench.action.uninstallCommandLine", categoryFile, "Uninstall '"+shellcmd.Name+"' Command", func(win *mygo.Window) { a.uninstallCommand(nil, win) })
+	add("workbench.action.gotoLine", categoryGo, "Go to Line/Column...", ws((*workspace.Workspace).GoToLine))
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
+		if cmd == editor.GoToLine {
+			continue
+		}
 		add(keymap.EditorCommandID(cmd), categoryEditor, humanize(cmd.String()), ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))
 	}
 	a.registerKeymapCommands()

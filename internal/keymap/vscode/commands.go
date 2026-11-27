@@ -114,7 +114,6 @@ var EditorCommands = []EditorCommand{
 	{editor.FindPrevious, "editor.action.previousMatchFindAction"},
 	{editor.UseSelectionForFind, "actions.findWithSelection"},
 	{editor.FindInSelection, "editor.action.toggleFindInSelection"},
-	{editor.GoToLine, "workbench.action.gotoLine"},
 	{editor.ScrollLineUp, "scrollLineUp"},
 	{editor.ScrollLineDown, "scrollLineDown"},
 	{editor.GoToDefinition, "editor.action.revealDefinition"},
@@ -139,6 +138,7 @@ var EditorAliases = map[string]editor.Command{
 }
 
 var WorkbenchAliases = map[string]string{
+	"editor.goToLine":                                  "workbench.action.gotoLine",
 	"saveAll":                                          "workbench.action.files.saveAll",
 	"workbench.action.files.openFileFolder":            "workbench.action.files.openFolder",
 	"workbench.action.splitEditor":                     "workbench.action.splitEditorRight",

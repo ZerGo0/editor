@@ -25,6 +25,7 @@ type Item struct {
 	Leading   func(c *ui.Context)
 	Action    *Action
 	Group     string
+	Disabled  bool
 }
 
 type Mode struct {
@@ -34,6 +35,7 @@ type Mode struct {
 	Search      func(query string, done func([]Item))
 	Accept      func(Item)
 	AcceptAlt   func(Item)
+	Dismiss     func()
 }
 
 type Palette struct {
@@ -60,6 +62,7 @@ func Filter(items []Item, query string) []Item {
 }
 
 func (p *Palette) Show(m Mode) {
+	p.Close()
 	p.open, p.mode = true, &m
 	p.state.Reset("")
 	p.refresh()
@@ -76,7 +79,19 @@ func (p *Palette) Label() string {
 	return ""
 }
 
+func (p *Palette) Query() string {
+	return p.state.Query
+}
+
 func (p *Palette) Close() {
+	m := p.mode
+	p.reset()
+	if m != nil && m.Dismiss != nil {
+		m.Dismiss()
+	}
+}
+
+func (p *Palette) reset() {
 	p.open, p.mode, p.items = false, nil, nil
 	p.seq++
 }
@@ -96,7 +111,10 @@ func (p *Palette) Accept() {
 
 func (p *Palette) accept(it Item, alt bool) {
 	m := p.mode
-	p.Close()
+	if it.Disabled {
+		return
+	}
+	p.reset()
 	switch {
 	case m == nil:
 	case alt && m.AcceptAlt != nil:

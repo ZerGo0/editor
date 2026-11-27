@@ -88,3 +88,31 @@ func TestRowActionAndAlternateAccept(t *testing.T) {
 		t.Fatalf("Cmd+Enter: alternate %q, accepted %q, open %v", alternate, accepted, p.IsOpen())
 	}
 }
+
+func TestDismissRunsOnCloseAndOnReplacementButNotOnAccept(t *testing.T) {
+	var dismissed, accepted int
+	mode := Mode{Label: "Go to Line", Search: Static(items("one")), Accept: func(Item) { accepted++ }, Dismiss: func() { dismissed++ }}
+	var p Palette
+	p.Show(mode)
+	p.Close()
+	p.Show(mode)
+	p.Show(Mode{Label: "Other"})
+	if dismissed != 2 {
+		t.Fatalf("dismissed %d times after Close and a replacing Show, want 2", dismissed)
+	}
+	p.Show(mode)
+	p.Accept()
+	if accepted != 1 || dismissed != 2 || p.IsOpen() {
+		t.Fatalf("accepted %d, dismissed %d, open %v; Accept must close without dismissing", accepted, dismissed, p.IsOpen())
+	}
+}
+
+func TestDisabledItemKeepsThePaletteOpen(t *testing.T) {
+	var accepted int
+	var p Palette
+	p.Show(Mode{Label: "Go to Line", Search: func(_ string, done func([]Item)) { done([]Item{{Label: "Invalid", Disabled: true}}) }, Accept: func(Item) { accepted++ }})
+	p.Accept()
+	if accepted != 0 || !p.IsOpen() {
+		t.Fatalf("accepted %d, open %v; a disabled item must do nothing", accepted, p.IsOpen())
+	}
+}

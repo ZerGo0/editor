@@ -124,8 +124,12 @@ func rows(c *ui.Context, p *token.Palette, s *State, items []Item, o Options, re
 			case it.Icon != nil:
 				ui.Icon(c, it.Icon).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(text).Shrink(0).AccessHidden(true)
 			}
-			token.TextBody.Apply(ui.RichText(c, list.Spans(it.Label, it.Matches, text, match)...)).SingleLine().
-				Shrink(0).MaxWidth(token.QuickInputWidth.Px() / 2)
+			label := token.TextBody.Apply(ui.RichText(c, list.Spans(it.Label, it.Matches, text, match)...)).SingleLine()
+			if it.Description == "" {
+				label.Shrink(1).MinWidth(0)
+			} else {
+				label.Shrink(0).MaxWidth(token.QuickInputWidth.Px() / 2)
+			}
 			token.TextLabel.Apply(ui.Text(c, it.Description)).TextColor(secondary).SingleLine().Grow(1).Shrink(1).MinWidth(0)
 			if it.Group != "" && (i == 0 || items[i-1].Group != it.Group) {
 				token.TextLabel.Apply(ui.Text(c, it.Group)).TextColor(secondary).SingleLine().Shrink(0)

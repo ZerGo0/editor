@@ -32,7 +32,6 @@ const (
 	prefixLine          = ":"
 	prefixText          = "%"
 	prefixHelp          = "?"
-	lineColSeparator    = ":"
 )
 
 var modePrefixes = []string{prefixActions, prefixEditorSymbols, prefixSymbols, prefixLine, prefixText, prefixHelp}

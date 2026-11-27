@@ -12,6 +12,9 @@ import (
 func TestEveryEditorCommandHasOneID(t *testing.T) {
 	seen := map[string]editor.Command{}
 	for cmd := editor.NoCommand + 1; cmd.String() != "unknown"; cmd++ {
+		if cmd == editor.GoToLine {
+			continue
+		}
 		id := keymap.EditorCommandID(cmd)
 		if other, dup := seen[id]; dup {
 			t.Errorf("%s and %s share the ID %s", cmd, other, id)

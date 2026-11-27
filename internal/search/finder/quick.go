@@ -6,8 +6,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ZerGo0/editor/internal/fuzzy"
+	"github.com/ZerGo0/editor/internal/gotoline"
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/search/symbols"
@@ -196,29 +198,16 @@ func (in quickInput) line(q string) []entry {
 	if in.active.path == "" || in.active.lines == 0 {
 		return nil
 	}
-	line, col, ok := parseLineCol(q)
-	if !ok || line < 1 || line > in.active.lines {
+	lines := strings.Split(in.active.text, "\n")
+	t := gotoline.Parse(q, in.active.lines, func(line int) int { return utf8.RuneCountInString(lines[line]) })
+	if !t.LineOK {
 		return []entry{{kind: kindHint, label: "Type a line number between 1 and " + strconv.Itoa(in.active.lines), query: prefixLine}}
 	}
-	label := "Go to line " + strconv.Itoa(line)
-	if col > 0 {
-		label += ", column " + strconv.Itoa(col)
+	col := 0
+	if t.ColumnOK {
+		col = gotoline.ByteColumn(lines[t.Line-1], t.Column)
 	}
-	return []entry{{kind: kindLine, label: label, path: in.active.path, line: line - 1, col: max(col-1, 0), hasPos: true}}
-}
-
-func parseLineCol(q string) (line, col int, ok bool) {
-	lineText, colText, hasCol := strings.Cut(strings.TrimSpace(q), lineColSeparator)
-	line, err := strconv.Atoi(strings.TrimSpace(lineText))
-	if err != nil {
-		return 0, 0, false
-	}
-	if hasCol {
-		if col, err = strconv.Atoi(strings.TrimSpace(colText)); err != nil {
-			return 0, 0, false
-		}
-	}
-	return line, col, true
+	return []entry{{kind: kindLine, label: t.Label(0, 0, in.active.lines), path: in.active.path, line: t.Line - 1, col: col, hasPos: true}}
 }
 
 var quickHelp = []struct{ prefix, detail string }{
