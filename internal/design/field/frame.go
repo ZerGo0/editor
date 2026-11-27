@@ -49,7 +49,7 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 		box.Children(func() {
 			if f.leading != nil {
 				ui.Icon(c, f.leading).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(p.Text.Secondary).Shrink(0).
-					Margin(0, 0, 0, token.PadInputX.Px()).AccessHidden(true)
+					Margin(firstLineTop(token.IconSize, multiline), 0, 0, token.PadInputX.Px()).AccessHidden(true)
 			}
 			in = token.TextBody.Apply(input()).Grow(1).MinWidth(0).Padding(token.PadInputY.Px(), token.PadInputX.Px()).
 				TextColor(p.Text.Primary).PlaceholderColor(p.Text.Muted).CaretColor(p.Text.Primary).FocusRing(false).Label(f.label)
@@ -57,10 +57,10 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 				f.trailing()
 			}
 			for _, t := range f.toggles {
-				onFirstLine(action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys, KeepFocus: true}), token.ToggleSize, multiline)
+				action.ToggleIconButton(c, t.Icon, t.Label, t.On, action.IconOptions{Keys: t.Keys, KeepFocus: true}).Margin(firstLineTop(token.ToggleSize, multiline), 0, 0, 0)
 			}
 			for _, a := range f.actions {
-				b := onFirstLine(action.IconButton(c, a.Icon, a.Label, action.IconOptions{Keys: a.Keys, Disabled: a.Disabled, KeepFocus: true}), token.IconButtonSize, multiline)
+				b := action.IconButton(c, a.Icon, a.Label, action.IconOptions{Keys: a.Keys, Disabled: a.Disabled, KeepFocus: true}).Margin(firstLineTop(token.IconButtonSize, multiline), 0, 0, 0)
 				if b.Clicked() && a.Run != nil {
 					a.Run()
 				}
@@ -89,9 +89,9 @@ func (f frame) build(c *ui.Context, p *token.Palette, multiline bool, input func
 	return in
 }
 
-func onFirstLine(el ui.Element, size token.Size, multiline bool) ui.Element {
-	if multiline {
-		el.Margin((token.ControlHeight.Px()-2*token.BorderWidth.Px()-size.Px())/2, 0, 0, 0)
+func firstLineTop(size token.Size, multiline bool) float32 {
+	if !multiline {
+		return 0
 	}
-	return el
+	return (token.ControlHeight.Px() - 2*token.BorderWidth.Px() - size.Px()) / 2
 }
