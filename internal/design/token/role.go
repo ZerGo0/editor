@@ -22,6 +22,7 @@ var (
 	PadInputY       = Space4
 	PadInputEnd     = Space2
 	PadBadgeX       = Space4
+	PadBadgeSmallX  = Space2
 	PadChipX        = Space6
 	PadKeyX         = Space4
 	PadNoticeX      = Space8

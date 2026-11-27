@@ -26,15 +26,16 @@ type TextStyle struct {
 }
 
 var (
-	TextBody      = TextStyle{size: 13, weight: WeightRegular, line: 16}
-	TextStrong    = TextStyle{size: 13, weight: WeightSemibold, line: 16}
-	TextLabel     = TextStyle{size: 12, weight: WeightRegular, line: 16, rise: TextRise}
-	TextParagraph = TextStyle{size: 12, weight: WeightRegular, line: 18, muted: true}
-	TextCaption   = TextStyle{size: 11, weight: WeightRegular, line: 14, muted: true}
-	TextTitle     = TextStyle{size: 11, weight: WeightBold, line: 14, upper: true}
-	TextHeading   = TextStyle{size: 15, weight: WeightSemibold, line: 20}
-	TextBadge     = TextStyle{size: 11, weight: WeightSemibold, line: 14}
-	TextMono      = TextStyle{size: 12, weight: WeightRegular, line: 16, mono: true}
+	TextBody       = TextStyle{size: 13, weight: WeightRegular, line: 16}
+	TextStrong     = TextStyle{size: 13, weight: WeightSemibold, line: 16}
+	TextLabel      = TextStyle{size: 12, weight: WeightRegular, line: 16, rise: TextRise}
+	TextParagraph  = TextStyle{size: 12, weight: WeightRegular, line: 18, muted: true}
+	TextCaption    = TextStyle{size: 11, weight: WeightRegular, line: 14, muted: true}
+	TextTitle      = TextStyle{size: 11, weight: WeightBold, line: 14, upper: true}
+	TextHeading    = TextStyle{size: 15, weight: WeightSemibold, line: 20}
+	TextBadge      = TextStyle{size: 11, weight: WeightSemibold, line: 14, rise: BadgeRise}
+	TextBadgeSmall = TextStyle{size: 9, weight: WeightSemibold, line: 12, rise: BadgeRise}
+	TextMono       = TextStyle{size: 12, weight: WeightRegular, line: 16, mono: true}
 )
 
 func (t TextStyle) Px() float32 { return t.size }

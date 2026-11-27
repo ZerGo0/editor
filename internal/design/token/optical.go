@@ -6,7 +6,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-var TextRise = Size{1}
+var (
+	TextRise  = Size{1}
+	BadgeRise = Size{0.5}
+)
 
 func (t TextStyle) ApplyLine(el ui.Element) ui.Element {
 	t.Apply(el)

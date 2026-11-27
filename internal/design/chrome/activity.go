@@ -41,7 +41,7 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 					ui.Box(c).Absolute().Left(0).Right(0).Bottom(0).Height(token.IndicatorWidth.Px()).Background(p.Bar.ActivityIndicator)
 				}
 				if it.Badge > 0 {
-					badge.Count(c, it.Badge, badge.CountOptions{Accent: true, Small: true}).Absolute().Top(token.GapInline.Px()).Right(0)
+					badge.Count(c, it.Badge, badge.CountOptions{Accent: true, Small: true}).Absolute().Top(token.GapInline.Px()).Left(token.ActivityItem.Px() - token.BadgeSmall.Px())
 				}
 			})
 		}
