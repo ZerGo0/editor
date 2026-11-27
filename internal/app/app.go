@@ -30,6 +30,7 @@ type Options struct {
 	DiscardOnClose     bool
 	NoBackups          bool
 	NoMenuAccelerators bool
+	PickedPaths        []string
 }
 
 type projectWindow struct {
@@ -192,10 +193,7 @@ func (a *App) openProject(root string) *projectWindow {
 }
 
 func (a *App) confirmClose(pw *projectWindow, e *mygo.CloseEvent) {
-	if pw.closing {
-		return
-	}
-	if prompt := pw.ws.PrepareClose(); a.options.DiscardOnClose || !prompt {
+	if pw.closing || !a.needsSavePrompt(pw) {
 		return
 	}
 	e.PreventDefault()
@@ -211,6 +209,19 @@ func (a *App) confirmClose(pw *projectWindow, e *mygo.CloseEvent) {
 		}
 		pw.win.Close()
 	})
+}
+
+func (a *App) needsSavePrompt(pw *projectWindow) bool {
+	prompt := pw.ws.PrepareClose()
+	return prompt && !a.options.DiscardOnClose
+}
+
+func (a *App) confirmWindowClose(pw *projectWindow, done func(ok bool)) {
+	if !a.needsSavePrompt(pw) {
+		done(true)
+		return
+	}
+	pw.ws.ConfirmClose(done)
 }
 
 func (a *App) projectClosed(root string, pw *projectWindow) {
