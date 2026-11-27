@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"strings"
 	"time"
 
 	"github.com/ZerGo0/editor/internal/gitui"
@@ -59,6 +60,17 @@ func (w *Workspace) gitTitleActions(c *ui.Context) {
 	if w.git != nil {
 		w.git.TitleActions(c)
 	}
+}
+
+func (w *Workspace) ActiveViewID() string {
+	if t := w.active.ActiveTab(); t != nil && isVirtual(t.Path) {
+		return strings.TrimPrefix(t.Path, virtualPrefix)
+	}
+	return ""
+}
+
+func (w *Workspace) SourceControlFocused() bool {
+	return !w.sidebarHidden && w.focus.side && w.tools.side == SourceControlView
 }
 
 func (w *Workspace) OpenViewWith(id, title string, view func(c *ui.Context), preview, focus bool) {

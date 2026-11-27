@@ -155,3 +155,7 @@ func (w *Workspace) CycleTab(delta int) {
 func (w *Workspace) ToggleSidebar() {
 	w.sidebarHidden = !w.sidebarHidden
 }
+
+func (w *Workspace) CloseSidebar() {
+	w.sidebarHidden = true
+}

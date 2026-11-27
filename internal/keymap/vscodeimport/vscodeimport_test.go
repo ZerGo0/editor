@@ -22,7 +22,8 @@ var testNow = time.Date(2026, 11, 26, 10, 0, 0, 0, time.UTC)
 func knownCommands(id string) bool {
 	switch id {
 	case "workbench.action.gotoLine", "workbench.action.quickOpen", "workbench.action.showCommands",
-		"editor.action.startFindReplaceAction", "editor.action.commentLine", "cursorUp":
+		"editor.action.startFindReplaceAction", "editor.action.commentLine", "cursorUp",
+		"workbench.action.closeSidebar", "workbench.action.toggleSidebarVisibility", "git.branches":
 		return true
 	}
 	return false
@@ -94,8 +95,8 @@ func TestConvertMapsAndSkips(t *testing.T) {
 	for key, part := range map[string]string{
 		"ctrl+shift+e": "prefix",
 		"capslock":     "unsupported key",
-		"ctrl+t":       "unsupported command",
-		"ctrl+u":       "unsupported command",
+		"ctrl+t":       "no such command",
+		"ctrl+u":       "no such command",
 		"":             "no key",
 	} {
 		if !strings.Contains(reasons[key], part) {
@@ -282,8 +283,12 @@ func TestSectionsListWhatWasNotImported(t *testing.T) {
 	if strings.Join(titles, "|") != strings.Join(wantTitles, "|") {
 		t.Fatalf("sections = %q, want %q", titles, wantTitles)
 	}
-	if got := rows["Commands this editor does not have"]; len(got) != 1 || got[0] != "workbench.action.terminal.new: 2" {
-		t.Errorf("command rows = %q, want one row with a count of 2", got)
+	wantRows := []string{
+		"ctrl+t workbench.action.terminal.new: " + notFoundReason,
+		"ctrl+y workbench.action.terminal.new: " + notFoundReason,
+	}
+	if got := rows["Commands this editor does not have"]; strings.Join(got, "|") != strings.Join(wantRows, "|") {
+		t.Errorf("command rows = %q, want %q", got, wantRows)
 	}
 	if got := rows["Keys this editor cannot read"]; len(got) != 1 || !strings.Contains(got[0], "capslock") {
 		t.Errorf("key rows = %q, want the capslock entry", got)
@@ -320,7 +325,8 @@ func TestSummaryShowsTheSections(t *testing.T) {
 		"Backup of your old keybindings.json: /tmp/keybindings.json.backup",
 		"Set keyboard.dispatch to \"keyCode\".",
 		"Commands this editor does not have",
-		"workbench.action.terminal.new: 2",
+		"ctrl+t workbench.action.terminal.new: this editor has no such command",
+		"ctrl+y workbench.action.terminal.new: this editor has no such command",
 		"capslock cursorUp: unsupported key capslock",
 	} {
 		if !tt.HasText(text) {
@@ -329,5 +335,93 @@ func TestSummaryShowsTheSections(t *testing.T) {
 	}
 	if err := tt.Click("Open Keyboard Shortcuts (JSON)"); err != nil || !opened {
 		t.Fatalf("open: %v, opened %v", err, opened)
+	}
+}
+
+const runCommandsFixture = `[
+	{ "key": "ctrl+e", "command": "runCommands", "when": "sideBarVisible", "args": { "commands": ["workbench.action.closeSidebar", "workbench.action.closeAuxiliaryBar"] } },
+	{ "key": "ctrl+e", "command": "runCommands", "when": "!sideBarVisible", "args": { "commands": [
+		"workbench.action.toggleAuxiliaryBar",
+		"workbench.action.toggleSidebarVisibility",
+		"workbench.action.terminal.toggleTerminal"
+	] } },
+	{ "key": "f7", "command": "runCommands", "when": "terminalFocus", "args": { "commands": ["workbench.action.focusActiveEditorGroup", "workbench.action.terminal.toggleTerminal"] } },
+	{ "key": "f8", "command": "runCommands" },
+	{ "key": "f9", "command": "runCommands", "args": { "commands": "x" } },
+	{ "key": "f10", "command": "runCommands", "args": { "commands": [{ "command": "cursorUp", "args": { "to": "viewPortTop" } }] } },
+	{ "key": "ctrl+l", "command": "git.checkout" }
+]`
+
+func TestRunCommandsImportKeepsTheSupportedParts(t *testing.T) {
+	entries, err := keymap.ParseEntries([]byte(runCommandsFixture), "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := Convert(entries, nil, knownCommands)
+	var added []string
+	for _, e := range p.Add {
+		added = append(added, e.Key+" "+e.Command)
+	}
+	if want := "ctrl+e runCommands|ctrl+e runCommands|ctrl+l git.checkout"; strings.Join(added, "|") != want {
+		t.Errorf("added %q, want %q", added, want)
+	}
+	if len(p.Partial) != 2 {
+		t.Fatalf("partial = %+v, want the two ctrl+e entries", p.Partial)
+	}
+	if got := strings.Join(p.Partial[0].Missing, ","); got != "workbench.action.closeAuxiliaryBar" {
+		t.Errorf("first missing = %q", got)
+	}
+	if got := strings.Join(p.Partial[1].Missing, ","); got != "workbench.action.toggleAuxiliaryBar,workbench.action.terminal.toggleTerminal" {
+		t.Errorf("second missing = %q", got)
+	}
+	reasons := map[string]string{}
+	for _, s := range p.Skipped {
+		reasons[s.Entry.Key] = s.Reason
+	}
+	for key, part := range map[string]string{
+		"f7":  "none of its commands exist here: workbench.action.focusActiveEditorGroup, workbench.action.terminal.toggleTerminal",
+		"f8":  notFoundReason,
+		"f9":  "runCommands needs the args",
+		"f10": "none of its commands exist here: cursorUp (",
+	} {
+		if !strings.Contains(reasons[key], part) {
+			t.Errorf("skip reason for %q = %q, want it to contain %q", key, reasons[key], part)
+		}
+	}
+}
+
+func TestRunCommandsImportedEntriesBind(t *testing.T) {
+	entries, err := keymap.ParseEntries([]byte(runCommandsFixture), "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := Convert(entries, nil, knownCommands)
+	k := keymap.New(nil, p.Add)
+	if len(k.Errors) > 0 {
+		t.Fatalf("imported entries do not bind: %v", k.Errors)
+	}
+	if len(k.Bindings()) != len(p.Add) {
+		t.Errorf("bindings = %d, want %d", len(k.Bindings()), len(p.Add))
+	}
+}
+
+func TestReportListsPartialImports(t *testing.T) {
+	entries, err := keymap.ParseEntries([]byte(runCommandsFixture), "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Report{Source: Source{Product: "Code"}, Total: len(entries), Plan: Convert(entries, nil, knownCommands)}
+	var rows []string
+	for _, s := range r.Sections() {
+		if s.Title == "Imported without some commands" {
+			rows = s.Rows
+		}
+	}
+	want := []string{
+		"ctrl+e runCommands: skips workbench.action.closeAuxiliaryBar",
+		"ctrl+e runCommands: skips workbench.action.toggleAuxiliaryBar, workbench.action.terminal.toggleTerminal",
+	}
+	if strings.Join(rows, "|") != strings.Join(want, "|") {
+		t.Errorf("rows = %q, want %q", rows, want)
 	}
 }

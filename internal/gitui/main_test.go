@@ -2,6 +2,7 @@ package gitui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -106,6 +107,9 @@ type fakeHost struct {
 	buffers map[string]*editor.Buffer
 	active  string
 	editor  *editor.State
+	opened  []string
+	viewID  string
+	scmOn   bool
 }
 
 func newFakeHost(root string) *fakeHost {
@@ -115,7 +119,9 @@ func newFakeHost(root string) *fakeHost {
 func (h *fakeHost) RootDir() string                { return h.root }
 func (h *fakeHost) Window() *mygo.Window           { return nil }
 func (h *fakeHost) Update(fn func())               { h.updates <- fn }
-func (h *fakeHost) OpenAt(string, int, int)        {}
+func (h *fakeHost) OpenAt(path string, _, _ int)   { h.opened = append(h.opened, path) }
+func (h *fakeHost) ActiveViewID() string           { return h.viewID }
+func (h *fakeHost) SourceControlFocused() bool     { return h.scmOn }
 func (h *fakeHost) CloseView(id string)            { delete(h.views, id) }
 func (h *fakeHost) SaveAllFiles() bool             { return true }
 func (h *fakeHost) ActivePath() string             { return h.active }
@@ -254,6 +260,11 @@ func (r *fakeRepo) Commit(_ context.Context, o git.CommitOptions) (string, error
 	r.mu.Unlock()
 	r.record("commit")
 	return "abcdef1234567890", nil
+}
+
+func (r *fakeRepo) CreateBranch(_ context.Context, name, start string, checkout bool) error {
+	r.record(fmt.Sprintf("branch %s from %s checkout %t", name, start, checkout))
+	return nil
 }
 
 func (r *fakeRepo) Checkout(_ context.Context, ref string, _ bool) error {

@@ -69,6 +69,7 @@ func (a *App) registerCommands() {
 	add("explorer.newFile", categoryFile, "New File...", ws((*workspace.Workspace).NewFile))
 	add("explorer.newFolder", categoryFile, "New Folder...", ws((*workspace.Workspace).NewFolder))
 	add("workbench.action.toggleSidebarVisibility", categoryView, "Toggle Primary Side Bar Visibility", ws((*workspace.Workspace).ToggleSidebar))
+	add("workbench.action.closeSidebar", categoryView, "Hide Primary Side Bar", ws((*workspace.Workspace).CloseSidebar))
 	add("workbench.view.explorer", categoryView, "Show Explorer", ws((*workspace.Workspace).FocusExplorer))
 	add("workbench.action.focusSideBar", categoryView, "Focus into Primary Side Bar", ws((*workspace.Workspace).FocusSideBar))
 	add("workbench.action.editor.changeLanguageMode", categoryView, "Change Language Mode", ws((*workspace.Workspace).ChangeLanguage))

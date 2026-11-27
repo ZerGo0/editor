@@ -117,6 +117,8 @@ func ResolveCommand(id string, args json.RawMessage) (string, error) {
 	switch {
 	case canonical == quickOpenCommand:
 		return quickOpenWithArgs(id, args)
+	case canonical == RunCommands:
+		return runCommandsWithArgs(args)
 	case canonical == cursorMoveCommand:
 		return cursorMoveWithArgs(args)
 	case argsIgnored[canonical]:

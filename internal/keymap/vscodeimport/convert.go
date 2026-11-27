@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/keymap/when"
 )
@@ -20,15 +21,23 @@ const (
 	SkipIncomplete
 )
 
+const notFoundReason = "this editor has no such command"
+
 type Skipped struct {
 	Entry  keymap.Entry
 	Kind   SkipKind
 	Reason string
 }
 
+type Partial struct {
+	Entry   keymap.Entry
+	Missing []string
+}
+
 type Plan struct {
 	Add        []keymap.Entry
 	Inactive   []keymap.Entry
+	Partial    []Partial
 	Skipped    []Skipped
 	Duplicates int
 }
@@ -66,6 +75,9 @@ func Convert(entries, ours []keymap.Entry, known func(id string) bool) Plan {
 		if len(clause.Unknown(ctx)) > 0 {
 			p.Inactive = append(p.Inactive, e)
 		}
+		if _, missing := runParts(e, known); len(missing) > 0 {
+			p.Partial = append(p.Partial, Partial{Entry: e, Missing: missing})
+		}
 	}
 	return p
 }
@@ -96,10 +108,38 @@ func check(e keymap.Entry, known func(string) bool) (*when.Clause, *Skipped) {
 			return skip(SkipArguments, err.Error())
 		}
 	}
+	if _, isSequence := command.ParseSequenceID(resolved); isSequence {
+		supported, missing := runParts(e, known)
+		if supported == 0 {
+			return skip(SkipCommand, "none of its commands exist here: "+strings.Join(missing, ", "))
+		}
+		return clause, nil
+	}
 	if !known(resolved) {
-		return skip(SkipCommand, "unsupported command "+id)
+		return skip(SkipCommand, notFoundReason)
 	}
 	return clause, nil
+}
+
+func runParts(e keymap.Entry, known func(string) bool) (supported int, missing []string) {
+	if keymap.CanonicalID(e.Command) != keymap.RunCommands {
+		return 0, nil
+	}
+	items, err := keymap.RunCommandItems(e.Args)
+	if err != nil {
+		return 0, nil
+	}
+	for _, it := range items {
+		switch {
+		case it.Err != nil:
+			missing = append(missing, it.ID+" ("+it.Err.Error()+")")
+		case !known(it.Resolved):
+			missing = append(missing, it.ID)
+		default:
+			supported++
+		}
+	}
+	return supported, missing
 }
 
 func keyOf(e keymap.Entry) (entryKey, error) {

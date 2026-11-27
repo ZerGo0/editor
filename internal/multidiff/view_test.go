@@ -419,3 +419,17 @@ func BenchmarkScrollFrame(b *testing.B) {
 	b.ReportMetric(float64(r.v.Held()), "held")
 	b.ReportMetric(float64(r.v.Stats.Built), "built")
 }
+
+func TestCurrentPathIsTheTopFile(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 30)
+	r := newRig(t, entries)
+	if _, ok := New().CurrentPath(); ok {
+		t.Error("an empty view has a current file")
+	}
+	r.v.Reveal(entries[20].Key)
+	r.settle()
+	if got, ok := r.v.CurrentPath(); !ok || got != entries[20].Path {
+		t.Errorf("CurrentPath = %q, %v, want %q", got, ok, entries[20].Path)
+	}
+}

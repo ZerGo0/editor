@@ -1,9 +1,6 @@
 package vscodeimport
 
 import (
-	"cmp"
-	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/keymap"
@@ -20,7 +17,7 @@ var skipSections = []struct {
 	title string
 	note  string
 }{
-	{SkipCommand, "Commands this editor does not have", "Each command is listed once with the number of keybindings that use it."},
+	{SkipCommand, "Commands this editor does not have", ""},
 	{SkipArguments, "Commands with arguments this editor does not support", ""},
 	{SkipKey, "Keys this editor cannot read", ""},
 	{SkipWhen, "When clauses this editor cannot read", ""},
@@ -36,6 +33,13 @@ func (r Report) Sections() []Section {
 			Rows:  entryRows(r.Plan.Inactive),
 		})
 	}
+	if len(r.Plan.Partial) > 0 {
+		out = append(out, Section{
+			Title: "Imported without some commands",
+			Note:  "These keys run the commands this editor has and skip the others.",
+			Rows:  partialRows(r.Plan.Partial),
+		})
+	}
 	for _, s := range skipSections {
 		var skipped []Skipped
 		for _, sk := range r.Plan.Skipped {
@@ -46,11 +50,7 @@ func (r Report) Sections() []Section {
 		if len(skipped) == 0 {
 			continue
 		}
-		rows := skippedRows(skipped)
-		if s.kind == SkipCommand {
-			rows = commandRows(skipped)
-		}
-		out = append(out, Section{Title: s.title, Note: s.note, Rows: rows})
+		out = append(out, Section{Title: s.title, Note: s.note, Rows: skippedRows(skipped)})
 	}
 	return out
 }
@@ -71,19 +71,10 @@ func skippedRows(skipped []Skipped) []string {
 	return rows
 }
 
-func commandRows(skipped []Skipped) []string {
-	counts := map[string]int{}
-	for _, sk := range skipped {
-		counts[strings.TrimPrefix(sk.Entry.Command, keymap.RemovePrefix)]++
-	}
-	ids := make([]string, 0, len(counts))
-	for id := range counts {
-		ids = append(ids, id)
-	}
-	slices.SortFunc(ids, func(a, b string) int { return cmp.Compare(a, b) })
-	rows := make([]string, len(ids))
-	for i, id := range ids {
-		rows[i] = fmt.Sprintf("%s: %d", id, counts[id])
+func partialRows(partial []Partial) []string {
+	rows := make([]string, len(partial))
+	for i, p := range partial {
+		rows[i] = entryText(p.Entry) + ": skips " + strings.Join(p.Missing, ", ")
 	}
 	return rows
 }

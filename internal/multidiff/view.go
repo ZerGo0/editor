@@ -126,6 +126,13 @@ func (v *View) Top() string {
 
 func (v *View) File(key string) *File { return v.files[key] }
 
+func (v *View) CurrentPath() (string, bool) {
+	if v.top < 0 || v.top >= len(v.entries) || !v.entries[v.top].isFile() {
+		return "", false
+	}
+	return v.entries[v.top].Path, true
+}
+
 func (v *View) isOpen(e *Entry) bool {
 	if open, ok := v.open[e.Key]; ok {
 		return open

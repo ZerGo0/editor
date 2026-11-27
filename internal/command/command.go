@@ -26,12 +26,13 @@ type Registry struct {
 	all    []*Command
 	inMenu map[string]bool
 	recent []string
+	warned map[string]bool
 }
 
 const maxRecent = 50
 
 func NewRegistry() *Registry {
-	return &Registry{byID: map[string]*Command{}, inMenu: map[string]bool{}}
+	return &Registry{byID: map[string]*Command{}, inMenu: map[string]bool{}, warned: map[string]bool{}}
 }
 
 func (r *Registry) Add(cmds ...*Command) {
@@ -46,7 +47,10 @@ func (r *Registry) Add(cmds ...*Command) {
 }
 
 func (r *Registry) Get(id string) *Command {
-	return r.byID[id]
+	if c := r.byID[id]; c != nil {
+		return c
+	}
+	return r.sequence(id)
 }
 
 func (r *Registry) All() []*Command {
@@ -54,7 +58,7 @@ func (r *Registry) All() []*Command {
 }
 
 func (r *Registry) Run(id string, win *mygo.Window) bool {
-	c := r.byID[id]
+	c := r.Get(id)
 	if c == nil {
 		return false
 	}

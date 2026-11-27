@@ -153,4 +153,5 @@ var WorkbenchAliases = map[string]string{
 	"workbench.action.nextEditorInGroup":               "workbench.action.nextEditor",
 	"workbench.action.previousEditorInGroup":           "workbench.action.previousEditor",
 	"workbench.action.closeFolder":                     "workbench.action.closeWindow",
+	"git.checkout":                                     "git.branches",
 }
