@@ -85,6 +85,7 @@ type fixture struct {
 	commands []palette.Item
 	used     []palette.Item
 	written  []string
+	onFrame  func()
 }
 
 func newFixture(t *testing.T, project map[string]string) *fixture {
@@ -149,6 +150,9 @@ func newFixture(t *testing.T, project map[string]string) *fixture {
 		f.dialog.View(c)
 		f.recent.View(c)
 		f.find.View(c)
+		if f.onFrame != nil {
+			f.onFrame()
+		}
 	}, testWidth, testHeight)
 	return f
 }
@@ -162,7 +166,7 @@ func (f *fixture) settle() {
 	for range settleTries {
 		ran := f.host.drain()
 		f.tt.Frame()
-		if !ran && len(f.host.queue) == 0 && !f.dialog.busy() {
+		if !ran && len(f.host.queue) == 0 && !f.dialog.busy() && !f.dialog.preview.pending {
 			return
 		}
 		time.Sleep(settleWait)

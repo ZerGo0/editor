@@ -90,8 +90,9 @@ func (d *Dialog) View(c *ui.Context) {
 		d.refresh()
 	}
 	if d.text.version != d.shown {
-		d.compose()
+		d.compose(d.text.takeRenewed())
 	}
+	d.showBusy = d.progress.visible(c, d.busy())
 	label := d.label()
 	opts := picker.DialogOptions{Label: label, ID: dialogID, Layout: &d.st.Layout,
 		Shortcuts: []picker.Shortcut{{Mods: ui.Cmd | ui.Shift, Key: ui.Key1, Run: d.replaceSelected}}}
@@ -108,6 +109,14 @@ func (d *Dialog) previewShown() bool {
 
 func (d *Dialog) hasPreview() bool {
 	return d.tab == TabFiles || d.tab == TabText
+}
+
+func (d *Dialog) previewable(row int) bool {
+	if row < 0 || row >= len(d.rowEntry) || d.rowEntry[row] == noEntry {
+		return false
+	}
+	kind := d.entries[d.rowEntry[row]].kind
+	return kind != kindMore && kind != kindHint
 }
 
 func (d *Dialog) body(c *ui.Context, label string) {
@@ -132,7 +141,21 @@ func (d *Dialog) body(c *ui.Context, label string) {
 	if d.tab == TabText {
 		d.optionsRow(c)
 	}
-	if i := picker.Results(c, &d.results, d.rows, picker.ResultsOptions{Label: resultsLabel, Fill: true, Empty: d.emptyState}); i >= 0 {
+	results := picker.ResultsOptions{Label: resultsLabel, Fill: true, Empty: d.emptyState}
+	clicked := noEntry
+	if d.previewShown() {
+		results.OnSelect = func(row int) {
+			d.moved = true
+			if !d.previewable(row) {
+				clicked = row
+			}
+		}
+	}
+	i := picker.Results(c, &d.results, d.rows, results)
+	if i < 0 {
+		i = clicked
+	}
+	if i >= 0 {
 		d.moved = true
 		d.results.Selected = i
 		d.accept(i, false)
@@ -177,6 +200,9 @@ func (d *Dialog) move(delta int) {
 
 func (d *Dialog) syncPreview() {
 	e, ok := d.current()
+	if !ok && d.busy() {
+		return
+	}
 	if !ok {
 		d.preview.show(Location{})
 		return
@@ -219,14 +245,21 @@ func (d *Dialog) filterMenu(m *ui.Menu) {
 func (d *Dialog) emptyState(c *ui.Context) {
 	q := strings.TrimSpace(d.st.Query)
 	switch {
-	case d.busy():
+	case d.busy() && d.showBusy:
 		feedback.Loading(c, searchingText)
+	case d.busy():
+		if d.settled != "" {
+			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})
+		}
 	case d.queryError() != "":
+		d.settled = ""
 		feedback.Error(c, "The pattern is not valid", errors.New(d.queryError()), nil)
 	case q == "":
-		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.hint()})
+		d.settled = d.hint()
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})
 	default:
-		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No results for " + quote(firstLine(q))})
+		d.settled = "No results for " + quote(firstLine(q))
+		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})
 	}
 }
 

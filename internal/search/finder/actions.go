@@ -1,5 +1,10 @@
 package finder
 
+import (
+	"slices"
+	"strings"
+)
+
 func (d *Dialog) accept(row int, side bool) {
 	if row < 0 || row >= len(d.rowEntry) || d.rowEntry[row] == noEntry {
 		return
@@ -31,7 +36,7 @@ func (d *Dialog) accept(row int, side bool) {
 func (d *Dialog) canOpenInFind() bool {
 	switch d.tab {
 	case TabText:
-		return d.text.total > 0 && !d.text.searching
+		return d.text.total > 0 && !d.text.searching && d.text.err == ""
 	case TabFiles:
 		for _, e := range d.entries {
 			if e.kind == kindFile {
@@ -46,7 +51,9 @@ func (d *Dialog) openInFindWindow() {
 	var res FindResults
 	switch d.tab {
 	case TabText:
-		res = FindResults{Title: "Text matches for " + quote(d.st.Query), Files: d.text.files, Total: d.text.total}
+		files := slices.Clone(d.text.files)
+		slices.SortFunc(files, func(a, b *FileNode) int { return strings.Compare(a.Rel, b.Rel) })
+		res = FindResults{Title: "Text matches for " + quote(d.st.Query), Files: files, Total: d.text.total}
 	case TabFiles:
 		res = FindResults{Title: "Files matching " + quote(d.st.Query)}
 		for _, e := range d.entries {

@@ -37,16 +37,22 @@ type ResultsOptions struct {
 	Rows  int
 	Fill  bool
 	Empty func(c *ui.Context)
+
+	OnSelect func(i int)
 }
 
 func (s *ResultsState) selectable(i int) bool {
 	return i >= 0 && i < len(s.rows) && s.rows[i].Kind != RowHeader
 }
 
-func (s *ResultsState) Reset(rows []Row) {
+func (s *ResultsState) SelectFirst(rows []Row) {
 	s.rows = rows
 	s.Selected = none
 	s.Clamp(rows)
+}
+
+func (s *ResultsState) Reset(rows []Row) {
+	s.SelectFirst(rows)
 	s.list.ScrollIntoView(0)
 }
 
@@ -125,6 +131,14 @@ func Results(c *ui.Context, s *ResultsState, rows []Row, o ResultsOptions) int {
 		}
 		i := r.Index
 		it.OnClick = func() { clicked = i }
+		if o.OnSelect != nil {
+			it.OnClick = func() { s.Selected = i; o.OnSelect(i) }
+			it.OnDoubleClick = func() {
+				if r.Context.Modifiers() == 0 {
+					s.Selected, clicked = i, i
+				}
+			}
+		}
 		list.Row(r.Context, list.State{Selected: i == s.Selected, Focused: true, Hovered: r.Hovered()}, it)
 	})
 	if s.scroll && s.Selected != none {

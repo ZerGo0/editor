@@ -42,7 +42,7 @@ func Query(c *ui.Context, label string, query *string, o QueryOptions) Keys {
 	}
 	k.Submitted, k.Changed = in.Submitted(), in.Changed()
 	if o.Busy {
-		feedback.ProgressBar(c, label)
+		feedback.ProgressBar(c, label).Absolute().Left(0).Right(0).Bottom(0)
 	}
 	return k
 }

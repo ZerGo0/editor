@@ -64,6 +64,10 @@ type Dialog struct {
 	cancel    context.CancelFunc
 	loading   bool
 	searched  string
+	resultsOf string
+	progress  delayedBusy
+	showBusy  bool
+	settled   string
 	moved     bool
 	selectAll bool
 	field     ui.Handle
@@ -120,6 +124,9 @@ func (d *Dialog) Close() {
 	d.stopSearch()
 	d.text.reset()
 	d.preview.clear()
+	d.quick, d.entries, d.rows, d.rowEntry = nil, nil, nil, nil
+	d.resultsOf, d.settled = "", ""
+	d.results.Reset(nil)
 }
 
 func (d *Dialog) stopSearch() {
@@ -220,9 +227,8 @@ func (d *Dialog) refresh() {
 	} else {
 		d.text.reset()
 	}
-	d.quick = nil
 	if d.tab == TabText {
-		d.compose()
+		d.compose(d.text.takeRenewed())
 		return
 	}
 	in := d.quickInput()
@@ -235,7 +241,7 @@ func (d *Dialog) refresh() {
 				return
 			}
 			d.loading, d.quick = false, entries
-			d.compose()
+			d.compose(true)
 		})
 	}()
 }
@@ -261,8 +267,15 @@ func (d *Dialog) directory() string {
 	return ""
 }
 
-func (d *Dialog) compose() {
+func (d *Dialog) awaitingText() bool {
+	return d.tab == TabText && d.text.fresh && d.text.searching && len(d.entries) > 0
+}
+
+func (d *Dialog) compose(renewed bool) {
 	d.shown = d.text.version
+	if d.awaitingText() {
+		return
+	}
 	entries := d.quick
 	switch d.tab {
 	case TabText:
@@ -273,11 +286,18 @@ func (d *Dialog) compose() {
 	d.labelMatches(entries)
 	d.entries = entries
 	d.rows, d.rowEntry = d.rowsOf(entries)
-	if d.moved {
+	fresh := renewed && !d.loading && d.resultsOf != d.searched
+	switch {
+	case d.moved:
 		d.results.Clamp(d.rows)
-		return
+	case fresh:
+		d.results.Reset(d.rows)
+	default:
+		d.results.SelectFirst(d.rows)
 	}
-	d.results.Reset(d.rows)
+	if fresh {
+		d.resultsOf = d.searched
+	}
 }
 
 func (d *Dialog) textEntries(limit int, group string) []entry {

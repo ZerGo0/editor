@@ -64,6 +64,9 @@ func (n *treeNode) dir(name string) *treeNode {
 
 func (v *View) buildTree() {
 	t := &v.tree
+	if t.built != t.filter {
+		t.list.ScrollTo(0, ui.Start)
+	}
 	t.rows = t.rows[:0]
 	t.fileRow = map[string]int{}
 	needle := strings.ToLower(t.filter)
@@ -105,7 +108,7 @@ func (v *View) flattenTree(n *treeNode, depth int) {
 	}
 }
 
-func (v *View) sidebar(c *ui.Context) {
+func (v *View) syncTree() {
 	t := &v.tree
 	if t.dirty || t.built != t.filter {
 		v.buildTree()
@@ -117,11 +120,16 @@ func (v *View) sidebar(c *ui.Context) {
 		}
 	}
 	t.list.Selected = &t.sel
+}
+
+func (v *View) sidebar(c *ui.Context) {
+	t := &v.tree
 	p := token.Of(c)
 	ui.Column(c.Key("multidiff-tree")).Fill().Background(p.Layer.SideBar).Children(func() {
 		ui.Row(c).FillWidth().Padding(token.GapInline.Px(), token.PadRow.Px()).Shrink(0).Children(func() {
 			field.SearchInput(c, filterLabel, &t.filter, field.SearchOptions{Placeholder: "Filter files", ID: "tree-filter"}).Grow(1).MinWidth(0)
 		})
+		v.syncTree()
 		list.View(c, &t.list, len(t.rows), list.ViewOptions{Label: treeLabel, Tree: true, Guides: true, Empty: func(c *ui.Context) {
 			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Filter, Title: "No matching files"})
 		}}, func(i int) list.Item { return v.treeItem(t.rows[i]) })

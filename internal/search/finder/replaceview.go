@@ -38,7 +38,7 @@ func (d *Dialog) queryRow(c *ui.Context, label string, toggles []field.Toggle) p
 		}
 		ui.Column(c.Key("search-fields")).Grow(1).MinWidth(0).Gap(token.GapInline.Px()).Children(func() {
 			keys = picker.Query(c, label, &d.st.Query, picker.QueryOptions{Placeholder: d.placeholder(), Toggles: toggles, Error: d.queryError(),
-				Busy: d.busy(), Handle: &d.field, NoAutoFocus: d.focusWith})
+				Busy: d.showBusy, Handle: &d.field, NoAutoFocus: d.focusWith})
 			if d.replaceVisible() {
 				d.replaceRow(c)
 			}

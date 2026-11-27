@@ -27,9 +27,7 @@ func Preview(c *ui.Context, st *editor.State, o PreviewOptions) ui.Element {
 		box := ui.Column(c).FillWidth().Grow(1).MinHeight(0).Clip().Radius(token.RadiusControl.Px()).
 			Background(p.Layer.Editor).Border(token.BorderWidth.Px(), p.Border.Default).Label(o.Label)
 		box.Children(func() {
-			if o.Title != "" {
-				previewTitle(c, p, o.Title)
-			}
+			previewTitle(c, p, o.Title)
 			switch {
 			case o.Busy:
 				feedback.Loading(c, o.Message)

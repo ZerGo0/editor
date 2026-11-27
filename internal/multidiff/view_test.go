@@ -12,11 +12,12 @@ import (
 )
 
 const (
-	testWidth    = 1100
-	testHeight   = 700
-	hunkLines    = 12
-	testSet      = "set"
-	testFileName = "file.txt"
+	testWidth      = 1100
+	testHeight     = 700
+	hunkLines      = 12
+	testSet        = "set"
+	treeScrollDown = 2000
+	testFileName   = "file.txt"
 )
 
 func patchFor(t testing.TB, path string, changed int) *editor.FilePatch {
@@ -46,9 +47,10 @@ func testEntries(t testing.TB, n int) []Entry {
 }
 
 type rig struct {
-	v      *View
-	tt     *ui.Tester
-	viewed *Memory
+	v       *View
+	tt      *ui.Tester
+	viewed  *Memory
+	onFrame func()
 }
 
 func newRig(t testing.TB, entries []Entry) *rig {
@@ -56,7 +58,12 @@ func newRig(t testing.TB, entries []Entry) *rig {
 	r := &rig{v: New(), viewed: NewMemory()}
 	r.v.SetEntries(entries)
 	o := Options{Label: "Changes", Set: testSet, Ctx: context.Background(), Post: func(f func()) { f() }, Viewed: r.viewed}
-	r.tt = ui.NewTester(func(c *ui.Context) { r.v.Render(c, o) }, testWidth, testHeight)
+	r.tt = ui.NewTester(func(c *ui.Context) {
+		r.v.Render(c, o)
+		if r.onFrame != nil {
+			r.onFrame()
+		}
+	}, testWidth, testHeight)
 	r.tt.Frame()
 	r.tt.Frame()
 	return r
@@ -237,6 +244,57 @@ func TestFileCardsAreSeparatedByAGap(t *testing.T) {
 	}
 	if gap := second.Bounds.Y - (diff.Bounds.Y + diff.Bounds.H); gap < token.GapGroup.Px() {
 		t.Errorf("gap %.1f between the diff and the next header", gap)
+	}
+}
+
+func TestTreeFilterShowsTheRowsOfTheTextInTheSameFrame(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 30)
+	r := newRig(t, entries)
+	input, ok := r.tt.Access(filterLabel)
+	if !ok {
+		t.Fatal("no filter field")
+	}
+	r.tt.ClickAt(input.Bounds.X+input.Bounds.W/2, input.Bounds.Y+input.Bounds.H/2)
+	r.settle()
+	var stale, frames int
+	r.onFrame = func() {
+		frames++
+		if r.v.tree.built != r.v.tree.filter {
+			stale++
+		}
+	}
+	for _, ch := range "f01" {
+		r.tt.Type(string(ch))
+		r.settle()
+	}
+	if frames == 0 || r.v.tree.filter != "f01" {
+		t.Fatalf("filter %q after %d frames", r.v.tree.filter, frames)
+	}
+	if stale != 0 {
+		t.Fatalf("%d of %d frames drew a tree built for an older filter", stale, frames)
+	}
+}
+
+func TestTreeFilterScrollsTheTreeToTheTop(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 200)
+	r := newRig(t, entries)
+	tree, ok := r.tt.AccessByRole(ui.RoleList, treeLabel)
+	if !ok {
+		t.Fatal("no tree")
+	}
+	r.tt.Scroll(tree.Bounds.X+tree.Bounds.W/2, tree.Bounds.Y+tree.Bounds.H/2, 0, treeScrollDown)
+	r.settle()
+	if first, _ := r.v.tree.list.Visible(); first == 0 {
+		t.Fatal("the tree did not scroll")
+	}
+	input, _ := r.tt.Access(filterLabel)
+	r.tt.ClickAt(input.Bounds.X+input.Bounds.W/2, input.Bounds.Y+input.Bounds.H/2)
+	r.tt.Type("f1")
+	r.settle()
+	if first, _ := r.v.tree.list.Visible(); first != 0 {
+		t.Fatalf("the filtered tree starts at row %d", first)
 	}
 }
 

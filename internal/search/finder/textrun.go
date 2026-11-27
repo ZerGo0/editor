@@ -44,6 +44,7 @@ type textRun struct {
 	truncated bool
 	searching bool
 	fresh     bool
+	renewed   bool
 	err       string
 	matcher   *textsearch.Matcher
 	pattern   string
@@ -62,10 +63,23 @@ func (r *textRun) stop() {
 	r.searching = false
 }
 
+func (r *textRun) clear() {
+	r.files, r.total, r.truncated, r.err, r.matcher, r.pattern = nil, 0, false, "", nil, ""
+	r.renewed = true
+	r.version++
+}
+
 func (r *textRun) reset() {
 	r.stop()
-	r.files, r.total, r.truncated, r.err, r.matcher, r.pattern = nil, 0, false, "", nil, ""
-	r.version++
+	if r.files != nil || r.err != "" || r.matcher != nil {
+		r.clear()
+	}
+}
+
+func (r *textRun) takeRenewed() bool {
+	renewed := r.renewed
+	r.renewed = false
+	return renewed
 }
 
 func (r *textRun) currentGen() int {
@@ -132,14 +146,13 @@ func overlayFunc(snaps map[string]editor.Snapshot) func(string) (string, bool) {
 
 func (r *textRun) start(req textRequest) {
 	r.stop()
-	r.version++
 	if strings.TrimSpace(req.Pattern) == "" {
-		r.files, r.total, r.truncated, r.err, r.matcher, r.pattern = nil, 0, false, "", nil, ""
+		r.clear()
 		return
 	}
 	m, err := r.compile(req)
 	if err != nil {
-		r.files, r.total, r.truncated, r.matcher = nil, 0, false, nil
+		r.matcher = nil
 		r.err, r.pattern = patternMessage(err), req.Pattern
 		return
 	}
@@ -233,15 +246,19 @@ func (r *textRun) flush(gen int) {
 	if !ok || len(batch) == 0 {
 		return
 	}
-	if r.fresh {
-		r.files, r.total, r.fresh = nil, 0, false
-	}
+	r.replaceIfFresh()
+	slices.SortFunc(batch, func(a, b textsearch.FileResult) int { return strings.Compare(a.Path, b.Path) })
 	for _, fr := range batch {
 		r.files = append(r.files, newFileNode(fr.Path, r.relPath(fr.Path), fr.Matches))
 		r.total += len(fr.Matches)
 	}
-	slices.SortFunc(r.files, func(a, b *FileNode) int { return strings.Compare(a.Rel, b.Rel) })
 	r.version++
+}
+
+func (r *textRun) replaceIfFresh() {
+	if r.fresh {
+		r.files, r.total, r.fresh, r.renewed = nil, 0, false, true
+	}
 }
 
 func (r *textRun) finish(gen int, stats textsearch.Stats) {
@@ -249,9 +266,7 @@ func (r *textRun) finish(gen int, stats textsearch.Stats) {
 	if gen != r.currentGen() {
 		return
 	}
-	if r.fresh {
-		r.files, r.total, r.fresh = nil, 0, false
-	}
+	r.replaceIfFresh()
 	r.searching, r.truncated = false, stats.Truncated
 	r.version++
 }
