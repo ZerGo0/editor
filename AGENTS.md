@@ -16,6 +16,14 @@ Read [docs/design.md](docs/design.md) before you change UI, and load the `design
 - Mark independent tests `t.Parallel()`. In `e2e`, pass per-app environment through `LaunchEnv`, never `t.Setenv`; `NewDemoProject` returns a private copy of a fixture that is built once.
 - Find the slowest tests: `go test -json ./... | jq -r 'select(.Test and .Action=="pass") | "\(.Elapsed)\t\(.Package)\t\(.Test)"' | sort -rn | head -20`, or add `-v` for timings. Use the same pipe in `e2e` with `-tags e2e -count=1`.
 
+## Checks
+
+- Before the final summary of a change, run `task check` and `task test:e2e`. After behavior changes, also run `task aislop`.
+- Never run `task aislop:setup` unless the user asks for the SlopO setup.
+- Fix the `task aislop` findings that the change introduces or that the change needs fixed: simplify, give the code one clear owner, or remove dead code. Report unrelated findings that were already there, with evidence, but do not expand the task to fix them.
+- Do not hide findings: do not weaken a check, add an exclusion, or move code only to escape a check.
+- Consolidate SlopO duplicate clusters that the change introduces. Move callers to the one canonical implementation, with no forwarding aliases, and delete modules that become empty. Add a cluster hash to `.quality-gates/slopo.ignore.txt` only with a comment that gives the reason why a merge is unsafe or makes ownership worse.
+
 ## Diagnose the installed app
 
 - The installed app logs to `~/Library/Logs/Editor/` (`editor.log`, `crash.log`). The dev profile logs to `~/Library/Logs/Editor Dev/`.
