@@ -69,9 +69,6 @@ b6b349e8dace
 # Each filter test asserts a different mode and different output lines on one fixture.
 48a21cad1de7
 
-# e2e.Node and qa.Node are separate types in two test suites; each predicate builder matches its own type.
-3842e3cd5d8a
-
 # Unpin and toggle-pin guards differ in the pinned state they set; a shared helper would need a callback for one line.
 32b20029f725
 
@@ -83,9 +80,6 @@ fcad811a4441
 
 # The two when-expression tests assert different contracts (evaluation only, evaluation plus unknown keys).
 b93654e98444
-
-# newRealGit drives a real repository and newFakeGit drives a recording fake with its own init hook; the dependency sets differ.
-a2670ba09da1
 
 # Forward and reverse frontier steps of one bidirectional diff; they differ in comparisons and meeting test.
 5f3ed72fa02b
