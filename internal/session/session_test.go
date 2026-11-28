@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -101,7 +102,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatalf("project %+v", pa)
 	}
 	first := pa.Layout.First.Group.Tabs[0]
-	if first != (Tab{Path: "/a/x.go", Preview: true, Line: 3, Col: 4, ScrollY: 12.5}) {
+	if !reflect.DeepEqual(first, Tab{Path: "/a/x.go", Preview: true, Line: 3, Col: 4, ScrollY: 12.5}) {
 		t.Fatalf("tab %+v", first)
 	}
 	if !pa.Layout.Vertical || pa.Layout.Percent != 40 || pa.Layout.Second.Group.Tabs[0].Path != "/a/y.go" {

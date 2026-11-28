@@ -8,13 +8,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/largefile"
 	"github.com/ZerGo0/editor/internal/syntax"
+	"github.com/ZerGo0/editor/internal/telemetry"
 	"github.com/egoist/mygo/ui/editor"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type Kind int
@@ -50,8 +53,20 @@ type Document struct {
 	Buffer   *editor.Buffer
 	Large    *largefile.Doc
 	ReadOnly bool
+	NotUTF8  bool
+	Locked   bool
 	stamp    stamp
 }
+
+type NotUTF8Error struct{ Path string }
+
+func (e *NotUTF8Error) Error() string { return filepath.Base(e.Path) + " is not valid UTF-8" }
+
+func (e *NotUTF8Error) Reason() string {
+	return "It is not valid UTF-8 text, so it opens read-only."
+}
+
+var errNotText = errors.New("this file has no text to save")
 
 type DiskState struct {
 	text  string
@@ -77,8 +92,10 @@ func open(path string, allowBinary bool) (*Document, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, span := telemetry.Start(context.Background(), telemetry.SpanFileLoad, attribute.Int64("size", info.Size()))
+	defer span.End()
 	if info.IsDir() {
-		return nil, errors.New("is a directory")
+		return nil, &fs.PathError{Op: "open", Path: path, Err: syscall.EISDIR}
 	}
 	d := &Document{Path: path, stamp: stampOf(info)}
 	if info.Size() > EditLimit {
@@ -97,7 +114,8 @@ func open(path string, allowBinary bool) (*Document, error) {
 		return d, nil
 	}
 	text := string(data)
-	d.ReadOnly = !utf8.ValidString(text)
+	d.NotUTF8 = !utf8.ValidString(text)
+	d.SetLocked(!fsutil.Writable(path))
 	d.Buffer = editor.NewBuffer(text)
 	if len(data) > HighlightLimit {
 		d.Kind = Plain
@@ -110,6 +128,11 @@ func open(path string, allowBinary bool) (*Document, error) {
 
 func isBinary(data []byte) bool {
 	return bytes.IndexByte(data[:min(len(data), binarySniffSize)], 0) >= 0
+}
+
+func (d *Document) SetLocked(locked bool) {
+	d.Locked = locked
+	d.ReadOnly = d.NotUTF8 || locked
 }
 
 func (d *Document) Editable() bool {
@@ -138,8 +161,11 @@ func (d *Document) SaveLarge(ctx context.Context, progress func(done, total int6
 
 // TECHDEBT: Saves on the UI thread; write a buffer snapshot on a goroutine once large files make saves slow.
 func (d *Document) Save() error {
-	if d.Buffer == nil || d.ReadOnly {
-		return errors.New("this file cannot be saved")
+	switch {
+	case d.Buffer == nil:
+		return errNotText
+	case d.NotUTF8:
+		return &NotUTF8Error{Path: d.Path}
 	}
 	target, err := filepath.EvalSymlinks(d.Path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -155,10 +181,14 @@ func (d *Document) Save() error {
 		_, err := d.Buffer.WriteTo(w)
 		return err
 	})
+	if errors.Is(err, fs.ErrPermission) {
+		d.SetLocked(!fsutil.Writable(target))
+	}
 	if err != nil {
 		return err
 	}
 	d.Buffer.MarkSaved()
+	d.SetLocked(false)
 	if info, err := os.Stat(target); err == nil {
 		d.stamp = stampOf(info)
 	}

@@ -40,6 +40,55 @@ func (n *Node) Groups() []*Group {
 	return append(n.First.Groups(), n.Second.Groups()...)
 }
 
+type Step struct {
+	Node  *Node
+	First bool
+}
+
+func (n *Node) Path(g *Group) []Step {
+	if n.Group != nil {
+		return nil
+	}
+	for _, side := range []struct {
+		child *Node
+		first bool
+	}{{n.First, true}, {n.Second, false}} {
+		if side.child.Group == g {
+			return []Step{{n, side.first}}
+		}
+		if rest := side.child.Path(g); rest != nil {
+			return append([]Step{{n, side.first}}, rest...)
+		}
+	}
+	return nil
+}
+
+func (n *Node) Even() {
+	if n.Group != nil {
+		return
+	}
+	n.First.Even()
+	n.Second.Even()
+	a, b := n.First.span(n.Vertical), n.Second.span(n.Vertical)
+	n.Percent = a * fullPercent / (a + b)
+}
+
+func (n *Node) span(vertical bool) float32 {
+	if n.Group != nil || n.Vertical != vertical {
+		return 1
+	}
+	return n.First.span(vertical) + n.Second.span(vertical)
+}
+
+func (n *Node) Expand(g *Group) {
+	for _, s := range n.Path(g) {
+		s.Node.Percent = 0
+		if s.First {
+			s.Node.Percent = fullPercent
+		}
+	}
+}
+
 func (n *Node) Split(target, added *Group, vertical bool) bool {
 	return n.split(target, added, vertical, false)
 }

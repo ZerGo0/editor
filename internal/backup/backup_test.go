@@ -97,3 +97,25 @@ func TestClearAndCorruptFiles(t *testing.T) {
 		t.Fatal("read a backup whose text is missing")
 	}
 }
+
+func TestKeepMovesTheBackupOutOfTheStore(t *testing.T) {
+	s := Open(filepath.Join(t.TempDir(), "store"), DefaultLimit)
+	write(t, s, 1, "/p/a.go", "draft")
+	kept := filepath.Join(t.TempDir(), "Recovered")
+	dest, err := s.Keep("/p/a.go", kept, "a.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(dest); err != nil || string(data) != "draft" || filepath.Dir(dest) != kept {
+		t.Fatalf("kept %s = %q, %v", dest, data, err)
+	}
+	if s.Has("/p/a.go") {
+		t.Fatal("the store still lists the kept backup")
+	}
+	if err := s.Clear(2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dest); err != nil {
+		t.Fatalf("clear removed the kept backup: %v", err)
+	}
+}

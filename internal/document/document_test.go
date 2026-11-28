@@ -1,11 +1,14 @@
 package document
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/errtext"
 	"github.com/ZerGo0/editor/internal/testutil"
 )
 
@@ -303,5 +306,37 @@ func TestApplyDiskSameTextMarksSaved(t *testing.T) {
 	}
 	if !d.ApplyDisk(s) || d.Buffer.String() != "same" {
 		t.Fatal("apply failed")
+	}
+}
+
+func TestOpenWithoutWritePermissionLocks(t *testing.T) {
+	p := writeFile(t, "ro.txt", []byte("keep\n"), 0o444)
+	d, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Locked || !d.ReadOnly || d.NotUTF8 {
+		t.Fatalf("doc locked %v read-only %v not UTF-8 %v", d.Locked, d.ReadOnly, d.NotUTF8)
+	}
+	d.Buffer.Set("changed\n")
+	if err := d.Save(); !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("save err = %v, want a permission error", err)
+	}
+	if testutil.ReadText(t, p) != "keep\n" {
+		t.Fatal("a read-only file was overwritten")
+	}
+	if info, _ := os.Stat(p); info.Mode().Perm() != 0o444 {
+		t.Fatalf("mode %v changed", info.Mode().Perm())
+	}
+}
+
+func TestSaveNotUTF8ExplainsWhy(t *testing.T) {
+	p := writeFile(t, "latin.txt", []byte("caf\xe9"), 0o644)
+	d, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := errtext.Text(d.Save()); got != "It is not valid UTF-8 text, so it opens read-only." {
+		t.Fatalf("reason %q", got)
 	}
 }

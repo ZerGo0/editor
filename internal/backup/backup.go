@@ -25,6 +25,7 @@ const (
 	keyBytes     = 16
 	filePerm     = 0o600
 	dirPerm      = 0o700
+	keptStamp    = "2006-01-02 15.04.05"
 )
 
 var (
@@ -175,6 +176,24 @@ func remove(path string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Store) Keep(path, dir, name string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.metas[path]; !ok {
+		return "", os.ErrNotExist
+	}
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		return "", err
+	}
+	dest := filepath.Join(dir, name+" "+time.Now().Format(keptStamp)+textExt)
+	k := key(path)
+	if err := os.Rename(filepath.Join(s.dir, k+textExt), dest); err != nil {
+		return "", err
+	}
+	delete(s.metas, path)
+	return dest, remove(filepath.Join(s.dir, k+metaExt))
 }
 
 func (s *Store) Read(path string) (string, Meta, error) {

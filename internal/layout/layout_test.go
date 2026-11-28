@@ -417,3 +417,32 @@ func TestNeighbor(t *testing.T) {
 		t.Fatal("unknown group has no neighbor")
 	}
 }
+
+func TestEvenSharesTheRoomByGroupsAlongEachAxis(t *testing.T) {
+	a, b, c := &Group{ID: 1}, &Group{ID: 2}, &Group{ID: 3}
+	root := Leaf(a)
+	root.Split(a, b, false)
+	root.Split(b, c, false)
+	root.Percent, root.Second.Percent = 80, 10
+	root.Even()
+	if got := root.Percent; got < 33 || got > 34 {
+		t.Fatalf("first of three groups takes %v%%, want a third", got)
+	}
+	if root.Second.Percent != 50 {
+		t.Fatalf("second split = %v%%, want 50", root.Second.Percent)
+	}
+}
+
+func TestExpandGivesTheGroupAllTheRoomOnItsPath(t *testing.T) {
+	a, b, c := &Group{ID: 1}, &Group{ID: 2}, &Group{ID: 3}
+	root := Leaf(a)
+	root.Split(a, b, false)
+	root.Split(b, c, true)
+	root.Expand(c)
+	if root.Percent != 0 || root.Second.Percent != 0 {
+		t.Fatalf("percents = %v, %v, want 0 and 0", root.Percent, root.Second.Percent)
+	}
+	if steps := root.Path(a); len(steps) != 1 || !steps[0].First {
+		t.Fatalf("path to a = %+v", steps)
+	}
+}

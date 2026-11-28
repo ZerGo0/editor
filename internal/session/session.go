@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -17,12 +18,15 @@ const (
 )
 
 type Tab struct {
-	Path    string  `json:"path"`
-	Preview bool    `json:"preview,omitempty"`
-	Line    int     `json:"line,omitempty"`
-	Col     int     `json:"col,omitempty"`
-	ScrollY float64 `json:"scrollY,omitempty"`
-	Pinned  bool    `json:"pinned,omitempty"`
+	Path       string   `json:"path"`
+	Title      string   `json:"title,omitempty"`
+	Preview    bool     `json:"preview,omitempty"`
+	Line       int      `json:"line,omitempty"`
+	Col        int      `json:"col,omitempty"`
+	ScrollY    float64  `json:"scrollY,omitempty"`
+	Selections [][2]int `json:"selections,omitempty"`
+	Folds      []int    `json:"folds,omitempty"`
+	Pinned     bool     `json:"pinned,omitempty"`
 }
 
 type Location struct {
@@ -65,7 +69,14 @@ type Project struct {
 	StatusHidden  []string        `json:"statusHidden,omitempty"`
 	LastEdit      *Location       `json:"lastEdit,omitempty"`
 	RecentFiles   []string        `json:"recentFiles,omitempty"`
+	PanelSide     float32         `json:"panelSidePercent,omitempty"`
+	PanelMax      bool            `json:"panelMaximized,omitempty"`
+	TreeTop       int             `json:"treeTop,omitempty"`
+	ClosedTabs    []Tab           `json:"closedTabs,omitempty"`
+	Views         Views           `json:"views,omitempty"`
 }
+
+type Views = map[string]json.RawMessage
 
 type State struct {
 	Recent   []string           `json:"recent"`
@@ -73,11 +84,13 @@ type State struct {
 	Open     []string           `json:"open"`
 	Projects map[string]Project `json:"projects"`
 	Commands []string           `json:"commands,omitempty"`
+	Views    Views              `json:"views,omitempty"`
 }
 
 type Store struct {
-	path  string
-	State State
+	path    string
+	written []byte
+	State   State
 }
 
 func Load(path string) (*Store, error) {
@@ -100,11 +113,18 @@ func Load(path string) (*Store, error) {
 
 func (s *Store) Save() error {
 	s.prune()
-	data, err := json.MarshalIndent(s.State, "", "  ")
+	data, err := json.Marshal(s.State)
 	if err != nil {
 		return err
 	}
-	return fsutil.WriteFileAtomic(s.path, data, filePerm)
+	if bytes.Equal(data, s.written) {
+		return nil
+	}
+	if err := fsutil.WriteFileAtomic(s.path, data, filePerm); err != nil {
+		return err
+	}
+	s.written = data
+	return nil
 }
 
 func (s *Store) prune() {

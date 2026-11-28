@@ -8,10 +8,12 @@ import (
 )
 
 type Position struct {
-	Line, Col int
-	ScrollY   float64
-	Reveal    bool
-	End       *editor.Pos
+	Line, Col  int
+	ScrollY    float64
+	Reveal     bool
+	End        *editor.Pos
+	Selections []editor.Selection
+	Folds      []int
 }
 
 type Tab struct {
@@ -37,6 +39,13 @@ func (g *Group) ActiveTab() *Tab {
 		return nil
 	}
 	return g.Tabs[g.Active]
+}
+
+func (g *Group) PreviewTab() *Tab {
+	if i := slices.IndexFunc(g.Tabs, func(t *Tab) bool { return t.Preview }); i >= 0 {
+		return g.Tabs[i]
+	}
+	return nil
 }
 
 func (g *Group) Index(t *Tab) int {
