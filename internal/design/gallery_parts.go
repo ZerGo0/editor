@@ -16,6 +16,7 @@ import (
 const (
 	galleryLoadingRows  = 4
 	galleryLoadingWords = 3
+	galleryTaskValue    = 0.45
 )
 
 func galleryButtons(c *ui.Context, g *gallery) {
@@ -136,12 +137,27 @@ func galleryBadges(c *ui.Context) {
 				badge.Decoration(c, s)
 			}
 		})
+		Inline(c, token.GapInline, func() {
+			font := ui.Font{Family: token.FontMono, Size: token.TextMono.Px()}
+			for _, m := range []struct {
+				text string
+				tone token.Tone
+			}{{"[U+202E]", token.ToneError}, {"с", token.ToneWarning}, {"", token.ToneWarning}} {
+				sample := m.text
+				if sample == "" {
+					sample = " "
+				}
+				box := ui.Row(c).Size(badge.CodeMarkWidth(c, sample, font), token.TextMono.LineHeight()).Label("Code mark " + sample)
+				badge.CodeMark(c, box, m.text, badge.CodeMarkOptions{Font: font, Tone: m.tone})
+			}
+		})
 	})
 }
 
 func galleryFeedback(c *ui.Context) {
 	gallerySection(c, "Feedback", func() {
 		feedback.ProgressBar(c, "Loading")
+		feedback.Task(c, "Fetch: Receiving objects 45%", feedback.TaskOptions{Value: galleryTaskValue, Cancel: "Cancel Fetch", OnCancel: func() {}})
 		Inline(c, token.GapControl, func() {
 			feedback.Spinner(c, "Loading")
 			Text(c, "Body text", token.TextBody)

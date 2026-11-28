@@ -15,14 +15,17 @@ const (
 	longAside     = "a-very-long-folder-name/another-long-folder-name/and-a-file-name.svelte 38"
 	shortAside    = "post-row.svelte 38"
 	minLabelShare = 0.55
+	rowName       = "row"
 )
+
+func fixedName(int) string { return rowName }
 
 func TestLongNameTruncatesBeforeTrailing(t *testing.T) {
 	var natural float32
 	tt := ui.NewTester(func(c *ui.Context) {
 		natural, _ = c.MeasureText(0, ui.Span{Text: longName, Size: token.TextBody.Px()})
 		selected := -1
-		View(c, &ui.ListState{Selected: &selected}, 1, ViewOptions{Label: "Changes"}, func(int) Item {
+		View(c, &ui.ListState{Selected: &selected, Label: fixedName}, 1, ViewOptions{Label: "Changes"}, func(int) Item {
 			return Item{Label: longName, Trailing: func(c *ui.Context) { ui.Text(c, trailingText) }}
 		})
 	}, narrowWidth, testHeight)
@@ -50,7 +53,7 @@ func asideRow(t *testing.T, label, aside string) (name, side ui.Rect) {
 	t.Helper()
 	tt := ui.NewTester(func(c *ui.Context) {
 		selected := -1
-		View(c, &ui.ListState{Selected: &selected}, 1, ViewOptions{Label: "Matches"}, func(int) Item { return Item{Label: label, Aside: aside} })
+		View(c, &ui.ListState{Selected: &selected, Label: fixedName}, 1, ViewOptions{Label: "Matches"}, func(int) Item { return Item{Label: label, Aside: aside} })
 	}, asideWidth, testHeight)
 	tt.Frame()
 	var ok bool

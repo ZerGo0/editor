@@ -17,7 +17,7 @@ const galleryPickerRowCount = 5
 
 var galleryScopes = []string{"All", "Files", "Symbols", "Text", "Actions"}
 
-var galleryPickerTabs = []string{"All", "Actions", "Files", "Text"}
+var galleryPickerTabs = []picker.Tab{{Title: "All"}, {Title: "Actions"}, {Title: "Files"}, {Title: "Text"}}
 
 type featureState struct {
 	scope, layout int

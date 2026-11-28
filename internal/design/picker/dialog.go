@@ -37,6 +37,9 @@ func Dialog(c *ui.Context, o DialogOptions, body func()) (closed bool) {
 			if o.Layout != nil {
 				w, h := o.Layout.frame(win)
 				panel.MaxWidth(w).Height(h).Shrink(1).MinHeight(0)
+				if x, y := o.Layout.offset(win, w, h); x != 0 || y != 0 {
+					panel.Translate(x, y)
+				}
 			} else {
 				panel.MaxWidth(token.SearchPopupWidth.Px())
 				if room := win.H - 2*margin; room > 0 {

@@ -13,7 +13,7 @@ func Tooltip(c *ui.Context, anchor ui.Element, text string) ui.Element {
 	below := anchor.Bounds().Y < token.TitleBarHeight.Px()+token.TooltipHeight.Px()+token.OffsetTooltip.Px()
 	p := token.Of(c)
 	ui.TooltipBase(c, anchor, func(tip ui.Element) {
-		tip.MaxWidth(token.TooltipMaxWidth.Px()).Padding(token.PadTooltipY.Px(), token.PadTooltipX.Px()).Radius(token.RadiusControl.Px()).
+		tip.MaxWidth(token.TooltipMaxWidth.Px()).Padding(token.PadTooltipY.Px()-token.TextRise.Px(), token.PadTooltipX.Px(), token.PadTooltipY.Px()+token.TextRise.Px(), token.PadTooltipX.Px()).Radius(token.RadiusControl.Px()).
 			Background(p.Layer.Widget).TextColor(p.Text.Primary)
 		token.ElevationPopover.Apply(tip, p)
 		tip.Children(func() { token.TextLabel.Apply(ui.Text(c, text)).Wrap() })

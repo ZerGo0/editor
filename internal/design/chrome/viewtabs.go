@@ -16,6 +16,7 @@ type ViewTab struct {
 func ViewTabs(c *ui.Context, label string, selected *int, tabs []ViewTab) ui.Element {
 	p := token.Of(c)
 	parts := ui.TabsBase(c, selected, len(tabs))
+	shown := ui.Local(parts.List, "shown", func() int { return noTab })
 	parts.List.FillHeight().AlignItems(ui.Stretch).Gap(token.GapTight.Px()).Shrink(0).Label(label).Children(func() {
 		for i, t := range tabs {
 			tab := parts.Tab(i).FillHeight().Padding(0, token.PadControlX.Px()).Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).
@@ -24,6 +25,9 @@ func ViewTabs(c *ui.Context, label string, selected *int, tabs []ViewTab) ui.Ele
 			color := p.Text.Secondary
 			if i == *selected || tab.Hovered() {
 				color = p.Text.Primary
+			}
+			if i == *selected && *shown != i {
+				tab.ScrollIntoView()
 			}
 			tab.Children(func() {
 				token.TextCaption.WholeText(c, token.TextTitle.Format(t.Title)).TextColor(color).SingleLine().AccessHidden(true)
@@ -37,5 +41,6 @@ func ViewTabs(c *ui.Context, label string, selected *int, tabs []ViewTab) ui.Ele
 			})
 		}
 	})
+	*shown = *selected
 	return parts.List
 }

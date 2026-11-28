@@ -32,6 +32,7 @@ func lineKeys(in ui.Element, query string, k *Keys) {
 	}
 	k.Up, k.Down, k.PageUp, k.PageDown = got.Up, got.Down, got.PageUp, got.PageDown
 	k.Side, k.Submitted = got.Side, got.Submitted
+	k.Older, k.Newer = got.Older, got.Newer
 }
 
 func (st *lineKeyState) take(k ui.TextKey) bool {
@@ -47,6 +48,10 @@ func (st *lineKeyState) take(k ui.TextKey) bool {
 		p.Up = true
 	case k.Key == ui.KeyDown && k.Mods == 0 && st.downToResults:
 		p.Down = true
+	case k.Key == ui.KeyUp && k.Mods == ui.Alt:
+		p.Older = true
+	case k.Key == ui.KeyDown && k.Mods == ui.Alt:
+		p.Newer = true
 	case k.Key == ui.KeyPageUp && k.Mods == 0:
 		p.PageUp = true
 	case k.Key == ui.KeyPageDown && k.Mods == 0:

@@ -32,7 +32,7 @@ func manyPills() []Pill {
 func fitTester(width int, it Item) *ui.Tester {
 	selected := -1
 	tt := ui.NewTester(func(c *ui.Context) {
-		View(c, &ui.ListState{Selected: &selected}, 1, ViewOptions{Label: "Rows"}, func(int) Item { return it })
+		View(c, &ui.ListState{Selected: &selected, Label: fixedName}, 1, ViewOptions{Label: "Rows"}, func(int) Item { return it })
 	}, width, testHeight)
 	tt.Frame()
 	tt.Frame()

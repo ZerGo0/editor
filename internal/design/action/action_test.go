@@ -62,7 +62,7 @@ func TestExpandButton(t *testing.T) {
 			}
 		})
 	}, testWidth, testHeight)
-	info, ok := tt.AccessByRole(ui.RoleButton, "Toggle Replace")
+	info, ok := tt.AccessByRole(ui.RoleDisclosure, "Toggle Replace")
 	if !ok || info.Expanded || info.Description != "Toggle Replace (⌥⌘F)" {
 		t.Fatalf("expand button = %+v, want a collapsed button with its keys in the tooltip", info)
 	}
@@ -72,7 +72,7 @@ func TestExpandButton(t *testing.T) {
 	tt.Key(0, ui.KeyTab)
 	tt.Key(0, ui.KeySpace)
 	tt.Frame()
-	if info, _ := tt.AccessByRole(ui.RoleButton, "Toggle Replace"); !open || !info.Expanded {
+	if info, _ := tt.AccessByRole(ui.RoleDisclosure, "Toggle Replace"); !open || !info.Expanded {
 		t.Fatal("Space does not expand the button")
 	}
 }

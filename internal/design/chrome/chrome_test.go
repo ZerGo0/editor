@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	testWidth  = 600
-	testHeight = 200
+	testWidth        = 600
+	testHeight       = 200
+	narrowStripWidth = 300
 )
 
 type history map[string]action.CommandInfo
@@ -77,17 +78,23 @@ func TestActivityBarPassesFocusToSelectedTab(t *testing.T) {
 	}
 }
 
+func stripTester(selected *int, tabs *[]Tab, o TabStripOptions, width int) *ui.Tester {
+	o.Label = "Editors"
+	return ui.NewTester(func(c *ui.Context) { TabStrip(c, selected, *tabs, o) }, width, testHeight)
+}
+
 func TestTabStrip(t *testing.T) {
 	selected, closed := 0, -1
 	tabs := []Tab{{Label: "a.go"}, {Label: "b.go", Dirty: true}}
-	tt := ui.NewTester(func(c *ui.Context) {
-		TabStrip(c, &selected, tabs, TabStripOptions{Label: "Editors", OnClose: func(i int) { closed = i }})
-	}, testWidth, testHeight)
+	tt := stripTester(&selected, &tabs, TabStripOptions{OnClose: func(i int) { closed = i }}, testWidth)
 	if info, ok := tt.AccessByRole(ui.RoleTab, "a.go"); !ok || !info.Selected {
 		t.Fatalf("tab = %+v, want the chosen tab", info)
 	}
-	if info, _ := tt.Access("b.go"); info.Description != dirtyLabel {
+	if _, ok := tt.AccessByRole(ui.RoleTab, "b.go"+accessSeparator+dirtyLabel); !ok {
 		t.Fatal("dirty tab shows no dirty mark")
+	}
+	if got := (Tab{Label: "c.go", Dirty: true, Deleted: true, ReadOnly: true}).accessName(); got != "c.go"+accessSeparator+dirtyLabel+accessSeparator+deletedLabel+accessSeparator+readOnlyText {
+		t.Fatalf("access name = %q", got)
 	}
 	if err := tt.Click(closeLabel + " a.go"); err != nil {
 		t.Fatal(err)
@@ -97,12 +104,29 @@ func TestTabStrip(t *testing.T) {
 	}
 }
 
+func TestTabStripOffersTheOpenedEditorsWhenTabsOverflow(t *testing.T) {
+	selected := 0
+	many := []Tab{{Label: "alpha.go"}, {Label: "bravo.go"}, {Label: "charlie.go"}, {Label: "delta.go"}, {Label: "echo.go"}, {Label: "foxtrot.go"}}
+	few := many[:1]
+	tabs := many
+	tt := stripTester(&selected, &tabs, TabStripOptions{OnSelect: func(int) {}}, narrowStripWidth)
+	tt.Frame()
+	tt.Frame()
+	if _, ok := tt.Access(openedLabel); !ok {
+		t.Fatal("no opened editors button for overflowing tabs")
+	}
+	tabs = few
+	tt.Frame()
+	tt.Frame()
+	if _, ok := tt.Access(openedLabel); ok {
+		t.Fatal("opened editors button shows without overflow")
+	}
+}
+
 func TestTabStripMiddleClickClosesTabAtOnce(t *testing.T) {
 	selected := 0
 	tabs := []Tab{{Label: "a.go"}, {Label: "b.go"}}
-	tt := ui.NewTester(func(c *ui.Context) {
-		TabStrip(c, &selected, tabs, TabStripOptions{Label: "Editors", OnAuxClick: func(i int) { tabs = slices.Delete(tabs, i, i+1) }})
-	}, testWidth, testHeight)
+	tt := stripTester(&selected, &tabs, TabStripOptions{OnAuxClick: func(i int) { tabs = slices.Delete(tabs, i, i+1) }}, testWidth)
 	at, ok := tt.Find("a.go")
 	if !ok {
 		t.Fatal("no a.go tab")
@@ -113,5 +137,24 @@ func TestTabStripMiddleClickClosesTabAtOnce(t *testing.T) {
 	tt.ReleaseButton(middleButton, x, y)
 	if _, open := tt.AccessByRole(ui.RoleTab, "a.go"); open {
 		t.Fatal("a.go tab still shows after a middle click")
+	}
+}
+
+func TestStatusItemIsAButtonOnlyWhenItActs(t *testing.T) {
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Row(c).Children(func() {
+			StatusItem(c, "UTF-8", StatusOptions{Label: "File Encoding: UTF-8", OnClick: func() {}})
+			StatusItem(c, "Large file", StatusOptions{Tooltip: "This file is large"})
+		})
+	}, 600, 40)
+	tt.Frame()
+	if _, ok := tt.AccessByRole(ui.RoleButton, "File Encoding: UTF-8"); !ok {
+		t.Fatal("a status item with an action is not a button")
+	}
+	if _, ok := tt.AccessByRole(ui.RoleStatus, "Large file"); !ok {
+		t.Fatal("a status item without an action is not a status")
+	}
+	if _, ok := tt.AccessByRole(ui.RoleButton, "Large file"); ok {
+		t.Fatal("a status item without an action is a button")
 	}
 }

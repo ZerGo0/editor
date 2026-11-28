@@ -20,6 +20,7 @@ const (
 	toggleLightAlpha float32 = 0.25
 	contrastMix      float32 = 0.45
 	contrastTextMix  float32 = 0.4
+	contrastFillMix  float32 = 0.15
 )
 
 type paletteKey struct {
@@ -161,10 +162,18 @@ func (p *Palette) enforceContrast() {
 	surfaces := append([]ui.Color{p.Layer.Input, p.Layer.Widget, p.Layer.Menu, p.Layer.Panel, p.Layer.SectionHeader, p.Layer.QuickInput}, rows...)
 	p.Text.Secondary = ensure(p.Text.Secondary, ContrastText, surfaces...)
 	p.Text.Link = ensure(p.Text.Link, ContrastText, rows...)
+	keyCaps := []ui.Color{Over(p.Key.Background, p.Layer.Widget)}
+	for _, row := range rows {
+		keyCaps = append(keyCaps, Over(p.Key.Background, row))
+	}
+	p.Key.Text = ensure(p.Key.Text, ContrastText, keyCaps...)
 	p.enforceSyntax()
 	p.List.Highlight = ensure(p.List.Highlight, ContrastText, rows...)
 	p.Accent.Focus = ensure(p.Accent.Focus, ContrastLarge, surfaces...)
 	p.Accent.Hover = ensure(p.Accent.Hover, ContrastText, p.Accent.Text)
+	for _, c := range []*ui.Color{&p.Severity.Error, &p.Severity.Warning, &p.Severity.Info, &p.Severity.Success} {
+		*c = ensure(*c, ContrastLarge, rows...)
+	}
 	for _, c := range []*ui.Color{&p.Git.Added, &p.Git.Modified, &p.Git.Deleted, &p.Git.Renamed, &p.Git.Untracked, &p.Git.Ignored, &p.Git.Conflict, &p.Git.Submodule} {
 		*c = ensure(*c, ContrastText, rows...)
 	}
@@ -172,11 +181,32 @@ func (p *Palette) enforceContrast() {
 
 func (p *Palette) withHighContrast() {
 	strong := func(c ui.Color) ui.Color { return c.Mix(p.Text.Primary, contrastMix) }
-	p.Border = Borders{Default: strong(p.Border.Default), Input: strong(p.Border.Input), Widget: strong(p.Border.Widget), Section: strong(p.Border.Section)}
-	p.Tab.Border = strong(p.Tab.Border)
+	visible := func(c ui.Color, against ...ui.Color) ui.Color { return ensure(strong(c), ContrastLarge, against...) }
+	bars := []ui.Color{p.Layer.SideBar, p.Layer.Editor, p.Layer.Panel, p.Layer.TabBar, p.Layer.StatusBar, p.Layer.TitleBar}
+	p.Border = Borders{
+		Default: visible(p.Border.Default, bars...),
+		Input:   visible(p.Border.Input, p.Layer.Input, p.Layer.Editor, p.Layer.SideBar),
+		Widget:  visible(p.Border.Widget, p.Layer.Widget, p.Layer.QuickInput, p.Layer.Editor),
+		Section: visible(p.Border.Section, p.Layer.SideBar, p.Layer.Panel),
+	}
+	p.Tab.Border = visible(p.Tab.Border, p.Layer.TabBar, p.Tab.Active)
+	p.Menu.Border = visible(p.Menu.Border, p.Layer.Menu, p.Layer.Editor)
+	p.Control.ButtonBorder = visible(p.Control.ButtonBorder, p.Control.Secondary, p.Layer.Editor, p.Layer.Widget)
+	p.Bar.CommandCenterBorder = visible(p.Bar.CommandCenterBorder, p.Layer.TitleBar)
+	p.Key.Border = visible(p.Key.Border, p.Layer.Widget)
+	p.List.Hover = Over(p.List.Hover, p.Layer.SideBar).Mix(p.Text.Primary, contrastFillMix)
+	p.List.InactiveSelection = Over(p.List.InactiveSelection, p.Layer.SideBar).Mix(p.Text.Primary, contrastFillMix)
+	p.Control.Hover = Over(p.Control.Hover, p.Layer.SideBar).Mix(p.Text.Primary, contrastFillMix)
+	rows := []ui.Color{p.Layer.SideBar, p.Layer.Editor, p.Layer.Panel, p.Layer.QuickInput, p.List.Hover, p.List.InactiveSelection}
+	p.List.FocusOutline = ensure(p.List.FocusOutline, ContrastLarge, append(rows, p.List.ActiveSelection)...)
+	p.List.SelectionOutline = ensure(p.Accent.Base, ContrastLarge, rows...)
+	p.List.HoverOutline = ensure(p.Border.Widget, ContrastLarge, rows...)
+	p.Text.Primary = p.Text.Strong
+	p.Icon = p.Text.Strong
 	p.List.IndentGuide = strong(p.List.IndentGuide)
 	p.Text.Secondary = p.Text.Secondary.Mix(p.Text.Primary, contrastTextMix)
 	p.Text.Muted = p.Text.Muted.Mix(p.Text.Primary, contrastTextMix)
 	p.Tab.InactiveText = p.Tab.InactiveText.Mix(p.Text.Primary, contrastTextMix)
+	p.Key.Text = p.Key.Text.Mix(p.Text.Primary, contrastTextMix)
 	p.strengthenSyntax()
 }

@@ -26,6 +26,7 @@ type AreaOptions struct {
 	ReadOnly    bool
 	AutoFocus   bool
 	FontSize    float32
+	Mono        bool
 	ID          string
 }
 
@@ -52,6 +53,9 @@ func TextArea(c *ui.Context, label string, value *string, o AreaOptions) ui.Elem
 		}
 		return in
 	})
+	if o.Mono {
+		token.TextMono.Apply(in)
+	}
 	if o.FontSize > 0 {
 		in.FontSize(o.FontSize).FixedLineHeight(float32(math.Round(float64(o.FontSize * fontLineRatio))))
 	}

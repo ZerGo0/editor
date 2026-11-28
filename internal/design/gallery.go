@@ -58,17 +58,27 @@ func Gallery(c *ui.Context) ui.Element {
 	return root
 }
 
+var gallerySections = []func(c *ui.Context, g *gallery){
+	galleryButtons,
+	galleryInputs,
+	galleryLists,
+	func(c *ui.Context, _ *gallery) { galleryBadges(c) },
+	func(c *ui.Context, _ *gallery) { galleryFeedback(c) },
+	galleryFeatures,
+}
+
 func galleryColumn(c *ui.Context, g *gallery) {
 	ui.Column(c).Fill().Gap(0).Children(func() {
 		galleryChrome(c, g)
-		ui.Column(c).FillWidth().Padding(token.PadPanel.Px()).Gap(token.GapSection.Px()).Children(func() {
-			galleryButtons(c, g)
-			galleryInputs(c, g)
-			galleryLists(c, g)
-			galleryBadges(c)
-			galleryFeedback(c)
-			galleryFeatures(c, g)
-		})
+		galleryBody(c, g, gallerySections)
+	})
+}
+
+func galleryBody(c *ui.Context, g *gallery, sections []func(c *ui.Context, g *gallery)) {
+	ui.Column(c).FillWidth().Padding(token.PadPanel.Px()).Gap(token.GapSection.Px()).Children(func() {
+		for _, section := range sections {
+			section(c, g)
+		}
 	})
 }
 
@@ -87,7 +97,7 @@ func galleryChrome(c *ui.Context, g *gallery) {
 			chrome.NavButton(c, icons.ArrowLeft, galleryBack, galleryHistory)
 			chrome.NavButton(c, icons.ArrowRight, galleryForward, galleryHistory)
 			Spacer(c)
-			chrome.CommandCenter(c, "editor", galleryOpen)
+			chrome.CommandCenter(c, "editor", galleryOpen, nil)
 			Spacer(c)
 			action.IconButton(c, icons.SidebarRight, "Toggle Secondary Side Bar", action.IconOptions{Keys: "⌥⌘B"})
 		})

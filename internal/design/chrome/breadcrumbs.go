@@ -14,6 +14,8 @@ type Crumb struct {
 	Icon    *ui.SVG
 	Leading func(c *ui.Context)
 	Menu    func(m *ui.Menu)
+	Focus   bool
+	Open    *bool
 }
 
 func Breadcrumbs(c *ui.Context, label string, crumbs []Crumb) ui.Element {
@@ -49,7 +51,10 @@ func crumb(c *ui.Context, p *token.Palette, i int, cr Crumb, last bool) {
 		}
 		token.TextBody.Apply(ui.Text(c, cr.Label)).TextColor(color).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
 	})
+	if cr.Focus {
+		b.Focus()
+	}
 	if cr.Menu != nil {
-		action.PopoverMenu(c, b, cr.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomStart, Self: ui.AnchorTopStart})
+		action.PopoverMenu(c, b, cr.Menu, ui.PopoverMenuButtonOptions{At: ui.AnchorBottomStart, Self: ui.AnchorTopStart, Open: cr.Open})
 	}
 }

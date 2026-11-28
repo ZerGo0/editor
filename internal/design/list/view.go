@@ -22,9 +22,17 @@ func (o ViewOptions) size(el ui.Element) ui.Element {
 func View(c *ui.Context, s *ui.ListState, n int, o ViewOptions, item func(i int) Item) ui.Element {
 	l := o.size(ui.List(c, s, n)).FillWidth().Label(o.Label).Background(ui.Transparent)
 	width := ObserveWidth(c, l)
+	defaultAccessLabels(l, s, item)
 	l.Rows(func(r ui.ListRow) {
 		it := item(r.Index)
 		Row(r.Context, State{Selected: r.Selected(), Focused: r.ListFocused(), Hovered: r.Hovered(), Depth: it.Depth, Branch: it.Branch, Open: it.Open, Width: width, Guides: o.Guides, flat: o.Tree}, it)
+	})
+	pageKeys(c, s, n, func(row int) {
+		var key any = row
+		if s.Key != nil {
+			key = s.Key(row)
+		}
+		_ = selectOnly[string](s.Selection, key) || selectOnly[int](s.Selection, key)
 	})
 	if n == 0 && o.Empty != nil {
 		l.Children(func() { o.Empty(c) })
@@ -47,6 +55,7 @@ func Tree[K comparable](c *ui.Context, s *ui.OutlineState[K], roots []K, childre
 				Guides: guides || focused, Width: width, arrow: cur.Arrow, tree: true}
 			Row(c, st, item(k))
 		}).Grow(1).FillWidth().MinHeight(0).Label(o.Label).Background(ui.Transparent)
+		pageKeys(c, &s.List, s.Rows(), func(row int) { selectOnly[K](s.List.Selection, s.Item(row)) })
 		if len(roots) == 0 && o.Empty != nil {
 			outline.Children(func() { o.Empty(c) })
 		}

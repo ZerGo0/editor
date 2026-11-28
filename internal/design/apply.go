@@ -14,8 +14,10 @@ const (
 )
 
 type Settings struct {
-	Appearance   Appearance
-	SystemAccent bool
+	Appearance         Appearance
+	HighContrast       bool
+	FollowHighContrast bool
+	SystemAccent       bool
 }
 
 func Apply(c *ui.Context, s Settings) *token.Palette {
@@ -31,7 +33,7 @@ func Apply(c *ui.Context, s Settings) *token.Palette {
 	if s.SystemAccent {
 		accent = prefs.Accent
 	}
-	p := token.For(dark, accent, prefs.HighContrast)
+	p := token.For(dark, accent, s.HighContrast || s.FollowHighContrast && prefs.HighContrast)
 	c.SetTheme(p.Theme())
 	c.DisableAnimations()
 	return p

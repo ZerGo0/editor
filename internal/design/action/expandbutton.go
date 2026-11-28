@@ -13,7 +13,7 @@ func ExpandButton(c *ui.Context, label string, expanded bool, o IconOptions) ui.
 		icon = icons.ChevronDown
 	}
 	b := ui.ButtonBase(c.Key(keyOf(o.ID, label))).Width(token.HitTargetMin.Px()).AlignSelf(ui.Stretch).Radius(token.RadiusControl.Px()).
-		Center().Shrink(0).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled).Expanded(expanded)
+		Center().Shrink(0).Role(ui.RoleDisclosure).Label(label).Tooltip(tooltipText(label, o.Tooltip, o.Keys)).Disabled(o.Disabled).Expanded(expanded)
 	keepFocus(b, o)
 	b.Background(p.Fill(b.Hovered(), b.Pressed())).Children(func() { glyph(c, icon, p.Icon) })
 	return b

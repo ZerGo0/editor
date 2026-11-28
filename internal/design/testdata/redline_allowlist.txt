@@ -1,0 +1,1 @@
+gallery- optical group "⌃-" ink centre x -- internal/design badge.Keys: the group holds two separate key caps, and the ⌃ glyph has more ink than the - glyph, so the ink centre of the pair sits 0.6 px left of the group centre at scale 2; each cap centres its own glyph (⌃ alone and ⌘- measure centred)

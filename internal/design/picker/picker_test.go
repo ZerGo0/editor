@@ -42,7 +42,7 @@ func newHarness() *harness {
 
 func (h *harness) view(c *ui.Context) {
 	if Dialog(c, DialogOptions{Label: dialogName, ID: "test"}, func() {
-		Header(c, func() { Tabs(c, "Scope", &h.tab, []string{"All", "Files"}) }, nil)
+		Header(c, func() { Tabs(c, "Scope", &h.tab, []Tab{{Title: "All"}, {Title: "Files"}}) }, nil)
 		h.keys = Query(c, dialogName, &h.query, QueryOptions{Placeholder: "Type to search"})
 		switch {
 		case h.keys.Down:
@@ -217,5 +217,25 @@ func TestDialogGivesTheFocusBackToTheOpener(t *testing.T) {
 	tt.Frame()
 	if !tt.Focused(fieldLabel) {
 		t.Fatal("Escape did not give the focus back to the field that had it")
+	}
+}
+
+func TestResultsNameEachOptionAndCountThem(t *testing.T) {
+	h := newHarness()
+	tt := ui.NewTester(h.view, testWidth, testHeight)
+	tt.Frame()
+	tt.Frame()
+	opt, ok := tt.AccessByRole(ui.RoleOption, "b.go")
+	if !ok || opt.PosInSet != 2 || opt.SetSize != 4 {
+		t.Fatalf("option b.go = %+v, want position 2 of 4 (the more row is an option too)", opt)
+	}
+	if first, _ := tt.AccessByRole(ui.RoleOption, "a.go"); !first.Selected {
+		t.Fatal("the selected option does not report it is selected")
+	}
+	if _, ok := tt.AccessByRole(ui.RoleHeading, "Files"); !ok {
+		t.Fatal("group headers have no heading role")
+	}
+	if _, ok := tt.AccessByRole(ui.RoleStatus, "3 results"); !ok {
+		t.Fatal("the results have no status that counts them")
 	}
 }

@@ -15,6 +15,10 @@ type IconOptions struct {
 	ID        string
 }
 
+func IconClicked(c *ui.Context, icon *ui.SVG, label string, o IconOptions) bool {
+	return IconButton(c, icon, label, o).Clicked() && !o.Disabled
+}
+
 func IconButton(c *ui.Context, icon *ui.SVG, label string, o IconOptions) ui.Element {
 	p := token.Of(c)
 	b := ui.ButtonBase(c.Key(keyOf(o.ID, label))).Size(token.IconButtonSize.Px(), token.IconButtonSize.Px()).Radius(token.RadiusControl.Px()).

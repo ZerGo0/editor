@@ -1,16 +1,26 @@
 package picker
 
 import (
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
 
-func Tabs(c *ui.Context, label string, selected *int, titles []string) ui.Element {
+type Tab struct {
+	Title   string
+	Command string
+}
+
+func Tabs(c *ui.Context, label string, selected *int, tabs []Tab) ui.Element {
 	p := token.Of(c)
-	parts := ui.TabsBase(c, selected, len(titles))
+	parts := ui.TabsBase(c, selected, len(tabs))
 	parts.List.Height(token.ControlHeight.Px()).AlignItems(ui.Stretch).Gap(token.GapTight.Px()).Shrink(0).Label(label).Children(func() {
-		for i, title := range titles {
-			tab := parts.Tab(i).FillHeight().Padding(0, token.PadControlX.Px()).Radius(token.RadiusControl.Px()).Center().Shrink(0).Label(title)
+		for i, t := range tabs {
+			tab := parts.Tab(i).FillHeight().Padding(0, token.PadControlX.Px()).Radius(token.RadiusControl.Px()).Center().Shrink(0).Label(t.Title)
+			if t.Command != "" {
+				info, _ := action.Lookup(t.Command)
+				action.Tooltip(c, tab, action.Hint(info.Title, info.Keys))
+			}
 			color := p.Text.Secondary
 			switch {
 			case i == *selected:
@@ -21,7 +31,7 @@ func Tabs(c *ui.Context, label string, selected *int, titles []string) ui.Elemen
 				color = p.Text.Primary
 			}
 			tab.Children(func() {
-				token.TextBody.WholeText(c, title).TextColor(color).SingleLine().AccessHidden(true)
+				token.TextBody.WholeText(c, t.Title).TextColor(color).SingleLine().AccessHidden(true)
 			})
 		}
 	})

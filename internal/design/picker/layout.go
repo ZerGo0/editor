@@ -13,6 +13,8 @@ type Layout struct {
 	Width   int `json:"width,omitempty"`
 	Height  int `json:"height,omitempty"`
 	Preview int `json:"preview,omitempty"`
+	X       int `json:"x,omitempty"`
+	Y       int `json:"y,omitempty"`
 }
 
 type handle struct {
@@ -59,6 +61,29 @@ func (l *Layout) frame(win ui.Rect) (w, h float32) {
 	}
 	w, h = fit(w, token.SearchPopupMinWidth.Px(), win.W), fit(h, token.SearchPopupMinHeight.Px(), win.H)
 	return centered(w, win.W), centered(h, win.H)
+}
+
+func (l *Layout) offset(win ui.Rect, w, h float32) (x, y float32) {
+	if win.W > 0 && win.H > 0 {
+		l.X, l.Y = int(within(float32(l.X), win.W, w)), int(within(float32(l.Y), win.H, h))
+	}
+	return float32(l.X), float32(l.Y)
+}
+
+func within(v, win, size float32) float32 {
+	room := max(0, whole((win-size)/2-token.GapControl.Px()))
+	return max(min(v, room), -room)
+}
+
+func (l *Layout) Grip(el ui.Element) {
+	if el.DoubleClicked() {
+		l.X, l.Y = 0, 0
+		return
+	}
+	if dx, dy, ok := el.Dragged(); ok {
+		l.X += int(whole(dx))
+		l.Y += int(whole(dy))
+	}
 }
 
 func (l *Layout) previewHeight() float32 {

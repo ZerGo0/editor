@@ -79,6 +79,9 @@ func (p *Palette) CodeTheme() *editor.Theme {
 	} {
 		t.Tokens[kind].Color = color
 	}
+	if p.skeleton {
+		t.Added, t.Deleted, t.Modified = p.Git.Added, p.Git.Deleted, p.Git.Modified
+	}
 	registry.code[p] = t
 	return t
 }

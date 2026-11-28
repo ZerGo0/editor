@@ -136,7 +136,9 @@ The primitive scale (`token.Space2`...`token.Space32`, `token.Radius2`...`token.
 | TwistieWidth | 16 | SashSize | 4 |
 | ScrollbarSize | 10 | ProgressHeight | 2 |
 | PaneMinHeight | 66 | SidebarMinWidth | 170 |
-| PanelMinHeight | 100 | TabMinWidth | 80 |
+| PanelMinHeight / PanelMinWidth | 77 / 300 | TabMinWidth | 80 |
+| EditorMinWidth / EditorMinHeight | 220 / 70 | SplitMinPane | 40 |
+| SashKeyStep | 10 | | |
 | PopoverMaxWidth | 320 | DialogWidth | 440 |
 | QuickInputWidth | 600 | CommandCenterWidth / MinWidth | 600 / 160 |
 | EmptyStateWidth | 280 | NoticeMaxWidth | 480 |
@@ -241,7 +243,9 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 ### pane
 
 - `ViewTitle(c, title, TitleOptions{Actions, ShowActions, Busy})`, `Header(c, title, &open, SectionOptions{Count, Actions, ShowActions, Busy, Border})`, `Section(c, title, &open, SectionOptions{}, body)`.
-- `Stack(c, &StackState{}, []Pane{...})`: stacked sections with sashes; open sections share the height.
+- `Stack(c, &StackState{}, []Pane{...})`: stacked sections with sashes; open sections share the height. A sash takes the focus; the arrows move it, and a double click or Enter shares the height evenly again. Save `StackState.Collapsed` and `Weights` to keep the layout.
+- `Split(c, &SplitState{}, &size, SplitOptions{Label, Vertical, Percent, FirstMin, SecondMin, Reset, Snap, Hidden, Divider}, first, second)`: two panes and a sash, as VS Code's split view. `size` is the first pane's size in DIPs, or its share of the room with `Percent`. Each pane keeps its minimum (`SplitMinPane` when zero). With `Snap`, dragging that pane below half its minimum hides it (`*Hidden`); while the drag goes on, the sash stays at the edge, so dragging back shows it. `Reset` is the size a double click or Enter restores. `Divider` draws a 1 px line between the panes (editor groups). `SplitState.Total()` is the room the last frame had, for commands that resize by DIPs.
+- `Sash(c, SashOptions{Label, Rows})`: the handle alone, for an edge that resizes a view (peek height, find widget width, table columns). The caller places it (`Absolute` and offsets). It returns the move (`Delta`, from a drag or the arrows by `SashKeyStep`), whether a drag holds it, and `Reset` for a double click or Enter.
 - `Toolbar(c, label, children)`, `Separator(c, vertical)`.
 
 ### chrome
@@ -249,7 +253,7 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 - `NavButton(c, icon, commandID, history)`: back and forward. Disabled when the command is; right-click or long-press opens the history menu.
 - `CommandCenter(c, text, commandID)`, `ActivityBar(c, label, &selected, []Activity{...})`.
 - `TabStrip(c, &selected, []Tab{...}, TabStripOptions{Label, OnClose, Menu, Actions})`: dirty dot, close on hover and on the active tab, preview italics, pinned, git color.
-- `Breadcrumbs(c, label, []Crumb{{Label, Icon, Menu}})`, `StatusItem(c, text, StatusOptions{Icon, Tooltip, Tone, Command, Menu})`.
+- `Breadcrumbs(c, label, []Crumb{{Label, Icon, Menu}})`, `StatusItem(c, text, StatusOptions{Icon, Busy, Tooltip, Tone, Command, Menu})`. `Busy` shows a spinner in place of the icon while work runs.
 
 ### badge
 
@@ -257,7 +261,9 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 ### feedback
 
-- `ProgressBar(c, label)` (2 px, indeterminate), `Progress(c, label, value)`, `Spinner(c, label)`, `Loading(c, text)`.
+- `ProgressBar(c, label)` (2 px, indeterminate), `Progress(c, label, value)` (`value` from 0 to 1, or `Indeterminate`), `Spinner(c, label)`, `Loading(c, text)`.
+- `Task(c, label, TaskOptions{Value, Cancel, Keys, OnCancel})`: long work that the user can stop. A row with the label and a Cancel button over a 2 px bar.
+- Skeletons: `Skeleton(c, label, body)` renders `body` in the skeleton theme after `token.SpinnerDelay`: text becomes bars, icons become squares, colors turn gray. Pass the view's own layout with mock data of the same shape (the real counts when known), not a hand-built copy. `CodeSkeleton(c, label, lines, configure)` and `DiffSkeleton(c, label, adds, dels, configure)` render the real editor and diff viewer with mock text; `SkeletonCode` and `SkeletonDiff` make that text. A view that renders an editor itself calls `SkeletonEditor(c, st)` after it configures the state. Inside a skeleton, `token.Of(c).IsSkeleton()` is the loading flag: skip focus and other side effects.
 - `Empty(c, EmptyOptions{Icon, Title, Message, Action, OnAction, Link, OnLink})`, `Error(c, title, err, retry)`.
 - `Notice(c, NoticeOptions{Tone, Text, Action, OnAction, OnDismiss})`, `Toast(c, ToastOptions{Tone, Title, Message, Action, OnAction})`.
 
@@ -271,7 +277,7 @@ if action.Button(c, "Commit", action.ButtonOptions{Variant: action.Primary, Keys
 
 ### picker
 
-- `Dialog(c, DialogOptions{Label, ID, Layout, Shortcuts}, body) closed`: a modal popup centered in the window, 800 px wide (it shrinks with the window and keeps inside it); Escape and a click outside report `closed`. With a `*Layout{Width, Height, Preview}` it is resizable like JetBrains: drag an edge or corner (the dialog stays centered, so the dragged edge follows the pointer), from `SearchPopupMinWidth` x `SearchPopupMinHeight` up to the window minus `GapControl` on each side, on whole pixels. The caller saves the `Layout`; zero fields mean the defaults. `Header(c, left, right)` lays out tabs on the left and header actions on the right.
+- `Dialog(c, DialogOptions{Label, ID, Layout, Shortcuts}, body) closed`: a modal popup centered in the window, 800 px wide (it shrinks with the window and keeps inside it); Escape and a click outside report `closed`. With a `*Layout{Width, Height, Preview}` it is resizable like JetBrains: drag an edge or corner (the dialog stays centered, so the dragged edge follows the pointer), from `SearchPopupMinWidth` x `SearchPopupMinHeight` up to the window minus `GapControl` on each side, on whole pixels. `Layout.X` and `Layout.Y` move it from the center, kept inside the window: pass the `Header` to `Layout.Grip` to drag the dialog by its empty header area, and a double click there centers it again. The caller saves the `Layout`; zero fields mean the defaults. `Header(c, left, right)` lays out tabs on the left and header actions on the right.
 - `Tabs(c, label, &selected, titles)`: popup tabs. `Query(c, label, &query, QueryOptions{Placeholder, Toggles, Actions, Error, Busy, Handle}) Keys`: the input; it reports Up, Down, Page Up, Page Down, Tab, Shift+Tab, Cmd+Enter, Enter and changes, so the focus stays in the input.
 - `Results(c, &ResultsState{}, []Row{...}, ResultsOptions{Label, Rows, Fill, Empty}) clicked`: rows of kind `RowItem` (a `list.Item` and key caps), `RowHeader` (a sticky section title) and `RowMore` (a muted "Show 12 more files" row). `ResultsState.Move` skips headers.
   `Fill` makes the list take the height that is left.

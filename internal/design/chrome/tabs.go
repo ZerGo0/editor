@@ -1,18 +1,26 @@
 package chrome
 
 import (
+	"strings"
+
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	closeLabel   = "Close"
-	unpinLabel   = "Unpin"
-	dirtyLabel   = "Unsaved changes"
-	middleButton = 2
-	noTab        = -1
+	closeLabel      = "Close"
+	openedLabel     = "Show Opened Editors"
+	unpinLabel      = "Unpin"
+	dirtyLabel      = "Unsaved changes"
+	readOnlyText    = "Read-only"
+	deletedText     = "(deleted)"
+	deletedLabel    = "Deleted from disk"
+	accessSeparator = ", "
+	middleButton    = 2
+	noTab           = -1
 )
 
 type DropMark int
@@ -30,8 +38,9 @@ type tabRenderer struct {
 }
 
 type stripState struct {
-	scroll ui.ScrollState
-	middle int
+	scroll   ui.ScrollState
+	middle   int
+	overflow bool
 }
 
 type Tab struct {
@@ -44,6 +53,8 @@ type Tab struct {
 	Dirty       bool
 	Preview     bool
 	Pinned      bool
+	ReadOnly    bool
+	Deleted     bool
 }
 
 type TabStripOptions struct {
@@ -92,6 +103,10 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 			}
 		})
 		*shown = *selected
+		if overflow := state.scroll.MaxX > 0; overflow != state.overflow {
+			state.overflow = overflow
+			c.Invalidate()
+		}
 		rest := ui.Box(c.Key("rest")).Grow(1).FillHeight().MinWidth(token.TabMinWidth.Px() / 2)
 		if o.Drop != nil {
 			if mark := o.Drop(len(tabs), rest); mark != DropNone {
@@ -103,6 +118,16 @@ func TabStrip(c *ui.Context, selected *int, tabs []Tab, o TabStripOptions) ui.El
 		}
 		if o.OnEmptyDoubleClick != nil && rest.DoubleClicked() {
 			o.OnEmptyDoubleClick()
+		}
+		if state.overflow {
+			action.MenuIconButton(c, icons.ChevronDown, openedLabel, action.IconOptions{ID: "opened-editors"}, func(m *ui.Menu) {
+				for i, t := range tabs {
+					if m.Item(t.Label).Radio(i == *selected).Chosen() && o.OnSelect != nil {
+						*selected = i
+						o.OnSelect(i)
+					}
+				}
+			})
 		}
 		if o.Actions != nil {
 			action.Toolbar(c, o.Label).FillHeight().Padding(0, token.GapInline.Px()).Children(func() { o.Actions(c) })
@@ -135,22 +160,19 @@ func (r tabRenderer) item(c *ui.Context, tab ui.Element, active bool, i int, t T
 	fg := p.Tab.InactiveText
 	switch {
 	case active:
-		tab.Background(p.List.InactiveSelection)
+		list.Outline(tab.Background(p.List.InactiveSelection), p.List.SelectionOutline)
 		fg = p.Tab.ActiveText
 	case hovered:
-		tab.Background(p.List.Hover)
+		list.Outline(tab.Background(p.List.Hover), p.List.HoverOutline)
 	}
 	if t.Git != token.GitNone {
 		fg = p.GitColor(t.Git)
 	}
 	tab.Height(token.ControlHeight.Px()).MinWidth(token.TabMinWidth.Px()).MaxWidth(token.TabMaxWidth.Px()).
 		Padding(0, token.PadInputEnd.Px(), 0, token.PadControlX.Px()).Radius(token.RadiusCard.Px()).
-		Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).Label(t.Label).FocusRingOffset(-token.FocusRingWidth.Px())
+		Gap(token.GapRowIcon.Px()).AlignItems(ui.Center).Shrink(0).Label(t.accessName()).FocusRingOffset(-token.FocusRingWidth.Px())
 	if t.Tooltip != "" {
 		action.Tooltip(c, tab, t.Tooltip)
-	}
-	if t.Dirty {
-		tab.Description(dirtyLabel)
 	}
 	if o.Menu != nil {
 		tab.ContextMenu(func(m *ui.Menu) { o.Menu(i, m) })
@@ -176,8 +198,18 @@ func (r tabRenderer) item(c *ui.Context, tab ui.Element, active bool, i int, t T
 		if t.Preview {
 			text.Italic()
 		}
-		if t.Description != "" {
-			token.TextLabel.Apply(ui.Text(c, t.Description)).TextColor(p.Text.Secondary).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
+		if t.Deleted {
+			text.Strikethrough()
+		}
+		description := t.Description
+		if t.Deleted {
+			description = strings.TrimSpace(description + " " + deletedText)
+		}
+		if description != "" {
+			token.TextLabel.Apply(ui.Text(c, description)).TextColor(p.Text.Secondary).SingleLine().MinWidth(0).Shrink(1).AccessHidden(true)
+		}
+		if t.ReadOnly {
+			ui.Icon(c, icons.Lock).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Icon).Shrink(0).AccessHidden(true)
 		}
 		r.end(c, active, hovered, i, t)
 	})
@@ -193,6 +225,23 @@ func (r tabRenderer) item(c *ui.Context, tab ui.Element, active bool, i int, t T
 	if o.OnDoubleClick != nil && tab.DoubleClicked() {
 		o.OnDoubleClick(i)
 	}
+}
+
+func (t Tab) accessName() string {
+	parts := []string{t.Label}
+	if t.Description != "" {
+		parts = append(parts, t.Description)
+	}
+	if t.Dirty {
+		parts = append(parts, dirtyLabel)
+	}
+	if t.Deleted {
+		parts = append(parts, deletedLabel)
+	}
+	if t.ReadOnly {
+		parts = append(parts, readOnlyText)
+	}
+	return strings.Join(parts, accessSeparator)
 }
 
 func (r tabRenderer) end(c *ui.Context, active, hovered bool, i int, t Tab) {

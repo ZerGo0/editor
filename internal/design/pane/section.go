@@ -29,7 +29,7 @@ func Header(c *ui.Context, title string, open *bool, o SectionOptions) ui.Elemen
 	show := o.ShowActions || row.Hovered() || row.FocusWithin()
 	row.Children(func() {
 		toggle := ui.ButtonBase(c.Key("toggle")).Grow(1).MinWidth(0).FillHeight().AlignItems(ui.Center).Justify(ui.Start).
-			Gap(token.GapTight.Px()).Label(title).Expanded(*open).FocusRingOffset(-token.FocusRingWidth.Px())
+			Gap(token.GapTight.Px()).Role(ui.RoleDisclosure).Label(title).Expanded(*open).FocusRingOffset(-token.FocusRingWidth.Px())
 		target := float32(0)
 		if *open {
 			target = token.TwistieOpenAngle

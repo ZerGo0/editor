@@ -69,15 +69,17 @@ func noticeColors(p *token.Palette, t token.Tone) (bg, border ui.Color) {
 }
 
 type ToastOptions struct {
-	Tone     token.Tone
-	Title    string
-	Message  string
-	Action   string
-	OnAction func()
-	ID       string
-	Sticky   bool
-	Busy     bool
-	OnClose  func()
+	Tone        token.Tone
+	Title       string
+	Message     string
+	Action      string
+	OnAction    func()
+	Secondary   string
+	OnSecondary func()
+	ID          string
+	Sticky      bool
+	Busy        bool
+	OnClose     func()
 }
 
 func Toast(c *ui.Context, o ToastOptions) string {
@@ -85,8 +87,6 @@ func Toast(c *ui.Context, o ToastOptions) string {
 	if o.Sticky || o.Busy {
 		t.Timeout = stickyTimeout
 	}
-	if o.Busy {
-		t.Data = toastBusy{}
-	}
+	t.Data = toastData{busy: o.Busy, secondary: o.Secondary, onSecondary: o.OnSecondary}
 	return c.AddToast(t)
 }

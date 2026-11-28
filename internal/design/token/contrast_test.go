@@ -74,6 +74,7 @@ func pairs(p *Palette) []pair {
 		pair{"badge", p.Badge.Text, p.Badge.Background, ContrastText},
 		pair{"accent badge", p.Badge.AccentText, p.Badge.Accent, ContrastText},
 		pair{"key cap", p.Key.Text, Over(p.Key.Background, p.Layer.Widget), ContrastText},
+		pair{"key cap on hover", p.Key.Text, Over(p.Key.Background, Over(p.List.Hover, p.Layer.SideBar)), ContrastText},
 		pair{"status text", p.Bar.StatusText, p.Layer.StatusBar, ContrastText},
 		pair{"status hover", p.Bar.StatusText, Over(p.Bar.StatusHover, p.Layer.StatusBar), ContrastText},
 		pair{"active tab", p.Tab.ActiveText, p.Tab.Active, ContrastText},
@@ -187,5 +188,22 @@ func TestRegistry(t *testing.T) {
 	tt.Frame()
 	if got != Light() {
 		t.Fatal("Of does not find the palette of the theme in use")
+	}
+}
+
+func TestHighContrastBordersAndOutlinesStandOut(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		p := For(dark, ui.Transparent, true)
+		rows := map[string]ui.Color{"sidebar": p.Layer.SideBar, "editor": p.Layer.Editor, "panel": p.Layer.Panel}
+		for rowName, bg := range rows {
+			for name, c := range map[string]ui.Color{
+				"default border": p.Border.Default, "section border": p.Border.Section,
+				"focus outline": p.List.FocusOutline, "selection outline": p.List.SelectionOutline, "hover outline": p.List.HoverOutline,
+			} {
+				if got := Contrast(Over(c, bg), bg); got < ContrastLarge {
+					t.Errorf("dark=%v: %s on %s is %.2f:1, want %.1f:1", dark, name, rowName, got, ContrastLarge)
+				}
+			}
+		}
 	}
 }

@@ -1,6 +1,8 @@
 package pane
 
 import (
+	"math"
+
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/egoist/mygo/ui"
 )
@@ -36,15 +38,17 @@ func Stack(c *ui.Context, s *StackState, panes []Pane) ui.Element {
 		s.heights = map[string]float32{}
 	}
 	stack := ui.Column(c.Key("pane-stack")).Fill().MinHeight(0)
+	sizes := s.openSizes(stack.Bounds().H, panes)
 	stack.Children(func() {
 		prev := ""
 		for i, pn := range panes {
 			open := !s.Collapsed[pn.ID]
 			col := ui.Column(c.Key(pn.ID)).FillWidth().MinHeight(0).Shrink(0)
 			if open {
-				col.Grow(s.weight(pn.ID)).Basis(0).Shrink(1).MinHeight(token.PaneMinHeight.Px())
-				s.heights[pn.ID] = col.Bounds().H
+				h, grow := sizes[pn.ID].basis, sizes[pn.ID].grow
+				col.Grow(grow).Basis(h).Shrink(1).MinHeight(token.PaneMinHeight.Px())
 			}
+			s.heights[pn.ID] = col.Bounds().H
 			col.Children(func() {
 				if open && prev != "" {
 					s.sash(c, prev, pn.ID, panes)
@@ -64,6 +68,43 @@ func Stack(c *ui.Context, s *StackState, panes []Pane) ui.Element {
 	return stack
 }
 
+type paneSize struct {
+	basis float32
+	grow  float32
+}
+
+func (s *StackState) openSizes(total float32, panes []Pane) map[string]paneSize {
+	sizes := map[string]paneSize{}
+	var open []string
+	var weights, used float32
+	for _, pn := range panes {
+		if s.Collapsed[pn.ID] {
+			used += s.heights[pn.ID]
+			continue
+		}
+		open = append(open, pn.ID)
+		weights += s.weight(pn.ID)
+	}
+	free := float32(math.Floor(float64(total - used)))
+	if len(open) == 0 || free <= 0 {
+		for _, id := range open {
+			sizes[id] = paneSize{grow: s.weight(id)}
+		}
+		return sizes
+	}
+	for i, id := range open {
+		if i == len(open)-1 {
+			sizes[id] = paneSize{basis: free, grow: 1}
+			break
+		}
+		h := float32(math.Floor(float64(free * s.weight(id) / weights)))
+		sizes[id] = paneSize{basis: h}
+		free -= h
+		weights -= s.weight(id)
+	}
+	return sizes
+}
+
 func (s *StackState) weight(id string) float32 {
 	if w, ok := s.Weights[id]; ok && w > 0 {
 		return w
@@ -72,15 +113,29 @@ func (s *StackState) weight(id string) float32 {
 }
 
 func (s *StackState) sash(c *ui.Context, above, below string, panes []Pane) {
-	p := token.Of(c)
-	sash := ui.Box(c.Key("sash")).Absolute().Top(sashOffset).Left(0).Right(0).Height(token.SashSize.Px()).
-		Cursor(ui.CursorResizeRow).ZIndex(token.LayerSticky.Z()).Role(ui.RoleSplitter).Label("Resize " + above)
-	if sash.Hovered() || sash.Dragging() {
-		sash.Background(p.Accent.Focus)
+	var r SashResult
+	sashAnchor(c.Key("sash"), true, -sashOffset).Children(func() {
+		var sash ui.Element
+		sash, r = Sash(c, SashOptions{Label: "Resize " + titleOf(panes, above), Rows: true})
+		sash.Top(0).Left(0).Right(0).Bottom(0)
+	})
+	switch {
+	case r.Reset:
+		clear(s.Weights)
+		c.Invalidate()
+	case r.Delta != 0:
+		s.resize(above, below, r.Delta, panes)
+		c.Invalidate()
 	}
-	if _, dy, ok := sash.Dragged(); ok && dy != 0 {
-		s.resize(above, below, dy, panes)
+}
+
+func titleOf(panes []Pane, id string) string {
+	for _, pn := range panes {
+		if pn.ID == id {
+			return pn.Title
+		}
 	}
+	return id
 }
 
 func (s *StackState) resize(above, below string, dy float32, panes []Pane) {

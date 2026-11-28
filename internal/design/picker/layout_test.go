@@ -16,6 +16,9 @@ const (
 	previewLabel  = "Preview"
 	resultsLabel  = "Results"
 	edgeTolerance = 1
+	headerText    = "Title"
+	headerLabel   = "Header"
+	moveX, moveY  = 100, 50
 )
 
 type layoutHarness struct {
@@ -23,6 +26,7 @@ type layoutHarness struct {
 	results ResultsState
 	closed  bool
 	preview bool
+	grip    bool
 }
 
 func (h *layoutHarness) view(c *ui.Context) {
@@ -31,6 +35,9 @@ func (h *layoutHarness) view(c *ui.Context) {
 		rows[i] = Row{Item: list.Item{Label: "row"}}
 	}
 	if Dialog(c, DialogOptions{Label: layoutLabel, ID: "layout", Layout: &h.layout}, func() {
+		if h.grip {
+			h.layout.Grip(Header(c, func() { ui.Text(c, headerText) }, nil).Role(ui.RoleGroup).Label(headerLabel))
+		}
 		Results(c, &h.results, rows, ResultsOptions{Label: resultsLabel, Fill: true})
 		if h.preview {
 			Preview(c, nil, PreviewOptions{Label: previewLabel, Message: "No preview", Layout: &h.layout, Results: &h.results})
@@ -204,5 +211,62 @@ func TestPreviewSplitterIsAbsentWithoutALayout(t *testing.T) {
 	tt.Frame()
 	if _, ok := tt.AccessByRole(ui.RoleSplitter, "Resize "+previewLabel); ok {
 		t.Fatal("a preview without a layout has a splitter")
+	}
+}
+
+func dragHeader(t *testing.T, tt *ui.Tester, dx, dy float32) {
+	t.Helper()
+	a, ok := tt.AccessByRole(ui.RoleGroup, headerLabel)
+	if !ok {
+		t.Fatal("no header")
+	}
+	x, y := a.Bounds.X+a.Bounds.W-edgeTolerance-dragStep, a.Bounds.Y+a.Bounds.H/2
+	tt.Press(x, y)
+	tt.Frame()
+	tt.Move(x+dx/2, y+dy/2)
+	tt.Frame()
+	tt.Move(x+dx, y+dy)
+	tt.Frame()
+	tt.Release(x+dx, y+dy)
+	tt.Frame()
+	tt.Frame()
+}
+
+func TestDraggingTheHeaderMovesTheDialogInsideTheWindow(t *testing.T) {
+	h := &layoutHarness{layout: Layout{Width: 600, Height: 400}, grip: true}
+	tt := newLayoutTester(t, h, 1000, 900)
+	start := dialogRect(t, tt)
+	dragHeader(t, tt, moveX, moveY)
+	if h.layout.X != moveX || h.layout.Y != moveY || h.closed {
+		t.Fatalf("layout %+v closed %v, want the dialog moved by %d, %d", h.layout, h.closed, moveX, moveY)
+	}
+	if r := dialogRect(t, tt); r.X != start.X+moveX || r.Y != start.Y+moveY {
+		t.Fatalf("dialog %+v, want it moved from %+v", r, start)
+	}
+	dragHeader(t, tt, hugeDrag, hugeDrag)
+	margin := token.GapControl.Px()
+	if r := dialogRect(t, tt); r.X+r.W != 1000-margin || r.Y+r.H != 900-margin {
+		t.Fatalf("dialog %+v leaves the window", r)
+	}
+	a, _ := tt.AccessByRole(ui.RoleGroup, headerLabel)
+	x, y := a.Bounds.X+a.Bounds.W-edgeTolerance-dragStep, a.Bounds.Y+a.Bounds.H/2
+	tt.ClickAt(x, y)
+	tt.ClickAt(x, y)
+	tt.Frame()
+	tt.Frame()
+	if h.layout.X != 0 || h.layout.Y != 0 {
+		t.Fatalf("layout %+v after a double click, want the dialog centered", h.layout)
+	}
+	if r := dialogRect(t, tt); r != start {
+		t.Fatalf("dialog %+v after a double click, want %+v", r, start)
+	}
+}
+
+func TestSavedPositionIsKeptInsideASmallerWindow(t *testing.T) {
+	h := &layoutHarness{layout: Layout{Width: 600, Height: 400, X: hugeDrag, Y: -hugeDrag}}
+	tt := newLayoutTester(t, h, 800, 600)
+	margin := token.GapControl.Px()
+	if r := dialogRect(t, tt); r.X+r.W != 800-margin || r.Y != margin {
+		t.Fatalf("dialog %+v, want it at the top right inside the window", r)
 	}
 }

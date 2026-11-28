@@ -1,6 +1,8 @@
 package chrome
 
 import (
+	"strconv"
+
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -28,6 +30,9 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 			tab := parts.Tab(i).Size(token.ActivityItem.Px(), token.ActivityBarHeight.Px()).Center().Shrink(0).Label(it.Label).
 				FocusRingOffset(-token.FocusRingWidth.Px())
 			action.Tooltip(c, tab, activityTip(it))
+			if it.Badge > 0 {
+				tab.Description(it.badgeText())
+			}
 			if active && forward {
 				tab.Focus()
 			}
@@ -51,8 +56,15 @@ func ActivityBar(c *ui.Context, label string, selected *int, items []Activity) u
 
 func activityTip(it Activity) string {
 	tip := action.Hint(it.Label, it.Keys)
-	if it.BadgeTip == "" {
+	if it.Badge <= 0 {
 		return tip
 	}
-	return tip + tipSeparator + it.BadgeTip
+	return tip + tipSeparator + it.badgeText()
+}
+
+func (it Activity) badgeText() string {
+	if it.BadgeTip != "" {
+		return it.BadgeTip
+	}
+	return strconv.Itoa(it.Badge)
 }

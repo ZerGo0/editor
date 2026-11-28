@@ -134,3 +134,6 @@ ba92542c25a3
 
 # Git.post and viewer State.publish drop updates after close, but read a plain bool owned by the UI goroutine and an atomic.Bool set from other goroutines; a shared helper would need a closure for the flag and is as long as either body.
 180c24b4957e
+
+# Two tab strips with different visuals: picker pills (hover fill, fixed control height) and workbench view tabs (underline, badge, scroll into view); a shared helper would need a callback for every visual difference.
+553f2765ac1b

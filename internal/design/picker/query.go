@@ -11,20 +11,22 @@ import (
 const queryID = "picker-query"
 
 type QueryOptions struct {
-	Placeholder string
-	Toggles     []field.Toggle
-	Actions     []field.Action
-	Error       string
-	Busy        bool
-	Handle      *ui.Handle
-	NoAutoFocus bool
-	Multiline   bool
+	Placeholder   string
+	Toggles       []field.Toggle
+	Actions       []field.Action
+	Error         string
+	Busy          bool
+	Handle        *ui.Handle
+	NoAutoFocus   bool
+	Multiline     bool
+	TabMovesFocus bool
 }
 
 type Keys struct {
 	Up, Down, PageUp, PageDown bool
 	Next, Previous             bool
 	Side, Submitted, Changed   bool
+	Older, Newer               bool
 }
 
 func Query(c *ui.Context, label string, query *string, o QueryOptions) Keys {
@@ -39,9 +41,9 @@ func Query(c *ui.Context, label string, query *string, o QueryOptions) Keys {
 	if o.Handle != nil {
 		in.Bind(o.Handle)
 	}
-	k := Keys{
-		Next:     in.Shortcut(0, ui.KeyTab),
-		Previous: in.Shortcut(ui.Shift, ui.KeyTab),
+	var k Keys
+	if !o.TabMovesFocus {
+		k.Next, k.Previous = in.Shortcut(0, ui.KeyTab), in.Shortcut(ui.Shift, ui.KeyTab)
 	}
 	if o.Multiline {
 		lineKeys(in, *query, &k)
@@ -49,6 +51,7 @@ func Query(c *ui.Context, label string, query *string, o QueryOptions) Keys {
 		k.Up, k.Down = in.Shortcut(0, ui.KeyUp), in.Shortcut(0, ui.KeyDown)
 		k.PageUp, k.PageDown = in.Shortcut(0, ui.KeyPageUp), in.Shortcut(0, ui.KeyPageDown)
 		k.Side, k.Submitted = in.Shortcut(ui.Cmd, ui.KeyEnter), in.Submitted()
+		k.Older, k.Newer = in.Shortcut(ui.Alt, ui.KeyUp), in.Shortcut(ui.Alt, ui.KeyDown)
 	}
 	k.Changed = in.Changed()
 	if o.Busy {

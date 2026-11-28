@@ -30,7 +30,7 @@ func Preview(c *ui.Context, st *editor.State, o PreviewOptions) ui.Element {
 			previewTitle(c, p, o.Title)
 			switch {
 			case o.Busy:
-				feedback.CodeSkeleton(c, o.Message)
+				feedback.CodeSkeleton(c, o.Message, feedback.SkeletonCodeLines, nil)
 			case st == nil:
 				feedback.Empty(c, feedback.EmptyOptions{Title: o.Message})
 			default:

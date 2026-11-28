@@ -112,6 +112,57 @@ func TestTextBand(t *testing.T) {
 	}
 }
 
+func textMeasure(res Result) (Measure, bool) {
+	for _, m := range res.Measures {
+		if m.Kind == MeasureText {
+			return m, true
+		}
+	}
+	return Measure{}, false
+}
+
+func TestTextBandIgnoresStrikeThrough(t *testing.T) {
+	img := canvasOf()
+	for _, x := range []float64{10, 18, 26} {
+		fill(img, Rect{X: x, Y: 8, W: 5, H: 9}, testInk)
+	}
+	fill(img, Rect{X: 10, Y: 12, W: 21, H: 1}, testInk)
+	res := run(t, img, []Box{{Role: "row", Label: "HHH", Rect: Rect{X: 0, Y: 0, W: 100, H: 22}}})
+	m, ok := textMeasure(res)
+	if !ok || m.Ink.H != 9 {
+		t.Fatalf("text measure = %+v, %v", m, ok)
+	}
+}
+
+func TestTextBandNeedsTwoTallGlyphs(t *testing.T) {
+	img := canvasOf()
+	for i, x := range []float64{10, 18, 26} {
+		top := 9.0
+		if i == 2 {
+			top = 6
+		}
+		fill(img, Rect{X: x, Y: top + 1, W: 5, H: 16 - top}, testInk)
+	}
+	res := run(t, img, []Box{{Role: "row", Label: "web", Rect: Rect{X: 0, Y: 0, W: 100, H: 22}}})
+	if m, ok := textMeasure(res); ok {
+		t.Fatalf("one ascender measured as a cap band: %+v", m)
+	}
+}
+
+func TestOpticalSkipsBoxUnderTooltip(t *testing.T) {
+	img := canvasOf()
+	fill(img, Rect{X: 5, Y: 5, W: 12, H: 12}, testInk)
+	res := run(t, img, []Box{
+		{Role: "button", Label: "Under", Rect: Rect{X: 0, Y: 0, W: 22, H: 22}},
+		{Role: "tooltip", Label: "Tip", Rect: Rect{X: 10, Y: 15, W: 60, H: 24}},
+	})
+	for _, m := range res.Measures {
+		if res.Boxes[m.Box].Label == "Under" {
+			t.Fatalf("box under a tooltip was measured: %+v", m)
+		}
+	}
+}
+
 func TestUnevenGaps(t *testing.T) {
 	res := run(t, canvasOf(), []Box{
 		{ID: "bar", Role: "toolbar", Rect: Rect{X: 0, Y: 0, W: 120, H: 22}},

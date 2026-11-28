@@ -36,8 +36,11 @@ type Item struct {
 	Menu          func(m *ui.Menu)
 	OnClick       func()
 	OnDoubleClick func()
+	OnAuxClick    func()
 	Drop          func(row ui.Element) bool
 }
+
+const middleButton = 2
 
 type Style struct {
 	Text      ui.Color
@@ -74,9 +77,9 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 	case active:
 		row.Background(p.List.ActiveSelection).Border(token.BorderWidth.Px(), p.List.FocusOutline)
 	case s.Selected:
-		row.Background(p.List.InactiveSelection)
+		Outline(row.Background(p.List.InactiveSelection), p.List.SelectionOutline)
 	case hovered:
-		row.Background(p.List.Hover)
+		Outline(row.Background(p.List.Hover), p.List.HoverOutline)
 	}
 	showDescription := s.showDescription(c, it)
 	shown, dropped := s.fitPills(c, it, showDescription)
@@ -120,11 +123,11 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 			badge.Count(c, it.Count, badge.CountOptions{})
 		}
 		if it.Git != token.GitNone {
-			badge.Decoration(c, it.Git)
+			badge.Decoration(c, it.Git).AccessHidden(true)
 		}
 	})
 	if s.flat {
-		row.Role(ui.RoleTreeItem).Level(s.Depth + 1)
+		row.Role(ui.RoleTreeItem).Level(s.Depth + 1).Label(AccessName(it)).AccessSelected(s.Selected)
 		if s.Branch {
 			row.Expanded(s.Open)
 		}
@@ -138,7 +141,31 @@ func Row(c *ui.Context, s State, it Item) ui.Element {
 	case it.OnClick != nil && row.RowClicked():
 		it.OnClick()
 	}
+	if it.OnAuxClick != nil {
+		auxClick(c, row, it.OnAuxClick)
+	}
 	return row
+}
+
+func Outline(el ui.Element, color ui.Color) {
+	if color.A > 0 {
+		el.Border(token.BorderWidth.Px(), color)
+	}
+}
+
+func auxClick(c *ui.Context, row ui.Element, run func()) {
+	pressed := ui.Local(row, "aux-press", func() bool { return false })
+	if b, ok := row.PressedButton(); ok && b == middleButton {
+		*pressed = true
+		return
+	}
+	if *pressed {
+		*pressed = false
+		if row.Hovered() {
+			run()
+			c.Invalidate()
+		}
+	}
 }
 
 func twistie(c *ui.Context, p *token.Palette, s State) {

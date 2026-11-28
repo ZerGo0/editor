@@ -93,6 +93,8 @@ type Lists struct {
 	PickSelection            ui.Color
 	PickSelectionText        ui.Color
 	PickHighlight            ui.Color
+	SelectionOutline         ui.Color
+	HoverOutline             ui.Color
 }
 
 type Tabs struct {
@@ -176,29 +178,23 @@ const (
 	GitCopied
 )
 
-func (s GitStatus) Letter() string {
-	switch s {
-	case GitAdded:
-		return "A"
-	case GitModified:
-		return "M"
-	case GitDeleted:
-		return "D"
-	case GitRenamed:
-		return "R"
-	case GitUntracked:
-		return "U"
-	case GitIgnored:
-		return "I"
-	case GitConflict:
-		return "!"
-	case GitSubmodule:
-		return "S"
-	case GitCopied:
-		return "C"
-	}
-	return ""
+type gitStatusText struct{ letter, name string }
+
+var gitStatusTexts = map[GitStatus]gitStatusText{
+	GitAdded:     {"A", "Added"},
+	GitModified:  {"M", "Modified"},
+	GitDeleted:   {"D", "Deleted"},
+	GitRenamed:   {"R", "Renamed"},
+	GitUntracked: {"U", "Untracked"},
+	GitIgnored:   {"I", "Ignored"},
+	GitConflict:  {"!", "Conflict"},
+	GitSubmodule: {"S", "Submodule"},
+	GitCopied:    {"C", "Copied"},
 }
+
+func (s GitStatus) Letter() string { return gitStatusTexts[s].letter }
+
+func (s GitStatus) Name() string { return gitStatusTexts[s].name }
 
 func (p *Palette) GitColor(s GitStatus) ui.Color {
 	switch s {

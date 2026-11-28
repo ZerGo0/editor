@@ -72,7 +72,7 @@ func titleBarWithPick(c *ui.Context) {
 	ui.Column(c).Fill().Children(func() {
 		ui.Row(c).FillWidth().Height(token.TitleBarHeight.Px()).AlignItems(ui.Center).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).Children(func() {
 			ui.Box(c).Width(sideWidth).Shrink(0)
-			chrome.CommandCenter(c, "editor", centerCommand)
+			chrome.CommandCenter(c, "editor", centerCommand, nil)
 			ui.Box(c).Width(sideWidth).Shrink(0)
 		})
 	})

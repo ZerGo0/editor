@@ -69,6 +69,9 @@ func (s State) fixedWidth(it Item) float32 {
 	if s.tree || s.flat {
 		w += float32(s.Depth)*token.IndentStep.Px() + token.TwistieWidth.Px()
 	}
+	if it.Git != token.GitNone {
+		w += token.DecorationWidth.Px()
+	}
 	if it.Leading != nil || it.Icon != nil {
 		w += token.GapRowIcon.Px()
 	}

@@ -140,6 +140,34 @@ func (s ink) columns(rows span) []float64 {
 	return out
 }
 
+func (s ink) columnsSkipping(skip []bool) []float64 {
+	out := make([]float64, s.r.Dx())
+	for y, skipped := range skip {
+		if skipped {
+			continue
+		}
+		for x := range out {
+			out[x] = math.Max(out[x], s.at(x, y))
+		}
+	}
+	return out
+}
+
+func (s ink) strikeRows(cols span) []bool {
+	out := make([]bool, s.r.Dy())
+	width := cols.to - cols.from
+	for y := range out {
+		n := 0
+		for x := cols.from; x < cols.to; x++ {
+			if s.at(x, y) >= maskCov {
+				n++
+			}
+		}
+		out[y] = width > 0 && float64(n) >= strikeShare*float64(width)
+	}
+	return out
+}
+
 func (s ink) rows(cols span) []float64 {
 	out := make([]float64, s.r.Dy())
 	for y := range out {

@@ -17,12 +17,11 @@ import (
 
 const (
 	redlineWidth     = 640
-	redlineHeight    = 1500
+	redlineHeight    = 1600
 	redlineAllowPath = "testdata/redline_allowlist.txt"
 	redlineUpdateEnv = "DESIGN_REDLINE_UPDATE"
 	redlineDetailEnv = "DESIGN_REDLINE_DETAIL"
 	stateMargin      = 4
-	pointerShards    = 4
 )
 
 var redlineScales = []float64{1, 2}
@@ -140,10 +139,10 @@ func slug(label string) string {
 	}, label)
 }
 
-func sweepPointerStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64, shard int) {
+func sweepPointerStates(t *testing.T, tt *ui.Tester, view string, allow *redline.Allowlist, scale float64) {
 	t.Helper()
-	for i, b := range testerBoxes(tt) {
-		if i%pointerShards != shard || !stateRoles[b.Role] || b.Disabled {
+	for _, b := range testerBoxes(tt) {
+		if !stateRoles[b.Role] || b.Disabled {
 			continue
 		}
 		x, y := float32(b.Rect.CenterX()), float32(b.Rect.CenterY())
@@ -194,10 +193,10 @@ func TestGalleryRedlines(t *testing.T) {
 			t.Run(fmt.Sprintf("%s@%gx", th.name, scale), func(t *testing.T) {
 				t.Parallel()
 				view := fmt.Sprintf("gallery-%s@%gx", th.name, scale)
-				newTester := func() *ui.Tester {
+				newTester := func(part func(c *ui.Context, g *gallery)) *ui.Tester {
 					p, g := th.palette(), newGallery()
 					tt := ui.NewTester(func(c *ui.Context) {
-						ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { galleryColumn(c, g) })
+						ui.Themed(c.Key(th.name), p.Theme()).Fill().Background(p.Layer.SideBar).Children(func() { part(c, g) })
 					}, redlineWidth, redlineHeight)
 					tt.SetScale(float32(scale))
 					tt.Frame()
@@ -205,14 +204,18 @@ func TestGalleryRedlines(t *testing.T) {
 				}
 				t.Run("static and focus", func(t *testing.T) {
 					t.Parallel()
-					tt := newTester()
+					tt := newTester(galleryColumn)
 					checkRedlines(t, analyzeTester(t, tt, view, scale), allow)
 					sweepFocusStates(t, tt, view, allow, scale)
 				})
-				for shard := range pointerShards {
-					t.Run(fmt.Sprintf("pointer-%d", shard), func(t *testing.T) {
+				parts := []func(c *ui.Context, g *gallery){func(c *ui.Context, g *gallery) { galleryChrome(c, g) }}
+				for _, section := range gallerySections {
+					parts = append(parts, func(c *ui.Context, g *gallery) { galleryBody(c, g, []func(c *ui.Context, g *gallery){section}) })
+				}
+				for i, part := range parts {
+					t.Run(fmt.Sprintf("pointer-%d", i), func(t *testing.T) {
 						t.Parallel()
-						sweepPointerStates(t, newTester(), view, allow, scale, shard)
+						sweepPointerStates(t, newTester(part), view, allow, scale)
 					})
 				}
 			})

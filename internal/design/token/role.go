@@ -83,6 +83,7 @@ var (
 	TwistieWidth       = Size{16}
 	SashSize           = Size{4}
 	SashCorner         = Size{12}
+	SashKeyStep        = Size{10}
 	ScrollbarSize      = Size{10}
 	ProgressHeight     = Size{2}
 )
@@ -90,7 +91,11 @@ var (
 var (
 	PaneMinHeight         = Size{66}
 	SidebarMinWidth       = Size{170}
-	PanelMinHeight        = Size{100}
+	PanelMinHeight        = Size{77}
+	PanelMinWidth         = Size{300}
+	EditorMinWidth        = Size{220}
+	EditorMinHeight       = Size{70}
+	SplitMinPane          = Size{40}
 	TabMinWidth           = Size{80}
 	PopoverMaxWidth       = Size{320}
 	DialogWidth           = Size{440}

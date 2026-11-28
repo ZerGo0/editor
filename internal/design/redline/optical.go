@@ -26,17 +26,21 @@ const (
 	ringPx       = 2
 	tallShare    = 0.5
 	hugShare     = 0.6
-	capGlyphs    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789bdfhklt"
+	capGlyphs    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789bdhkl"
+	tallMin      = 2
+	strikeShare  = 0.9
 )
 
 var (
-	skipOptical = map[string]bool{"progress": true}
+	skipOptical = map[string]bool{"progress": true, "switch": true}
+	floatRoles  = map[string]bool{"tooltip": true}
+	signRoles   = map[string]bool{"insertion": true, "deletion": true}
 	textRoles   = map[string]bool{"text": true, "staticText": true, "label": true}
 )
 
 func (a *analysis) optical() {
 	for i, b := range a.boxes {
-		if skipOptical[b.Role] || a.clipped(i) {
+		if skipOptical[b.Role] || a.clipped(i) || a.underFloat(i) {
 			continue
 		}
 		switch r := b.Rect; {
@@ -46,6 +50,16 @@ func (a *analysis) optical() {
 			a.textBox(i)
 		}
 	}
+}
+
+func (a *analysis) underFloat(i int) bool {
+	r := a.boxes[i].Rect
+	for k, b := range a.boxes {
+		if floatRoles[b.Role] && k != i && overlap(r.X, r.Right(), b.Rect.X, b.Rect.Right()) > 0 && overlap(r.Y, r.Bottom(), b.Rect.Y, b.Rect.Bottom()) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analysis) scanBox(i int) (ink, bool) {
@@ -92,7 +106,7 @@ func (a *analysis) iconBox(i int) {
 	m.HasX = true
 	m.Text = textRoles[b.Role] || len(clusters(s.columns(span{0, s.r.Dy()}), glyphGap)) > 1
 	if m.Text {
-		if t, ok := a.measureText(i, s, all); ok {
+		if t, ok := a.measureText(i, s, all, 1); ok {
 			m.Ink.Y, m.Ink.H, m.DY = t.Ink.Y, t.Ink.H, t.DY
 		}
 	}
@@ -150,7 +164,7 @@ func (a *analysis) textBox(i int) {
 		}
 	}
 	iconPx := iconLikeMax * a.scale
-	if lead := parts[0]; text != 0 && !textRoles[a.boxes[i].Role] && float64(lead.to-lead.from) <= iconPx {
+	if lead := parts[0]; text != 0 && !textRoles[a.boxes[i].Role] && !signRoles[a.boxes[i].Role] && float64(lead.to-lead.from) <= iconPx {
 		if m, ok := a.measureIcon(i, s, lead, MeasureRowIcon); ok && m.Ink.H <= iconLikeMax && math.Max(m.Ink.W, m.Ink.H) >= iconInkMin {
 			a.measures = append(a.measures, m)
 			a.flagCentre(m, "row icon centre y", m.DY, "move the icon by "+signed(-m.DY)+" px in whole px: change the box size or padding so the difference is even")
@@ -160,7 +174,7 @@ func (a *analysis) textBox(i int) {
 	if float64(parts[text].to-parts[text].from) <= iconPx {
 		return
 	}
-	m, ok := a.measureText(i, s, parts[text])
+	m, ok := a.measureText(i, s, parts[text], tallMin)
 	if !ok {
 		return
 	}
@@ -171,15 +185,19 @@ func (a *analysis) textBox(i int) {
 	a.flagContrast(m, contrastText)
 }
 
-func (a *analysis) measureText(i int, s ink, cols span) (Measure, bool) {
+func (a *analysis) measureText(i int, s ink, cols span, minTall int) (Measure, bool) {
 	if !strings.ContainsAny(a.boxes[i].Label, capGlyphs) {
 		return Measure{}, false
 	}
 	h := s.r.Dy()
+	strike := s.strikeRows(cols)
 	var tops, bottoms []int
-	for _, g := range clusters(s.columns(span{0, h})[cols.from:cols.to], glyphGap) {
+	for _, g := range clusters(s.columnsSkipping(strike)[cols.from:cols.to], glyphGap) {
 		top, bottom := -1, -1
 		for y := 0; y < h; y++ {
+			if strike[y] {
+				continue
+			}
 			for x := cols.from + g.from; x < cols.from+g.to; x++ {
 				if s.at(x, y) >= maskCov {
 					if top < 0 {
@@ -206,6 +224,9 @@ func (a *analysis) measureText(i int, s ink, cols span) (Measure, bool) {
 		if float64(t) <= float64(minTop)+tallShare*float64(xTop-minTop) {
 			tall = append(tall, float64(t))
 		}
+	}
+	if len(tall) < minTall {
+		return Measure{}, false
 	}
 	r := a.boxes[i].Rect
 	y0, y1 := median(tall)+float64(s.r.Min.Y), float64(base+s.r.Min.Y)
