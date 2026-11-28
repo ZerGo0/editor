@@ -7,12 +7,21 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/review"
 	"github.com/egoist/mygo"
 )
 
+const newFileMode = 0o644
+
 func (a *App) openArgs(args []string, dir string) bool {
 	opened := false
-	for _, arg := range args {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == review.RequestFlag && i+1 < len(args) {
+			i++
+			opened = a.openReview(args[i]) || opened
+			continue
+		}
 		if arg == "" || strings.HasPrefix(arg, "-") {
 			continue
 		}
@@ -31,11 +40,13 @@ func (a *App) openPath(path string) bool {
 }
 
 func (a *App) openPathIn(path string, window *projectWindow) bool {
-	path, info, err := resolvePath(path)
+	resolved, info, err := resolvePath(path)
 	if err != nil {
-		log.Printf("open %s: %v", path, err)
+		log.Printf("open %s: %v", resolved, err)
+		a.reportUnopened(path, err, window)
 		return false
 	}
+	path = resolved
 	if info.IsDir() {
 		a.openProject(path)
 		return true
@@ -146,6 +157,38 @@ func (a *App) openDialog(parent *mygo.Window, title string, directory bool) {
 		}
 		mygo.RunOnMain(func() { a.openPathIn(paths[0], a.workspaceFor(parent)) })
 	})
+}
+
+func (a *App) newFileDialog(parent *mygo.Window) {
+	applog.Go(func() {
+		path, err := a.pickSavePath(parent)
+		if err == nil && path != "" {
+			err = createFile(path)
+		}
+		if err != nil {
+			log.Printf("new file: %v", err)
+			mygo.Dialog.Error("Cannot create "+filepath.Base(path), err.Error())
+			return
+		}
+		if path != "" {
+			mygo.RunOnMain(func() { a.openPath(path) })
+		}
+	})
+}
+
+func (a *App) pickSavePath(parent *mygo.Window) (string, error) {
+	if len(a.options.PickedPaths) > 0 {
+		return a.options.PickedPaths[0], nil
+	}
+	return mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: parent, Title: newFileTitle, ButtonLabel: newFileButton, CreateDirectories: true})
+}
+
+func createFile(path string) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, newFileMode)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 func (a *App) pickPaths(parent *mygo.Window, title string, directory bool) ([]string, error) {

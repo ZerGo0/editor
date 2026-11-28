@@ -17,10 +17,7 @@ func (s commandSource) Lookup(id string) (action.CommandInfo, bool) {
 	if cmd == nil {
 		return action.CommandInfo{}, false
 	}
-	info := action.CommandInfo{Title: cmd.Title}
-	if chords := a.keys.Current.For(id); len(chords) > 0 {
-		info.Keys = chords[0].Label()
-	}
+	info := action.CommandInfo{Title: cmd.Title, Keys: a.keys.Current.Label(id)}
 	if ws := a.drawing; ws != nil {
 		info.Disabled = !ws.CommandEnabled(id)
 	}

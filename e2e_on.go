@@ -9,6 +9,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/app"
 	"github.com/ZerGo0/editor/internal/document"
+	"github.com/ZerGo0/editor/internal/github"
 	"github.com/egoist/mygo"
 	_ "github.com/egoist/mygo/plugins/automation"
 )
@@ -19,6 +20,8 @@ const (
 	editLimitEnv   = "EDITOR_E2E_EDIT_LIMIT"
 	unfocusedEnv   = "EDITOR_E2E_SHOW_UNFOCUSED"
 	transparentEnv = "EDITOR_E2E_TRANSPARENT"
+	githubURLEnv   = "EDITOR_E2E_GITHUB_URL"
+	githubTokenEnv = "EDITOR_E2E_GITHUB_TOKEN"
 	logsDirName    = "logs"
 )
 
@@ -30,6 +33,9 @@ func e2eOptions() app.Options {
 	}
 	if n, err := strconv.ParseInt(os.Getenv(editLimitEnv), 10, 64); err == nil && n > 0 {
 		document.EditLimit = n
+	}
+	if url := os.Getenv(githubURLEnv); url != "" {
+		github.SetOverride(url, os.Getenv(githubTokenEnv))
 	}
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
 	return app.Options{Hidden: true, ShowUnfocused: os.Getenv(unfocusedEnv) != "", Transparent: os.Getenv(transparentEnv) != "", DiscardOnClose: true, NoBackups: dir == "", NoMenuAccelerators: true, PickedPaths: filepath.SplitList(os.Getenv(pickedEnv))}

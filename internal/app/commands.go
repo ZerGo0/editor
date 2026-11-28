@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -29,6 +30,8 @@ const (
 	categoryGo          = "Go"
 	categorySearch      = "Search"
 	categoryDeveloper   = "Developer"
+	categoryReview      = "Review"
+	maxEditorIndex      = 9
 )
 
 func (a *App) registerCommands() {
@@ -37,6 +40,7 @@ func (a *App) registerCommands() {
 	a.registerPanelCommands()
 	a.registerEditorCommands()
 	a.registerKeymapCommands()
+	a.registerReviewCommands()
 }
 
 func appAction(fn func()) func(*mygo.Window) { return func(*mygo.Window) { fn() } }
@@ -56,6 +60,13 @@ func (a *App) registerWorkbenchCommands() {
 	add("workbench.action.openGlobalKeybindingsFile", categoryPreferences, "Open Keyboard Shortcuts (JSON)", ws((*workspace.Workspace).OpenKeybindingsJSON))
 	add("workbench.action.files.save", categoryFile, "Save", ws((*workspace.Workspace).Save))
 	add("workbench.action.files.saveAll", categoryFile, "Save All", ws((*workspace.Workspace).SaveAll))
+	add("workbench.action.files.saveAs", categoryFile, "Save as...", ws((*workspace.Workspace).SaveAs))
+	add("workbench.action.files.revert", categoryFile, "Revert File", ws((*workspace.Workspace).RevertFile))
+	add("workbench.files.action.compareWithSaved", categoryFile, "Compare Active File with Saved", ws((*workspace.Workspace).CompareWithSaved))
+	add("workbench.files.action.compareWithClipboard", categoryFile, "Compare Active File with Clipboard", ws((*workspace.Workspace).CompareWithClipboard))
+	add("keybindings.editor.searchKeybindings", categoryPreferences, "Search Keybindings", ws((*workspace.Workspace).SearchKeybindings))
+	add("keybindings.editor.recordSearchKeys", categoryPreferences, "Record Keys", ws((*workspace.Workspace).RecordKeybindingSearchKeys))
+	add("settings.action.search", categoryPreferences, "Focus Settings Search", ws((*workspace.Workspace).SearchSettings))
 	add("workbench.action.closeActiveEditor", categoryView, "Close Editor", ws((*workspace.Workspace).CloseActiveTab))
 	add("workbench.action.closeAllEditors", categoryView, "Close All Editors", ws((*workspace.Workspace).CloseAllEditors))
 	add("workbench.action.closeEditorsInGroup", categoryView, "Close All Editors in Group", ws((*workspace.Workspace).CloseGroup))
@@ -79,6 +90,11 @@ func (a *App) registerWorkbenchCommands() {
 	add("workbench.view.explorer", categoryView, "Show Explorer", ws((*workspace.Workspace).FocusExplorer))
 	add("workbench.action.focusSideBar", categoryView, "Focus into Primary Side Bar", ws((*workspace.Workspace).FocusSideBar))
 	add("workbench.action.editor.changeLanguageMode", categoryView, "Change Language Mode", ws((*workspace.Workspace).ChangeLanguage))
+	add("explorer.openToSide", categoryExplorer, "Open to the Side", ws((*workspace.Workspace).OpenSelectedToSide))
+	add("list.find", categoryExplorer, "Find", ws((*workspace.Workspace).FindInExplorer))
+	add("filesExplorer.findInFolder", categoryExplorer, "Find in Folder...", ws((*workspace.Workspace).FindInSelectedFolder))
+	add("selectForCompare", categoryExplorer, "Select for Compare", ws((*workspace.Workspace).SelectForCompare))
+	add("compareFiles", categoryExplorer, "Compare with Selected", ws((*workspace.Workspace).CompareWithSelected))
 	add("workbench.files.action.showActiveFileInExplorer", categoryExplorer, "Reveal Active File in Explorer View", ws((*workspace.Workspace).RevealInSidebar))
 }
 
@@ -114,6 +130,30 @@ func (a *App) registerEditorGroupCommands() {
 	add("workbench.action.moveEditorRightInGroup", categoryView, "Move Editor Right", ws(func(w *workspace.Workspace) { w.MoveEditorInGroup(1) }))
 	add("workbench.action.nextEditor", categoryView, "Open Next Editor", ws(func(w *workspace.Workspace) { w.CycleTab(1) }))
 	add("workbench.action.previousEditor", categoryView, "Open Previous Editor", ws(func(w *workspace.Workspace) { w.CycleTab(-1) }))
+	for i := range maxEditorIndex {
+		n := strconv.Itoa(i + 1)
+		add("workbench.action.openEditorAtIndex"+n, categoryView, "Open Editor at Index "+n, ws(func(w *workspace.Workspace) { w.OpenEditorAtIndex(i) }))
+	}
+	add("workbench.action.lastEditorInGroup", categoryView, "Open Last Editor in Group", ws((*workspace.Workspace).LastEditorInGroup))
+	add("workbench.action.showAllEditors", categoryView, "Show All Editors by Appearance", ws((*workspace.Workspace).ShowAllEditors))
+	add("workbench.action.toggleMaximizeEditorGroup", categoryView, "Toggle Maximize Editor Group", ws((*workspace.Workspace).ToggleMaximizeEditorGroup))
+	add("workbench.action.evenEditorWidths", categoryView, "Reset Editor Group Sizes", ws((*workspace.Workspace).EvenEditorWidths))
+	add("workbench.action.toggleEditorWidths", categoryView, "Toggle Editor Group Sizes", ws((*workspace.Workspace).ToggleEditorWidths))
+	for _, r := range []struct {
+		id, title     string
+		delta         float32
+		width, height bool
+	}{
+		{"workbench.action.increaseViewSize", "Increase Current View Size", workspace.ViewSizeStep, true, true},
+		{"workbench.action.decreaseViewSize", "Decrease Current View Size", -workspace.ViewSizeStep, true, true},
+		{"workbench.action.increaseViewWidth", "Increase Current View Width", workspace.ViewSizeStep, true, false},
+		{"workbench.action.decreaseViewWidth", "Decrease Current View Width", -workspace.ViewSizeStep, true, false},
+		{"workbench.action.increaseViewHeight", "Increase Current View Height", workspace.ViewSizeStep, false, true},
+		{"workbench.action.decreaseViewHeight", "Decrease Current View Height", -workspace.ViewSizeStep, false, true},
+	} {
+		add(r.id, categoryView, r.title, ws(func(w *workspace.Workspace) { w.ResizeView(r.delta, r.width, r.height) }))
+	}
+	add("workbench.action.maximizeEditorHideSidebar", categoryView, "Maximize Editor Group and Hide Side Bars", ws((*workspace.Workspace).ToggleHideToolWindows))
 	for i, name := range []string{"First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth"} {
 		add("workbench.action.focus"+name+"EditorGroup", categoryView, "Focus "+name+" Editor Group", ws(func(w *workspace.Workspace) { w.FocusGroup(i) }))
 	}
@@ -142,6 +182,13 @@ func (a *App) registerPanelCommands() {
 	add("search.action.focusPreviousSearchResult", categorySearch, "Focus Previous Search Result", ws((*workspace.Workspace).PreviousSearchResult))
 	add("workbench.action.togglePanel", categoryView, "Toggle Panel Visibility", ws((*workspace.Workspace).TogglePanel))
 	add("workbench.action.togglePanelPosition", categoryView, "Toggle Panel Position", ws((*workspace.Workspace).TogglePanelPosition))
+	add("workbench.action.toggleMaximizedPanel", categoryView, "Toggle Maximized Panel", ws((*workspace.Workspace).ToggleMaximizedPanel))
+	add("breadcrumbs.focus", categoryView, "Focus Breadcrumbs", ws(func(w *workspace.Workspace) { w.FocusBreadcrumbs(false) }))
+	add("breadcrumbs.focusAndSelect", categoryView, "Focus and Select Breadcrumbs", ws(func(w *workspace.Workspace) { w.FocusBreadcrumbs(true) }))
+	add("editor.action.marker.next", "", "Go to Next Problem (Error, Warning, Info)", ws(func(w *workspace.Workspace) { w.GoToProblem(1, false) }))
+	add("editor.action.marker.prev", "", "Go to Previous Problem (Error, Warning, Info)", ws(func(w *workspace.Workspace) { w.GoToProblem(-1, false) }))
+	add("editor.action.marker.nextInFiles", "", "Go to Next Problem in Files (Error, Warning, Info)", ws(func(w *workspace.Workspace) { w.GoToProblem(1, true) }))
+	add("editor.action.marker.prevInFiles", "", "Go to Previous Problem in Files (Error, Warning, Info)", ws(func(w *workspace.Workspace) { w.GoToProblem(-1, true) }))
 	add("workbench.action.navigateBack", categoryGo, "Go Back", ws((*workspace.Workspace).NavigateBack))
 	add("workbench.action.navigateForward", categoryGo, "Go Forward", ws((*workspace.Workspace).NavigateForward))
 	add("workbench.action.navigateToLastEditLocation", categoryGo, "Go to Last Edit Location", ws((*workspace.Workspace).NavigateToLastEdit))
@@ -149,8 +196,12 @@ func (a *App) registerPanelCommands() {
 	add("workbench.action.focusPreviousPart", categoryView, "Focus Previous Part", ws((*workspace.Workspace).FocusPreviousPart))
 	add("notifications.showList", categoryView, "Show Notifications", ws((*workspace.Workspace).ToggleNotifications))
 	add("notifications.clearAll", categoryView, "Clear All Notifications", ws((*workspace.Workspace).ClearNotifications))
-	add("workbench.actions.view.problems", categoryView, "Show Problems", ws(func(w *workspace.Workspace) { w.ShowPanel(workspace.ProblemsPanel) }))
-	add("todo.show", categoryView, "Show TODO", ws(func(w *workspace.Workspace) { w.ShowPanel(workspace.TODOPanel) }))
+	add("notifications.hideList", categoryView, "Hide Notifications", ws((*workspace.Workspace).HideNotifications))
+	add("notifications.hideToasts", categoryView, "Hide Notification Toasts", ws((*workspace.Workspace).HideToasts))
+	add("notifications.focusToasts", categoryView, "Focus Notification Toast", ws((*workspace.Workspace).FocusToasts))
+	add("notifications.toggleDoNotDisturbMode", categoryView, "Toggle Do Not Disturb Mode", ws((*workspace.Workspace).ToggleDoNotDisturb))
+	add("workbench.actions.view.problems", categoryView, "Show Problems", ws(func(w *workspace.Workspace) { w.FocusPanel(workspace.ProblemsPanel) }))
+	add("todo.show", categoryView, "Show TODO", ws(func(w *workspace.Workspace) { w.FocusPanel(workspace.TODOPanel) }))
 	for _, act := range history.Actions {
 		add(act.ID, act.Category, act.Title, ws(func(w *workspace.Workspace) { w.RunHistory(act.ID) }))
 	}
@@ -185,7 +236,11 @@ func (a *App) registerEditorCommands() {
 		if cmd == editor.GoToLine || cmd == editor.GoToDefinition {
 			continue
 		}
-		add(keymap.EditorCommandID(cmd), categoryEditor, humanize(cmd.String()), ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))
+		title, ok := keymap.EditorTitle(cmd)
+		if !ok {
+			title = humanize(cmd.String())
+		}
+		add(keymap.EditorCommandID(cmd), categoryEditor, title, ws(func(w *workspace.Workspace) { w.RunEditor(cmd) }))
 	}
 }
 

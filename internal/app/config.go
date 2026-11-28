@@ -1,9 +1,13 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io/fs"
 	"log"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -13,6 +17,7 @@ import (
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/history"
 	"github.com/ZerGo0/editor/internal/keymap"
+	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/workspace"
 	"github.com/egoist/mygo"
@@ -53,6 +58,8 @@ func (a *App) loadConfig() {
 		ForgetFile:    a.store.RemoveRecentFile,
 		OpenFolder:    a.openFolder,
 		ForgetFolder:  a.removeRecent,
+		PickFolder:    func(parent *mygo.Window, title string) ([]string, error) { return a.pickPaths(parent, title, true) },
+		Global:        session.NewMemento(a.store.State.Views),
 	}
 	if !a.options.NoBackups {
 		a.env.BackupDir = filepath.Join(dir, dataDir, backupsDir)
@@ -70,6 +77,7 @@ func (a *App) watchConfig(ctx context.Context, dir string) {
 		return
 	}
 	defer watcher.Close()
+	last := readConfig(dir)
 	for {
 		events, err := watcher.Next(ctx)
 		if err != nil {
@@ -78,6 +86,11 @@ func (a *App) watchConfig(ctx context.Context, dir string) {
 		if !touchesConfig(events) {
 			continue
 		}
+		cur := readConfig(dir)
+		if slices.EqualFunc(cur, last, bytes.Equal) {
+			continue
+		}
+		last = cur
 		mygo.RunOnMain(func() {
 			a.settings.Reload()
 			a.keys.Reload()
@@ -93,6 +106,18 @@ func (a *App) openHistory(dir string) {
 		return
 	}
 	mygo.RunOnMain(func() { a.env.History = store })
+}
+
+func readConfig(dir string) [][]byte {
+	out := make([][]byte, 0, 2)
+	for _, name := range []string{settingsFile, keybindingsFile} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			data = []byte(err.Error())
+		}
+		out = append(out, data)
+	}
+	return out
 }
 
 func touchesConfig(events []mygo.FileEvent) bool {

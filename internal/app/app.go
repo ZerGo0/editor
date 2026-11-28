@@ -5,14 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/keymap"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/ZerGo0/editor/internal/telemetry"
 	"github.com/ZerGo0/editor/internal/workspace"
+	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/ZerGo0/editor/resources"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -26,6 +31,9 @@ const (
 	projectMinHeight = 400
 
 	transparentOpacity = 0
+
+	damagedSuffix       = " (damaged)"
+	revealInFinderLabel = "Reveal in Finder"
 )
 
 type Options struct {
@@ -46,22 +54,24 @@ type projectWindow struct {
 }
 
 type App struct {
-	options      Options
-	store        *session.Store
-	settings     *settings.Store
-	keys         *keymap.Store
-	commands     *command.Registry
-	env          *workspace.Env
-	projects     map[string]*projectWindow
-	welcome      *mygo.Window
-	recentList   ui.ListState
-	quitting     bool
-	focusSeq     uint64
-	ready        bool
-	launchFiles  []string
-	drawing      *workspace.Workspace
-	panicReloads map[string]int
-	wordWrapItem *mygo.MenuItem
+	options        Options
+	store          *session.Store
+	settings       *settings.Store
+	keys           *keymap.Store
+	commands       *command.Registry
+	env            *workspace.Env
+	projects       map[string]*projectWindow
+	welcome        *mygo.Window
+	home           welcomeState
+	quitting       bool
+	focusSeq       uint64
+	ready          bool
+	launchFiles    []string
+	drawing        *workspace.Workspace
+	panicReloads   map[string]int
+	menu           menuState
+	saveTimer      *time.Timer
+	damagedSession string
 }
 
 func New(options Options) *App {
@@ -91,6 +101,7 @@ func (a *App) Run(args []string) error {
 		a.quitting = true
 		a.store.State.Open = a.openRoots()
 		a.saveSession()
+		telemetry.Collect()
 	})
 	mygo.App.OnQuitCanceled(func() { a.quitting = false })
 	mygo.App.WhenReady(func() {
@@ -105,6 +116,7 @@ func (a *App) Run(args []string) error {
 		if !a.openArgs(args, wd) && !a.openLaunchFiles() {
 			a.restore()
 		}
+		a.reportDamagedSession()
 	})
 	return mygo.App.Run()
 }
@@ -117,12 +129,45 @@ func (a *App) loadSession() {
 	store, err := session.Load(path)
 	if err != nil {
 		log.Printf("load session: %v", err)
+		a.damagedSession = keepDamagedSession(path)
 	}
 	a.store = store
 }
 
+func keepDamagedSession(path string) string {
+	dest := strings.TrimSuffix(path, filepath.Ext(path)) + damagedSuffix + filepath.Ext(path)
+	if err := os.Rename(path, dest); err != nil {
+		log.Printf("keep damaged session: %v", err)
+		return ""
+	}
+	return dest
+}
+
+func (a *App) reportDamagedSession() {
+	kept := a.damagedSession
+	if kept == "" {
+		return
+	}
+	a.damagedSession = ""
+	const title = "Cannot read the list of recent projects"
+	detail := "The file was damaged, so the list starts empty. The damaged file is kept as " + fsutil.DisplayPath(kept) + "."
+	if pw := a.lastActiveWindow(); pw != nil {
+		pw.ws.Warn(title, detail, notices.Action{Label: revealInFinderLabel, Run: func() { mygo.Shell.ShowItemInFolder(kept) }})
+		return
+	}
+	parent := a.welcome
+	applog.Go(func() {
+		if _, err := mygo.Dialog.Message(mygo.MessageOptions{Parent: parent, Type: mygo.MessageWarning, Message: title, Detail: detail}); err != nil {
+			log.Printf("damaged session notice: %v", err)
+		}
+	})
+}
+
 func (a *App) saveSession() {
 	a.store.State.Commands = a.commands.Recent()
+	if a.env != nil {
+		a.store.State.Views = a.env.Global.Snapshot()
+	}
 	if err := a.store.Save(); err != nil {
 		log.Printf("save session: %v", err)
 	}
@@ -173,6 +218,7 @@ func (a *App) newWindow(o mygo.WindowOptions) *mygo.Window {
 		win.SetHasShadow(false)
 	}
 	if a.options.ShowUnfocused {
+		win.SetActiveAppearance(true)
 		win.ShowInactive()
 	}
 	return win
@@ -210,6 +256,7 @@ func (a *App) openProject(root string) *projectWindow {
 		Content:              ui.View(a.projectView(ws)),
 	})
 	ws.Attach(win)
+	a.watchFullScreen(win)
 	pw := &projectWindow{win: win, ws: ws}
 	ws.OnViewState = func(s workspace.ViewState) {
 		if a.workspaceFor(nil) == pw {
@@ -217,12 +264,14 @@ func (a *App) openProject(root string) *projectWindow {
 		}
 	}
 	ws.OnPanicLoop = func() { win.Update(func() { a.reloadAfterPanic(pw) }) }
+	ws.OnStateChange = a.sessionChanged
 	a.touchWindow(pw)
 	win.OnFocus(func() {
 		a.touchWindow(pw)
 		a.syncViewMenu()
 	})
 	a.projects[root] = pw
+	win.OnBlur(telemetry.CollectIfDue)
 	win.OnClose(func(e *mygo.CloseEvent) { a.confirmClose(pw, e) })
 	win.OnClosed(func() { a.projectClosed(root, pw) })
 	a.store.AddRecent(root)
@@ -292,6 +341,7 @@ func (a *App) inWorkspace(fn func(*workspace.Workspace)) func(*mygo.Window) {
 	return func(win *mygo.Window) {
 		if pw := a.workspaceFor(win); pw != nil {
 			pw.ws.Update(func() { fn(pw.ws) })
+			a.sessionChanged()
 		}
 	}
 }

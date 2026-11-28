@@ -10,5 +10,14 @@
       "mimeType": "text/plain",
       "role": "Editor"
     }
-  ]
+  ],
+  "macos": {
+    "infoPlist": {
+      "CFBundleDocumentTypes": [
+        {"CFBundleTypeName": "Folder", "CFBundleTypeRole": "Editor", "LSHandlerRank": "Alternate", "LSItemContentTypes": ["public.folder"]},
+        {"CFBundleTypeName": "Text Document", "CFBundleTypeRole": "Editor", "LSHandlerRank": "Default", "LSItemContentTypes": ["public.text", "public.source-code"]},
+        {"CFBundleTypeName": "Document", "CFBundleTypeRole": "Editor", "LSHandlerRank": "Alternate", "LSItemContentTypes": ["public.data"]}
+      ]
+    }
+  }
 }
