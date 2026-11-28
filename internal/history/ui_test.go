@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -23,6 +24,7 @@ const (
 )
 
 type fakeHost struct {
+	host.MemoryState
 	root    string
 	active  string
 	mu      sync.Mutex

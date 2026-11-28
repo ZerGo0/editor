@@ -263,7 +263,7 @@ func (p *mediaPane) transport(c *ui.Context, loaded bool) {
 		if pl.Playing() {
 			label, icon = "Pause", icons.Pause
 		}
-		if iconButton(c, "play", icon, label, !loaded) {
+		if action.IconClicked(c, icon, label, action.IconOptions{ID: "play", Disabled: !loaded}) {
 			p.toggle()
 		}
 		design.Text(c.Key("time"), formatClock(pl.Position())+" / "+formatClock(dur), token.TextLabel).Width(token.ClockWidth.Px()).SingleLine()

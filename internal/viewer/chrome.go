@@ -36,7 +36,7 @@ func (s *State) header(c *ui.Context) {
 	dpane.Toolbar(c, toolbarLabel, func(c *ui.Context) {
 		s.pane.controls(c)
 		design.Spacer(c)
-		if iconButton(c, "reveal", icons.Reveal, "Reveal in Finder", false) {
+		if action.IconClicked(c, icons.Reveal, "Reveal in Finder", action.IconOptions{ID: "reveal"}) {
 			s.reveal()
 		}
 		if action.Button(c, "Open With Default App", action.ButtonOptions{Variant: action.Ghost, Small: true, ID: "open-default"}).Clicked() {
@@ -78,8 +78,7 @@ func message(c *ui.Context, title, description, actionLabel string, onAction fun
 	})
 }
 
-var iconKeys = map[string]string{"Zoom In": "⌘=", "Zoom Out": "⌘-"}
-
-func iconButton(c *ui.Context, key string, svg *ui.SVG, label string, disabled bool) bool {
-	return action.IconButton(c, svg, label, action.IconOptions{ID: key, Disabled: disabled, Keys: iconKeys[label]}).Clicked()
-}
+const (
+	zoomInKeys  = "\u2318="
+	zoomOutKeys = "\u2318-"
+)

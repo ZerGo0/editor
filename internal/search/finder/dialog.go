@@ -42,7 +42,7 @@ const (
 	groupFiles          = "Files"
 	groupActions        = "Actions"
 	groupText           = "Text"
-	groupRecentlyOpened = "Recently Opened"
+	groupRecentlyOpened = "Recent"
 	groupFileResults    = "File Results"
 	groupRecentlyUsed   = "Recently Used"
 	groupOtherCommands  = "Other Commands"
@@ -120,6 +120,9 @@ func (d *Dialog) OpenReplace(seed string) {
 }
 
 func (d *Dialog) Close() {
+	if d.open && d.tab == TabText {
+		d.st.History.Add(d.st.Query)
+	}
 	d.open, d.confirm = false, false
 	d.stopSearch()
 	d.text.reset()

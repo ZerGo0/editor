@@ -2,6 +2,7 @@ package multidiff
 
 import (
 	"context"
+	"slices"
 
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
@@ -26,6 +27,7 @@ type Entry struct {
 	Size        int64
 	Fingerprint string
 	Binary      bool
+	Whole       bool
 	Note        string
 	Patch       *editor.FilePatch
 	Live        func() *editor.Buffer
@@ -62,9 +64,34 @@ type Viewed interface {
 	SetViewed(set string, e *Entry, on bool)
 }
 
-type Memory struct{ marked map[string]bool }
+const MaxViewedMarks = 100
 
-func NewMemory() *Memory { return &Memory{marked: map[string]bool{}} }
+type Memory struct {
+	marked map[string]bool
+	order  []string
+}
+
+func NewMemory(marks ...string) *Memory {
+	m := &Memory{marked: map[string]bool{}}
+	for _, key := range marks {
+		m.mark(key)
+	}
+	return m
+}
+
+func (m *Memory) Marks() []string { return slices.Clone(m.order) }
+
+func (m *Memory) mark(key string) {
+	if m.marked[key] {
+		return
+	}
+	m.marked[key] = true
+	m.order = append(m.order, key)
+	if len(m.order) > MaxViewedMarks {
+		delete(m.marked, m.order[0])
+		m.order = m.order[1:]
+	}
+}
 
 func memoryKey(set string, e *Entry) string {
 	return set + "\x00" + e.Path + "\x00" + e.Fingerprint
@@ -73,11 +100,15 @@ func memoryKey(set string, e *Entry) string {
 func (m *Memory) IsViewed(set string, e *Entry) bool { return m.marked[memoryKey(set, e)] }
 
 func (m *Memory) SetViewed(set string, e *Entry, on bool) {
+	key := memoryKey(set, e)
 	if on {
-		m.marked[memoryKey(set, e)] = true
+		m.mark(key)
 		return
 	}
-	delete(m.marked, memoryKey(set, e))
+	if m.marked[key] {
+		delete(m.marked, key)
+		m.order = slices.DeleteFunc(m.order, func(k string) bool { return k == key })
+	}
 }
 
 type Options struct {

@@ -3,6 +3,8 @@ package history
 import (
 	"fmt"
 	"time"
+
+	"github.com/ZerGo0/editor/internal/plural"
 )
 
 const (
@@ -20,21 +22,17 @@ func relativeTime(now, t time.Time) string {
 	case d < justNow:
 		return "just now"
 	case d < time.Hour:
-		return plural(int(d/time.Minute), "minute")
+		return ago(int(d/time.Minute), "minute")
 	case d < 24*time.Hour:
-		return plural(int(d/time.Hour), "hour")
+		return ago(int(d/time.Hour), "hour")
 	case d < daysPerWeek*24*time.Hour:
-		return plural(int(d/(24*time.Hour)), "day")
+		return ago(int(d/(24*time.Hour)), "day")
 	}
-	return plural(int(d/(daysPerWeek*24*time.Hour)), "week")
+	return ago(int(d/(daysPerWeek*24*time.Hour)), "week")
 }
 
-func plural(n int, unit string) string {
-	n = max(n, 1)
-	if n == 1 {
-		return fmt.Sprintf("1 %s ago", unit)
-	}
-	return fmt.Sprintf("%d %ss ago", n, unit)
+func ago(n int, unit string) string {
+	return plural.Count(max(n, 1), unit, unit+"s") + " ago"
 }
 
 func absoluteTime(now, t time.Time) string {

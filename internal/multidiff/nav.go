@@ -91,6 +91,7 @@ func (v *View) advance(order []int, pos, hunk, delta int) {
 func (v *View) aim(entry, hunk, delta int) {
 	e := &v.entries[entry]
 	v.nav = navTarget{key: e.Key, hunk: hunk, pending: true, delta: delta}
+	v.focus.caret = ""
 	if !v.isOpen(e) {
 		v.setOpen(e, true)
 		v.layoutRows()
@@ -135,6 +136,10 @@ func (v *View) marker(c *ui.Context, e *Entry, f *File) {
 	}
 	h = min(max(h, 0), len(hunks)-1)
 	v.nav.hunk, v.nav.pending = h, false
+	f.state.GoToHunk(h)
+	if v.focus.within {
+		f.state.Focus()
+	}
 	y := f.state.LineTop(editor.DiffNew, hunks[h].NewStart) - float64(filediff.Height())
 	ui.Box(c.Key("hunk-marker")).Absolute().Top(float32(max(y, 0))).Left(0).Width(token.BorderWidth.Px()).Height(token.BorderWidth.Px()).AccessHidden(true).
 		ScrollIntoView(ui.ScrollIntoViewOptions{Block: ui.ScrollStart})

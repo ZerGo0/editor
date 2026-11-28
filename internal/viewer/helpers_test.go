@@ -52,6 +52,10 @@ func (f *fakeHost) Notify(text string) {
 	f.notes = append(f.notes, text)
 }
 
+func (f *fakeHost) ShowError(title string, err error) {
+	f.Notify(title + ": " + err.Error())
+}
+
 func (f *fakeHost) OpenAt(path string, line, col int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

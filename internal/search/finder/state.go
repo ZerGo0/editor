@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/design/picker"
+	"github.com/ZerGo0/editor/internal/findwidget"
 )
 
 type Tab int
@@ -40,19 +41,20 @@ const (
 )
 
 type State struct {
-	Tab          string        `json:"tab,omitempty"`
-	Query        string        `json:"query,omitempty"`
-	MatchCase    bool          `json:"matchCase,omitempty"`
-	WholeWord    bool          `json:"wholeWord,omitempty"`
-	Regex        bool          `json:"regex,omitempty"`
-	Preview      bool          `json:"preview,omitempty"`
-	FileTypes    []string      `json:"fileTypes,omitempty"`
-	NonProject   bool          `json:"nonProject,omitempty"`
-	With         string        `json:"with,omitempty"`
-	PreserveCase bool          `json:"preserveCase,omitempty"`
-	ShowReplace  bool          `json:"showReplace,omitempty"`
-	Mask         string        `json:"mask,omitempty"`
-	Scope        string        `json:"scope,omitempty"`
-	Directory    string        `json:"directory,omitempty"`
-	Layout       picker.Layout `json:"layout"`
+	Tab          string             `json:"tab,omitempty"`
+	Query        string             `json:"query,omitempty"`
+	MatchCase    bool               `json:"matchCase,omitempty"`
+	WholeWord    bool               `json:"wholeWord,omitempty"`
+	Regex        bool               `json:"regex,omitempty"`
+	Preview      bool               `json:"preview,omitempty"`
+	FileTypes    []string           `json:"fileTypes,omitempty"`
+	NonProject   bool               `json:"nonProject,omitempty"`
+	With         string             `json:"with,omitempty"`
+	PreserveCase bool               `json:"preserveCase,omitempty"`
+	ShowReplace  bool               `json:"showReplace,omitempty"`
+	Mask         string             `json:"mask,omitempty"`
+	Scope        string             `json:"scope,omitempty"`
+	Directory    string             `json:"directory,omitempty"`
+	Layout       picker.Layout      `json:"layout"`
+	History      findwidget.History `json:"history,omitzero"`
 }

@@ -205,11 +205,11 @@ func (p *imagePane) controls(c *ui.Context) {
 	if p.pic == nil {
 		return
 	}
-	if iconButton(c, "zoom-out", icons.ZoomOut, "Zoom Out", false) {
+	if action.IconClicked(c, icons.ZoomOut, "Zoom Out", action.IconOptions{ID: "zoom-out", Keys: zoomOutKeys}) {
 		p.zoomStep(-1)
 	}
 	design.Text(c.Key("zoom-level"), fmt.Sprintf("%d%%", percentLabel(p.effective())), token.TextLabel).Width(token.ValueLabelWidth.Px()).TextAlign(ui.Center).SingleLine()
-	if iconButton(c, "zoom-in", icons.ZoomIn, "Zoom In", false) {
+	if action.IconClicked(c, icons.ZoomIn, "Zoom In", action.IconOptions{ID: "zoom-in", Keys: zoomInKeys}) {
 		p.zoomStep(1)
 	}
 	if action.Button(c, "Fit", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Fit to Window", ID: "fit"}).Clicked() {
@@ -224,7 +224,7 @@ func (p *imagePane) controls(c *ui.Context) {
 		if !p.player.Playing() {
 			label, icon = "Play", icons.Play
 		}
-		if iconButton(c, "animation", icon, label, false) {
+		if action.IconClicked(c, icon, label, action.IconOptions{ID: "animation"}) {
 			if p.player.Playing() {
 				p.player.Pause()
 			} else {

@@ -13,12 +13,15 @@ import (
 	"sync/atomic"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
 	DefaultMaxFileSize int64 = 10 << 20
 	DefaultLimit             = 2000
 	binarySniffBytes         = 8000
+	maxDefaultWorkers        = 4
 )
 
 type FileResult struct {
@@ -51,6 +54,8 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 		return Stats{}, fmt.Errorf("textsearch: nil matcher")
 	}
 	o = o.withDefaults()
+	ctx, span := telemetry.Start(ctx, telemetry.SpanTextSearch)
+	defer span.End()
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -75,6 +80,7 @@ func Search(ctx context.Context, m *Matcher, o Options, emit func(FileResult)) (
 	}
 	st.Files = int(counts.scanned.Load())
 	st.Skipped = int(counts.skipped.Load())
+	span.SetAttributes(attribute.Int("files", st.Files), attribute.Int("matched", st.Matched), attribute.Bool("truncated", st.Truncated))
 	return st, ctx.Err()
 }
 
@@ -86,7 +92,7 @@ func (o Options) withDefaults() Options {
 		o.Limit = DefaultLimit
 	}
 	if o.Workers <= 0 {
-		o.Workers = max(1, runtime.GOMAXPROCS(0)-1)
+		o.Workers = max(1, min(runtime.GOMAXPROCS(0)-1, maxDefaultWorkers))
 	}
 	return o
 }

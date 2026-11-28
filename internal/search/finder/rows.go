@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	removeRecentLabel = "Remove from Recently Opened"
+	removeRecentLabel = "Remove from Recent"
 	noEntry           = -1
 )
 

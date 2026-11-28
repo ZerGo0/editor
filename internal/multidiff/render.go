@@ -41,6 +41,9 @@ func (v *View) Render(c *ui.Context, o Options) {
 		}
 	}
 	if v.reveal != "" {
+		if v.focus.wanted {
+			v.focus.key = v.reveal
+		}
 		if i, ok := v.headerRow[v.reveal]; ok {
 			v.list.ScrollTo(i, ui.Start)
 		}
@@ -48,6 +51,11 @@ func (v *View) Render(c *ui.Context, o Options) {
 	}
 	root := ui.Column(c.Key("multidiff")).Fill()
 	v.width = root.Bounds().W
+	v.focus.within = root.FocusWithin()
+	root.OnShortcut(0, ui.KeyF7, func() { v.step(1) })
+	root.OnShortcut(ui.Shift, ui.KeyF7, func() { v.step(-1) })
+	root.OnShortcut(ui.Alt, ui.KeyF5, func() { v.step(1) })
+	root.OnShortcut(ui.Alt|ui.Shift, ui.KeyF5, func() { v.step(-1) })
 	root.Children(func() {
 		v.toolbar(c, o)
 		if v.treeShown() {
@@ -75,10 +83,6 @@ func (v *View) stack(c *ui.Context, o Options) {
 			v.body(r.Context, e, o)
 		}
 	})
-	c.OnWindowShortcut(0, ui.KeyF7, func() { v.step(1) })
-	c.OnWindowShortcut(ui.Shift, ui.KeyF7, func() { v.step(-1) })
-	c.OnWindowShortcut(ui.Alt, ui.KeyF5, func() { v.stepFile(1) })
-	c.OnWindowShortcut(ui.Alt|ui.Shift, ui.KeyF5, func() { v.stepFile(-1) })
 }
 
 func (v *View) rowKey(i int) any {
@@ -162,8 +166,21 @@ func (v *View) failure(c *ui.Context, e *Entry, f *File, o Options) {
 	feedback.Error(c, "Cannot load the diff of "+e.Path, f.err, func() { f.drop(); v.request(f, o) })
 }
 
-func placeholder(c *ui.Context, e *Entry) {
-	ui.Column(c).FillWidth().Height(placeholderHeight(e)).Clip().Children(func() { feedback.CodeSkeleton(c, loadingLabel) })
+func (v *View) placeholder(c *ui.Context, e *Entry, o Options) {
+	ui.Column(c).FillWidth().Height(placeholderHeight(e)).Clip().Children(func() {
+		feedback.DiffSkeleton(c, loadingLabel, e.Adds, e.Dels, func(d *editor.DiffState) { v.configure(d, e, o) })
+	})
+}
+
+func (v *View) configure(d *editor.DiffState, e *Entry, o Options) {
+	d.Layout = editor.DiffLayout(v.layout)
+	d.FitContent = true
+	if o.Configure != nil {
+		o.Configure(d, e.Path)
+	}
+	if e.Whole {
+		d.Layout, d.ExpandUnchanged = editor.DiffUnified, true
+	}
 }
 
 func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
@@ -178,13 +195,13 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 		f.stale = false
 	}
 	if !f.ready && !f.stale {
-		placeholder(c, e)
+		v.placeholder(c, e, o)
 		return
 	}
 	if f.state == nil || f.mode != diffmode.Session.Whitespace && e.Patch != nil {
 		if v.builds >= buildsPerFrame {
 			c.Invalidate()
-			placeholder(c, e)
+			v.placeholder(c, e, o)
 			return
 		}
 		if f.engine != nil {
@@ -197,10 +214,10 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	d, eng := f.state, f.engine
 	eng.Refresh()
 	if e.Patch == nil && !eng.Ready() {
-		placeholder(c, e)
+		v.placeholder(c, e, o)
 		return
 	}
-	if len(d.Hunks()) == 0 && !d.Comparing() {
+	if len(d.Hunks()) == 0 && !d.Comparing() && !e.Whole {
 		if diffmode.Session.Whitespace != git.WhitespaceNone {
 			v.note(c, whitespaceNote)
 		} else {
@@ -208,11 +225,7 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 		}
 		return
 	}
-	d.Layout = editor.DiffLayout(v.layout)
-	d.FitContent = true
-	if o.Configure != nil {
-		o.Configure(d, e.Path)
-	}
+	v.configure(d, e, o)
 	if e.Frame != nil {
 		e.Frame(d, eng)
 	}
@@ -222,7 +235,10 @@ func (v *View) diff(c *ui.Context, e *Entry, f *File, o Options) {
 	}
 	d.Annotations = eng.Annotations(base)
 	v.marker(c, e, f)
-	editor.DiffView(c.Key("diff:"+e.Key), d).FillWidth().Label(diffLabelPrefix + e.Path)
+	v.focus.claim(e.Key, d)
+	if editor.DiffView(c.Key("diff:"+e.Key), d).FillWidth().Label(diffLabelPrefix + e.Path).FocusWithin() {
+		v.focus.caret = e.Key
+	}
 }
 
 func (v *View) request(f *File, o Options) {

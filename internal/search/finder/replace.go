@@ -1,6 +1,7 @@
 package finder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -107,9 +108,15 @@ func (d *Dialog) apply(targets []replaceTarget) {
 		replaced += len(edits)
 		changed++
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := d.replaceProgress(len(disk), cancel)
 	applog.Go(func() {
+		defer cancel()
 		var errs []error
 		for _, t := range disk {
+			if ctx.Err() != nil {
+				break
+			}
 			path := t.file.Path
 			n, err := textsearch.ReplaceFile(path, m, repl, t.accept, 0, func() { d.beforeWrite(path) })
 			if err != nil {
@@ -121,8 +128,19 @@ func (d *Dialog) apply(targets []replaceTarget) {
 				changed++
 			}
 		}
-		h.Update(func() { d.replaceDone(replaced, changed, errors.Join(errs...)) })
+		stopped := ctx.Err() != nil
+		h.Update(func() {
+			done()
+			d.replaceDone(replaced, changed, errors.Join(errs...), stopped)
+		})
 	})
+}
+
+func (d *Dialog) replaceProgress(files int, cancel func()) func() {
+	if files == 0 || d.env.Progress == nil {
+		return func() {}
+	}
+	return d.env.Progress("Replacing in "+plural(files, "file")+"...", cancel)
 }
 
 func (d *Dialog) beforeWrite(path string) {
@@ -131,12 +149,15 @@ func (d *Dialog) beforeWrite(path string) {
 	}
 }
 
-func (d *Dialog) replaceDone(replaced, files int, err error) {
+func (d *Dialog) replaceDone(replaced, files int, err error, stopped bool) {
 	d.replacing = false
 	if err != nil {
 		d.env.Host.ShowError("Cannot replace in every file", err)
 	}
-	if replaced > 0 {
+	switch {
+	case stopped:
+		d.env.Host.Notify(fmt.Sprintf("Replace canceled after %s in %s", plural(replaced, "occurrence"), plural(files, "file")))
+	case replaced > 0:
 		d.env.Host.Notify(fmt.Sprintf("Replaced %s in %s", plural(replaced, "occurrence"), plural(files, "file")))
 	}
 	if d.open {

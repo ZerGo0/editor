@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/syntax"
+	"github.com/ZerGo0/editor/internal/telemetry"
 	"github.com/egoist/mygo/ui/editor"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -33,6 +35,8 @@ type Scanner struct {
 func (s *Scanner) Scan(ctx context.Context, rels []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	_, span := telemetry.Start(ctx, telemetry.SpanIndex, attribute.Int("files", len(rels)))
+	defer span.End()
 	if s.mtimes == nil {
 		s.mtimes = map[string]time.Time{}
 	}

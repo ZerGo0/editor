@@ -3,9 +3,12 @@ package shellcmd
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/review"
 )
 
 func setupHome(t *testing.T) string {
@@ -25,6 +28,28 @@ func writeForeign(t *testing.T, p string) {
 	}
 	if err := os.WriteFile(p, []byte("#!/bin/sh\necho foreign\n"), 0o755); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestScriptRunsReviewCommandsInTheForeground(t *testing.T) {
+	setupHome(t)
+	exe := filepath.Join(t.TempDir(), "fake editor")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\necho \"ran $*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path, err := Install(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range review.Commands {
+		out, err := exec.Command(path, name, "-json").Output()
+		if err != nil || string(out) != "ran "+name+" -json\n" {
+			t.Fatalf("%s output %q, err %v", name, out, err)
+		}
+	}
+	out, err := exec.Command(path, ".").Output()
+	if err != nil || len(out) != 0 {
+		t.Fatalf("opening a folder printed %q, err %v; want it in the background", out, err)
 	}
 }
 

@@ -82,7 +82,7 @@ func TestHeaderActions(t *testing.T) {
 	if err := tt.Click("Copy Path"); err != nil {
 		t.Fatal(err)
 	}
-	if tt.Clipboard() != s.path || h.lastNote() != "Path copied" {
+	if tt.Clipboard() != s.path || h.lastNote() != "Copied the path" {
 		t.Errorf("clipboard %q note %q", tt.Clipboard(), h.lastNote())
 	}
 }

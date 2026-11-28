@@ -142,7 +142,7 @@ func (s *State) redraw() { s.publish(func() {}) }
 func (s *State) system(args ...string) {
 	applog.Go(func() {
 		if err := s.run(openCommand, args...); err != nil {
-			s.publish(func() { s.h.Notify(err.Error()) })
+			s.publish(func() { s.h.ShowError("Cannot open "+filepath.Base(s.path), err) })
 		}
 	})
 }
@@ -155,5 +155,5 @@ func (s *State) openURL(url string) { s.system(url) }
 
 func (s *State) copyPath(c *ui.Context) {
 	c.WriteClipboard(s.path)
-	s.h.Notify("Path copied")
+	s.h.Notify("Copied the path")
 }

@@ -17,8 +17,6 @@ import (
 const (
 	keyNextChange = "F7"
 	keyPrevChange = "\u21e7F7"
-	keyNextFile   = "\u2325F5"
-	keyPrevFile   = "\u21e7\u2325F5"
 )
 
 var layoutNames = []string{"Side by Side", "Unified"}
@@ -56,8 +54,8 @@ func (v *View) toolbar(c *ui.Context, o Options) {
 		toolbarGroup(c, func() {
 			action.IconButton(c, icons.ChevronUp, "Previous Change", action.IconOptions{Keys: keyPrevChange, ID: "prev-change"}).OnClick(func() { v.step(-1) })
 			action.IconButton(c, icons.ChevronDown, "Next Change", action.IconOptions{Keys: keyNextChange, ID: "next-change"}).OnClick(func() { v.step(1) })
-			action.IconButton(c, icons.ArrowUp, "Previous File", action.IconOptions{Keys: keyPrevFile, Disabled: !v.hasFile(-1), ID: "prev-file"}).OnClick(func() { v.stepFile(-1) })
-			action.IconButton(c, icons.ArrowDown, "Next File", action.IconOptions{Keys: keyNextFile, Disabled: !v.hasFile(1), ID: "next-file"}).OnClick(func() { v.stepFile(1) })
+			action.IconButton(c, icons.ArrowUp, "Previous File", action.IconOptions{Disabled: !v.hasFile(-1), ID: "prev-file"}).OnClick(func() { v.stepFile(-1) })
+			action.IconButton(c, icons.ArrowDown, "Next File", action.IconOptions{Disabled: !v.hasFile(1), ID: "next-file"}).OnClick(func() { v.stepFile(1) })
 		})
 		toolbarSeparator(c)
 		toolbarGroup(c, func() {

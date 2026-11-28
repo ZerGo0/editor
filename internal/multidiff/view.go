@@ -51,6 +51,7 @@ type View struct {
 	opts       Options
 	builds     int
 	width      float32
+	focus      focusState
 	Stats      Stats
 }
 
@@ -59,6 +60,19 @@ func New() *View {
 }
 
 func (v *View) Entries() []Entry { return v.entries }
+
+func (v *View) Layout() int { return v.layout }
+
+func (v *View) SetLayout(layout int) { v.layout = layout }
+
+func (v *View) Tree() (width float32, shown bool) { return v.tree.width, v.tree.shown }
+
+func (v *View) SetTree(width float32, shown bool) {
+	if width > 0 {
+		v.tree.width = width
+	}
+	v.tree.shown, v.tree.forced = shown, false
+}
 
 func (v *View) SetEntries(entries []Entry) {
 	old := v.files

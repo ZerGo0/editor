@@ -535,7 +535,7 @@ func (p *hexPane) copySelection(asHex bool) {
 				return
 			}
 			if err != nil {
-				p.s.h.Notify(err.Error())
+				p.s.h.ShowError("Cannot copy the bytes", err)
 				return
 			}
 			text, kind := hexdump.HexString(data), "hex"

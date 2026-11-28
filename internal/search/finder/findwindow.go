@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
+	pl "github.com/ZerGo0/editor/internal/plural"
 	"github.com/ZerGo0/editor/internal/search/textsearch"
 	"github.com/egoist/mygo/ui"
 )
@@ -136,13 +137,10 @@ func (f *FindWindow) summary() string {
 }
 
 func plural(n int, noun string) string {
-	if n == 1 {
-		return "1 " + noun
-	}
 	if noun == "match" {
-		return strconv.Itoa(n) + " matches"
+		return pl.Count(n, noun, "matches")
 	}
-	return strconv.Itoa(n) + " " + noun + "s"
+	return pl.Count(n, noun, noun+"s")
 }
 
 func (f *FindWindow) empty(c *ui.Context) {

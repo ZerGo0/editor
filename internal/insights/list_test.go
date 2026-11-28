@@ -66,7 +66,7 @@ func TestListFilterAndCollapse(t *testing.T) {
 	}
 	l.Filter = "nothing matches"
 	tt.Frame()
-	if !tt.HasText("No results match the filter.") {
+	if !tt.HasText("No matching results") {
 		t.Fatal("no empty filter state")
 	}
 	if err := tt.Click("Clear Filter"); err != nil {

@@ -26,6 +26,7 @@ const (
 	allTypesLabel         = "All File Types"
 	nonProjectLabel       = "Include Non-Project Items"
 	searchingText         = "Searching..."
+	noMatchingResults     = "No matching results"
 	placeholderAsideWords = 2
 	placeholderLineWords  = 3
 	pageRows              = token.SearchPopupRows - 1
@@ -42,6 +43,13 @@ const (
 	placeholderFiles      = "Search files by name (type ? for help)"
 	placeholderText       = "Type the text to search for"
 )
+
+var pickerTabs = [tabCount]picker.Tab{
+	{Title: tabTitles[TabAll], Command: "workbench.action.searchEverywhere"},
+	{Title: tabTitles[TabActions], Command: "workbench.action.showCommands"},
+	{Title: tabTitles[TabFiles], Command: "workbench.action.quickOpen"},
+	{Title: tabTitles[TabText], Command: "workbench.action.findInFiles"},
+}
 
 func (d *Dialog) label() string {
 	switch d.tab {
@@ -124,7 +132,7 @@ func (d *Dialog) previewable(row int) bool {
 
 func (d *Dialog) body(c *ui.Context, label string) {
 	tab := int(d.tab)
-	picker.Header(c, func() { picker.Tabs(c, scopeLabel, &tab, tabTitles[:]) }, func() { d.headerActions(c) })
+	d.st.Layout.Grip(picker.Header(c, func() { picker.Tabs(c, scopeLabel, &tab, pickerTabs[:]) }, func() { d.headerActions(c) }))
 	if tab != int(d.tab) {
 		d.setTab(Tab(tab))
 	}
@@ -144,7 +152,7 @@ func (d *Dialog) body(c *ui.Context, label string) {
 	if d.tab == TabText {
 		d.optionsRow(c)
 	}
-	results := picker.ResultsOptions{Label: resultsLabel, Fill: true, Empty: d.emptyState}
+	results := picker.ResultsOptions{Label: resultsLabel, Fill: true, Empty: d.emptyState, Input: &d.field, Busy: d.busy()}
 	clicked := noEntry
 	if d.previewShown() {
 		results.OnSelect = func(row int) {
@@ -189,8 +197,23 @@ func (d *Dialog) handleKeys(c *ui.Context, k picker.Keys) {
 		d.accept(d.results.Selected, true)
 	case k.Submitted:
 		d.accept(d.results.Selected, false)
+	case k.Older:
+		d.recall(c, d.st.History.Prev)
+	case k.Newer:
+		d.recall(c, d.st.History.Next)
 	}
 	if k.Changed {
+		d.queryChanged()
+		c.Invalidate()
+	}
+}
+
+func (d *Dialog) recall(c *ui.Context, step func(string) (string, bool)) {
+	if d.tab != TabText {
+		return
+	}
+	if q, ok := step(d.st.Query); ok {
+		d.st.Query = q
 		d.queryChanged()
 		c.Invalidate()
 	}
@@ -264,7 +287,7 @@ func (d *Dialog) emptyState(c *ui.Context) {
 		d.settled = d.hint()
 		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})
 	default:
-		d.settled = "No results for " + quote(firstLine(q))
+		d.settled = noMatchingResults
 		feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: d.settled})
 	}
 }
@@ -274,11 +297,6 @@ func (d *Dialog) hint() string {
 }
 
 func quote(s string) string { return strconv.Quote(s) }
-
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(s, "\n")
-	return line
-}
 
 type FindResults struct {
 	Title string

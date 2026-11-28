@@ -37,7 +37,6 @@ type page struct {
 	versions []Version
 	list     ui.ListState
 	selected int
-	split    float32
 
 	disk     *editor.Buffer
 	deleted  bool
@@ -49,7 +48,7 @@ type page struct {
 }
 
 func newPage(path string) *page {
-	p := &page{path: path, selected: -1, split: listWidth}
+	p := &page{path: path, selected: -1}
 	p.list.Selected = &p.selected
 	p.list.Key = func(i int) any { return p.versions[i].Hash + p.versions[i].Time.String() }
 	p.list.Label = func(i int) string {
@@ -179,7 +178,7 @@ func (u *UI) pageView(c *ui.Context, p *page) {
 				feedback.Empty(c, feedback.EmptyOptions{Icon: icons.History, Title: "No history yet", Message: emptyMessage})
 			})
 		default:
-			ui.Split(c, &p.split, func() { u.versionList(c, p) }, func() { u.detail(c, p) }).SplitReset(listWidth).Fill()
+			ui.Split(c, &u.split, func() { u.versionList(c, p) }, func() { u.detail(c, p) }).SplitReset(listWidth).Fill()
 		}
 	})
 }
@@ -244,7 +243,7 @@ func (u *UI) toolbar(c *ui.Context, p *page) {
 		}
 		if action.Button(c, "Copy", action.ButtonOptions{Variant: action.Ghost, Small: true, Disabled: !ready}).Clicked() {
 			u.copyText(p.oldText)
-			u.h.Notify("Copied version text")
+			u.h.Notify("Copied the version text")
 		}
 		if action.Button(c, "Put Label...", action.ButtonOptions{Variant: action.Ghost, Small: true, Tooltip: "Label the Current Text"}).Clicked() {
 			u.PutLabel(p.path)

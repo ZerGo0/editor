@@ -372,6 +372,13 @@ func TestChangeKeysStepThroughHunks(t *testing.T) {
 	r := newRig(t, entries)
 	r.tt.Key(0, ui.KeyF7)
 	r.settle()
+	if r.v.nav.key != "" {
+		t.Fatalf("F7 without focus in the view aimed at %q", r.v.nav.key)
+	}
+	r.tt.Key(0, ui.KeyTab)
+	r.settle()
+	r.tt.Key(0, ui.KeyF7)
+	r.settle()
 	if r.v.nav.key != entries[0].Key {
 		t.Fatalf("first F7 aimed at %q", r.v.nav.key)
 	}
@@ -387,14 +394,77 @@ func TestChangeKeysStepThroughHunks(t *testing.T) {
 	}
 }
 
-func TestFileKeysStepThroughFiles(t *testing.T) {
+func TestAltF5StepsThroughChanges(t *testing.T) {
 	t.Parallel()
 	entries := testEntries(t, 5)
 	r := newRig(t, entries)
+	r.tt.Key(0, ui.KeyTab)
+	r.settle()
 	r.tt.Key(ui.Alt, ui.KeyF5)
 	r.settle()
+	r.tt.Key(ui.Alt, ui.KeyF5)
+	r.settle()
+	if r.v.nav.key != entries[1].Key {
+		t.Fatalf("second Alt+F5 aimed at %q", r.v.nav.key)
+	}
+	r.tt.Key(ui.Alt|ui.Shift, ui.KeyF5)
+	r.settle()
+	if r.v.nav.key != entries[0].Key {
+		t.Errorf("Shift+Alt+F5 aimed at %q", r.v.nav.key)
+	}
+}
+
+func TestNextFileButtonStepsThroughFiles(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 5)
+	r := newRig(t, entries)
+	if err := r.tt.Click("Next File"); err != nil {
+		t.Fatal(err)
+	}
+	r.settle()
 	if got := r.v.Top(); got != entries[1].Key {
-		t.Errorf("Alt+F5 moved to %q", got)
+		t.Errorf("Next File moved to %q", got)
+	}
+}
+
+func TestCaretFollowsTheChangeKeys(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 3)
+	r := newRig(t, entries)
+	if path, line, ok := r.v.Caret(); !ok || path != entries[0].Path || line != -1 {
+		t.Fatalf("caret before navigation = %q %d %v", path, line, ok)
+	}
+	r.tt.Key(0, ui.KeyTab)
+	r.settle()
+	r.tt.Key(0, ui.KeyF7)
+	r.tt.Key(0, ui.KeyF7)
+	r.settle()
+	if path, line, ok := r.v.Caret(); !ok || path != entries[1].Path || line != 0 {
+		t.Errorf("caret after two F7 = %q %d %v, want %q 0", path, line, ok, entries[1].Path)
+	}
+}
+
+func TestFocusGoesToTheRevealedDiff(t *testing.T) {
+	t.Parallel()
+	entries := testEntries(t, 3)
+	r := newRig(t, entries)
+	r.v.RevealPath(entries[1].Path)
+	r.v.Focus()
+	r.settle()
+	if !r.v.Focused() || r.v.focus.caret != entries[1].Key {
+		t.Errorf("focused %v in %q, want %q", r.v.Focused(), r.v.focus.caret, entries[1].Key)
+	}
+}
+
+func TestNewSideLineMapsOldLines(t *testing.T) {
+	t.Parallel()
+	hunks := []editor.DiffHunk{{OldStart: 1, OldEnd: 2, NewStart: 1, NewEnd: 4}, {OldStart: 3, OldEnd: 4, NewStart: 5, NewEnd: 5}}
+	tests := []struct{ old, want int }{{0, 0}, {1, 1}, {2, 4}, {3, 5}, {4, 5}}
+	for _, tt := range tests {
+		got := newLineOf(hunks, tt.old)
+		if got != tt.want {
+			t.Errorf("old line %d maps to %d, want %d", tt.old, got, tt.want)
+		}
 	}
 }
 

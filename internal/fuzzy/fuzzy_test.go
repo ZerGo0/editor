@@ -162,3 +162,27 @@ func BenchmarkFilter(b *testing.B) {
 		Filter("mod hand", count, text)
 	}
 }
+
+func TestFindMatchesAcrossUnicodeNormalForms(t *testing.T) {
+	const nfc, nfd = "caf\u00e9.txt", "cafe\u0301.txt"
+	tests := []struct {
+		pattern, text string
+		want          []int
+	}{
+		{"caf\u00e9", nfd, []int{0, 1, 2, 3}},
+		{"cafe\u0301", nfc, []int{0, 1, 2, 3}},
+		{"\u00e9t", nfd, []int{3, 6}},
+		{"txt", nfd, []int{6, 7, 8}},
+	}
+	for _, tt := range tests {
+		m, ok := Find(tt.pattern, tt.text)
+		if !ok || !reflect.DeepEqual(m.Positions, tt.want) {
+			t.Errorf("Find(%q, %q) = %v, %v; want %v", tt.pattern, tt.text, m.Positions, ok, tt.want)
+		}
+	}
+	names := []string{"cafe.txt", nfd, "notes.md"}
+	got := Filter("caf\u00e9", len(names), func(i int) string { return names[i] })
+	if len(got) != 1 || got[0].Index != 1 {
+		t.Fatalf("Filter(café) = %+v, want only the decomposed name", got)
+	}
+}

@@ -14,7 +14,7 @@ import (
 
 const (
 	noGroup      = -1
-	filterNoHits = "No results match the filter."
+	filterNoHits = "No matching results"
 	clearFilter  = "Clear Filter"
 )
 
@@ -49,6 +49,14 @@ type List struct {
 	byPath    map[string]int
 	roots     []rowKey
 	seen      map[string]bool
+}
+
+func (l *List) Focus() bool {
+	if len(l.roots) == 0 {
+		return false
+	}
+	l.state.List.Handle.Focus()
+	return true
 }
 
 func (l *List) CollapseAll() {
@@ -200,11 +208,14 @@ func (l *List) copy(c *ui.Context, k rowKey, rel func(string) string, message bo
 		return
 	}
 	text := e.Title
-	if !message {
+	switch {
+	case !message && e.Line < 0:
+		text = fmt.Sprintf("%s: %s", rel(k.path), e.Title)
+	case !message:
 		text = fmt.Sprintf("%s:%d:%d: %s", rel(k.path), e.Line+1, e.Col+1, e.Title)
-		if e.Detail != "" {
-			text += " (" + e.Detail + ")"
-		}
+	}
+	if !message && e.Detail != "" {
+		text += " (" + e.Detail + ")"
 	}
 	c.WriteClipboard(text)
 }
@@ -242,10 +253,14 @@ func (l *List) entryItem(c *ui.Context, k rowKey, rel func(string) string, open 
 	if !ok {
 		return list.Item{}
 	}
-	detail := fmt.Sprintf("[Ln %d, Col %d]", e.Line+1, e.Col+1)
+	var parts []string
 	if e.Detail != "" {
-		detail = e.Detail + "  " + detail
+		parts = append(parts, e.Detail)
 	}
+	if e.Line >= 0 {
+		parts = append(parts, fmt.Sprintf("[Ln %d, Col %d]", e.Line+1, e.Col+1))
+	}
+	detail := strings.Join(parts, "  ")
 	it := list.Item{
 		Label:       e.Title,
 		Description: detail,

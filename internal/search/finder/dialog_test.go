@@ -30,9 +30,10 @@ func TestTabKeysSwitchTabsAndKeepQuery(t *testing.T) {
 		t.Fatalf("tab %v; want Text after three Tab keys", f.dialog.Tab())
 	}
 	f.key(0, ui.KeyTab)
-	if f.dialog.Tab() != TabAll {
-		t.Fatalf("tab %v; want All after wrapping", f.dialog.Tab())
+	if f.dialog.Tab() != TabText {
+		t.Fatalf("tab %v; want Tab to move the focus inside the Find in Files form", f.dialog.Tab())
 	}
+	f.open(TabAll, "")
 	f.key(ui.Shift, ui.KeyTab)
 	if f.dialog.Tab() != TabText || f.dialog.Query() != "serv" {
 		t.Fatalf("after Shift+Tab: tab %v query %q; want Text and serv", f.dialog.Tab(), f.dialog.Query())

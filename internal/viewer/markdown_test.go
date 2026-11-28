@@ -2,6 +2,7 @@ package viewer
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -56,7 +57,7 @@ func TestMarkdownLinks(t *testing.T) {
 		t.Fatalf("opened %+v, want %s", h.opened, other)
 	}
 	p.link("missing.md")
-	if len(h.opened) != 1 || h.lastNote() != "Cannot open missing.md: file not found" {
+	if len(h.opened) != 1 || !strings.HasPrefix(h.lastNote(), "Cannot open missing.md: ") {
 		t.Errorf("opened %+v note %q", h.opened, h.lastNote())
 	}
 	select {

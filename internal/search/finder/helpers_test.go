@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/search/everywhere"
 	"github.com/ZerGo0/editor/internal/search/files"
@@ -26,6 +27,7 @@ const (
 )
 
 type fakeHost struct {
+	host.MemoryState
 	root    string
 	buffers map[string]*editor.Buffer
 	active  string

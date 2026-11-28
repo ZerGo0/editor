@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/fsutil"
+	"github.com/ZerGo0/editor/internal/review"
 )
 
 const (
@@ -81,7 +82,8 @@ func checkOwned(path string) error {
 }
 
 func script(executable string) string {
-	return fmt.Sprintf("#!/bin/sh\n%s\nnohup %s \"$@\" >/dev/null 2>&1 &\n", marker, Quote(executable))
+	exe := Quote(executable)
+	return fmt.Sprintf("#!/bin/sh\n%s\ncase \"$1\" in %s) exec %s \"$@\" ;; esac\nnohup %s \"$@\" >/dev/null 2>&1 &\n", marker, strings.Join(review.Commands, "|"), exe, exe)
 }
 
 func Quote(s string) string {

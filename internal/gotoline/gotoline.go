@@ -9,6 +9,7 @@ import (
 
 const (
 	NoEditor        = "Open a text editor first to go to a line."
+	Placeholder     = "Type the line number and optional column to go to (e.g. 42:5 for line 42 and column 5)."
 	separators      = ",:#"
 	firstLine       = 1
 	singleLineHelp  = "Current Line: %d, Character: %d. Type a line number to navigate to."

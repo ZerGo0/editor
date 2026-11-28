@@ -143,7 +143,7 @@ func (p *markdownPane) openRelative(target string) {
 		path = filepath.Join(filepath.Dir(p.s.path), path)
 	}
 	if _, err := os.Stat(path); err != nil {
-		p.s.h.Notify("Cannot open " + target + ": file not found")
+		p.s.h.ShowError("Cannot open "+target, err)
 		return
 	}
 	p.s.h.OpenAt(path, 0, 0)

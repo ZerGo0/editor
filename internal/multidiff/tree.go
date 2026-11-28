@@ -190,7 +190,7 @@ func (v *View) treeItem(r treeRow) list.Item {
 	e := &v.entries[r.entry]
 	it := list.Item{
 		Label: r.name, Depth: r.depth, Git: e.Status, Tooltip: e.Path, Muted: v.viewed(e),
-		Leading: func(c *ui.Context) { icons.FileIcon(c, r.name, false, false, token.IconSize.Px()) },
+		Leading: func(c *ui.Context) { icons.FileIcon(c, r.name, false, false, token.IconSize.Px()) }, LeadingWidth: token.IconSize.Px(),
 		OnClick: func() { v.Reveal(e.Key) },
 	}
 	if e.Adds != CountUnknown {

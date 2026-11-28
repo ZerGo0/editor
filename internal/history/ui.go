@@ -25,6 +25,7 @@ const (
 	beforeRevertLabel = "Before revert"
 	revertedLabel     = "Reverted"
 	defaultFilePerm   = fs.FileMode(0o644)
+	splitStateKey     = "history.split"
 )
 
 type Action struct {
@@ -48,19 +49,27 @@ type UI struct {
 	now      func() time.Time
 	confirm  func(parent *mygo.Window, name string, at time.Time) bool
 	copyText func(text string)
+	split    float32
 
 	lowDiskNotified bool
 }
 
 func NewUI(h host.Host, s *Store) *UI {
-	return &UI{
+	u := &UI{
 		h:        h,
 		store:    s,
 		pages:    map[string]*page{},
 		now:      time.Now,
 		confirm:  confirmRevert,
 		copyText: mygo.Clipboard.WriteText,
+		split:    listWidth,
 	}
+	state := h.ProjectState()
+	if !state.Load(splitStateKey, &u.split) || u.split <= 0 {
+		u.split = listWidth
+	}
+	state.Track(splitStateKey, func() any { return u.split })
+	return u
 }
 
 func confirmRevert(parent *mygo.Window, name string, at time.Time) bool {
@@ -102,7 +111,7 @@ func (u *UI) reportAuto(err error) {
 			u.h.Notify("Local History paused: low disk space.")
 		}
 	default:
-		u.h.Notify("Local History: " + err.Error())
+		u.h.ShowError("Local History cannot save a version", err)
 	}
 }
 

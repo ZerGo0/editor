@@ -15,7 +15,7 @@ import (
 
 const (
 	itemFiles       = 12
-	noResultsPrefix = "No results for"
+	noResultsPrefix = "No matching results"
 )
 
 type shot struct {

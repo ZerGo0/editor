@@ -44,6 +44,7 @@ type Env struct {
 	ToolWindows     func() []ToolWindow
 	BeforeWrite     func(path string)
 	ShowFindResults func(res FindResults)
+	Progress        func(title string, cancel func()) (done func())
 	WindowKeys      focus.Keys
 }
 

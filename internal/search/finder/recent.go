@@ -14,10 +14,10 @@ import (
 
 const (
 	recentLabel       = "Recent Files"
-	toolWindowsGroup  = "Tool Windows"
-	recentPlaceholder = "Type to filter recent files and tool windows"
+	toolWindowsGroup  = "Views"
+	recentPlaceholder = "Type to filter recent files and views"
 	recentID          = "recent"
-	recentListLabel   = "Recent files and tool windows"
+	recentListLabel   = "Recent files and views"
 )
 
 type recentRow struct {
@@ -135,13 +135,13 @@ func (r *RecentFiles) body(c *ui.Context) {
 	case keys.Submitted:
 		r.accept(r.results.Selected)
 	}
-	if i := picker.Results(c, &r.results, r.rows, picker.ResultsOptions{Label: recentListLabel, Empty: r.empty}); i >= 0 && r.open {
+	if i := picker.Results(c, &r.results, r.rows, picker.ResultsOptions{Label: recentListLabel, Empty: r.empty, Input: &r.field}); i >= 0 && r.open {
 		r.accept(i)
 	}
 }
 
 func (r *RecentFiles) empty(c *ui.Context) {
-	feedback.Empty(c, feedback.EmptyOptions{Icon: icons.History, Title: "No recent files or tool windows"})
+	feedback.Empty(c, feedback.EmptyOptions{Icon: icons.History, Title: "No recent files or views"})
 }
 
 func (r *RecentFiles) accept(row int) {

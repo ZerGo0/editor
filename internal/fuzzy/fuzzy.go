@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -37,7 +39,52 @@ type term struct {
 }
 
 func Find(pattern, text string) (Match, bool) {
-	return matchText(parse(pattern), []rune(text))
+	var t normalized
+	t.set(text)
+	return t.match(parse(pattern))
+}
+
+type normalized struct {
+	runes  []rune
+	origin []int
+}
+
+func (n *normalized) set(s string) {
+	n.runes, n.origin = n.runes[:0], n.origin[:0]
+	if norm.NFC.IsNormalString(s) {
+		for _, r := range s {
+			n.runes = append(n.runes, r)
+		}
+		n.origin = nil
+		return
+	}
+	var it norm.Iter
+	it.InitString(norm.NFC, s)
+	at := 0
+	for !it.Done() {
+		start := it.Pos()
+		seg := it.Next()
+		count := utf8.RuneCountInString(s[start:it.Pos()])
+		k := 0
+		for _, r := range string(seg) {
+			n.runes = append(n.runes, r)
+			n.origin = append(n.origin, at+min(k, count-1))
+			k++
+		}
+		at += count
+	}
+}
+
+func (n *normalized) match(terms []term) (Match, bool) {
+	m, ok := matchText(terms, n.runes)
+	if !ok || n.origin == nil || len(m.Positions) == 0 {
+		return m, ok
+	}
+	for i, p := range m.Positions {
+		m.Positions[i] = n.origin[p]
+	}
+	m.Positions = dedupe(m.Positions)
+	return m, true
 }
 
 func Filter(pattern string, n int, text func(i int) string) []Result {
@@ -50,11 +97,11 @@ func Filter(pattern string, n int, text func(i int) string) []Result {
 		return results
 	}
 	lengths := make([]int, 0, n)
-	var buf []rune
+	var buf normalized
 	for i := 0; i < n; i++ {
 		s := text(i)
-		buf = append(buf[:0], []rune(s)...)
-		if m, ok := matchText(terms, buf); ok {
+		buf.set(s)
+		if m, ok := buf.match(terms); ok {
 			results = append(results, Result{Index: i, Match: m})
 			lengths = append(lengths, len(s))
 		}
@@ -88,7 +135,7 @@ func (o *resultOrder) Less(i, j int) bool {
 }
 
 func parse(pattern string) []term {
-	fields := strings.Fields(pattern)
+	fields := strings.Fields(norm.NFC.String(pattern))
 	terms := make([]term, len(fields))
 	for i, field := range fields {
 		caseSensitive := strings.IndexFunc(field, unicode.IsUpper) >= 0

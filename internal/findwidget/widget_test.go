@@ -22,15 +22,19 @@ type harness struct {
 	tt *ui.Tester
 }
 
-func newHarness(t *testing.T, text string, readOnly bool) *harness {
-	t.Helper()
-	st := &editor.State{Buffer: editor.NewBuffer(text), ReadOnly: readOnly}
-	st.RenderFindBar = ForEditor(st)
+func editorTester(st *editor.State) *ui.Tester {
 	tt := ui.NewTester(func(c *ui.Context) {
 		ui.Column(c).Fill().Children(func() { editor.View(c, st).Grow(1) })
 	}, testW, testH)
 	tt.Frame()
-	return &harness{t: t, st: st, tt: tt}
+	return tt
+}
+
+func newHarness(t *testing.T, text string, readOnly bool) *harness {
+	t.Helper()
+	st := &editor.State{Buffer: editor.NewBuffer(text), ReadOnly: readOnly}
+	st.RenderFindBar = ForEditor(st, nil)
+	return &harness{t: t, st: st, tt: editorTester(st)}
 }
 
 func (h *harness) open(cmd editor.Command) {
@@ -277,7 +281,7 @@ func TestStatusAndDisabledButtons(t *testing.T) {
 func TestReadOnlyDisablesReplace(t *testing.T) {
 	h := newHarness(t, "alpha", true)
 	h.open(editor.FindReplace)
-	info, ok := h.tt.AccessByRole(ui.RoleButton, toggleReplaceLabel)
+	info, ok := h.tt.AccessByRole(ui.RoleDisclosure, toggleReplaceLabel)
 	if !ok || !info.Disabled {
 		t.Fatalf("toggle replace = %+v in a read-only editor, want disabled", info)
 	}
@@ -294,7 +298,7 @@ func TestToggleReplace(t *testing.T) {
 	}
 	h.tt.Frame()
 	h.field(replaceLabel)
-	if info, _ := h.tt.AccessByRole(ui.RoleButton, toggleReplaceLabel); !info.Expanded {
+	if info, _ := h.tt.AccessByRole(ui.RoleDisclosure, toggleReplaceLabel); !info.Expanded {
 		t.Fatal("toggle replace does not report it is expanded")
 	}
 }
