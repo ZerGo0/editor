@@ -16,7 +16,7 @@ import (
 
 func chooseMore(t *testing.T, tt *ui.Tester, item string) {
 	t.Helper()
-	ghtest.MustClick(t, tt, "More actions")
+	ghtest.MustClick(t, tt, "More Actions")
 	if err := tt.ChooseMenuItem(item); err != nil {
 		t.Fatalf("menu %q: %v (menu %q)", item, err, tt.Menu())
 	}
@@ -256,7 +256,7 @@ func TestPickerLoadFailureShowsError(t *testing.T) {
 	hs.p.openLabelPicker(d)
 	hs.h.Pump(t, func() bool { return !hs.p.picker.loading })
 	tt.Frame()
-	ghtest.MustHaveText(t, tt, "GitHub answered 500: boom")
+	ghtest.MustHaveText(t, tt, "GitHub is not responding right now. Try again later.")
 }
 
 func TestReactionsToggle(t *testing.T) {
@@ -704,11 +704,11 @@ func TestReviewModeHidesViewedFilesAndHandlesStates(t *testing.T) {
 	ghtest.MustHaveText(t, tt, "Every file is marked as viewed.")
 	hs.p.details[prNumber].files = nil
 	tt.Frame()
-	ghtest.MustHaveText(t, tt, "No changed files.")
+	ghtest.MustHaveText(t, tt, "No changes.")
 	d := hs.p.details[prNumber]
 	d.loaded, d.err = false, &github.APIError{Status: 500, Message: "boom"}
 	tt.Frame()
-	ghtest.MustHaveText(t, tt, "GitHub answered 500: boom")
+	ghtest.MustHaveText(t, tt, "GitHub is not responding right now. Try again later.")
 }
 
 func TestExitReviewWithoutPR(t *testing.T) {

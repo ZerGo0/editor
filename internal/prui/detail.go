@@ -180,6 +180,14 @@ func lastReviewedSHA(reviews []github.Review, viewer, head string) string {
 	return latest.CommitID
 }
 
+func (p *PRs) showRestored(c *ui.Context, number int) {
+	d := p.dataFor(number)
+	if !d.loaded && !d.loading && d.err == nil {
+		p.loadDetail(d)
+	}
+	p.detailView(c, d)
+}
+
 func (p *PRs) loadDetail(d *prData) {
 	d.loading, d.stale = true, false
 	be, repo, number := p.be, p.repo, d.number

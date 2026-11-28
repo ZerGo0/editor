@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -135,7 +136,7 @@ func (p *PRs) openNotification(n Notification) {
 }
 
 func (p *PRs) NotificationsActions(c *ui.Context) {
-	if p.Ready() && action.IconButton(c, icons.Refresh, "Refresh notifications", action.IconOptions{ID: "refresh-notifications"}).Clicked() {
+	if p.Ready() && action.IconButton(c, icons.Refresh, "Refresh Notifications", action.IconOptions{ID: "refresh-notifications"}).Clicked() {
 		p.notifs.fetchedAt = time.Time{}
 		p.notifs.modified = ""
 	}
@@ -185,22 +186,29 @@ const notificationWords = 3
 
 func (p *PRs) notificationItem(c *ui.Context, n Notification) list.Item {
 	pal := token.Of(c)
-	description := "#" + strconv.Itoa(n.Number) + prMetaSeparator + reasonLabel(n.Reason)
+	reference := p.repo.Owner + "/" + p.repo.Name + " #" + strconv.Itoa(n.Number)
+	description := reference
 	if when := ghshared.RelativeTime(p.env.Now(), n.Updated); when != "" {
 		description += prMetaSeparator + when
 	}
+	reason := reasonLabel(n.Reason)
 	return list.Item{
-		Label:       n.Title,
-		Strong:      n.Unread,
-		Description: description,
-		Tooltip:     n.Title,
+		Label:        n.Title,
+		Strong:       n.Unread,
+		Description:  description,
+		Pills:        []list.Pill{{Text: reason, Icon: reasonIcon(n.Reason), Tone: token.ToneInfo, Tooltip: reason}},
+		Tooltip:      n.Title + "\n" + reference + prMetaSeparator + reason,
+		LeadingWidth: token.IconSizeSmall.Px() + token.GapRowIcon.Px() + token.IconSize.Px(),
 		Leading: func(c *ui.Context) {
-			dot := ui.Icon(c, icons.Dot).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).Shrink(0)
-			if n.Unread {
-				dot.TextColor(pal.Accent.Base).Label("Unread")
-			} else {
-				dot.TextColor(ui.Transparent).AccessHidden(true)
-			}
+			design.Inline(c, token.GapRowIcon, func() {
+				dot := ui.Icon(c, icons.Dot).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).Shrink(0)
+				if n.Unread {
+					dot.TextColor(pal.Accent.Base).Label("Unread")
+				} else {
+					dot.TextColor(ui.Transparent).AccessHidden(true)
+				}
+				ui.Icon(c, icons.PullRequest).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Icon).Shrink(0).AccessHidden(true)
+			})
 		},
 		OnClick: func() { p.openNotification(n) },
 		Menu: func(m *ui.Menu) {
@@ -219,6 +227,22 @@ func (p *PRs) notificationItem(c *ui.Context, n Notification) list.Item {
 			}
 		},
 	}
+}
+
+func reasonIcon(reason string) *ui.SVG {
+	switch reason {
+	case "review_requested":
+		return icons.Preview
+	case "mention", "team_mention", "comment":
+		return icons.Comment
+	case "author":
+		return icons.Edit
+	case "ci_activity":
+		return icons.Play
+	case "state_change":
+		return icons.Merge
+	}
+	return icons.Info
 }
 
 func reasonLabel(reason string) string {

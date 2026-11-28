@@ -19,6 +19,7 @@ import (
 	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 )
@@ -154,7 +155,7 @@ func (p *PRs) detailActions(c *ui.Context, d *prData) {
 		ghshared.SmallButton(c, "Request Changes", !idle).OnClick(func() { p.openReviewDialog(d, 2) })
 		ghshared.SmallButton(c, "Comment", !idle).OnClick(func() { p.openReviewDialog(d, 0) })
 	}
-	action.MenuButton(c, moreActionsLabel, action.ButtonOptions{Small: true, Disabled: !idle, ID: "more"}, func(m *ui.Menu) { p.moreMenu(c, m, d) }).Label("More actions")
+	action.MenuButton(c, moreActionsLabel, action.ButtonOptions{Small: true, Disabled: !idle, ID: "more"}, func(m *ui.Menu) { p.moreMenu(c, m, d) }).Label("More Actions")
 	if !idle {
 		feedback.Spinner(c, d.busy)
 		ghshared.MutedText(c, d.busy+"...")
@@ -396,10 +397,10 @@ func (p *PRs) filesCard(c *ui.Context, d *prData) {
 	}
 	detail.Card(c, "Changed files", detail.CardOptions{Count: len(d.files), Actions: actions}, func() {
 		if len(d.files) == 0 {
-			ghshared.MutedText(c, "No changed files.")
+			ghshared.MutedText(c, "No changes.")
 			return
 		}
-		ghshared.MutedText(c, fmt.Sprintf("+%d -%d across %d files, %d viewed. Select a file to open its diff.", d.pr.Additions, d.pr.Deletions, len(d.files), d.viewedCount()))
+		ghshared.MutedText(c, fmt.Sprintf("+%d -%d across %s, %d viewed. Select a file to open its diff.", d.pr.Additions, d.pr.Deletions, plural.Count(len(d.files), "file", "files"), d.viewedCount()))
 		p.fileList(c, d, fileListView{state: &d.fileList, row: &d.fileRow, files: files, mode: modePR, label: "Changed files"})
 	})
 }
@@ -581,6 +582,6 @@ func (p *PRs) reactionBar(c *ui.Context, d *prData, e TimelineEvent) {
 					p.react(d, e, r.content)
 				}
 			}
-		}).Label("Add reaction")
+		}).Label("Add Reaction")
 	})
 }

@@ -95,7 +95,7 @@ func TestDetailPartialFailureKeepsRest(t *testing.T) {
 	if len(d.partErrs) != 1 {
 		t.Fatalf("part errors %v", d.partErrs)
 	}
-	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "checks: boom", "src/widget.go", "No checks reported for this commit.")
+	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "checks: Boom.", "src/widget.go", "No checks reported for this commit.")
 }
 
 func TestDetailEmptyStates(t *testing.T) {
@@ -103,7 +103,7 @@ func TestDetailEmptyStates(t *testing.T) {
 	hs.be.pr.Body, hs.be.pr.Labels, hs.be.pr.Reviewers = "", nil, nil
 	hs.be.checks, hs.be.comments, hs.be.files = nil, nil, nil
 	_, tt := hs.openDetail(t)
-	ghtest.MustHaveText(t, tt, "No description provided.", "None requested", "No checks reported for this commit.", "No changed files.", "No activity yet.")
+	ghtest.MustHaveText(t, tt, "No description provided.", "None requested", "No checks reported for this commit.", "No changes.", "No activity yet.")
 }
 
 func TestDetailAddComment(t *testing.T) {
@@ -381,7 +381,7 @@ func TestFetchDetailCollectsPartErrors(t *testing.T) {
 	hs.be.errs["Files"] = errors.New("a")
 	hs.be.errs["Threads"] = errors.New("b")
 	res := fetchDetail(t.Context(), hs.be, github.Remote{Owner: "acme", Name: "widgets"}, 12)
-	if res.err != nil || len(res.partErrs) != 2 || res.partErrs[0] != "files: a" || res.partErrs[1] != "review threads: b" {
+	if res.err != nil || len(res.partErrs) != 2 || res.partErrs[0] != "files: A." || res.partErrs[1] != "review threads: B." {
 		t.Errorf("%+v", res)
 	}
 	hs.be.errs["Get"] = errors.New("fatal")

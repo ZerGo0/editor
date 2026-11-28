@@ -198,25 +198,29 @@ func (s serverViewed) SetViewed(_ string, e *multidiff.Entry, on bool) {
 	s.p.setViewed(s.d, e.Path, on)
 }
 
-func (p *PRs) reviewOptions(rt *reviewTab) multidiff.Options {
-	d := rt.data
-	o := multidiff.Options{
-		Label: reviewTitle(d.number, rt.spec, ""),
-		Set:   rt.id,
+func (p *PRs) diffOptions(label, set string) multidiff.Options {
+	return multidiff.Options{
+		Label: label,
+		Set:   set,
 		Ctx:   p.Ctx,
 		Post:  p.Post,
 		Configure: func(st *editor.DiffState, rel string) {
 			p.Host.ConfigureDiff(st, filepath.Join(p.Host.RootDir(), rel))
 		},
 		Language: func(rel, text string) *editor.Language { return p.Host.Language(rel, text) },
-		OpenFile: func(rel string) { p.Host.OpenAt(filepath.Join(p.Host.RootDir(), rel), -1, -1) },
-		Busy:     d.loading,
-		Toolbar: func(c *ui.Context) {
-			if rt.spec.mode == modePR {
-				action.Checkbox(c, "Hide Comments", &rt.hideComments, action.ChoiceOptions{ID: "hide-comments"})
-			}
-			ghshared.SmallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
-		},
+	}
+}
+
+func (p *PRs) reviewOptions(rt *reviewTab) multidiff.Options {
+	d := rt.data
+	o := p.diffOptions(reviewTitle(d.number, rt.spec, ""), rt.id)
+	o.OpenFile = func(rel string) { p.Host.OpenAt(filepath.Join(p.Host.RootDir(), rel), -1, -1) }
+	o.Busy = d.loading
+	o.Toolbar = func(c *ui.Context) {
+		if rt.spec.mode == modePR {
+			action.Checkbox(c, "Hide Comments", &rt.hideComments, action.ChoiceOptions{ID: "hide-comments"})
+		}
+		ghshared.SmallButton(c, "Open Pull Request", false).OnClick(func() { p.openPR(d.number, nil) })
 	}
 	if rt.spec.mode == modePR && d.pr.NodeID != "" {
 		o.Viewed = serverViewed{p: p, d: d}
@@ -230,7 +234,7 @@ func (p *PRs) reviewView(c *ui.Context, rt *reviewTab) {
 	}
 	detail.Page(c, func() {
 		if len(p.reviewFiles(rt)) == 0 {
-			detail.Centered(c, func() { feedback.Empty(c, feedback.EmptyOptions{Icon: icons.File, Title: "No changed files"}) })
+			detail.Centered(c, func() { feedback.Empty(c, feedback.EmptyOptions{Icon: icons.File, Title: "No changes"}) })
 			return
 		}
 		rt.view.Render(c, p.reviewOptions(rt))

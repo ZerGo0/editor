@@ -34,7 +34,7 @@ func TestNotificationsLoadAtConnectAndBadge(t *testing.T) {
 		t.Errorf("badge %d", hs.p.NotificationsBadge())
 	}
 	tt := notificationsTester(hs.p)
-	ghtest.MustHaveText(t, tt, "Add caching", "#3", "review requested", "1h ago", "Fix flaky test", "mentioned")
+	ghtest.MustHaveText(t, tt, "Add caching", "acme/widgets #3 · 1h ago", "Fix flaky test", "acme/widgets #4 · 2h ago")
 	if _, ok := tt.Access("Unread"); !ok {
 		t.Error("the unread marker has no name")
 	}
@@ -125,7 +125,7 @@ func TestNotificationsEmptyAndError(t *testing.T) {
 	failing.ready(t)
 	failing.h.Pump(t, func() bool { return failing.p.notifs.err != nil })
 	tt = notificationsTester(failing.p)
-	ghtest.MustHaveText(t, tt, "GitHub answered 403: no scope", "Retry")
+	ghtest.MustHaveText(t, tt, "GitHub denied access. Check that your account can access this repository.", "Retry")
 	failing.be.clearErr("Notifications")
 	failing.withNotifications()
 	ghtest.MustClick(t, tt, "Retry")
@@ -169,7 +169,7 @@ func TestNotificationsRefreshButton(t *testing.T) {
 	tt := notificationsTester(hs.p)
 	hs.h.Drain()
 	base := hs.be.Count("Notifications")
-	ghtest.MustClick(t, tt, "Refresh notifications")
+	ghtest.MustClick(t, tt, "Refresh Notifications")
 	hs.h.Pump(t, func() bool { return hs.be.Count("Notifications") > base })
 	if hs.be.arg != "" {
 		t.Errorf("a manual refresh must not be conditional: %q", hs.be.arg)

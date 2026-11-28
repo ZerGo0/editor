@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/github"
+	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -152,11 +153,7 @@ func TestIssueCompletions(t *testing.T) {
 		{Number: 12, Title: "Duplicate of twelve", State: github.StateOpen},
 	}
 	labels := func(items []editor.Completion) []string {
-		var out []string
-		for _, c := range items {
-			out = append(out, c.Label)
-		}
-		return out
+		return testutil.Map(items, func(c editor.Completion) string { return c.Label })
 	}
 	got := issueCompletions(issues, "12")
 	want := []string{"#120 Other", "#12 Fix the crash", "#7 Crash at 12 o'clock"}

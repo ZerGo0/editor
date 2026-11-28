@@ -55,6 +55,12 @@ func (s *Session[C]) StateMessage(host string) StateMessage {
 	return StateMessage{Title: "Connecting to GitHub...", Spin: true}
 }
 
+func TrackState[C, T any](s *Session[C], key string, saved *T, current func() T) {
+	state := s.Host.ProjectState()
+	state.Load(key, saved)
+	state.Track(key, func() any { return current() })
+}
+
 func StateView(c *ui.Context, m StateMessage, connect func()) ui.Element {
 	return ui.Column(c).FillWidth().Children(func() {
 		if m.Spin {

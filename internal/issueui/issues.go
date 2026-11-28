@@ -30,6 +30,7 @@ type Issues struct {
 	user    string
 
 	side    *sideState
+	saved   sideMemo
 	details map[int]*issueData
 	create  *createForm
 	meta    metaState
@@ -49,6 +50,8 @@ func NewWith(h host.Host, env Env) *Issues {
 		details:  map[int]*issueData{},
 	}
 	i.Session = ghshared.NewSession(h, stateWording, i.resolveConnection, i.apply)
+	ghshared.TrackState(&i.Session, sideStateKey, &i.saved, i.sideMemo)
+	i.RestoreDetails(detailIDPrefix, func() github.Remote { return i.repo }, errOtherRepo, i.showRestored)
 	i.Connect()
 	return i
 }
@@ -71,7 +74,7 @@ func (i *Issues) Badge() int {
 func (i *Issues) SetSettings(s Settings) {
 	i.settings = s.normalized()
 	if i.Phase == ghshared.PhaseReady {
-		i.side = newSideState(i.settings.Queries)
+		i.resetSide()
 	}
 }
 
@@ -116,7 +119,7 @@ func (i *Issues) resolveConnection(ctx context.Context, root, dataDir string) co
 func (i *Issues) apply(conn connection) {
 	i.Phase, i.PhaseErr = conn.phase, conn.err
 	i.local, i.be, i.repo, i.remotes, i.user, i.work = conn.local, conn.be, conn.repo, conn.remotes, conn.user, conn.work
-	i.side = newSideState(i.settings.Queries)
+	i.resetSide()
 	i.details = map[int]*issueData{}
 	i.meta = metaState{}
 	i.mention = mentionState{}

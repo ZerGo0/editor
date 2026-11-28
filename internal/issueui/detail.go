@@ -115,6 +115,14 @@ func fetchDetail(ctx context.Context, be Backend, repo github.Remote, number int
 	return res
 }
 
+func (i *Issues) showRestored(c *ui.Context, number int) {
+	d := i.dataFor(number)
+	if !d.loaded && !d.loading && d.err == nil {
+		i.loadDetail(d)
+	}
+	i.detailView(c, d)
+}
+
 func (i *Issues) loadDetail(d *issueData) {
 	d.loading, d.stale = true, false
 	be, repo, number := i.be, i.repo, d.number

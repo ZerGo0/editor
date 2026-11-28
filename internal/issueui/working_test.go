@@ -118,7 +118,7 @@ func TestStartWorkingAssignFailureIsAWarning(t *testing.T) {
 	if hs.i.work.Active == nil {
 		t.Fatal("work did not start")
 	}
-	if got := hs.h.LastNotice(); got != "Working on #5 in branch me/issue5. Could not assign you: boom" {
+	if got := hs.h.LastNotice(); got != "Working on #5 in branch me/issue5. Could not assign you: Boom." {
 		t.Errorf("notice %q", got)
 	}
 }
@@ -210,7 +210,7 @@ func TestStartWorkingLinkedBranchFailureFallsBackToLocal(t *testing.T) {
 	if hs.i.work.Active == nil || !slices.Contains(hs.local.called(), "CreateBranch:me/issue5::true") {
 		t.Errorf("active %v calls %v", hs.i.work.Active, hs.local.called())
 	}
-	if got := hs.h.LastNotice(); got != "Working on #5 in branch me/issue5. Could not create the linked branch: boom" {
+	if got := hs.h.LastNotice(); got != "Working on #5 in branch me/issue5. Could not create the linked branch: Boom." {
 		t.Errorf("notice %q", got)
 	}
 }

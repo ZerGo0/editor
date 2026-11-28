@@ -2,20 +2,24 @@ package ghshared_test
 
 import (
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
 	"testing"
-	"time"
 
 	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
 func TestErrorText(t *testing.T) {
-	reset := time.Date(2026, 1, 1, 15, 4, 0, 0, time.Local)
+	offline := fmt.Errorf("prui: GET http://127.0.0.1:1/user: %w", &url.Error{Op: "Get", URL: "http://127.0.0.1:1/user",
+		Err: &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")}})
 	cases := map[string]error{
-		"GitHub rate limit reached. Try again after 15:04.": &github.RateLimitError{Reset: reset},
-		"GitHub rate limit reached. Try again later.":       &github.RateLimitError{},
-		"GitHub answered 404: Not Found":                    &github.APIError{Status: 404, Message: "Not Found"},
-		"plain":                                             errors.New("github: plain"),
+		"GitHub rate limit reached. Try again later.":                                      &github.RateLimitError{},
+		"GitHub cannot find it. Check that it exists and that your account can access it.": &github.APIError{Status: 404, Message: "Not Found"},
+		"GitHub is not responding right now. Try again later.":                             &github.APIError{Status: 502, Message: "Bad Gateway"},
+		"Cannot reach GitHub. Check your connection.":                                      offline,
+		"Plain.": errors.New("github: plain"),
 	}
 	for want, err := range cases {
 		if got := ghshared.ErrorText(err); got != want {

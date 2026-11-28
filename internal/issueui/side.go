@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/feedback"
@@ -16,6 +17,7 @@ import (
 	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -363,15 +365,18 @@ func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
 		svg = icons.Check
 	}
 	return list.Item{
-		Depth:       depth,
-		Label:       issue.Title,
-		Description: description,
-		Tooltip:     issueTooltip(issue),
-		Count:       issue.Comments,
+		Depth:         depth,
+		Label:         issue.Title,
+		Description:   description,
+		Tooltip:       issueTooltip(issue),
+		TrailingWidth: issueTrailingWidth(c, issue),
 		Leading: func(c *ui.Context) {
 			ui.Icon(c, svg).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(issue))).Shrink(0).Label(stateLabel(issue))
 		},
 		Trailing: func(c *ui.Context) {
+			if issue.Comments > 0 {
+				commentCount(c, issue.Comments)
+			}
 			if issue.Author != "" {
 				badge.Avatar(c, issue.Author, token.AvatarSize)
 			}
@@ -381,8 +386,31 @@ func (i *Issues) issueItem(c *ui.Context, r sideRow) list.Item {
 	}
 }
 
+func commentCount(c *ui.Context, n int) {
+	p := token.Of(c)
+	design.Inline(c, token.GapTight, func() {
+		ui.Icon(c, icons.Comment).Size(token.IconSizeSmall.Px(), token.IconSizeSmall.Px()).TextColor(p.Icon).Shrink(0).AccessHidden(true)
+		token.TextLabel.Apply(ui.Text(c, strconv.Itoa(n))).TextColor(p.Text.Secondary).SingleLine().AccessHidden(true)
+	}).Shrink(0).Label(plural.Count(n, "comment", "comments"))
+}
+
+func issueTrailingWidth(c *ui.Context, issue github.Issue) float32 {
+	var w float32
+	if issue.Author != "" {
+		w += token.AvatarSize.Px() + token.GapInline.Px()
+	}
+	if issue.Comments > 0 {
+		digits, _ := c.MeasureText(0, ui.Span{Text: strconv.Itoa(issue.Comments), Size: token.TextLabel.Px(), Weight: token.TextLabel.Weight()})
+		w += token.IconSizeSmall.Px() + token.GapTight.Px() + digits + token.GapInline.Px()
+	}
+	return w
+}
+
 func issueTooltip(issue github.Issue) string {
-	tip := fmt.Sprintf("%s\n#%d by %s", issue.Title, issue.Number, issue.Author)
+	tip := issue.Title
+	if issue.Author != "" {
+		tip += "\nby " + issue.Author
+	}
 	if len(issue.Labels) == 0 {
 		return tip
 	}

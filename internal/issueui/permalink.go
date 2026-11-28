@@ -17,6 +17,7 @@ import (
 
 const (
 	permalinkBlob       = "blob"
+	permalinkErrorTitle = "Cannot create a GitHub permalink"
 	permalinkLinePrefix = "#L"
 	permalinkRangeSep   = "-L"
 	untrackedMark       = '?'
@@ -156,18 +157,18 @@ func (i *Issues) permalinkAsync(path string, startLine, endLine int, done func(l
 func (i *Issues) CopyPermalink(path string, startLine, endLine int) {
 	i.permalinkAsync(path, startLine, endLine, func(link string, err error) {
 		if err != nil {
-			i.Host.Notify(err.Error())
+			i.Host.ShowError(permalinkErrorTitle, err)
 			return
 		}
 		i.env.Copy(link)
-		i.Host.Notify("Copied GitHub permalink")
+		i.Host.Notify("Copied the GitHub permalink")
 	})
 }
 
 func (i *Issues) OpenPermalink(path string, startLine, endLine int) {
 	i.permalinkAsync(path, startLine, endLine, func(link string, err error) {
 		if err != nil {
-			i.Host.Notify(err.Error())
+			i.Host.ShowError(permalinkErrorTitle, err)
 			return
 		}
 		if err := i.env.OpenURL(link); err != nil {

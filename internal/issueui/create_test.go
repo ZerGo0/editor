@@ -103,7 +103,7 @@ func TestCreateMetaFailureOffersRetry(t *testing.T) {
 	hs.i.openCreate(createDraft{})
 	hs.h.Pump(t, func() bool { return hs.i.meta.loaded })
 	tt := viewTester(hs, createViewID)
-	ghtest.MustHaveText(t, tt, "Some choices could not be loaded: boom", "Retry")
+	ghtest.MustHaveText(t, tt, "Some choices could not be loaded: Boom.", "Retry")
 	hs.be.with(func() { delete(hs.be.errs, "Labels") })
 	ghtest.MustClick(t, tt, "Retry")
 	hs.h.Pump(t, func() bool { return hs.i.meta.loaded && hs.i.meta.err == nil })
@@ -168,8 +168,8 @@ func TestCreateFromTODOFallsBackToLocation(t *testing.T) {
 	if got := hs.i.create.body; got != "Found in `src/a.go:1`." {
 		t.Errorf("body %q", got)
 	}
-	if hs.h.LastNotice() != errPermalinkUnpushed.Error() {
-		t.Errorf("notice %q", hs.h.LastNotice())
+	if len(hs.h.Errs) != 1 || !strings.HasSuffix(hs.h.Errs[0], errPermalinkUnpushed.Error()) {
+		t.Errorf("errors %q", hs.h.Errs)
 	}
 }
 

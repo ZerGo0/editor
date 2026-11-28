@@ -60,16 +60,17 @@ func TestIssueTitleKeepsItsShareInNarrowSideBars(t *testing.T) {
 			t.Fatalf("%d px: the comment count is missing", width)
 		}
 		avatarLeft := avatar.X + avatar.W/2 - token.AvatarSize.Px()/2
-		if gap := avatarLeft - (title.X + title.W); gap > token.GapRowIcon.Px()+fitPixelSlack {
+		countLeft := count.X - token.IconSizeSmall.Px() - token.GapTight.Px()
+		if gap := countLeft - (title.X + title.W); gap > token.GapRowIcon.Px()+fitPixelSlack {
 			t.Errorf("%d px: %.0f px of the row stay empty after the title, want the title to take all room the avatar and the count leave", width, gap)
 		}
-		if count.X < avatarLeft {
-			t.Errorf("%d px: the count at %.0f is left of the avatar at %.0f", width, count.X, avatarLeft)
+		if count.X+count.W > avatarLeft+fitPixelSlack {
+			t.Errorf("%d px: the count ends at %.0f, right of the avatar at %.0f", width, count.X+count.W, avatarLeft)
 		}
 		if title.W >= natural {
 			t.Errorf("%d px: the title is %.0f px wide, want it cut below %.0f px with an ellipsis", width, title.W, natural)
 		}
-		if tt.HasText("#21 · 3h ago") {
+		if _, drawn := tt.AccessByRole(ui.RoleText, "#21 · 3h ago"); drawn {
 			t.Errorf("%d px: the description is drawn, want it hidden and in the tooltip", width)
 		}
 		for _, name := range fitLabels {

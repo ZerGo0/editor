@@ -198,9 +198,13 @@ func (p *PRs) runSearch(query string) {
 		p.side.search = nil
 		return
 	}
-	s := &section{id: sectionSearch, title: "Search Results", query: query, opts: github.ListOptions{Query: query}, open: true}
+	s := newSearchSection(query)
 	p.side.search = s
 	p.loadSection(s, false)
+}
+
+func newSearchSection(query string) *section {
+	return &section{id: sectionSearch, title: "Search Results", query: query, opts: github.ListOptions{Query: query}, open: true}
 }
 
 func (p *PRs) ensureLoaded() {
@@ -272,7 +276,7 @@ func (p *PRs) reviewRows() []sideRow {
 	case !d.loaded:
 		return append(rows, sideRow{kind: rowError, sec: sec, err: d.err, data: d})
 	case len(d.files) == 0:
-		return append(rows, sideRow{kind: rowNote, sec: sec, text: "No changed files."})
+		return append(rows, sideRow{kind: rowNote, sec: sec, text: "No changes."})
 	}
 	files := d.visibleFiles()
 	if len(files) == 0 {
@@ -347,6 +351,14 @@ func (p *PRs) Badge() int {
 		return 0
 	}
 	return len(p.side.review.items)
+}
+
+func (p *PRs) FocusList() bool {
+	if !p.Ready() || p.side == nil {
+		return false
+	}
+	p.side.list.Handle.Focus()
+	return true
 }
 
 func (p *PRs) SideView(c *ui.Context) {
@@ -477,6 +489,13 @@ func (p *PRs) headerItem(c *ui.Context, r sideRow) list.Item {
 	return it
 }
 
+func prTooltip(pr *github.PullRequest) string {
+	if pr.Author == "" {
+		return pr.Title
+	}
+	return pr.Title + "\nby " + pr.Author
+}
+
 func (p *PRs) prItem(c *ui.Context, pr *github.PullRequest) list.Item {
 	pal := token.Of(c)
 	description := "#" + strconv.Itoa(pr.Number)
@@ -501,7 +520,7 @@ func (p *PRs) prItem(c *ui.Context, pr *github.PullRequest) list.Item {
 		Description:   description,
 		Pills:         pills,
 		TrailingWidth: trailing,
-		Tooltip:       fmt.Sprintf("%s\n#%d by %s", pr.Title, pr.Number, pr.Author),
+		Tooltip:       prTooltip(pr),
 		Leading: func(c *ui.Context) {
 			ui.Icon(c, icons.PullRequest).Size(token.IconSize.Px(), token.IconSize.Px()).TextColor(pal.Tone(stateTone(*pr))).Shrink(0).AccessHidden(true)
 		},

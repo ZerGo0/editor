@@ -105,7 +105,7 @@ func TestDetailPartialFailureKeepsIssueAndOffersRetry(t *testing.T) {
 	hs := newHarness(t)
 	hs.be.errs["IssueComments"] = errBoom
 	_, tt := hs.openDetail(t)
-	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "comments: boom", "Crash on start")
+	ghtest.MustHaveText(t, tt, "Some details could not be loaded:", "comments: Boom.", "Crash on start")
 }
 
 func TestDetailPreloadShowsListDataImmediately(t *testing.T) {

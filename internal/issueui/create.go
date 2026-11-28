@@ -189,7 +189,7 @@ func (i *Issues) createAt(title, path string, startLine, endLine int, snippet st
 		i.Post(func() {
 			body := link
 			if err != nil {
-				i.Host.Notify(err.Error())
+				i.Host.ShowError(permalinkErrorTitle, err)
 				body = locationBody(rel, startLine, snippet)
 			}
 			i.openCreate(createDraft{title: title, body: body})

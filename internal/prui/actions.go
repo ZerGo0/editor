@@ -69,7 +69,7 @@ func (p *PRs) Run(id string) bool {
 	case ActionCopyLink:
 		if p.requireCurrent() {
 			p.env.CopyText(p.current.pr.URL)
-			p.Host.Notify("Copied the pull request link.")
+			p.Host.Notify("Copied the pull request link")
 		}
 	case ActionOpenOnGitHub:
 		if p.requireCurrent() {

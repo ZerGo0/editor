@@ -16,6 +16,7 @@ import (
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/github"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -342,7 +343,7 @@ func (p *PRs) threadView(c *ui.Context, t *diffTab, a editor.DiffAnnotation) {
 				mutedTag(c, "Outdated")
 			}
 			if collapsed {
-				ghshared.MutedText(c, fmt.Sprintf("%d comments", len(thread.Comments))).Grow(1)
+				ghshared.MutedText(c, plural.Count(len(thread.Comments), "comment", "comments")).Grow(1)
 				ghshared.GhostButton(c, "Show", "show-"+id).Label("Show thread").OnClick(func() { t.expanded[id] = true })
 				return
 			}

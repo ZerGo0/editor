@@ -23,10 +23,8 @@ func (p *PRs) StatusItems(c *ui.Context) {
 		tip += "\n" + text
 	}
 	_, tone, _ := checkAppearance(state)
-	item := chrome.StatusItem(c, fmt.Sprintf("#%d", pr.Number), chrome.StatusOptions{Icon: icons.PullRequest, Tooltip: tip, Tone: statusTone(tone)}).Label(label)
-	if item.Clicked() {
-		p.openPR(pr.Number, pr)
-	}
+	chrome.StatusItem(c, fmt.Sprintf("#%d", pr.Number), chrome.StatusOptions{Icon: icons.PullRequest, Label: label, Tooltip: tip, Tone: statusTone(tone),
+		OnClick: func() { p.openPR(pr.Number, pr) }})
 }
 
 func statusTone(t token.Tone) token.Tone {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/git"
@@ -170,7 +171,7 @@ func TestPermalinkActions(t *testing.T) {
 	hs.i.Run(ActionCopyPermalink)
 	hs.h.Pump(t, func() bool { return len(hs.copied) == 1 })
 	want := "https://github.com/acme/widgets/blob/abc123/src/a.go#L2"
-	if hs.copied[0] != want || hs.h.LastNotice() != "Copied GitHub permalink" {
+	if hs.copied[0] != want || hs.h.LastNotice() != "Copied the GitHub permalink" {
 		t.Errorf("copied %v notice %q", hs.copied, hs.h.LastNotice())
 	}
 	hs.i.Run(ActionOpenPermalink)
@@ -183,7 +184,9 @@ func TestPermalinkActions(t *testing.T) {
 	hs.local.status.Files = []git.FileStatus{{Path: "src/a.go", Index: ' ', WorkTree: 'M'}}
 	hs.local.mu.Unlock()
 	hs.i.CopyPermalink(hs.h.Path, 0, 0)
-	hs.h.Pump(t, func() bool { return hs.h.LastNotice() == errPermalinkModified.Error() })
+	hs.h.Pump(t, func() bool {
+		return len(hs.h.Errs) == 1 && strings.HasSuffix(hs.h.Errs[0], errPermalinkModified.Error())
+	})
 	if len(hs.copied) != 1 {
 		t.Error("a failed permalink was copied")
 	}

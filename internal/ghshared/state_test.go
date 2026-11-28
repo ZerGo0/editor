@@ -28,7 +28,7 @@ func TestStateMessages(t *testing.T) {
 		{"no gh", ghshared.PhaseNoGH, "", nil, []string{"GitHub CLI not found", "Install the GitHub CLI and run gh auth login"}},
 		{"not logged in", ghshared.PhaseNotLoggedIn, "github.com", nil, []string{"Sign in to GitHub", "gh auth login", "Copy Command"}},
 		{"not logged in on a host", ghshared.PhaseNotLoggedIn, "ghe.example.com", nil, []string{"gh auth login --hostname ghe.example.com"}},
-		{"error", ghshared.PhaseError, "", errors.New("boom"), []string{"Cannot load things", "boom", "Retry"}},
+		{"error", ghshared.PhaseError, "", errors.New("boom"), []string{"Cannot load things", "Boom.", "Retry"}},
 		{"error without detail", ghshared.PhaseError, "", nil, []string{"Cannot load things", "Something went wrong.", "Retry"}},
 		{"connecting", ghshared.PhaseLoading, "", nil, []string{"Connecting to GitHub..."}},
 	}

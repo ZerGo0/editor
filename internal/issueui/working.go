@@ -225,7 +225,8 @@ func (i *Issues) StatusItems(c *ui.Context) {
 	}
 	number := active.Number
 	label := fmt.Sprintf("Working on issue #%d", number)
-	b := chrome.StatusItem(c, "#"+strconv.Itoa(number), chrome.StatusOptions{Icon: icons.GitBranch, Tooltip: label + ": " + active.Title}).Label(label)
+	b := chrome.StatusItem(c, "#"+strconv.Itoa(number), chrome.StatusOptions{Icon: icons.GitBranch, Label: label, Tooltip: label + ": " + active.Title,
+		OnClick: func() { i.openIssue(number, nil) }})
 	b.ContextMenu(func(m *ui.Menu) {
 		if action.Item(m, "Open Issue", action.ItemOptions{}).Chosen() {
 			i.openIssue(number, nil)
@@ -234,9 +235,6 @@ func (i *Issues) StatusItems(c *ui.Context) {
 			i.stopWorking()
 		}
 	})
-	if b.Clicked() {
-		i.openIssue(number, nil)
-	}
 }
 
 func (i *Issues) ensureCompletionData() {

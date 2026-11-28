@@ -43,7 +43,7 @@ func userURL(repo github.Remote, login string) string {
 }
 
 func detailID(repo github.Remote, number int) string {
-	return fmt.Sprintf("issue/%s/%s/%d", repo.Owner, repo.Name, number)
+	return fmt.Sprintf("%s/%s/%s/%d", detailIDPrefix, repo.Owner, repo.Name, number)
 }
 
 func detailTitle(number int, title string) string {

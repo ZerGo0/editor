@@ -70,6 +70,9 @@ func newRESTClient(host, token string) *restClient {
 		r.base = fmt.Sprintf(enterpriseRESTFmt, host)
 		r.graphqlURL = fmt.Sprintf(enterpriseGraphQLFmt, host)
 	}
+	if rest, graphql, ok := github.OverrideURLs(); ok {
+		r.base, r.graphqlURL = rest, graphql
+	}
 	return r
 }
 

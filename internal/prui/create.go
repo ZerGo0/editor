@@ -19,6 +19,7 @@ import (
 	"github.com/ZerGo0/editor/internal/ghshared"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/github"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -398,7 +399,7 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 			ghshared.ErrorNotice(c, f.cmpErr, func() { p.loadCompare(f) })
 			return
 		}
-		ghshared.MutedText(c, fmt.Sprintf("%d commits ahead of %s", len(f.cmpCommits), f.base))
+		ghshared.MutedText(c, fmt.Sprintf("%s ahead of %s", plural.Count(len(f.cmpCommits), "commit", "commits"), f.base))
 		for i, s := range f.cmpCommits[:min(len(f.cmpCommits), compareListRows)] {
 			design.Text(c.Key(i), s, token.TextBody).SingleLine()
 		}
@@ -410,7 +411,7 @@ func (p *PRs) createCompare(c *ui.Context, f *createForm) {
 			compareFileRow(c.Key("f"+fmt.Sprint(i)), file)
 		}
 		if len(f.cmpFiles) > compareListRows {
-			ghshared.MutedText(c, fmt.Sprintf("and %d more files", len(f.cmpFiles)-compareListRows))
+			ghshared.MutedText(c, "and "+plural.Count(len(f.cmpFiles)-compareListRows, "more file", "more files"))
 		}
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/ghshared"
+	"github.com/ZerGo0/editor/internal/host"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -23,6 +24,7 @@ type AskCall struct {
 }
 
 type FakeHost struct {
+	host.MemoryState
 	Root     string
 	UserData string
 	Path     string

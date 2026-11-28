@@ -45,7 +45,7 @@ func TestConnectionErrorShowsRetry(t *testing.T) {
 	hs := newHarness(t)
 	hs.open = errBoom
 	hs.start(t)
-	ghtest.MustHaveText(t, sideTester(hs.i), "Cannot connect to GitHub", "boom", "Retry")
+	ghtest.MustHaveText(t, sideTester(hs.i), "Cannot connect to GitHub", "Boom.", "Retry")
 }
 
 func TestRetryReconnects(t *testing.T) {

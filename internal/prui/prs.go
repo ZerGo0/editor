@@ -25,30 +25,32 @@ type PRs struct {
 	ghshared.Session[connection]
 	env Env
 
-	local       Local
-	be          Backend
-	repo        github.Remote
-	remotes     map[string]github.Remote
-	branch      branchInfo
-	branchGen   int
-	locals      []string
-	queries     []savedQuery
-	queriesSeq  int
-	queriesMu   sync.Mutex
-	queriesDone int
-	notifs      notifState
-	current     currentPR
-	checks      map[int]checkState
-	refreshed   time.Time
-	tickAt      time.Time
-	side        *sideState
-	details     map[int]*prData
-	diffs       map[string]*reviewTab
-	logs        map[string]*logTab
-	createForm  *createForm
-	dialog      dialog
-	picker      picker
-	viewer      string
+	local        Local
+	be           Backend
+	repo         github.Remote
+	remotes      map[string]github.Remote
+	branch       branchInfo
+	branchGen    int
+	locals       []string
+	queries      []savedQuery
+	queriesSeq   int
+	queriesMu    sync.Mutex
+	queriesDone  int
+	notifs       notifState
+	current      currentPR
+	checks       map[int]checkState
+	refreshed    time.Time
+	tickAt       time.Time
+	side         *sideState
+	saved        sideMemo
+	sideRestored bool
+	details      map[int]*prData
+	diffs        map[string]*reviewTab
+	logs         map[string]*logTab
+	createForm   *createForm
+	dialog       dialog
+	picker       picker
+	viewer       string
 
 	checkoutBusy string
 }
@@ -74,6 +76,8 @@ func NewWith(h host.Host, env Env) *PRs {
 		logs:    map[string]*logTab{},
 	}
 	p.Session = ghshared.NewSession(h, stateWording, p.resolveConnection, p.apply)
+	ghshared.TrackState(&p.Session, sideStateKey, &p.saved, p.sideMemo)
+	p.RestoreDetails(detailIDPrefix, func() github.Remote { return p.repo }, errOtherRepo, p.showRestored)
 	p.Connect()
 	return p
 }
@@ -109,12 +113,14 @@ func (p *PRs) resolveConnection(ctx context.Context, root, dataDir string) conne
 }
 
 func (p *PRs) apply(conn connection) {
+	p.sideMemo()
 	p.Phase, p.PhaseErr = conn.phase, conn.err
 	p.local, p.be, p.repo, p.remotes, p.branch = conn.local, conn.be, conn.repo, conn.remotes, conn.branch
 	p.locals, p.queries = conn.locals, conn.queries
 	p.viewer = ""
 	p.notifs = notifState{}
 	p.side = newSideState()
+	p.sideRestored = false
 	p.checks = map[int]checkState{}
 	p.details = map[int]*prData{}
 	p.diffs = map[string]*reviewTab{}
@@ -123,6 +129,8 @@ func (p *PRs) apply(conn connection) {
 	p.refreshed = p.env.Now()
 	if conn.phase == ghshared.PhaseReady {
 		p.rebuildCustom()
+		p.side.restore(p.saved)
+		p.sideRestored = true
 		p.refreshCurrent()
 		p.loadViewer()
 		p.loadNotifications()

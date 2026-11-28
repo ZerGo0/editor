@@ -2,27 +2,21 @@ package ghshared
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
+	"github.com/ZerGo0/editor/internal/errtext"
 	"github.com/ZerGo0/editor/internal/github"
 )
 
-const unauthorizedStatus = 401
+const (
+	unauthorizedStatus = 401
+	offlineText        = "Cannot reach GitHub. Check your connection."
+)
 
 func ErrorText(err error) string {
-	var limit *github.RateLimitError
-	var api *github.APIError
-	switch {
-	case errors.As(err, &limit):
-		if limit.Reset.IsZero() {
-			return "GitHub rate limit reached. Try again later."
-		}
-		return "GitHub rate limit reached. Try again after " + limit.Reset.Format("15:04") + "."
-	case errors.As(err, &api):
-		return fmt.Sprintf("GitHub answered %d: %s", api.Status, api.Message)
+	if errtext.IsNetwork(err) {
+		return offlineText
 	}
-	return strings.TrimPrefix(err.Error(), "github: ")
+	return errtext.Text(err)
 }
 
 func IsUnauthorized(err error) bool {

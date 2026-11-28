@@ -22,7 +22,7 @@ func TestConnectionErrorShowsRetry(t *testing.T) {
 	hs := newHarness(t)
 	hs.open = errors.New("boom")
 	hs.start(t)
-	ghtest.MustHaveText(t, sideTester(hs.p), "Cannot load pull requests", "boom", "Retry")
+	ghtest.MustHaveText(t, sideTester(hs.p), "Cannot load pull requests", "Boom.", "Retry")
 }
 
 func TestRetryReconnects(t *testing.T) {
@@ -132,7 +132,7 @@ func TestSectionErrorHasRetry(t *testing.T) {
 	tt := sideTester(hs.p)
 	hs.h.Pump(t, func() bool { return hs.p.side.review.err != nil })
 	tt.Frame()
-	ghtest.MustHaveText(t, tt, "connection reset", "Retry")
+	ghtest.MustHaveText(t, tt, "Connection reset.", "Retry")
 	hs.be.clearErr("List:review")
 	ghtest.MustClick(t, tt, "Retry")
 	hs.h.Pump(t, func() bool { return hs.p.side.review.loaded })
