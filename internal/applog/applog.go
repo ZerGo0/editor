@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/ZerGo0/editor/internal/fsutil"
 )
 
 const (
@@ -74,6 +76,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 	}
 	n, err := w.f.Write(p)
 	w.size += int64(n)
+	fsutil.CountWritten(n)
 	return n, err
 }
 
