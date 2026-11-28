@@ -86,11 +86,11 @@ func TestTreeShowsIgnoredFiles(t *testing.T) {
 			t.Fatalf("row %q is not shown", name)
 		}
 	}
-	if !tree.IsIgnored(filepath.Join(root, "dist")) || !tree.IsIgnored(filepath.Join(root, "debug.log")) {
+	if !tree.IsIgnored(filepath.Join(root, "dist")) || !tree.IsIgnored(filepath.Join(root, "dist", "cache")) || !tree.IsIgnored(filepath.Join(root, "debug.log")) {
 		t.Fatal("ignored entries are not marked")
 	}
-	if tree.IsIgnored(filepath.Join(root, "a.txt")) {
-		t.Fatal("a.txt is marked ignored")
+	if tree.IsIgnored(filepath.Join(root, "a.txt")) || tree.IsIgnored(root) {
+		t.Fatal("a.txt or the root is marked ignored")
 	}
 }
 

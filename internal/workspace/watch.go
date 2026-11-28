@@ -5,6 +5,7 @@ import (
 	"log"
 	"path"
 	"path/filepath"
+	"slices"
 
 	"github.com/egoist/mygo"
 )
@@ -41,12 +42,14 @@ func (w *Workspace) diskChanged(dirs []string) {
 		w.reloadChanged(dir)
 		w.reloadViewers(dir)
 	}
-	if w.git != nil {
-		w.git.DiskChanged()
+	if slices.ContainsFunc(dirs, func(dir string) bool { return !w.tree.IsIgnored(dir) }) {
+		if w.git != nil {
+			w.git.DiskChanged()
+		}
+		w.search.dialog.Changed()
+		w.scheduleReindex()
+		w.scheduleIgnored()
 	}
-	w.search.dialog.Changed()
-	w.scheduleReindex()
-	w.scheduleIgnored()
 	w.folderSettingsChanged(dirs)
 	w.editorConfigChanged(dirs)
 }
