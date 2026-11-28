@@ -15,21 +15,23 @@ import (
 )
 
 const (
-	demoRemoteName     = "origin"
-	demoRemoteDir      = "remote.git"
-	demoRepoDir        = "demo-project"
-	demoIncoming       = 3
-	demoOutgoing       = 2
-	demoGitDate        = "2026-01-15T12:00:00+0000"
-	demoLongOutgoing   = "feat(local): unpushed change with long title"
-	demoStashMessage   = "WIP: experimental refactor of the renderer with a message long enough to overflow the row"
-	demoStashUntracked = "WIP: scratch notes kept as untracked files"
-	demoUntrackedPer   = 160
-	demoAddedStaged    = 30
-	demoTabCount       = 30
-	demoOnlyRemote     = "only-on-the-remote-with-a-long-branch-name-for-remote-tracking-rows"
-	demoLongTag        = "very-long-tag-name-for-the-enterprise-edition-stable-release-candidate-number-three"
-	demoCacheDirPrefix = "editor-e2e-demo-"
+	demoRemoteName        = "origin"
+	demoRemoteDir         = "remote.git"
+	demoRepoDir           = "demo-project"
+	demoIncoming          = 3
+	demoOutgoing          = 2
+	demoGitDate           = "2026-01-15T12:00:00+0000"
+	demoLongOutgoing      = "feat(local): unpushed change with long title"
+	demoStashMessage      = "WIP: experimental refactor of the renderer with a message long enough to overflow the row"
+	demoStashUntracked    = "WIP: scratch notes kept as untracked files"
+	demoUntrackedPer      = 160
+	demoAddedStaged       = 30
+	demoTabCount          = 30
+	demoOnlyRemote        = "only-on-the-remote-with-a-long-branch-name-for-remote-tracking-rows"
+	demoLongTag           = "very-long-tag-name-for-the-enterprise-edition-stable-release-candidate-number-three"
+	demoCacheDirPrefix    = "editor-e2e-demo-"
+	githubRemoteName      = "upstream"
+	githubRemoteURLPrefix = "https://github.com/"
 )
 
 var demoTags = []string{"v0.1.0", "v1.0.0", "v1.1.0-beta.2", "release/2026.11.0-rc.1+build.5678", demoLongTag}
@@ -153,6 +155,12 @@ func NewDemoProject(t *testing.T) DemoProject {
 		t.Fatal(err)
 	}
 	return copyDemoProject(t, demoCache.demo, parent)
+}
+
+func (d DemoProject) WithGitHubRemote(t *testing.T, repo string) DemoProject {
+	t.Helper()
+	newDemoGit(t, d.Root).run("remote", "add", githubRemoteName, githubRemoteURLPrefix+repo+".git")
+	return d
 }
 
 func copyDemoProject(t *testing.T, from DemoProject, parent string) DemoProject {

@@ -136,8 +136,8 @@ func TestViewRedlines(t *testing.T) {
 	for _, theme := range []string{themeDark, themeLight} {
 		t.Run(theme, func(t *testing.T) {
 			t.Parallel()
-			demo := NewDemoProject(t)
-			q := LaunchQA(t, demo.Root, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Theme: theme, Tabs: demo.TabFiles})
+			demo := githubDemoProject(t)
+			q := LaunchQA(t, demo.Root, githubOptions(demo, QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Theme: theme}))
 			visit := func(view string) {
 				checkViewRedlines(t, q, allow, view, stateDefault, theme)
 				target, ok := redlineHoverTargets[view]
@@ -155,7 +155,7 @@ func TestViewRedlines(t *testing.T) {
 				}
 			}
 			visit("tabs")
-			for _, step := range demoViewSteps() {
+			for _, step := range allViewSteps() {
 				if err := step.Enter(q, demo); err != nil {
 					t.Errorf("open %s: %v", step.Name, err)
 					continue

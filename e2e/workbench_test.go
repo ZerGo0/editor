@@ -62,11 +62,11 @@ func TestSourceControlCommitsChange(t *testing.T) {
 	win := app.WaitWindow(filepath.Base(root))
 	app.Idle(win)
 	app.Menu(win, "View", "Source Control")
-	app.WaitNode(win, "changed file", func(n Node) bool { return n.Label == "main.go" && n.Role != "treeItem" })
+	app.WaitNode(win, "changed file", func(n Node) bool { return hasName(n.Label, "main.go") && n.Role != "treeItem" })
 	field := app.WaitNode(win, "commit message", Label("Commit Message"))
 	app.Act(win, field.ID, "focus", "")
 	app.Type(win, commitSubject)
-	commit := app.WaitNode(win, "commit button", func(n Node) bool { return n.Role == "button" && n.Label == "Commit" && !n.Has("disabled") })
+	commit := app.WaitNode(win, "commit button", commitButton(false))
 	app.Click(win, commit, 1)
 	app.Eventually("commit in history", func() bool {
 		return testutil.RunGit(t, root, "log", "-1", "--format=%s") == commitSubject

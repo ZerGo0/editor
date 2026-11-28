@@ -16,7 +16,7 @@ func TestDirtyIndicatorFollowsSavedState(t *testing.T) {
 	t.Parallel()
 	app, win, root := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-	focusEditor(app, win)
+	focusEditor(app, win, "a.txt")
 	app.WaitNode(win, "clean a.txt tab", notModified("a.txt"))
 	app.Type(win, "x")
 	app.WaitNode(win, "dirty after typing", tabModified("a.txt"))

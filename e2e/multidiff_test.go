@@ -46,7 +46,7 @@ func TestSourceControlFileOpensStackedDiffAtItsHeader(t *testing.T) {
 	app.Idle(win)
 	app.Menu(win, "View", "Source Control")
 	target := fmt.Sprintf("f%02d.txt", stackTarget)
-	row := app.WaitNode(win, "changed file", func(n Node) bool { return n.Label == target && n.Role != "treeItem" })
+	row := app.WaitNode(win, "changed file", func(n Node) bool { return hasName(n.Label, target) && n.Role != "treeItem" })
 	app.Click(win, row, 1)
 	app.WaitNode(win, "stacked diff toolbar", Label("Diff Toolbar"))
 	app.Eventually("the file header at the top of the stack", func() bool {
@@ -75,7 +75,7 @@ func TestAltZWrapsTheStackedDiff(t *testing.T) {
 	win := app.WaitWindow(filepath.Base(root))
 	app.Idle(win)
 	app.Menu(win, "View", "Source Control")
-	row := app.WaitNode(win, "changed file", func(n Node) bool { return n.Label == "a.txt" && n.Role != "treeItem" })
+	row := app.WaitNode(win, "changed file", func(n Node) bool { return hasName(n.Label, "a.txt") && n.Role != "treeItem" })
 	app.Click(win, row, 1)
 	app.WaitNode(win, "stacked diff toolbar", Label("Diff Toolbar"))
 	second := func() float64 {

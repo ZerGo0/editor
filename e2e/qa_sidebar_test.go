@@ -13,7 +13,7 @@ import (
 const (
 	dragSteps     = 6
 	sidebarTolPx  = 1.0
-	splitterLabel = "Divider"
+	splitterLabel = "Resize Primary Side Bar"
 )
 
 func sidebarWidth(t *qa.Tree) float64 {
@@ -28,18 +28,7 @@ func widthText(w float64) string { return fmt.Sprintf("%.0fpx", w) }
 
 func (q *QAApp) DragSplitter(toX float64) {
 	q.t.Helper()
-	splitter, err := q.TryWait(func(n qa.Node) bool { return n.Role == "splitter" && n.Bounds.Height > n.Bounds.Width }, navTimeout)
-	if err != nil {
-		q.t.Fatalf("splitter: %v", err)
-	}
-	x, y := splitter.Bounds.CenterX(), splitter.Bounds.CenterY()
-	q.Send(map[string]any{"type": "pointerMove", "x": x, "y": y})
-	q.Send(map[string]any{"type": "pointerDown", "x": x, "y": y})
-	for i := 1; i <= dragSteps; i++ {
-		q.Send(map[string]any{"type": "pointerMove", "x": x + (toX-x)*float64(i)/dragSteps, "y": y})
-	}
-	q.Send(map[string]any{"type": "pointerUp", "x": toX, "y": y})
-	q.Settle()
+	q.dragSplitterNamed(splitterLabel, toX)
 }
 
 func TestSidebarWidthStaysWithinLimits(t *testing.T) {
@@ -51,14 +40,23 @@ func TestSidebarWidthStaysWithinLimits(t *testing.T) {
 	add := func(measured, expected string) {
 		flags = append(flags, qa.Flag{Rule: "sidebar-width", View: "explorer", Owner: qa.OwnerWorkspace, Role: "splitter", Label: splitterLabel, Measured: measured, Expected: expected, Fix: "clamp the sidebar width in the split (MinSize) to token.SidebarMinWidth and keep the editor area usable"})
 	}
-	q.DragSplitter(0)
+	q.DragSplitter(min * 3 / 4)
 	if got := sidebarWidth(q.Snapshot()); got < min-sidebarTolPx {
 		add(widthText(got), "at least token.SidebarMinWidth ("+widthText(min)+")")
 	}
+	q.dragSplitterNamed(splitterLabel, 0, defaultSidebar)
+	if got := sidebarWidth(q.Snapshot()); got < min-sidebarTolPx {
+		add("dragged to the window edge and back in one drag: "+widthText(got), "shown again at the pointer")
+	}
+	q.DragSplitter(0)
+	if got := sidebarWidth(q.Snapshot()); got >= 0 {
+		add("dragged to the window edge: "+widthText(got), "hidden, as VS Code hides a side bar dragged below half its minimum")
+	}
+	q.Menu(q.Win, "View", "Primary Side Bar")
 	q.DragSplitter(normalWindowW)
 	tree := q.Snapshot()
-	if got := sidebarWidth(tree); got > tree.Window.Width-min {
-		add(widthText(got)+" of a "+widthText(tree.Window.Width)+" window", "the editor area keeps at least token.SidebarMinWidth ("+widthText(min)+")")
+	if editorMin := float64(token.EditorMinWidth.Px()); sidebarWidth(tree) > tree.Window.Width-editorMin {
+		add(widthText(sidebarWidth(tree))+" of a "+widthText(tree.Window.Width)+" window", "the editor area keeps at least token.EditorMinWidth ("+widthText(editorMin)+")")
 	}
 	small := LaunchQA(t, demo.Root, QAOptions{Width: smallestWindowW, Height: smallestWindowH, SidebarWidth: 1, Theme: themeDark, Tabs: demo.TabFiles[:fewTabs]})
 	if got := sidebarWidth(small.Snapshot()); got < min-sidebarTolPx {

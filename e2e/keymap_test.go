@@ -15,7 +15,7 @@ const goToLineTitle = "Go to Line/Column"
 func openInEditor(t *testing.T, app *App, win int, name string) Node {
 	t.Helper()
 	app.Click(win, app.WaitNode(win, name+" row", RoleLabel("treeItem", name)), 2)
-	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	field := app.WaitNode(win, "editor", codeEditor(name))
 	app.Act(win, field.ID, "focus", "")
 	return field
 }
@@ -46,7 +46,7 @@ func TestStatusBarPositionOpensGoToLineAndTypingStaysOutOfTheDocument(t *testing
 	app.Key(win, "Escape")
 	waitQuickInputClosed(app, win, goToLineTitle)
 	app.Eventually("document untouched", func() bool {
-		n, ok := app.Find(win, RoleLabel("textField", "Code editor"))
+		n, ok := app.Find(win, codeEditor("a.txt"))
 		return ok && n.ID == field.ID && !strings.Contains(n.Value, "3")
 	})
 }
@@ -94,7 +94,7 @@ func TestCmdEOpensRecentFiles(t *testing.T) {
 	openInEditor(t, app, win, "a.txt")
 	app.Key(win, "Cmd+E")
 	waitQuickOpen(app, win, "Recent Files")
-	app.WaitNode(win, "tool windows", Label("Tool Windows"))
+	app.WaitNode(win, "tool windows", Label("Views"))
 }
 
 func TestCmdSlashCommentsLine(t *testing.T) {

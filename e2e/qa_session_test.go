@@ -52,11 +52,15 @@ type QAOptions struct {
 	PanelOpen    bool
 	Panel        string
 	Tabs         []string
+	Groups       [][]string
 	ActiveTab    int
+	Seed         func(t *testing.T, root, userData string)
 	Settings     map[string]any
 	FrameStats   bool
+	GitHub       bool
 	QuietTimeout time.Duration
 	WaitTimeout  time.Duration
+	temp         string
 }
 
 type QAApp struct {
@@ -65,6 +69,7 @@ type QAApp struct {
 	Root string
 	Opts QAOptions
 	Temp string
+	env  []string
 	t    *testing.T
 }
 
@@ -98,6 +103,9 @@ func seedUserData(t *testing.T, root string, o QAOptions) string {
 		}
 		project.Layout = &session.Node{Group: &session.Group{Tabs: tabs, Active: o.ActiveTab}}
 	}
+	if len(o.Groups) > 0 {
+		project.Layout = groupsLayout(o.Groups)
+	}
 	store.State.Projects[root] = project
 	store.State.Recent = []string{root}
 	store.State.Open = []string{root}
@@ -106,6 +114,9 @@ func seedUserData(t *testing.T, root string, o QAOptions) string {
 	}
 	if o.Width > 0 && o.Height > 0 {
 		writeJSON(t, filepath.Join(dir, windowStateFile), map[string]any{windowStateKeyBase + root: map[string]any{"x": 0, "y": 0, "width": o.Width, "height": o.Height}})
+	}
+	if o.Seed != nil {
+		o.Seed(t, root, dir)
 	}
 	return dir
 }
@@ -124,12 +135,19 @@ func writeJSON(t *testing.T, path string, v any) {
 func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 	t.Helper()
 	env := []string{frameStatsEnv + "="}
-	var temp string
 	if o.FrameStats {
-		temp = t.TempDir()
-		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1", transparentEnv + "=1", tempDirEnv + "=" + temp}
+		o.temp = t.TempDir()
+		env = []string{frameStatsEnv + "=" + frameStatsAll, showUnfocusedEnv + "=1", transparentEnv + "=1", tempDirEnv + "=" + o.temp}
 	}
-	app := LaunchEnv(t, seedUserData(t, root, o), env, root)
+	if o.GitHub {
+		env = append(env, githubURLEnv+"="+sharedGitHubMock().URL(), githubTokenEnv+"="+mockToken)
+	}
+	return launchQAIn(t, seedUserData(t, root, o), env, root, o)
+}
+
+func launchQAIn(t *testing.T, userData string, env []string, root string, o QAOptions) *QAApp {
+	t.Helper()
+	app := LaunchEnv(t, userData, env, root)
 	var win int
 	app.Eventually("project window", func() bool {
 		for _, w := range app.Windows() {
@@ -140,7 +158,7 @@ func LaunchQA(t *testing.T, root string, o QAOptions) *QAApp {
 		}
 		return false
 	})
-	q := &QAApp{App: app, Win: win, Root: root, Opts: o, Temp: temp, t: t}
+	q := &QAApp{App: app, Win: win, Root: root, Opts: o, Temp: o.temp, env: env, t: t}
 	q.Settle()
 	if o.FrameStats {
 		q.WaitCPUQuiet()

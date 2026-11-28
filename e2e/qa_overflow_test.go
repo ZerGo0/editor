@@ -32,7 +32,23 @@ var overflowConfigs = []overflowConfig{
 
 var overflowThemes = []string{themeDark, themeLight}
 
+const (
+	githubRowTitleReason = "internal/design/list: a row title ends with an ellipsis and its tooltip shows the full title, so a long pull request or issue title is cut by design"
+	githubRowLabelReason = "internal/prui: the accessible name of a per-row button names its row (check or author) and keeps the sentence form that internal/prui tests assert"
+)
+
 var overflowAllow = []qa.Allow{
+	{Rule: qa.RuleTextCut, Role: "text", LabelPrefix: "Rework the text layout", Reason: githubRowTitleReason},
+	{Rule: qa.RuleTextCut, Role: "text", LabelPrefix: "Syntax highlighting is slow", Reason: githubRowTitleReason},
+	{Rule: qa.RuleTextCut, Role: "text", LabelPrefix: "Crash when the window is resized", Reason: githubRowTitleReason},
+	{Rule: qa.RuleTextCut, Role: "text", LabelPrefix: "Tab strip scrolls", Reason: githubRowTitleReason},
+	{Rule: qa.RuleTextCut, Role: "text", LabelPrefix: "The extremely long issue title", Reason: githubRowTitleReason},
+	{Rule: ruleWording + "/" + qa.RuleTitleCase, Role: "button", LabelPrefix: "Copy link to comment by ", Reason: githubRowLabelReason},
+	{Rule: ruleWording + "/" + qa.RuleTitleCase, Role: "button", LabelPrefix: "Details for ", Reason: githubRowLabelReason},
+	{Rule: ruleWording + "/" + qa.RuleTitleCase, Role: "button", LabelPrefix: "View logs of ", Reason: githubRowLabelReason},
+	{Rule: ruleWording + "/" + qa.RuleTitleCase, Role: "button", LabelPrefix: "Re-run ", Reason: githubRowLabelReason},
+	{Rule: ruleWording + "/" + qa.RuleTitleCase, Role: "button", LabelPrefix: "Cancel ", Reason: githubRowLabelReason},
+
 	{Rule: qa.RuleTextCut, View: "scm", Role: "text", LabelPrefix: demoLongOutgoing, Context: "narrow-sidebar", Reason: "internal/design/list: at the 170 px side bar the row keeps the 60% of its width for the subject that list.TitleShare asks, which is less than the 60% of the 11 pt text this check asks for"},
 	{Rule: qa.RuleTextCut, View: "scm", Role: "text", LabelPrefix: demoLongOutgoing, Context: "smallest-window", Reason: "internal/design/list: the smallest window uses the same 170 px side bar, see above"},
 	{Rule: qa.RuleTextCut, View: "search-all", Role: "text", LabelPrefix: "internal/a-very-long-directory-name", Reason: "internal/search/finder: the file name keeps its space first and the directory of the same file row is cut with an ellipsis as Go to File does"},
@@ -96,15 +112,15 @@ func TestOverflowAndEdgeCases(t *testing.T) {
 			context := contextName(cfg, theme)
 			t.Run(context, func(t *testing.T) {
 				t.Parallel()
-				demo := NewDemoProject(t)
-				q := LaunchQA(t, demo.Root, QAOptions{Width: cfg.Width, Height: cfg.Height, SidebarWidth: cfg.Sidebar, Theme: theme, Tabs: demo.TabFiles, ActiveTab: 0})
+				demo := githubDemoProject(t)
+				q := LaunchQA(t, demo.Root, githubOptions(demo, QAOptions{Width: cfg.Width, Height: cfg.Height, SidebarWidth: cfg.Sidebar, Theme: theme, ActiveTab: 0}))
 				var flags []qa.Flag
 				visit := func(view string) {
 					flags = append(flags, checkSnapshot(q, view, context, measure)...)
 					q.SaveShot(fmt.Sprintf("%s-%s-%s", view, cfg.Name, themeSuffix(theme)))
 				}
 				visit("tabs")
-				for _, step := range demoViewSteps() {
+				for _, step := range allViewSteps() {
 					if err := step.Enter(q, demo); err != nil {
 						flags = append(flags, unreachableFlag(step.Name, context, err))
 						continue
@@ -123,6 +139,7 @@ func TestOverflowAndEdgeCases(t *testing.T) {
 				if len(kept) > 0 {
 					t.Errorf("%d flags:\n%s", len(kept), report)
 				}
+				requireNoUnhandled(t)
 			})
 		}
 	}

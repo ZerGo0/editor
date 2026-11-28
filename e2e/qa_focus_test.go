@@ -38,7 +38,7 @@ var focusAllow = []qa.Allow{
 }
 
 func isCodeEditor(n qa.Node) bool {
-	return n.Role == "textField" && n.Has("multiline") && n.Label == "Code editor"
+	return n.Role == "textField" && n.Has("multiline") && n.Placeholder == ""
 }
 
 func (q *QAApp) Walk(key string, limit int) []qa.FocusStop {
@@ -221,7 +221,7 @@ func TestKeyboardFocusWalk(t *testing.T) {
 			{"editor", "Find widget", func() error { q.Press(findKey); return nil }},
 			{"tabs", "New File prompt", func() error { return q.TryMenu("File", "New File...") }},
 			{"tabs", "More Actions menu", func() error {
-				button, err := q.TryWait(hasRoleLabel("menuButton", moreActionsName), navTimeout)
+				button, err := q.TryWait(RoleLabel("menuButton", moreActionsName), navTimeout)
 				if err != nil {
 					return err
 				}
@@ -240,7 +240,7 @@ func TestKeyboardFocusWalk(t *testing.T) {
 			}
 			opened := q.Snapshot()
 			if c.what == "Find widget" {
-				if _, ok := opened.Find(hasRoleLabel("textField", "Find")); !ok {
+				if _, ok := opened.Find(RoleLabel("textField", "Find")); !ok {
 					flags = append(flags, unreachableFlag(c.view, "escape", fmt.Errorf("Find widget did not open")))
 					continue
 				}

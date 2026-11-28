@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ZerGo0/editor/e2e/qa"
 	"github.com/ZerGo0/editor/internal/testutil"
 )
 
@@ -27,6 +28,8 @@ const (
 	socketEnv          = "MYGO_AUTOMATION"
 	userDataEnv        = "EDITOR_E2E_USER_DATA"
 	showUnfocusedEnv   = "EDITOR_E2E_SHOW_UNFOCUSED"
+	githubURLEnv       = "EDITOR_E2E_GITHUB_URL"
+	githubTokenEnv     = "EDITOR_E2E_GITHUB_TOKEN"
 	transparentEnv     = "EDITOR_E2E_TRANSPARENT"
 	artifactsEnv       = "EDITOR_E2E_ARTIFACTS"
 	startTimeout       = 20 * time.Second
@@ -61,38 +64,15 @@ func TestMain(m *testing.M) {
 	}
 	code := m.Run()
 	removeDemoCache()
+	stopGitHubMock()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)
 }
 
-type Rect struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Width  float64 `json:"width"`
-	Height float64 `json:"height"`
-}
-
-type Node struct {
-	ID          string   `json:"id"`
-	Parent      string   `json:"parent"`
-	Role        string   `json:"role"`
-	Key         any      `json:"key"`
-	Label       string   `json:"label"`
-	Value       string   `json:"value"`
-	Description string   `json:"description"`
-	States      []string `json:"states"`
-	Actions     []string `json:"actions"`
-	Bounds      Rect     `json:"bounds"`
-}
-
-func (n Node) Has(state string) bool {
-	for _, s := range n.States {
-		if s == state {
-			return true
-		}
-	}
-	return false
-}
+type (
+	Rect = qa.Rect
+	Node = qa.Node
+)
 
 type Window struct {
 	ID      int    `json:"id"`
@@ -445,4 +425,16 @@ func Label(label string) func(Node) bool {
 
 func RoleLabel(role, label string) func(Node) bool {
 	return func(n Node) bool { return n.Role == role && n.Label == label }
+}
+
+func FieldValue(label, value string) func(Node) bool {
+	return func(n Node) bool { return n.Role == "textField" && n.Label == label && n.Value == value }
+}
+
+func hasName(label, name string) bool {
+	return label == name || strings.HasPrefix(label, name+nameSeparator)
+}
+
+func RoleNamed(role, name string) func(Node) bool {
+	return func(n Node) bool { return n.Role == role && hasName(n.Label, name) }
 }

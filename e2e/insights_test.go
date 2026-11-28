@@ -18,7 +18,7 @@ func TestProblemsPanelShowsBracketError(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"bad.go": "package main\n\nfunc main() {\n"})
 	app.Click(win, app.WaitNode(win, "bad.go row", RoleLabel("treeItem", "bad.go")), 2)
-	app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	app.WaitNode(win, "editor", codeEditor("bad.go"))
 	app.Menu(win, "View", "Problems")
 	app.WaitNode(win, "problem row", Label("'{' is not closed"))
 }

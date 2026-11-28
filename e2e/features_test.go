@@ -13,6 +13,7 @@ import (
 
 const (
 	modifiedState    = "Unsaved changes"
+	nameSeparator    = ", "
 	closeButtonInset = 14
 )
 
@@ -27,18 +28,20 @@ func hasUnsavedAlpha(n Node) bool {
 }
 
 func tabModified(name string) func(Node) bool {
-	return func(n Node) bool {
-		return n.Role == "tab" && n.Label == name && strings.Contains(n.Description, modifiedState)
-	}
+	return RoleLabel("tab", name+nameSeparator+modifiedState)
+}
+
+func codeEditor(name string) func(Node) bool {
+	return func(n Node) bool { return n.Role == "textField" && n.Has("multiline") && n.Label == name }
 }
 
 func hasTab(app *App, win int, name string) bool {
-	_, ok := app.Find(win, RoleLabel("tab", name))
+	_, ok := app.Find(win, RoleNamed("tab", name))
 	return ok
 }
 
-func focusEditor(app *App, win int) {
-	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+func focusEditor(app *App, win int, name string) {
+	field := app.WaitNode(win, "editor", codeEditor(name))
 	app.Act(win, field.ID, "focus", "")
 }
 
@@ -47,12 +50,12 @@ func TestNewUntitledFile(t *testing.T) {
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Menu(win, "File", "New Text File")
 	app.WaitNode(win, "Untitled-1 tab", RoleLabel("tab", "Untitled-1"))
-	focusEditor(app, win)
+	focusEditor(app, win, "Untitled-1")
 	app.Type(win, "draft")
 	app.WaitNode(win, "modified Untitled-1 tab", tabModified("Untitled-1"))
 	app.Menu(win, "File", "New Text File")
 	app.WaitNode(win, "Untitled-2 tab", RoleLabel("tab", "Untitled-2"))
-	if _, ok := app.Find(win, RoleLabel("tab", "Untitled-1")); !ok {
+	if _, ok := app.Find(win, RoleNamed("tab", "Untitled-1")); !ok {
 		t.Fatal("Untitled-1 tab closed")
 	}
 }
@@ -84,7 +87,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 			win := app.WaitWindow(filepath.Base(root))
 			app.Idle(win)
 			app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-			focusEditor(app, win)
+			focusEditor(app, win, "a.txt")
 			app.Type(win, "unsaved ")
 			app.WaitNode(win, "modified a.txt tab", tabModified("a.txt"))
 			if tc.closeWindow {

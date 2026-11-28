@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ZerGo0/editor/e2e/qa"
@@ -49,16 +51,59 @@ func scrollAction(options func(d DemoProject) QAOptions, startKey, endKey string
 	return a
 }
 
-func quickQueryAction(menuItem, query string) latencyAction {
+func menuTitle(menu []string) string { return strings.TrimSuffix(menu[len(menu)-1], "...") }
+
+func (k *actionKit) scrollToTop(q *QAApp, d DemoProject, i int) {
+	q.Send(map[string]any{"type": "wheel", "x": k.target.Bounds.CenterX(), "y": k.target.Bounds.CenterY(), "dy": -scrollToTop})
+	q.Settle()
+}
+
+func (k *actionKit) wheel(dy int) func(q *QAApp, d DemoProject, i int) {
+	return func(q *QAApp, d DemoProject, i int) {
+		q.Send(map[string]any{"type": "wheel", "x": k.target.Bounds.CenterX(), "y": k.target.Bounds.CenterY(), "dy": dy})
+	}
+}
+
+func clearFocusedField(q *QAApp, d DemoProject, i int) {
+	q.Send(KeyEvent("Cmd+A"))
+	q.Send(KeyEvent("Backspace"))
+	q.Settle()
+}
+
+func typeText(text string) func(q *QAApp, d DemoProject, i int) {
+	return func(q *QAApp, d DemoProject, i int) { q.Send(TextEvent(text)) }
+}
+
+func expectFieldValue(label, value string) func(q *QAApp, d DemoProject) error {
+	return func(q *QAApp, d DemoProject) error {
+		if _, err := q.TryWait(FieldValue(label, value), q.waitFor()); err != nil {
+			return fmt.Errorf("the %s field does not hold %q: %w", label, value, err)
+		}
+		return nil
+	}
+}
+
+func quickQueryAction(menu []string, query string, hit func(n qa.Node) bool) latencyAction {
+	title := menuTitle(menu)
 	return latencyAction{
 		Owner: qa.OwnerSearch, IdleFrames: blinkFramesPerSec,
-		Prepare: func(q *QAApp, d DemoProject) error { return q.TryMenu(goMenu, menuItem) },
-		Reset: func(q *QAApp, d DemoProject, i int) {
-			q.Send(KeyEvent("Cmd+A"))
-			q.Send(KeyEvent("Backspace"))
-			q.Settle()
+		Prepare: func(q *QAApp, d DemoProject) error {
+			if err := q.TryMenu(menu...); err != nil {
+				return err
+			}
+			if _, err := q.TryWait(RoleLabel(paletteRole, title), q.waitFor()); err != nil {
+				return fmt.Errorf("%s dialog did not open: %w", title, err)
+			}
+			return nil
 		},
-		Do: func(q *QAApp, d DemoProject, i int) { q.Send(TextEvent(query)) },
+		Verify: func(q *QAApp, d DemoProject) error {
+			if _, err := q.TryWait(func(n qa.Node) bool { return n.Role == "listItem" && hit(n) }, q.waitFor()); err != nil {
+				return fmt.Errorf("%s shows no result row for %q: %w", title, query, err)
+			}
+			return nil
+		},
+		Reset: clearFocusedField,
+		Do:    typeText(query),
 	}
 }
 
@@ -83,7 +128,7 @@ func expandFolderAction(dir string) latencyAction {
 			return nil
 		},
 		Reset: func(q *QAApp, d DemoProject, i int) {
-			n, err := q.TryWait(hasRoleLabel("treeItem", dir), q.waitFor())
+			n, err := q.TryWait(RoleLabel("treeItem", dir), q.waitFor())
 			if err != nil {
 				q.t.Fatalf("folder %s not in the tree: %v", dir, err)
 			}
@@ -112,7 +157,7 @@ func stackedDiffAction(row func(q *QAApp) (qa.Node, error)) latencyAction {
 		Owner: qa.OwnerGit,
 		Prepare: func(q *QAApp, d DemoProject) error {
 			menuOrFail(q, viewMenu, "Source Control")
-			_, err := q.TryWait(hasLabel("Commit Message"), q.waitFor())
+			_, err := q.TryWait(Label("Commit Message"), q.waitFor())
 			return err
 		},
 		Reset: func(q *QAApp, d DemoProject, i int) {
@@ -140,7 +185,7 @@ func toggleSidebarAction() latencyAction {
 	return latencyAction{
 		Owner: qa.OwnerWorkspace,
 		Reset: func(q *QAApp, d DemoProject, i int) {
-			n, err := q.TryWait(hasRoleLabel("button", toggleSidebarName), navTimeout)
+			n, err := q.TryWait(RoleLabel("button", toggleSidebarName), navTimeout)
 			if err != nil {
 				q.t.Fatalf("toggle sidebar button: %v", err)
 			}

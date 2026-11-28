@@ -58,7 +58,7 @@ func TestOpenFolderReplacingTheWindowKeepsUnsavedText(t *testing.T) {
 	win := app.WaitWindow(filepath.Base(first))
 	app.Idle(win)
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-	focusEditor(app, win)
+	focusEditor(app, win, "a.txt")
 	app.Type(win, "unsaved ")
 	app.WaitNode(win, "modified a.txt tab", tabModified("a.txt"))
 
@@ -108,7 +108,7 @@ func TestOpenFileOutsideEveryFolderOpensInTheCurrentWindow(t *testing.T) {
 		return n.Role == "textField" && strings.Contains(n.Value, "loose")
 	})
 	app.Idle(win)
-	focusEditor(app, win)
+	focusEditor(app, win, "loose.txt")
 	app.Type(win, "edited ")
 	app.WaitNode(win, "modified loose.txt tab", tabModified("loose.txt"))
 	app.Menu(win, "File", "Save")

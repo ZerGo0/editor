@@ -126,6 +126,11 @@ func (r *latencyRun) action(t *testing.T, index int, action latencyAction) {
 	stats, firstStats := qa.Summarize(settled), qa.Summarize(first)
 	idle, quiet := q.MeasureIdle()
 	data := qa.DataBytes(q.UserData, q.Temp)
+	if action.Verify != nil {
+		if err := action.Verify(q, demo); err != nil {
+			t.Fatalf("verify: %v", err)
+		}
+	}
 	growth := int64(end.Footprint) - int64(begin.Footprint)
 	record := resourceRecord{
 		Action: action.Name, Owner: action.Owner, Runs: work.Runs, Fixture: action.Fixture, FixtureBytes: stressFixtureBytes(action.Fixture),

@@ -42,10 +42,13 @@ const (
 )
 
 var stressSpecs = map[string]stressSpec{
-	stressFixtureTree:    {estimate: 520 << 20, build: buildTreeFixture},
-	stressFixtureHistory: {estimate: 220 << 20, build: buildHistoryFixture},
-	stressFixtureChanges: {estimate: 140 << 20, build: buildChangesFixture},
-	stressFixtureFiles:   {estimate: 1100 << 20, build: buildFilesFixture},
+	stressFixtureTree:     {estimate: 520 << 20, build: buildTreeFixture},
+	stressFixtureHistory:  {estimate: 220 << 20, build: buildHistoryFixture},
+	stressFixtureChanges:  {estimate: 140 << 20, build: buildChangesFixture},
+	stressFixtureFiles:    {estimate: 1100 << 20, build: buildFilesFixture},
+	stressFixtureInsights: {estimate: 24 << 20, build: buildInsightsFixture},
+	stressFixtureBranches: {estimate: 160 << 20, build: buildBranchesFixture},
+	stressFixtureWrap:     {estimate: 20 << 20, build: buildWrapFixture},
 }
 
 func stressGitEnv() []string {

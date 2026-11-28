@@ -100,7 +100,7 @@ func TestEditAndSaveWritesFile(t *testing.T) {
 	t.Parallel()
 	app, win, root := openProject(t, map[string]string{"note.txt": "hello\n"})
 	app.Click(win, app.WaitNode(win, "note.txt row", RoleLabel("treeItem", "note.txt")), 2)
-	field := app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	field := app.WaitNode(win, "editor", codeEditor("note.txt"))
 	app.Act(win, field.ID, "focus", "")
 	app.Type(win, "edited ")
 	app.Menu(win, "File", "Save")
@@ -115,7 +115,7 @@ func TestSplitRightShowsTwoEditors(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, map[string]string{"a.txt": "alpha\n"})
 	app.Click(win, app.WaitNode(win, "a.txt row", RoleLabel("treeItem", "a.txt")), 2)
-	app.WaitNode(win, "editor", RoleLabel("textField", "Code editor"))
+	app.WaitNode(win, "editor", codeEditor("a.txt"))
 	app.Act(win, app.WaitNode(win, "split button", RoleLabel("button", "Split Right")).ID, "press", "")
 	app.Eventually("two editors", func() bool { return countRole(app.Tree(win), "textField") == 2 })
 }

@@ -60,11 +60,11 @@ func TestGoToFileOpensFile(t *testing.T) {
 func TestFindInFilesOpensMatch(t *testing.T) {
 	t.Parallel()
 	app, win, _ := openProject(t, searchProject)
-	app.Menu(win, "Go", "Find in Files")
+	app.Menu(win, "Edit", "Find in Files")
 	waitQuickOpen(app, win, findInFilesTitle)
 	waitTab(app, win, "Text", true)
 	app.Type(win, "needle")
-	row := app.WaitNode(win, "match row", Label(matchRowLabel))
+	row := app.WaitNode(win, "match row", func(n Node) bool { return hasName(n.Label, matchRowLabel) })
 	app.Click(win, row, 1)
 	app.WaitNode(win, "server.go tab", RoleLabel("tab", "server.go"))
 }
@@ -76,7 +76,7 @@ func TestCmdShiftFOpensTextTabWithMatch(t *testing.T) {
 	waitQuickOpen(app, win, findInFilesTitle)
 	waitTab(app, win, "Text", true)
 	app.Type(win, "needle")
-	app.WaitNode(win, "match row", Label(matchRowLabel))
+	app.WaitNode(win, "match row", func(n Node) bool { return hasName(n.Label, matchRowLabel) })
 }
 
 func TestCmdShiftPOpensActionsTab(t *testing.T) {
@@ -130,12 +130,12 @@ func TestSymbolSearchFindsType(t *testing.T) {
 func TestReplaceAllEditsMatchesAfterConfirmation(t *testing.T) {
 	t.Parallel()
 	app, win, root := openProject(t, searchProject)
-	app.Menu(win, "Go", "Replace in Files")
+	app.Menu(win, "Edit", "Replace in Files")
 	waitQuickOpen(app, win, replaceInFilesTitle)
 	query := app.WaitNode(win, "query field", RoleLabel("textField", replaceInFilesTitle))
 	app.Act(win, query.ID, "focus", "")
 	app.Type(win, "needle")
-	app.WaitNode(win, "match row", Label(matchRowLabel))
+	app.WaitNode(win, "match row", func(n Node) bool { return hasName(n.Label, matchRowLabel) })
 	replace := app.WaitNode(win, "replace field", RoleLabel("textField", "Replace"))
 	app.Act(win, replace.ID, "focus", "")
 	app.Type(win, "pin")

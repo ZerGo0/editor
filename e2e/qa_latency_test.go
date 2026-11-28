@@ -100,6 +100,7 @@ type latencyAction struct {
 	Prepare    func(q *QAApp, d DemoProject) error
 	Reset      func(q *QAApp, d DemoProject, i int)
 	Do         func(q *QAApp, d DemoProject, i int)
+	Verify     func(q *QAApp, d DemoProject) error
 	MaxWait    time.Duration
 	Timeout    time.Duration
 	Cold       bool
@@ -146,7 +147,7 @@ func menuOrFail(q *QAApp, path ...string) {
 }
 
 func clickLabel(q *QAApp, role, label string) error {
-	n, err := q.TryWait(hasRoleLabel(role, label), navTimeout)
+	n, err := q.TryWait(RoleLabel(role, label), navTimeout)
 	if err != nil {
 		return fmt.Errorf("%s %q: %w", role, label, err)
 	}
@@ -163,7 +164,7 @@ func latencyActions() []latencyAction {
 			Reset: func(q *QAApp, d DemoProject, i int) { q.Escape() },
 			Do:    func(q *QAApp, d DemoProject, i int) { menuNow(q, goMenu, "Go to File...") },
 		}.with("open Go to File", latencySamples, burstQuietShort),
-		quickQueryAction(goToFileMenu, quickQuery).with("type a query in Go to File", latencySamples, burstQuietShort),
+		quickQueryAction(goToFileMenuPath, quickQuery, labelPrefix(quickQuery)).with("type a query in Go to File", latencySamples, burstQuietShort),
 		switchTabAction(allTabsOptions).with("switch tab", latencySamples, burstQuietShort),
 		toggleSidebarAction().with("toggle sidebar", latencySamples, burstQuietShort),
 		expandFolderAction(demoChangelogDir).with("expand a 2000-entry folder", latencySamples, burstQuietShort),
@@ -241,10 +242,10 @@ func TestInputLatencyBudget(t *testing.T) {
 	run.finish(t)
 }
 
-func isDemoChangedFile(label string) bool { return label == demoChangedFile }
+func isDemoChangedFile(label string) bool { return hasName(label, demoChangedFile) }
 
 func firstChangedRow(tree *qa.Tree, match func(label string) bool) (qa.Node, bool) {
-	list, ok := tree.Find(hasRoleLabel("list", "Changes"))
+	list, ok := tree.Find(RoleLabel("list", "Changes"))
 	if !ok {
 		return qa.Node{}, false
 	}
@@ -260,7 +261,7 @@ func (q *QAApp) waitChangedRow(match func(label string) bool) (qa.Node, error) {
 		if n, ok := firstChangedRow(tree, match); ok {
 			return n, nil
 		}
-		if list, ok := tree.Find(hasRoleLabel("list", "Changes")); ok {
+		if list, ok := tree.Find(RoleLabel("list", "Changes")); ok {
 			q.Send(map[string]any{"type": "wheel", "x": list.Bounds.CenterX(), "y": list.Bounds.CenterY(), "dy": findRowScroll})
 		}
 		time.Sleep(changedRowPoll)

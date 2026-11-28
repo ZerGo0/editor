@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,6 +32,7 @@ const (
 	closeAllEditorsLabel  = "Close All Editors"
 	findInFilesMenu       = "Find in Files"
 	goToFileMenu          = "Go to File..."
+	stressSmallFile       = "README.md"
 	cmdTop                = "Cmd+Up"
 	cmdBottom             = "Cmd+Down"
 )
@@ -45,6 +47,11 @@ var stressBigFiles = []bigFile{
 	{"50 MB single-line file", stressMinifiedName},
 	{"200k-line file", stressLongName},
 }
+
+var (
+	goToFileMenuPath    = []string{goMenu, goToFileMenu}
+	findInFilesMenuPath = []string{editMenu, findInFilesMenu}
+)
 
 func stressTreeTabFile(root string, i int) string {
 	return filepath.Join(root, filepath.FromSlash(stressTreePath(i*stressTabStride%(stressTreeLeafDirs*stressTreeLeafFiles))))
@@ -78,14 +85,31 @@ func stressProject(fixture string) func(t *testing.T) DemoProject {
 	return func(t *testing.T) DemoProject { return DemoProject{Root: stressRoot(fixture)} }
 }
 
-func (a latencyAction) onFixture(fixture, name string, quiet time.Duration, samples int) latencyAction {
-	a.Fixture, a.Project = fixture, stressProject(fixture)
+func stressSmallProject(t *testing.T) DemoProject {
+	t.Helper()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, stressSmallFile), []byte("# Small project\n"), shotFilePerm); err != nil {
+		t.Fatal(err)
+	}
+	return DemoProject{Root: root}
+}
+
+func (a latencyAction) onProject(project func(t *testing.T) DemoProject, name string, quiet time.Duration, samples int) latencyAction {
+	a.Project = project
 	a.Name, a.Samples, a.Quiet = name, samples, quiet
 	a.MaxWait, a.Timeout = stressMaxWait, stressScenarioTimeout
 	if a.Options == nil {
 		a.Options = stressOptions(nil)
 	}
 	return a
+}
+
+func (a latencyAction) onFixture(fixture, name string, quiet time.Duration, samples int) latencyAction {
+	a.Fixture = fixture
+	return a.onProject(stressProject(fixture), name, quiet, samples)
 }
 
 func (a latencyAction) withOptions(options func(d DemoProject) QAOptions) latencyAction {
@@ -105,18 +129,21 @@ func (a latencyAction) leakCheck() latencyAction {
 
 func openFromExplorer(q *QAApp, name string) {
 	q.t.Helper()
-	row, err := q.TryWait(hasRoleLabel("treeItem", name), q.waitFor())
+	row, err := q.TryWait(RoleLabel("treeItem", name), q.waitFor())
 	if err != nil {
 		q.t.Fatalf("%s not in the explorer: %v", name, err)
 	}
 	q.Send(ClickEvent(row.Bounds.CenterX(), row.Bounds.CenterY()))
-	if _, err := q.TryWait(hasRoleLabel("tab", name), q.waitFor()); err != nil {
+	if _, err := q.TryWait(RoleLabel("tab", name), q.waitFor()); err != nil {
 		q.t.Fatalf("tab %s did not open: %v", name, err)
 	}
 }
 
 func firstChangeRow(q *QAApp) (qa.Node, error) {
-	return q.waitChangedRow(func(label string) bool { return strings.HasSuffix(label, ".go") })
+	return q.waitChangedRow(func(label string) bool {
+		name, _, _ := strings.Cut(label, nameSeparator)
+		return strings.HasSuffix(name, ".go")
+	})
 }
 
 func openFolderAction() latencyAction {
@@ -128,7 +155,7 @@ func closeAllTabsAction() latencyAction {
 	return latencyAction{
 		Owner: qa.OwnerWorkspace,
 		Prepare: func(q *QAApp, d DemoProject) (err error) {
-			k.target, err = q.TryWait(hasLabel(closeAllEditorsLabel), q.waitFor())
+			k.target, err = q.TryWait(Label(closeAllEditorsLabel), q.waitFor())
 			return err
 		},
 		Do: k.click,
@@ -148,7 +175,7 @@ func scrollGraphAction() latencyAction {
 		Owner: qa.OwnerGit,
 		Prepare: func(q *QAApp, d DemoProject) (err error) {
 			menuOrFail(q, viewMenu, "Source Control")
-			k.target, err = q.TryWait(hasRoleLabel("list", "Graph"), q.waitFor())
+			k.target, err = q.TryWait(RoleLabel("list", "Graph"), q.waitFor())
 			return err
 		},
 		Do: func(q *QAApp, d DemoProject, i int) {
@@ -188,8 +215,8 @@ func stressActions() []latencyAction {
 	actions := []latencyAction{
 		openFolderAction().onFixture(stressFixtureTree, fmt.Sprintf("open the %dk-file folder", stressTreeFiles/1000), stressQuietLong, 0),
 		expandFolderAction(stressFlatDir).onFixture(stressFixtureTree, fmt.Sprintf("expand a %dk-entry folder", stressFlatFiles/1000), stressQuietLong, stressSamples),
-		quickQueryAction(goToFileMenu, stressQueryFile).onFixture(stressFixtureTree, "type a query in Go to File over the big folder", stressQuietLong, stressSamples),
-		quickQueryAction(findInFilesMenu, stressNeedle).onFixture(stressFixtureTree, "text search over all files", stressQuietLong, stressBigSamples),
+		quickQueryAction(goToFileMenuPath, stressQueryFile, labelPrefix(stressQueryFile)).onFixture(stressFixtureTree, "type a query in Go to File over the big folder", stressQuietLong, stressSamples),
+		quickQueryAction(findInFilesMenuPath, stressNeedle, isMatchRow).onFixture(stressFixtureTree, "text search over all files", stressQuietLong, stressBigSamples),
 		switchTabAction(stressOptions(tabs200)).onFixture(stressFixtureTree, fmt.Sprintf("switch tab with %d tabs open", stressTabCount), stressQuietLong, stressSamples),
 		closeAllTabsAction().onFixture(stressFixtureTree, fmt.Sprintf("close %d tabs", stressTabCount), stressQuietLong, 1).cold(),
 		openGraphAction().onFixture(stressFixtureHistory, fmt.Sprintf("open the Graph (%dk commits)", stressHistoryCommits/1000), stressQuietLong, stressBigSamples),
@@ -207,6 +234,15 @@ func stressActions() []latencyAction {
 			searchInFileAction(onFile, stressEndNeedle).onFixture(stressFixtureFiles, "search in the "+f.label, stressQuietLong, stressBigSamples),
 		)
 	}
+	actions = append(actions, stressGitHubActions()...)
+	actions = append(actions, stressSplitActions()...)
+	actions = append(actions, stressSearchActions()...)
+	actions = append(actions, stressSettingsActions()...)
+	actions = append(actions, stressInsightsActions()...)
+	actions = append(actions, stressHistoryActions()...)
+	actions = append(actions, stressHotExitActions()...)
+	actions = append(actions, stressWrapActions()...)
+	actions = append(actions, stressGitActions()...)
 	return append([]latencyAction{
 		closeTabsOneByOneAction().withOptions(stressOptions(stressTreeTabs(stressLeakTabs))).onFixture(stressFixtureTree, fmt.Sprintf("leak check: open and close %d tabs", stressLeakTabs), stressQuietShort, stressLeakTabs).leakCheck(),
 		stackedDiffAction(firstChangeRow).onFixture(stressFixtureChanges, fmt.Sprintf("leak check: open the stacked diff %d times", stressLeakDiffs), stressQuietLong, stressLeakDiffs).leakCheck(),
