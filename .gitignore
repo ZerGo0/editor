@@ -4,3 +4,5 @@
 /.task/
 mygo_windows_*.syso
 .DS_Store
+COMMIT-MESSAGE.md
+/.claude/worktrees/
