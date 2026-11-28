@@ -1,6 +1,6 @@
 # Ideas
 
-Features we chose not to build now. Each one comes from the [IDE research](docs/research/ide-features.md). Effort: S small, M medium, L large.
+Features we chose not to build now. Effort: S small, M medium, L large.
 
 ## Code intelligence
 
