@@ -100,6 +100,11 @@ func EditorCommandID(cmd editor.Command) string {
 	return legacyEditorPrefix + cmd.String()
 }
 
+func EditorTitle(cmd editor.Command) (string, bool) {
+	title, ok := vscode.EditorTitles[cmd]
+	return title, ok
+}
+
 func EditorCommand(id string) (editor.Command, bool) {
 	cmd, ok := editorByID[CanonicalID(id)]
 	return cmd, ok

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/fsutil"
@@ -24,7 +25,8 @@ type Store struct {
 	Base   *Store
 	values map[string]any
 	set    map[string]bool
-	Errors []string
+	Errors []jsonc.Problem
+	Broken bool
 }
 
 func Load(path string) *Store {
@@ -40,16 +42,24 @@ func LoadFolder(path string, base *Store) *Store {
 }
 
 func (s *Store) Reload() {
-	s.values, s.set, s.Errors = map[string]any{}, map[string]bool{}, nil
+	s.values, s.set, s.Errors, s.Broken = map[string]any{}, map[string]bool{}, nil, false
 	if s.Base == nil {
 		for _, d := range Defs {
 			s.values[d.Key] = d.Default
 		}
 	}
-	raw, err := s.read()
-	if err != nil {
-		s.Errors = append(s.Errors, err.Error())
+	raw, data, bad := s.read()
+	if bad != nil {
+		s.Broken = true
+		s.Errors = append(s.Errors, *bad)
 		return
+	}
+	offsets := jsonc.KeyOffsets(data)
+	problem := func(key, text string) jsonc.Problem {
+		if at, ok := offsets[key]; ok {
+			return jsonc.At(data, at, text)
+		}
+		return jsonc.Unlocated(text)
 	}
 	keys := make([]string, 0, len(raw))
 	for k := range raw {
@@ -59,63 +69,80 @@ func (s *Store) Reload() {
 	for _, key := range keys {
 		d := DefFor(key)
 		if d == nil {
-			s.Errors = append(s.Errors, fmt.Sprintf("%s: unknown setting", key))
+			s.Errors = append(s.Errors, problem(key, key+": unknown setting."))
 			continue
 		}
 		if s.Base != nil && d.AppWide {
-			s.Errors = append(s.Errors, fmt.Sprintf("%s: applies to all windows; set it in the user settings", key))
+			s.Errors = append(s.Errors, problem(key, key+": applies to all windows; set it in the user settings."))
 			continue
 		}
 		v, err := decode(d, raw[key])
 		if err != nil {
-			s.Errors = append(s.Errors, fmt.Sprintf("%s: %v", key, err))
+			s.Errors = append(s.Errors, problem(key, fmt.Sprintf("%s: %v.", key, err)))
 			continue
 		}
 		s.values[key], s.set[key] = v, true
 	}
 }
 
-func (s *Store) read() (map[string]json.RawMessage, error) {
+func (s *Store) read() (map[string]json.RawMessage, []byte, *jsonc.Problem) {
 	data, err := jsonc.ReadFile(s.Path)
-	if err != nil || data == nil {
-		return nil, err
+	if err != nil {
+		p := jsonc.Unlocated(fmt.Sprintf("%s: %v.", filepath.Base(s.Path), err))
+		return nil, nil, &p
+	}
+	if data == nil {
+		return nil, nil, nil
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("%s: %w", filepath.Base(s.Path), err)
+		f := jsonc.Describe(err)
+		p := jsonc.At(data, f.Offset, f.Sentence())
+		return nil, nil, &p
 	}
-	return raw, nil
+	return raw, data, nil
+}
+
+func unmarshal(raw json.RawMessage, v any) error {
+	if err := json.Unmarshal(raw, v); err != nil {
+		return errors.New(jsonc.Describe(err).Message)
+	}
+	return nil
 }
 
 func decode(d *Def, raw json.RawMessage) (any, error) {
 	switch d.Kind {
 	case Bool:
 		var v bool
-		err := json.Unmarshal(raw, &v)
+		err := unmarshal(raw, &v)
 		return v, err
 	case Int:
 		var v float64
-		if err := json.Unmarshal(raw, &v); err != nil {
+		if err := unmarshal(raw, &v); err != nil {
 			return nil, err
 		}
 		if v != math.Trunc(v) {
-			return nil, fmt.Errorf("must be a whole number")
+			return nil, errors.New("must be a whole number")
 		}
 		return int(clamp(d, v)), nil
 	case Number:
 		var v float64
-		if err := json.Unmarshal(raw, &v); err != nil {
+		if err := unmarshal(raw, &v); err != nil {
 			return nil, err
 		}
 		return clamp(d, v), nil
 	case String:
 		var v string
-		err := json.Unmarshal(raw, &v)
+		err := unmarshal(raw, &v)
 		return v, err
 	case Enum:
 		var v string
-		if err := json.Unmarshal(raw, &v); err != nil {
-			return nil, err
+		if err := unmarshal(raw, &v); err != nil {
+			var b bool
+			if unmarshal(raw, &b) != nil {
+				return nil, err
+			}
+			v = strconv.FormatBool(b)
 		}
 		if !slices.Contains(d.Options, v) {
 			return nil, fmt.Errorf("must be one of %s", strings.Join(d.Options, ", "))
@@ -123,19 +150,19 @@ func decode(d *Def, raw json.RawMessage) (any, error) {
 		return v, nil
 	case IntList:
 		var v []int
-		err := json.Unmarshal(raw, &v)
+		err := unmarshal(raw, &v)
 		return v, err
 	case StringList:
 		var v []string
-		err := json.Unmarshal(raw, &v)
+		err := unmarshal(raw, &v)
 		return v, err
 	case JSON:
 		if !json.Valid(raw) {
-			return nil, fmt.Errorf("must be valid JSON")
+			return nil, errors.New("must be valid JSON")
 		}
 		return json.RawMessage(slices.Clone(raw)), nil
 	}
-	return nil, fmt.Errorf("unsupported kind")
+	return nil, errors.New("unsupported kind")
 }
 
 func clamp(d *Def, v float64) float64 {

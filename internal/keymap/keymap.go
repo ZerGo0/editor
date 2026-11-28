@@ -41,7 +41,7 @@ type Keymap struct {
 	byCommand   map[string][]Chord
 	editor      []editor.Binding
 	editorReady bool
-	Errors      []string
+	Errors      []jsonc.Problem
 }
 
 type Active struct {
@@ -78,23 +78,34 @@ func newBinding(e Entry) (Binding, error) {
 }
 
 func New(defaults []Binding, user []Entry) *Keymap {
+	return newLocated(defaults, user, nil)
+}
+
+func newLocated(defaults []Binding, user []Entry, locate func(int) (int, int)) *Keymap {
 	k := &Keymap{ctx: DefaultContext()}
+	fail := func(i int, format string, args ...any) {
+		p := jsonc.Unlocated(fmt.Sprintf(format, args...))
+		if locate != nil {
+			p.Line, p.Col = locate(i)
+		}
+		k.Errors = append(k.Errors, p)
+	}
 	base := slices.Clone(defaults)
 	var added []Binding
 	for i, e := range user {
 		if id, ok := strings.CutPrefix(e.Command, RemovePrefix); ok {
 			if err := removeDefaults(&base, id, e); err != nil {
-				k.Errors = append(k.Errors, fmt.Sprintf("entry %d: %v", i+1, err))
+				fail(i, "entry %d: %v", i+1, err)
 			}
 			continue
 		}
 		if e.Key == "" || e.Command == "" {
-			k.Errors = append(k.Errors, fmt.Sprintf("entry %d: needs a key and a command", i+1))
+			fail(i, "entry %d: needs a key and a command", i+1)
 			continue
 		}
 		b, err := newBinding(e)
 		if err != nil {
-			k.Errors = append(k.Errors, fmt.Sprintf("entry %d: %v", i+1, err))
+			fail(i, "entry %d: %v", i+1, err)
 			continue
 		}
 		b.User = true
@@ -127,12 +138,29 @@ func removeDefaults(base *[]Binding, id string, e Entry) error {
 
 func (k *Keymap) index() {
 	k.Active = k.In(k.ctx)
+	labels := k.In(LabelContext())
 	k.byCommand = map[string][]Chord{}
 	for i := len(k.bindings) - 1; i >= 0; i-- {
-		if b := k.bindings[i]; k.owner(b.Chord) == i {
+		if b := k.bindings[i]; labels.owner(b.Chord) == i {
 			k.byCommand[b.Command] = append(k.byCommand[b.Command], b.Chord)
 		}
 	}
+	for i := len(k.bindings) - 1; i >= 0; i-- {
+		b := k.bindings[i]
+		if _, labeled := k.byCommand[b.Command]; !labeled && !k.overridden(i) && !otherPlatform(b) {
+			k.byCommand[b.Command] = []Chord{b.Chord}
+		}
+	}
+}
+
+var otherPlatformKeys = []string{"isWeb", "isWindows", "isLinux"}
+
+func otherPlatform(b Binding) bool {
+	return slices.ContainsFunc(b.When.Keys(), func(key string) bool { return slices.Contains(otherPlatformKeys, key) })
+}
+
+func (k *Keymap) overridden(i int) bool {
+	return slices.ContainsFunc(k.bindings[i+1:], func(b Binding) bool { return b.When == nil && b.Chord.Equal(k.bindings[i].Chord) })
 }
 
 func (k *Keymap) In(ctx when.Context) *Active {
@@ -175,6 +203,16 @@ func (k *Keymap) Bindings() []Binding {
 
 func (k *Keymap) For(command string) []Chord {
 	return k.byCommand[CanonicalID(command)]
+}
+
+func (k *Keymap) Label(command string) string {
+	if chords := k.For(command); len(chords) > 0 {
+		return chords[0].Label()
+	}
+	if CanonicalID(command) == SearchEverywhereCommand {
+		return doubleShiftLabel
+	}
+	return ""
 }
 
 func (a *Active) Lookup(c Chord) (Binding, bool) {
@@ -285,26 +323,31 @@ func (s *Store) Reload() {
 	if s.Settings != nil {
 		s.Preset, s.Dispatch = s.Settings.String(SettingKeymap), Dispatch(s.Settings.String(SettingDispatch))
 	}
-	user, err := readUser(s.Path)
+	user, data, err := readUser(s.Path)
 	s.User = user
-	s.Current = New(Defaults(s.Preset), user)
+	s.Current = newLocated(Defaults(s.Preset), user, entryLocator(data))
 	if err != nil {
-		s.Current.Errors = append([]string{err.Error()}, s.Current.Errors...)
+		p, ok := err.(jsonc.Problem)
+		if !ok {
+			p = jsonc.Unlocated(err.Error())
+		}
+		s.Current.Errors = append([]jsonc.Problem{p}, s.Current.Errors...)
 	}
 }
 
-func readUser(path string) ([]Entry, error) {
+func readUser(path string) ([]Entry, []byte, error) {
 	data, err := jsonc.ReadFile(path)
 	if err != nil || data == nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return ParseEntries(data, path)
+	entries, err := ParseEntries(data, path)
+	return entries, data, err
 }
 
 func ParseEntries(data []byte, name string) ([]Entry, error) {
 	var entries []Entry
 	if err := json.Unmarshal(jsonc.Standard(data), &entries); err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
+		return nil, describeEntries(data, name, err)
 	}
 	return entries, nil
 }

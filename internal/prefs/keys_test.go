@@ -34,6 +34,28 @@ func newKeysBed(t *testing.T) (*KeysView, *ui.Tester, *bool) {
 	return v, tt, focusList
 }
 
+func TestKeybindingsKeepTheCommandColumnWhenNarrow(t *testing.T) {
+	t.Parallel()
+	reg := command.NewRegistry()
+	reg.Add(&command.Command{ID: testCommandID, Title: testCommandTitle, Run: func(*mygo.Window) {}})
+	v := &KeysView{Keys: keymap.Load(filepath.Join(t.TempDir(), "keybindings.json")), Commands: reg, OpenJSON: func() {}}
+	tt := ui.NewTester(v.View, narrowViewWidth, testViewHeight)
+	tt.Frame()
+	tt.Frame()
+	if !tt.HasText("Command") || !tt.HasText("Keybinding") {
+		t.Fatalf("header = %v", tt.Texts())
+	}
+	if tt.HasText("When") {
+		t.Fatalf("the When column stays in a narrow view: %v", tt.Texts())
+	}
+	if _, ok := tt.AccessByRole(ui.RoleButton, keysJSONOpen); !ok {
+		t.Fatal("no JSON button")
+	}
+	if got := v.columns(); got.when {
+		t.Fatalf("columns = %+v", got)
+	}
+}
+
 func focusedRole(tt *ui.Tester) (ui.Role, bool) {
 	for _, a := range tt.AccessAll() {
 		if a.Focused {

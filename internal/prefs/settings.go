@@ -2,7 +2,9 @@ package prefs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,6 +36,11 @@ const (
 	copySettingID    = "Copy Setting ID"
 	copySettingJSON  = "Copy Setting as JSON"
 	settingsJSONOpen = "Open Settings (JSON)"
+	brokenSuffix     = " has errors. Fix the file to change settings here."
+	wholeNumberHint  = "Enter a whole number."
+	numberHint       = "Enter a number."
+	rangeHint        = "Enter a value from %v to %v."
+	numberListHint   = "Enter whole numbers separated by commas."
 )
 
 type SettingsView struct {
@@ -49,11 +56,18 @@ type SettingsView struct {
 	err            string
 	list           ui.ListState
 	nav            ui.ListState
+	matchSel       int
+	width          float32
+	search         searchFocus
 }
 
 func (v *SettingsView) ShowFolder() {
 	v.scope = scopeFolder
 	v.drafts = nil
+}
+
+func (v *SettingsView) Focus() {
+	v.search.want = true
 }
 
 func (v *SettingsView) store() *settings.Store {
@@ -82,26 +96,36 @@ func (v *SettingsView) filter() settingFilter {
 func (v *SettingsView) View(c *ui.Context) {
 	f := v.filter()
 	defs := v.visible(f)
-	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
+	narrow := v.width > 0 && v.width < token.NarrowViewWidth.Px()
+	root := ui.Column(c).Grow(1).FillWidth().MinHeight(0)
+	root.Children(func() {
 		toolbar(c, settingsLabel, func() {
 			if v.Folder != nil && action.Segmented(c, "Settings scope", &v.scope, []string{"User", "Folder"}, action.SegmentedOptions{}).Changed() {
 				v.drafts, v.err = nil, ""
 			}
 			ui.Box(c).Grow(1).MinWidth(0).Children(func() {
-				field.SearchInput(c, searchLabel, &v.query, field.SearchOptions{
+				in := field.SearchInput(c, searchLabel, &v.query, field.SearchOptions{
 					Placeholder: "Search settings by name or ID, @modified, @id:",
 					Toggles:     []field.Toggle{{Icon: icons.Filter, Label: modifiedOnly, On: &v.modified}},
 					ID:          "settings-search",
 				})
+				v.search.apply(in)
 			})
-			if action.Button(c, settingsJSONOpen, action.ButtonOptions{Variant: action.Ghost, Icon: icons.File}).Clicked() {
+			if openJSONButton(c, settingsJSONOpen, v.width) {
 				v.openJSON()
 			}
 		})
-		problems(c, append(slices.Clone(v.store().Errors), nonEmpty(v.err)...))
+		if v.store().Broken {
+			v.brokenBanner(c)
+		} else {
+			problems(c, append(problemTexts(v.store().Errors), nonEmpty(v.err)...))
+		}
+		if narrow && !f.active() {
+			v.categoryPicker(c)
+		}
 		ui.Row(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-			if !f.active() {
-				v.categories(c)
+			if !narrow {
+				v.categories(c, f, defs)
 			}
 			l := ui.List(c, &v.list, len(defs)).Grow(1).FillHeight().MinWidth(0).Padding(token.GapStack.Px(), token.PadView.Px()).Label(settingsLabel)
 			l.Rows(func(r ui.ListRow) { v.row(r.Context, defs[r.Index]) })
@@ -109,6 +133,26 @@ func (v *SettingsView) View(c *ui.Context) {
 				l.Children(func() { v.empty(c, f) })
 			}
 		})
+	})
+	v.width = list.ObserveWidth(c, root)
+}
+
+func (v *SettingsView) brokenBanner(c *ui.Context) {
+	text := filepath.Base(v.store().Path) + brokenSuffix
+	ui.Box(c).FillWidth().Shrink(0).Padding(token.GapStack.Px(), token.PadView.Px()).Children(func() {
+		feedback.Notice(c, feedback.NoticeOptions{Tone: token.ToneWarning, Text: text, Action: settingsJSONOpen, OnAction: v.openJSON})
+	})
+}
+
+func (v *SettingsView) categoryPicker(c *ui.Context) {
+	opts := make([]action.Option[int], len(settings.Categories))
+	for i, name := range settings.Categories {
+		opts[i] = action.Option[int]{Value: i, Label: name}
+	}
+	ui.Row(c).FillWidth().Shrink(0).Padding(token.GapStack.Px(), token.PadView.Px()).Children(func() {
+		if action.Select(c, categoriesLabel, &v.category, opts, action.SelectOptions{ID: "category-picker"}).Changed() {
+			v.list.ScrollTo(0, ui.Start)
+		}
 	})
 }
 
@@ -139,16 +183,49 @@ func (v *SettingsView) visible(f settingFilter) []*settings.Def {
 	return out
 }
 
-func (v *SettingsView) categories(c *ui.Context) {
+type categoryEntry struct {
+	name  string
+	first int
+	count int
+}
+
+func (v *SettingsView) navEntries(f settingFilter, defs []*settings.Def) []categoryEntry {
+	if !f.active() {
+		out := make([]categoryEntry, len(settings.Categories))
+		for i, name := range settings.Categories {
+			out[i] = categoryEntry{name: name}
+		}
+		return out
+	}
+	var out []categoryEntry
+	for i, d := range defs {
+		if j := slices.IndexFunc(out, func(e categoryEntry) bool { return e.name == d.Category }); j >= 0 {
+			out[j].count++
+			continue
+		}
+		out = append(out, categoryEntry{name: d.Category, first: i, count: 1})
+	}
+	return out
+}
+
+func (v *SettingsView) categories(c *ui.Context, f settingFilter, defs []*settings.Def) {
 	p := token.Of(c)
-	if v.nav.Selected == nil {
+	entries := v.navEntries(f, defs)
+	if f.active() {
+		v.nav.Selected = &v.matchSel
+		v.matchSel = min(v.matchSel, max(len(entries)-1, 0))
+	} else {
 		v.nav.Selected = &v.category
 	}
 	ui.Column(c).Width(token.SettingsNavWidth.Px()).Shrink(0).FillHeight().Padding(token.GapStack.Px(), 0).
 		BorderWidth(0, token.BorderWidth.Px(), 0, 0).BorderColor(p.Border.Section).Children(func() {
-		list.View(c, &v.nav, len(settings.Categories), list.ViewOptions{Label: categoriesLabel}, func(i int) list.Item {
-			label := settings.Categories[i]
-			return list.Item{Label: label, OnClick: func() { v.list.ScrollTo(0, ui.Start) }, Rich: func(s list.Style) []ui.Span {
+		list.View(c, &v.nav, len(entries), list.ViewOptions{Label: categoriesLabel}, func(i int) list.Item {
+			e := entries[i]
+			label := e.name
+			if f.active() {
+				label = fmt.Sprintf("%s (%d)", e.name, e.count)
+			}
+			return list.Item{Label: label, OnClick: func() { v.list.ScrollTo(e.first, ui.Start) }, Rich: func(s list.Style) []ui.Span {
 				if s.Text == p.Text.Primary {
 					s.Text = p.Text.Strong
 				}
@@ -208,23 +285,24 @@ func (v *SettingsView) reset(d *settings.Def) {
 
 func (v *SettingsView) control(c *ui.Context, d *settings.Def) {
 	s := v.store()
+	off := s.Broken
 	switch d.Kind {
 	case settings.Bool:
 		on := s.Bool(d.Key)
-		if action.Switch(c, "", &on, action.ChoiceOptions{ID: "control"}).Label(d.Title).Changed() {
+		if action.Switch(c, "", &on, action.ChoiceOptions{ID: "control", Disabled: off}).Label(d.Title).Description(d.Description).Changed() {
 			v.apply(s.Set(d.Key, on))
 		}
 	case settings.Enum:
 		sel := s.String(d.Key)
 		opts := make([]action.Option[string], len(d.Options))
 		for i, o := range d.Options {
-			opts[i] = action.Option[string]{Value: o, Label: o}
+			opts[i] = action.Option[string]{Value: o, Label: d.OptionLabel(o)}
 		}
-		if action.Select(c, d.Title, &sel, opts, action.SelectOptions{ID: "control", Width: token.SettingsControl}).Changed() {
+		if action.Select(c, d.Title, &sel, opts, action.SelectOptions{ID: "control", Width: token.SettingsControl, Disabled: off}).Description(d.Description).Changed() {
 			v.apply(s.Set(d.Key, sel))
 		}
 	case settings.JSON:
-		if action.Button(c, editInJSONLabel, action.ButtonOptions{ID: "control"}).Label(editInJSONLabel + ": " + d.Title).Clicked() {
+		if action.Button(c, editInJSONLabel, action.ButtonOptions{ID: "control"}).Label(editInJSONLabel + ": " + d.Title).Description(d.Description).Clicked() {
 			v.openJSON()
 		}
 	default:
@@ -240,20 +318,30 @@ func (v *SettingsView) textControl(c *ui.Context, d *settings.Def) {
 	if !editing {
 		draft = format(v.store().Value(d.Key))
 	}
+	problem := ""
+	if editing {
+		if _, err := parse(d, draft); err != nil {
+			problem = err.Error()
+		}
+	}
 	ui.Box(c).Width(token.SettingsControl.Px()).Shrink(0).Children(func() {
-		input := field.TextInput(c, d.Title, &draft, field.InputOptions{ID: "control"})
-		if input.Focused() {
+		input := field.TextInput(c, d.Title, &draft, field.InputOptions{ID: "control", Placeholder: defaultHint(d), Error: problem, Disabled: v.store().Broken}).Description(d.Description)
+		if input.Shortcut(0, ui.KeyEscape) {
+			delete(v.drafts, d.Key)
+			return
+		}
+		if input.Focused() || input.Changed() {
 			v.drafts[d.Key] = draft
 		}
 		if !input.Submitted() && !input.FocusLeft() {
 			return
 		}
-		delete(v.drafts, d.Key)
 		value, err := parse(d, draft)
 		if err != nil {
-			v.err = err.Error()
+			v.drafts[d.Key] = draft
 			return
 		}
+		delete(v.drafts, d.Key)
 		if format(v.store().Value(d.Key)) != draft {
 			v.apply(v.store().Set(d.Key, value))
 		}
@@ -265,6 +353,13 @@ func (v *SettingsView) apply(err error) {
 	if err != nil {
 		v.err = err.Error()
 	}
+}
+
+func defaultHint(d *settings.Def) string {
+	if d.Key == settings.FontFamily {
+		return token.FontEditor
+	}
+	return format(d.Default)
 }
 
 func format(value any) string {
@@ -288,13 +383,13 @@ func parse(d *settings.Def, text string) (any, error) {
 	case settings.Int:
 		n, err := strconv.Atoi(strings.TrimSpace(text))
 		if err != nil {
-			return nil, fmt.Errorf("%s: %q is not a whole number", d.Title, text)
+			return nil, errors.New(wholeNumberHint)
 		}
 		return n, inRange(d, float64(n))
 	case settings.Number:
 		n, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %q is not a number", d.Title, text)
+			return nil, errors.New(numberHint)
 		}
 		return n, inRange(d, n)
 	}
@@ -310,7 +405,7 @@ func parse(d *settings.Def, text string) (any, error) {
 		for _, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil {
-				return nil, fmt.Errorf("%s: %q is not a number", d.Title, p)
+				return nil, errors.New(numberListHint)
 			}
 			out = append(out, n)
 		}
@@ -328,5 +423,5 @@ func inRange(d *settings.Def, n float64) error {
 	if d.Min == 0 && d.Max == 0 || n >= d.Min && n <= d.Max {
 		return nil
 	}
-	return fmt.Errorf("%s: use a value from %v to %v", d.Title, d.Min, d.Max)
+	return fmt.Errorf(rangeHint, d.Min, d.Max)
 }

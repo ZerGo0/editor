@@ -120,11 +120,11 @@ func load(data []byte) (object, bool, error) {
 	}
 	var v any
 	if err := json.Unmarshal(std, &v); err != nil {
-		var syntax *json.SyntaxError
-		if errors.As(err, &syntax) {
-			return object{}, false, fmt.Errorf("line %d: %w", lineAt(data, int(syntax.Offset)-1), err)
+		f := Describe(err)
+		if f.Syntax {
+			return object{}, false, fmt.Errorf("line %d: %s", lineAt(data, f.Offset), f.Sentence())
 		}
-		return object{}, false, err
+		return object{}, false, errors.New(f.Sentence())
 	}
 	if _, ok := v.(map[string]any); !ok {
 		first := len(std) - len(bytes.TrimLeft(std, allSpaces))

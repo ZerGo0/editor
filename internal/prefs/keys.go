@@ -29,20 +29,30 @@ const (
 	recordHint      = "Press Enter to save, or Escape to cancel."
 	waitingKeys     = "Waiting for keys..."
 	copyCommandID   = "Copy Command ID"
+	recordKeysLabel = "Record Keys"
+	recordKeysID    = "keybindings.editor.recordSearchKeys"
 	rowActionSlots  = 3
+	noRow           = -1
 )
 
 var actionsWidth = rowActionSlots*token.IconButtonSize.Px() + (rowActionSlots-1)*token.GapTight.Px()
 
 type KeysView struct {
-	Keys     *keymap.Store
-	Commands *command.Registry
-	OpenJSON func()
-	query    string
-	list     ui.ListState
-	rec      recorder
-	err      string
+	Keys       *keymap.Store
+	Commands   *command.Registry
+	OpenJSON   func()
+	query      string
+	list       ui.ListState
+	row        int
+	rec        recorder
+	err        string
+	width      float32
+	search     searchFocus
+	recordKeys bool
+	recorded   keymap.Chord
 }
+
+type keyColumns struct{ when, source bool }
 
 type keyRow struct {
 	cmd     *command.Command
@@ -86,45 +96,124 @@ func (v *KeysView) rows(f keyFilter) []keyRow {
 	return out
 }
 
+func (v *KeysView) columns() keyColumns {
+	if v.width <= 0 {
+		return keyColumns{when: true, source: true}
+	}
+	gap := token.GapControl.Px()
+	fixed := 2*token.PadRow.Px() + token.KeyColumnWidth.Px() + actionsWidth + 2*gap + token.KeysCommandMinWidth.Px()
+	room := v.width - fixed
+	source := token.SourceColumnWidth.Px() + gap
+	when := token.WhenColumnWidth.Px() + gap
+	return keyColumns{source: room >= source, when: room >= source+when}
+}
+
 func (v *KeysView) View(c *ui.Context) {
 	f := parseKeyFilter(v.query)
 	rows := v.rows(f)
-	ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
+	cols := v.columns()
+	root := ui.Column(c).Grow(1).FillWidth().MinHeight(0)
+	root.Children(func() {
 		toolbar(c, keysLabel, func() {
 			ui.Box(c).Grow(1).MinWidth(0).Children(func() {
-				field.SearchInput(c, keysSearchLabel, &v.query, field.SearchOptions{Placeholder: "Search by command, ID or key, @source:user", ID: "keys-search"})
+				recordWas := v.recordKeys
+				in := field.SearchInput(c, keysSearchLabel, &v.query, field.SearchOptions{Placeholder: "Search by command, ID or key, @source:user", ID: "keys-search",
+					Toggles: []field.Toggle{{Icon: icons.Dot, Label: recordKeysLabel, Keys: v.Keys.Current.Label(recordKeysID), On: &v.recordKeys}}})
+				switch {
+				case v.recordKeys != recordWas:
+					v.startRecording(v.recordKeys)
+				case v.recordKeys && len(v.recorded) > 0 && v.query == "":
+					v.startRecording(false)
+				}
+				v.search.apply(in)
+				if len(rows) > 0 && in.Shortcut(0, ui.KeyDown) {
+					v.row = max(v.row, 0)
+					v.list.Focus(c)
+				}
+				if v.recordKeys {
+					in.HandleInput(v.recordSearchKey)
+				}
 			})
-			if action.Button(c, keysJSONOpen, action.ButtonOptions{Variant: action.Ghost, Icon: icons.File}).Clicked() {
+			if openJSONButton(c, keysJSONOpen, v.width) {
 				v.OpenJSON()
 			}
 		})
-		problems(c, append(slices.Clone(v.Keys.Current.Errors), nonEmpty(v.err)...))
-		v.header(c)
+		problems(c, append(problemTexts(v.Keys.Current.Errors), nonEmpty(v.err)...))
+		v.header(c, cols)
+		if v.list.Selected == nil {
+			v.row, v.list.Selected = noRow, &v.row
+		}
+		v.row = min(v.row, len(rows)-1)
 		l := list.View(c, &v.list, len(rows), list.ViewOptions{Label: keysLabel, Empty: func(c *ui.Context) {
 			feedback.Empty(c, feedback.EmptyOptions{Icon: icons.Search, Title: "No keyboard shortcuts found", Message: "No command matches the search.",
 				Action: "Clear Search", OnAction: func() { v.query = "" }})
-		}}, func(i int) list.Item { return v.item(rows[i], i) })
+		}}, func(i int) list.Item { return v.item(rows[i], i, cols) })
 		if sel := v.list.Selected; sel != nil && *sel >= 0 && *sel < len(rows) && l.Shortcut(0, ui.KeyEnter) {
 			v.record(rows[*sel])
 		}
 	})
+	v.width = list.ObserveWidth(c, root)
 	v.recorderView(c)
 }
 
-func (v *KeysView) header(c *ui.Context) {
+func (v *KeysView) Focus() {
+	v.search.want = true
+}
+
+func (v *KeysView) SearchFocused() bool {
+	return v.search.focused
+}
+
+func (v *KeysView) ToggleRecordKeys() {
+	v.startRecording(!v.recordKeys)
+	v.search.want = true
+}
+
+func (v *KeysView) startRecording(on bool) {
+	v.recordKeys, v.recorded = on, nil
+	if on {
+		v.query = ""
+	}
+}
+
+func (v *KeysView) recordSearchKey(ev ui.InputEvent) bool {
+	if ev.Kind == ui.InputText {
+		return true
+	}
+	stroke := keymap.StrokeFor(ev)
+	if ev.Kind != ui.InputKeyDown || stroke.Key == ui.KeyUnknown && !stroke.ByCode() {
+		return false
+	}
+	if stroke.Mods == 0 && stroke.Key == ui.KeyEscape || (keymap.Chord{stroke}).Label() == v.Keys.Current.Label(recordKeysID) {
+		v.startRecording(false)
+		return true
+	}
+	if len(v.recorded) == maxStrokes {
+		v.recorded = nil
+	}
+	v.recorded = append(v.recorded, stroke)
+	v.query = v.recorded.String()
+	return true
+}
+
+func (v *KeysView) header(c *ui.Context, cols keyColumns) {
 	p := token.Of(c)
 	ui.Row(c).Height(token.HeaderHeight.Px()).FillWidth().Shrink(0).Padding(0, token.PadRow.Px()).Gap(token.GapControl.Px()).AlignItems(ui.Center).
 		BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Section).Children(func() {
 		design.Text(c, "Command", token.TextCaption).Grow(1).MinWidth(0)
-		v.columns(c, func() { design.Text(c, "Keybinding", token.TextCaption) }, func() { design.Text(c, "When", token.TextCaption) },
+		columns(c, cols, func() { design.Text(c, "Keybinding", token.TextCaption) }, func() { design.Text(c, "When", token.TextCaption) },
 			func() { design.Text(c, "Source", token.TextCaption) }, nil)
 	})
 }
 
-func (v *KeysView) columns(c *ui.Context, keys, when, source, actions func()) {
+func columns(c *ui.Context, cols keyColumns, keys, when, source, actions func()) {
 	ui.Row(c).Width(token.KeyColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Clip().Children(keys)
-	ui.Row(c).Width(token.WhenColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Clip().Children(when)
-	ui.Row(c).Width(token.SourceColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Children(source)
+	if cols.when {
+		ui.Row(c).Width(token.WhenColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Clip().Children(when)
+	}
+	if cols.source {
+		ui.Row(c).Width(token.SourceColumnWidth.Px()).Shrink(0).AlignItems(ui.Center).Children(source)
+	}
 	ui.Row(c).Width(actionsWidth).Shrink(0).Gap(token.GapTight.Px()).Justify(ui.End).AlignItems(ui.Center).Children(func() {
 		if actions != nil {
 			actions()
@@ -132,7 +221,7 @@ func (v *KeysView) columns(c *ui.Context, keys, when, source, actions func()) {
 	})
 }
 
-func (v *KeysView) item(r keyRow, i int) list.Item {
+func (v *KeysView) item(r keyRow, i int, cols keyColumns) list.Item {
 	label := r.cmd.Label()
 	return list.Item{
 		Tooltip:       r.cmd.ID,
@@ -157,7 +246,7 @@ func (v *KeysView) item(r keyRow, i int) list.Item {
 			row.Children(func() {
 				token.TextBody.Apply(ui.RichText(c, ui.Span{Text: label + "  ", Color: p.Text.Primary}, ui.Span{Text: r.cmd.ID, Color: p.Text.Secondary})).
 					SingleLine().Grow(1).Shrink(1).MinWidth(0).AccessHidden(true)
-				v.columns(c, func() {
+				columns(c, cols, func() {
 					if keys != "" {
 						badge.Keys(c, keys)
 					}
