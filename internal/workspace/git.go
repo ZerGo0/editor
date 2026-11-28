@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/gitui"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
@@ -19,6 +21,8 @@ const (
 	annotateLabel     = "Annotate with Git Blame"
 )
 
+var errNoFolderPicker = errors.New("no folder picker in this window")
+
 var pullModes = map[string]gitui.PullMode{
 	settings.PullMerge:  gitui.PullMerge,
 	settings.PullRebase: gitui.PullRebase,
@@ -26,7 +30,7 @@ var pullModes = map[string]gitui.PullMode{
 }
 
 func (w *Workspace) initGit() {
-	w.addSideView(toolView{id: SourceControlView, title: "Source Control", command: "workbench.view.scm", icon: icons.GitBranch, view: w.gitSideView, badge: w.gitChangeCount, actions: w.gitTitleActions})
+	w.addSideView(toolView{id: SourceControlView, title: "Source Control", command: "workbench.view.scm", icon: icons.GitBranch, view: w.gitSideView, badge: w.gitChangeCount, badgeTip: pendingChangesTip, actions: w.gitTitleActions, focus: w.focusCommitMessage})
 	w.addPanel(toolView{id: GitPanel, title: "Git", command: "git.showLog", icon: icons.Commit, view: w.gitLogPanel})
 	w.statusLeft = append(w.statusLeft, w.gitStatusItems)
 }
@@ -35,6 +39,8 @@ func (w *Workspace) attachGit() {
 	w.git = gitui.New(w)
 	w.applyGitSettings()
 	w.git.OnHeadChange(w.headChanged)
+	w.git.OnStatus(w.tree.SetGit)
+	w.git.OnToggleWrap(w.ToggleWordWrap)
 }
 
 func (w *Workspace) applyGitSettings() {
@@ -46,7 +52,33 @@ func (w *Workspace) applyGitSettings() {
 		AutoFetch:   time.Duration(s.Int(settings.GitAutoFetch)) * time.Minute,
 		PullMode:    pullModes[s.String(settings.GitPullMode)],
 		LogPageSize: s.Int(settings.GitLogPageSize),
+		Unified:     !s.Bool(settings.DiffSideBySide),
 	})
+}
+
+func (w *Workspace) PickFolder(title string) (string, error) {
+	if w.env.PickFolder == nil {
+		return "", errNoFolderPicker
+	}
+	paths, err := w.env.PickFolder(w.win, title)
+	if err != nil || len(paths) == 0 {
+		return "", err
+	}
+	return paths[0], nil
+}
+
+func (w *Workspace) OpenFolder(root string) {
+	if w.env.OpenFolder != nil {
+		w.env.OpenFolder(w.win, root, false)
+	}
+}
+
+func (w *Workspace) focusCommitMessage() bool {
+	return w.git != nil && w.git.FocusCommitMessage()
+}
+
+func pendingChangesTip(n int) string {
+	return plural.Count(n, "pending change", "pending changes")
 }
 
 func (w *Workspace) gitSideView(c *ui.Context) {
@@ -68,6 +100,13 @@ func (w *Workspace) ActiveViewID() string {
 		return strings.TrimPrefix(t.Path, virtualPrefix)
 	}
 	return ""
+}
+
+func (w *Workspace) diffContext() (active, focused bool) {
+	if w.git == nil {
+		return false, false
+	}
+	return w.git.DiffContext()
 }
 
 func (w *Workspace) SourceControlFocused() bool {

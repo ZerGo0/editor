@@ -2,10 +2,12 @@ package workspace
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/egoist/mygo"
 )
 
 const (
@@ -208,5 +210,27 @@ func TestDroppingFilesOnTheEditorOpensThem(t *testing.T) {
 	b.tt.Frame()
 	if got := b.groups(); got != "a.txt,b.txt" {
 		t.Fatalf("after the file drop: %s", got)
+	}
+}
+
+func TestDroppingAFolderOnTheEditorOpensTheFolder(t *testing.T) {
+	b := newMouseBed(t, map[string]string{"a.txt": "a\n", "sub/c.txt": "c\n"})
+	b.open("a.txt")
+	var opened []string
+	b.w.env.OpenFolder = func(_ *mygo.Window, root string, replace bool) {
+		if replace {
+			t.Error("a dropped folder replaced the window")
+		}
+		opened = append(opened, root)
+	}
+	r := b.editorRects()[0]
+	sub := filepath.Join(b.root, "sub")
+	if !b.tt.DropFiles(r.X+r.W*dropAreaMid, r.Y+r.H*dropAreaMid, sub) {
+		t.Fatal("the editor area did not take the folder")
+	}
+	b.tt.Frame()
+	b.tt.Frame()
+	if !slices.Equal(opened, []string{sub}) || b.groups() != "a.txt" {
+		t.Fatalf("opened %v, groups %s", opened, b.groups())
 	}
 }

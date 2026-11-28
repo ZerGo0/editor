@@ -43,8 +43,9 @@ func (w *Workspace) tabBar(c *ui.Context, g *layout.Group) {
 	items := make([]chrome.Tab, len(tabs))
 	for i, t := range tabs {
 		d := w.doc(t.Path)
-		items[i] = chrome.Tab{Label: w.tabTitle(t.Path), Description: labels[t.Path], Tooltip: w.tabTooltip(t.Path),
-			Leading: func(c *ui.Context) { w.tabIcon(c, t.Path) }, Dirty: d != nil && d.Modified(), Preview: t.Preview, Pinned: t.Pinned}
+		items[i] = chrome.Tab{Label: tablabel.LTR(w.tabTitle(t.Path)), Description: labels[t.Path], Tooltip: w.tabTooltip(t.Path),
+			Leading: func(c *ui.Context) { w.tabIcon(c, t.Path) }, Dirty: d != nil && d.Modified(), Preview: t.Preview, Pinned: t.Pinned,
+			ReadOnly: d != nil && d.ReadOnly, Deleted: w.deleted(t.Path)}
 	}
 	selected := g.Active
 	closeTab := func(i int) { w.requestClose(g, []*layout.Tab{tabs[i]}) }
@@ -85,6 +86,9 @@ func (w *Workspace) tabIcon(c *ui.Context, p string) {
 		return
 	}
 	svg := icons.File
+	if v, ok := w.virtual[p]; ok && v.icon != nil {
+		svg = v.icon
+	}
 	if p == SettingsTab || p == KeybindingsTab {
 		svg = icons.Settings
 	}

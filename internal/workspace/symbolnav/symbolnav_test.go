@@ -63,13 +63,13 @@ func TestPlaceUsesTheRoomBelowThenAboveTheLine(t *testing.T) {
 }
 
 func TestListWidthKeepsBothPanesUsable(t *testing.T) {
-	if got := listWidth(1000); got != 300 {
+	if got := listWidth(1000, 0); got != 300 {
 		t.Fatalf("list width %v of 1000", got)
 	}
-	if got := listWidth(400); got != 120 {
+	if got := listWidth(400, 0); got != 120 {
 		t.Fatalf("list width %v of 400", got)
 	}
-	if got := listWidth(200); got != token.PeekListMinWidth.Px() {
+	if got := listWidth(200, 0); got != token.PeekListMinWidth.Px() {
 		t.Fatalf("list width %v of 200 is under its minimum", got)
 	}
 }

@@ -30,6 +30,11 @@ type Tree struct {
 	slotBuilt bool
 	chainTop  map[string]string
 	git       gitState
+	sel       ui.Selection[string]
+	find      *finder
+	history   history
+	top       int
+	rootErr   error
 }
 
 type edit struct {
@@ -38,6 +43,7 @@ type edit struct {
 	folder      bool
 	value       string
 	err         string
+	checked     string
 	focused     bool
 	selected    bool
 	returnFocus bool
@@ -47,6 +53,7 @@ func New(root string, expanded []string) *Tree {
 	t := &Tree{Root: root, dirs: map[string][]string{}, isDir: map[string]bool{root: true}, row: -1, chainTop: map[string]string{}}
 	t.state.Generation = 1
 	t.state.List.Selected = &t.row
+	t.state.List.Selection = &t.sel
 	for _, p := range expanded {
 		t.state.Open.Add(p)
 		t.isDir[p] = true
@@ -56,6 +63,20 @@ func New(root string, expanded []string) *Tree {
 
 func (t *Tree) Expanded() []string {
 	return slices.Sorted(t.state.Open.All())
+}
+
+func (t *Tree) TopRow() int {
+	if first, last := t.state.List.Visible(); last >= first {
+		t.top = first
+	}
+	return t.top
+}
+
+func (t *Tree) ScrollToRow(row int) {
+	if row > 0 {
+		t.top = row
+		t.state.List.ScrollTo(row, ui.Start)
+	}
 }
 
 func (t *Tree) IsDir(p string) bool {
@@ -87,9 +108,11 @@ func (t *Tree) visibleRows(p string) []string {
 	if rows == nil {
 		return nil
 	}
-	out := make([]string, len(rows))
-	for i, r := range rows {
-		out[i] = t.compact(r)
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		if r = t.compact(r); !t.hidden(r) {
+			out = append(out, r)
+		}
 	}
 	return out
 }
@@ -133,6 +156,9 @@ func (t *Tree) isPlaceholder(p string) bool {
 
 func (t *Tree) read(dir string) []string {
 	entries, err := os.ReadDir(dir)
+	if dir == t.Root {
+		t.rootErr = err
+	}
 	if err != nil {
 		return []string{}
 	}
@@ -194,6 +220,41 @@ func (t *Tree) Selected() string {
 		return p
 	}
 	return ""
+}
+
+func (t *Tree) SelectedPaths() []string {
+	var out []string
+	for i := range t.state.Rows() {
+		if p := t.state.Item(i); t.sel.Has(p) && !t.isPlaceholder(p) {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		if p := t.Selected(); p != "" {
+			return []string{p}
+		}
+	}
+	return outermost(out)
+}
+
+func (t *Tree) Targets(p string) []string {
+	if t.sel.Has(p) {
+		return t.SelectedPaths()
+	}
+	return []string{p}
+}
+
+func outermost(paths []string) []string {
+	all := slices.Clone(paths)
+	return slices.DeleteFunc(paths, func(p string) bool {
+		return slices.ContainsFunc(all, func(q string) bool { return q != p && fsutil.Within(q, p) })
+	})
+}
+
+func (t *Tree) choose(row int) {
+	t.state.List.Choose(row)
+	t.sel.Clear()
+	t.sel.Add(t.state.Item(row))
 }
 
 func (t *Tree) Reveal(p string) {

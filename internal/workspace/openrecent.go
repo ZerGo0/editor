@@ -89,7 +89,7 @@ func (w *Workspace) recentEntries() []palette.Item {
 }
 
 func removeAction(name string, run func()) *palette.Action {
-	return &palette.Action{Icon: icons.Close, Label: "Remove " + name + " from Recently Opened", Run: run}
+	return &palette.Action{Icon: icons.Close, Label: "Remove " + name + " from Recent", Run: run}
 }
 
 func (w *Workspace) folderAction(root string, open []string) *palette.Action {

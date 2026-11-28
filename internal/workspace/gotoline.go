@@ -37,7 +37,7 @@ func (w *Workspace) GoToLine() {
 	w.goTo = g
 	w.palette.Show(palette.Mode{
 		Label:       goToLineLabel,
-		Placeholder: g.label(gotoline.Target{}),
+		Placeholder: gotoline.Placeholder,
 		Search:      func(query string, done func([]palette.Item)) { done([]palette.Item{g.item(query)}) },
 		Accept:      func(it palette.Item) { w.finishGoToLine(g, it.Value.(gotoline.Target)) },
 		Dismiss:     func() { w.cancelGoToLine(g) },

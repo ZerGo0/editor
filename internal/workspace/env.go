@@ -4,6 +4,7 @@ import (
 	"github.com/ZerGo0/editor/internal/command"
 	"github.com/ZerGo0/editor/internal/history"
 	"github.com/ZerGo0/editor/internal/keymap"
+	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo"
 )
@@ -22,4 +23,6 @@ type Env struct {
 	ForgetFile    func(path string)
 	OpenFolder    func(from *mygo.Window, root string, replace bool)
 	ForgetFolder  func(root string)
+	PickFolder    func(parent *mygo.Window, title string) ([]string, error)
+	Global        *session.Memento
 }

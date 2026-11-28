@@ -8,6 +8,9 @@ import (
 )
 
 func (w *Workspace) wrapping(diff bool, path string) (on bool, column int) {
+	if override, ok := w.wrapOverrides[w.drawingTab]; ok && diff && w.drawingTab != "" {
+		return override, 0
+	}
 	s := w.settings
 	mode := s.String(settings.WordWrap)
 	if diff {
@@ -36,6 +39,10 @@ func (w *Workspace) ToggleWordWrap() {
 	if path == "" {
 		return
 	}
+	if _, ok := w.wrapOverrides[path]; ok {
+		delete(w.wrapOverrides, path)
+		return
+	}
 	on, _ := w.wrapping(diff, path)
 	if w.wrapOverrides == nil {
 		w.wrapOverrides = map[string]bool{}
@@ -44,8 +51,9 @@ func (w *Workspace) ToggleWordWrap() {
 }
 
 func (w *Workspace) trackDiff(path string) {
-	if w.diffPath == "" {
-		w.diffPath = path
+	key := cmp.Or(w.drawingTab, path)
+	if t := w.active.ActiveTab(); w.diffPath == "" || t != nil && t.Path == key {
+		w.diffPath = key
 	}
 }
 

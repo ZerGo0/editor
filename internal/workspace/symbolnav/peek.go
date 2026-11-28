@@ -9,6 +9,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
+	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -26,7 +27,15 @@ const (
 	closeKeys     = "Esc"
 	loadingLabel  = "Loading..."
 	definitionTag = "Definition"
+	heightLabel   = "Resize Peek"
+	splitLabel    = "Resize Peek Results"
+	layoutKey     = "symbolnav.peek"
 )
+
+type peekLayout struct {
+	Height int `json:"height,omitempty"`
+	List   int `json:"list,omitempty"`
+}
 
 type Env struct {
 	Host  host.Host
@@ -60,11 +69,17 @@ type Peek struct {
 	shown    int
 	preview  preview
 	focus    bool
+	layout   peekLayout
 }
 
 func New(env Env) *Peek {
 	p := &Peek{env: env, shown: -1}
 	p.preview.env = env
+	if env.Host != nil {
+		m := env.Host.ProjectState()
+		m.Load(layoutKey, &p.layout)
+		m.Track(layoutKey, func() any { return p.layout })
+	}
 	p.list.Selected = &p.selected
 	p.list.Header = func(i int) bool { return i >= 0 && i < len(p.rows) && p.rows[i].match < 0 }
 	p.list.Label = func(i int) string {
@@ -208,7 +223,7 @@ func (p *Peek) View(c *ui.Context, a Anchor) {
 	}
 	p.syncPreview()
 	pal := token.Of(c)
-	y, h := place(a, token.ReferencePeekHeight.Px())
+	y, h := place(a, p.height())
 	var dismissed, outside bool
 	ui.Overlay(c, func() {
 		panel := ui.Column(c.Key(peekKey)).Absolute().Left(whole(a.Area.X)).Top(y).Width(whole(a.Area.W)).Height(h).
@@ -218,6 +233,9 @@ func (p *Peek) View(c *ui.Context, a Anchor) {
 		panel.Children(func() {
 			p.header(c, pal, &dismissed)
 			p.body(c, pal, a.Area.W)
+			sash, r := pane.Sash(c, pane.SashOptions{Label: heightLabel, Rows: true})
+			sash.Left(0).Right(0).Bottom(0)
+			p.resizeHeight(r, h, a.Area.H)
 		})
 		dismissed = dismissed || panel.OverlayShortcut(0, ui.KeyEscape)
 		outside = panel.PressedOutside()
@@ -253,25 +271,57 @@ func (p *Peek) header(c *ui.Context, pal *token.Palette, dismissed *bool) {
 	})
 }
 
-func listWidth(total float32) float32 {
-	width := whole(total * token.PeekListShare / (token.PeekListShare + token.PeekPreviewShare))
-	return max(min(width, total-token.PeekPreviewMinWidth.Px()), token.PeekListMinWidth.Px())
+func (p *Peek) height() float32 {
+	if p.layout.Height > 0 {
+		return float32(p.layout.Height)
+	}
+	return token.ReferencePeekHeight.Px()
+}
+
+func (p *Peek) resizeHeight(r pane.SashResult, current, room float32) {
+	switch {
+	case r.Reset:
+		p.layout.Height = 0
+	case r.Delta != 0:
+		p.layout.Height = int(max(min(whole(current+r.Delta), room), token.PaneMinHeight.Px()))
+	}
+}
+
+func (p *Peek) resizeList(r pane.SashResult, total float32) {
+	switch {
+	case r.Reset:
+		p.layout.List = 0
+	case r.Delta != 0:
+		p.layout.List = int(listWidth(total, listWidth(total, float32(p.layout.List))-whole(r.Delta)))
+	}
+}
+
+func listWidth(total, want float32) float32 {
+	if want <= 0 {
+		want = whole(total * token.PeekListShare / (token.PeekListShare + token.PeekPreviewShare))
+	}
+	return max(min(want, total-token.PeekPreviewMinWidth.Px()), token.PeekListMinWidth.Px())
 }
 
 func (p *Peek) body(c *ui.Context, pal *token.Palette, width float32) {
 	if p.loading {
-		feedback.CodeSkeleton(c, loadingLabel)
+		p.previewSkeleton(c)
 		return
 	}
 	showList := p.res.Total > 1
 	ui.Row(c).Grow(1).FillWidth().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
-		pane := ui.Column(c.Key("peek-preview-pane")).Grow(1).MinWidth(token.PeekPreviewMinWidth.Px()).MinHeight(0).FillHeight()
-		pane.Children(func() { p.previewPane(c) })
+		view := ui.Column(c.Key("peek-preview-pane")).Grow(1).MinWidth(token.PeekPreviewMinWidth.Px()).MinHeight(0).FillHeight()
+		view.Children(func() { p.previewPane(c) })
 		if !showList {
 			return
 		}
-		ui.Column(c.Key("peek-results-pane")).Width(listWidth(width)).Shrink(0).MinHeight(0).FillHeight().
-			Background(pal.Layer.SideBar).BorderWidth(0, 0, 0, token.SeparatorWidth.Px()).BorderColor(pal.Border.Section).Children(func() { p.results(c, pal) })
+		ui.Column(c.Key("peek-results-pane")).Width(listWidth(width, float32(p.layout.List))).Shrink(0).MinHeight(0).FillHeight().
+			Background(pal.Layer.SideBar).BorderWidth(0, 0, 0, token.SeparatorWidth.Px()).BorderColor(pal.Border.Section).Children(func() {
+			p.results(c, pal)
+			sash, r := pane.Sash(c, pane.SashOptions{Label: splitLabel})
+			sash.Left(0).Top(0).Bottom(0)
+			p.resizeList(r, width)
+		})
 	})
 	if p.focus {
 		p.focus = false
@@ -287,12 +337,16 @@ func (p *Peek) previewPane(c *ui.Context) {
 	pv := &p.preview
 	switch {
 	case pv.loading:
-		feedback.CodeSkeleton(c, loadingLabel)
+		p.previewSkeleton(c)
 	case pv.st == nil:
 		feedback.Empty(c, feedback.EmptyOptions{Title: pv.message})
 	default:
 		editor.View(c.Key("peek-preview"), pv.st).Grow(1).FillWidth().MinHeight(0).Label(previewLabel).Bind(&pv.handle)
 	}
+}
+
+func (p *Peek) previewSkeleton(c *ui.Context) {
+	feedback.CodeSkeleton(c, loadingLabel, feedback.SkeletonCodeLines, func(st *editor.State) { p.env.Host.ConfigureEditor(st, "") })
 }
 
 func (p *Peek) results(c *ui.Context, pal *token.Palette) {

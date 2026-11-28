@@ -13,14 +13,19 @@ import (
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/backup"
 	"github.com/ZerGo0/editor/internal/document"
+	"github.com/ZerGo0/editor/internal/errtext"
+	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/ZerGo0/editor/internal/syntax"
 	"github.com/ZerGo0/editor/internal/viewer"
+	"github.com/ZerGo0/editor/internal/workspace/notices"
 )
 
 const (
 	backupDelay     = time.Second
 	projectKeyBytes = 8
+	recoveredDir    = "Recovered"
+	compareLabel    = "Compare"
 )
 
 type CloseReason int
@@ -301,10 +306,9 @@ func (w *Workspace) takeBackup(path string) (backup.Meta, bool) {
 }
 
 func (w *Workspace) restoreBackup(e *docEntry, path, text string, meta backup.Meta, err error) {
-	name := w.tabTitle(path)
 	if err != nil {
 		log.Printf("hot exit: %v", err)
-		w.setNotice("Cannot restore the unsaved changes to " + name + ".")
+		w.restoreFailed(path, errtext.Text(err))
 		return
 	}
 	if errors.Is(e.err, fs.ErrNotExist) {
@@ -312,7 +316,7 @@ func (w *Workspace) restoreBackup(e *docEntry, path, text string, meta backup.Me
 	}
 	d := e.doc
 	if !backupable(d) {
-		w.setNotice("Cannot restore the unsaved changes to " + name + ".")
+		w.restoreFailed(path, unrestorableReason(e))
 		return
 	}
 	d.Buffer.Set(text)
@@ -323,8 +327,37 @@ func (w *Workspace) restoreBackup(e *docEntry, path, text string, meta backup.Me
 	b.written, b.stored = d.Buffer.Version(), true
 	size, mod := d.DiskStamp()
 	if onDisk(path) && (size != meta.DiskSize || !mod.Equal(meta.DiskModTime)) {
-		w.setNotice("Restored the unsaved changes to " + name + ". The file changed on disk since then.")
+		w.Warn("Restored the unsaved changes to "+w.tabTitle(path), "The file changed on disk since then. Compare the versions before you save.",
+			notices.Action{Label: compareLabel, Run: func() { w.compareWithSaved(d) }})
 	}
+}
+
+func unrestorableReason(e *docEntry) string {
+	switch d := e.doc; {
+	case e.err != nil:
+		return errtext.Text(e.err)
+	case d == nil:
+		return "The file cannot be edited as text."
+	case d.NotUTF8:
+		return "The file is not valid UTF-8 text."
+	case d.Large != nil:
+		return "The file is too large to edit."
+	}
+	return "The file cannot be edited."
+}
+
+func (w *Workspace) restoreFailed(path, reason string) {
+	name := w.tabTitle(path)
+	title := "Cannot restore the unsaved changes to " + name
+	kept, err := w.hot.store.Keep(path, filepath.Join(w.env.BackupDir, recoveredDir), name)
+	if err != nil {
+		log.Printf("hot exit: keep %s: %v", path, err)
+		w.Warn(title, reason)
+		return
+	}
+	w.forgetBackup(path)
+	w.Warn(title, reason+" Your changes are saved in "+fsutil.DisplayPath(kept)+".",
+		notices.Action{Label: revealInFinderLabel, Run: func() { w.revealInFinder(kept) }})
 }
 
 func (w *Workspace) dropPendingBackups(open map[string]bool) {

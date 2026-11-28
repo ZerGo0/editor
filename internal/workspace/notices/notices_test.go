@@ -2,7 +2,10 @@ package notices
 
 import (
 	"slices"
+	"strconv"
 	"testing"
+
+	"github.com/ZerGo0/editor/internal/design/token"
 )
 
 func TestAddTakeAndList(t *testing.T) {
@@ -36,8 +39,8 @@ func TestSameIDReplaces(t *testing.T) {
 
 func TestClearAndLimit(t *testing.T) {
 	var s Store
-	for range Limit + 3 {
-		s.Add(Notice{Title: "n"})
+	for i := range Limit + 3 {
+		s.Add(Notice{Title: strconv.Itoa(i)})
 	}
 	if n := len(s.List()); n != Limit {
 		t.Fatalf("kept %d notices, want %d", n, Limit)
@@ -46,5 +49,31 @@ func TestClearAndLimit(t *testing.T) {
 	s.Clear()
 	if _, closed := s.Take(); len(closed) != Limit || len(s.List()) != 0 || s.Unread() != 0 {
 		t.Fatalf("clear closed %d, left %d", len(closed), len(s.List()))
+	}
+}
+
+func TestEqualNoticesMerge(t *testing.T) {
+	var s Store
+	first := s.Add(Notice{Tone: token.ToneError, Title: "Cannot fetch", Detail: "Offline."})
+	for range 11 {
+		if id := s.Add(Notice{Tone: token.ToneError, Title: "Cannot fetch", Detail: "Offline."}); id != first {
+			t.Fatalf("id %q, want the merged id %q", id, first)
+		}
+	}
+	if n, u := len(s.List()), s.Unread(); n != 1 || u != 1 {
+		t.Fatalf("list %d, unread %d, want 1 and 1", n, u)
+	}
+	if other := s.Add(Notice{Tone: token.ToneWarning, Title: "Cannot fetch", Detail: "Offline."}); other == first {
+		t.Fatal("a notice with another tone merged")
+	}
+}
+
+func TestCloseLowersUnread(t *testing.T) {
+	var s Store
+	busy := s.Add(Notice{Title: "Saving a.txt...", Busy: true})
+	s.Close(busy)
+	s.Add(Notice{Title: "Saved a.txt"})
+	if u := s.Unread(); u != 1 {
+		t.Fatalf("unread %d with one notice", u)
 	}
 }

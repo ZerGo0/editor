@@ -38,8 +38,8 @@ func (w *Workspace) viewPanicked(*applog.Panic) {
 }
 
 func (w *Workspace) ShowPanic() {
-	w.notify(notices.Notice{Tone: token.ToneError, Title: panicTitle, Detail: panicDetail, Action: panicAction, Sticky: true,
-		OnAction: func() { w.env.Commands.Run(openLogsFolderID, w.win) }})
+	w.notify(notices.Notice{Tone: token.ToneError, Title: panicTitle, Detail: panicDetail, Sticky: true,
+		Actions: []notices.Action{{Label: panicAction, Run: func() { w.env.Commands.Run(openLogsFolderID, w.win) }}}})
 }
 
 func (w *Workspace) ShowPanicLoop() {

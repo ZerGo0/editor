@@ -9,12 +9,19 @@ import (
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/ZerGo0/editor/internal/problems"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
 	largeFileText = "Large file mode"
+	readOnlyText  = "Read-only"
+	lockedTooltip = "You do not have permission to change this file"
+	largeFileTip  = "This file is large, so it opens in a lighter editor without syntax highlighting."
+	plainFileText = "Large file: no highlighting"
+	plainFileTip  = "This file is large, so syntax highlighting is off."
+	encodingTip   = "File Encoding"
 	gotoLineID    = "workbench.action.gotoLine"
 	problemsID    = "workbench.actions.view.problems"
 	todoID        = "todo.show"
@@ -57,11 +64,12 @@ func (w *Workspace) statusBar(c *ui.Context) {
 					w.problemsStatus(c)
 				}
 				if !w.statusHidden[statusTODO] {
-					chrome.StatusItem(c, strconv.Itoa(w.todoCount()), chrome.StatusOptions{ID: "todo", Icon: icons.Todo, Command: todoID,
-						Tooltip: "TODO comments", OnClick: func() { w.togglePanel(TODOPanel) }})
+					n := w.todoCount()
+					chrome.StatusParts(c, plural.Count(n, "TODO comment", "TODO comments"), []chrome.StatusPart{{Icon: icons.Todo, Text: strconv.Itoa(n)}},
+						chrome.StatusOptions{ID: "todo", Command: todoID, Tooltip: "Toggle TODO", OnClick: func() { w.togglePanel(TODOPanel) }})
 				}
 				if hint := w.chordHint(); hint != "" {
-					chrome.StatusItem(c, hint, chrome.StatusOptions{ID: "chord"})
+					chrome.StatusItem(c, hint, chrome.StatusOptions{ID: "chord", Tooltip: hint})
 				}
 			})
 		})
@@ -77,7 +85,7 @@ func (w *Workspace) statusBar(c *ui.Context) {
 func (w *Workspace) activeStatus(c *ui.Context) {
 	tab := w.active.ActiveTab()
 	if d := w.docOf(tab); d != nil && d.Large != nil {
-		chrome.StatusItem(c, largeFileText, chrome.StatusOptions{ID: "large"})
+		chrome.StatusItem(c, largeFileText, chrome.StatusOptions{ID: "large", Tooltip: largeFileTip})
 		return
 	}
 	if tab != nil && tab.Editor != nil {
@@ -103,7 +111,7 @@ func (w *Workspace) problemsStatus(c *ui.Context) {
 	if n := counts[problems.Info]; n > 0 {
 		parts = append(parts, chrome.StatusPart{Icon: icons.Info, Text: strconv.Itoa(n), Tone: token.ToneInfo})
 	}
-	label := fmt.Sprintf("Problems: %d errors, %d warnings", counts[problems.Error], counts[problems.Warning])
+	label := "Problems: " + plural.Count(counts[problems.Error], "error", "errors") + ", " + plural.Count(counts[problems.Warning], "warning", "warnings")
 	chrome.StatusParts(c, label, parts, chrome.StatusOptions{ID: "problems", Command: problemsID, OnClick: w.toggleProblems,
 		Tooltip: "Toggle Problems"})
 }
@@ -145,27 +153,32 @@ func (w *Workspace) editorStatus(c *ui.Context, tab *layout.Tab) {
 		chrome.StatusItem(c, text, chrome.StatusOptions{ID: "position", Command: gotoLineID, Tooltip: "Go to Line/Column"})
 	}
 	if !w.statusHidden[statusIndent] {
-		chrome.StatusItem(c, indentLabel(effectiveIndent(st)), chrome.StatusOptions{ID: "indent", Tooltip: "Select Indentation", Menu: func(m *ui.Menu) { w.indentMenu(m, tab) }})
+		indent := indentLabel(effectiveIndent(st))
+		chrome.StatusItem(c, indent, chrome.StatusOptions{ID: "indent", Label: statusIndent + ": " + indent, Tooltip: "Select Indentation", Menu: func(m *ui.Menu) { w.indentMenu(m, tab) }})
 	}
 	d := w.doc(tab.Path)
+	if d != nil && d.Locked {
+		chrome.StatusItem(c, readOnlyText, chrome.StatusOptions{ID: "read-only", Icon: icons.Lock, Tooltip: lockedTooltip})
+	}
 	if !w.statusHidden[statusEncoding] {
 		text := "UTF-8"
-		if d != nil && d.ReadOnly {
+		if d != nil && d.NotUTF8 {
 			text = "Read-only (not UTF-8)"
 		}
-		chrome.StatusItem(c, text, chrome.StatusOptions{ID: "encoding"})
+		chrome.StatusItem(c, text, chrome.StatusOptions{ID: "encoding", Tooltip: encodingTip})
 	}
 	if d != nil && d.Kind == document.Plain {
-		chrome.StatusItem(c, "Large file: no highlighting", chrome.StatusOptions{ID: "plain"})
+		chrome.StatusItem(c, plainFileText, chrome.StatusOptions{ID: "plain", Tooltip: plainFileTip})
 	}
 	if !w.statusHidden[statusLineEnding] {
-		chrome.StatusItem(c, lineEndingNames[buf.LineEnding()], chrome.StatusOptions{ID: "eol", Tooltip: "Select End of Line Sequence", Menu: func(m *ui.Menu) { w.lineEndingMenu(m, tab) }})
+		eol := lineEndingNames[buf.LineEnding()]
+		chrome.StatusItem(c, eol, chrome.StatusOptions{ID: "eol", Label: statusLineEnding + ": " + eol, Tooltip: "Select End of Line Sequence", Menu: func(m *ui.Menu) { w.lineEndingMenu(m, tab) }})
 	}
 	if !w.statusHidden[statusLanguage] {
 		lang := plainTextName
 		if l := buf.Language(); l != nil {
 			lang = l.Name
 		}
-		chrome.StatusItem(c, lang, chrome.StatusOptions{ID: "language", Tooltip: "Select Language Mode", OnClick: w.ChangeLanguage})
+		chrome.StatusItem(c, lang, chrome.StatusOptions{ID: "language", Label: statusLanguage + ": " + lang, Tooltip: "Select Language Mode", OnClick: w.ChangeLanguage})
 	}
 }

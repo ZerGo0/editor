@@ -27,6 +27,34 @@ type codeKey struct {
 	typesText bool
 }
 
+const (
+	usKeys        = "1234567890-=qwrtyopasdfghjklzxcvbm,./;'[]\\"
+	usOption      = "\u00a1\u2122\u00a3\u00a2\u221e\u00a7\u00b6\u2022\u00aa\u00ba\u2013\u2260\u0153\u2211\u00ae\u2020\u00a5\u00f8\u03c0\u00e5\u00df\u2202\u0192\u00a9\u02d9\u2206\u02da\u00ac\u03a9\u2248\u00e7\u221a\u222b\u00b5\u2264\u2265\u00f7\u2026\u00e6\u201c\u2018\u00ab"
+	usShiftOption = "\u2044\u20ac\u2039\u203a\ufb01\ufb02\u2021\u00b0\u00b7\u201a\u2014\u00b1\u0152\u201e\u2030\u02c7\u00c1\u00d8\u220f\u00c5\u00cd\u00ce\u00cf\u02dd\u00d3\u00d4\uf8ff\u00d2\u00b8\u02db\u00c7\u25ca\u0131\u00c2\u00af\u02d8\u00bf\u00da\u00c6\u201d\u2019\u00bb"
+)
+
+var usOptionText = buildUSOptionText()
+
+func buildUSOptionText() map[keymap.Stroke]string {
+	keys, plain, shifted := []rune(usKeys), []rune(usOption), []rune(usShiftOption)
+	out := make(map[keymap.Stroke]string, len(keys)*2)
+	for i, r := range keys {
+		for prefix, text := range map[string]rune{"alt+": plain[i], "shift+alt+": shifted[i]} {
+			if chord, err := keymap.ParseChord(prefix + string(r)); err == nil {
+				out[chord[0]] = string(text)
+			}
+		}
+	}
+	return out
+}
+
+func layoutTypes(s keymap.Stroke, text string) bool {
+	if s.Mods&ui.Alt == 0 || s.Mods&noTextMods != 0 || text == "" {
+		return false
+	}
+	return usOptionText[s] != text
+}
+
 var characterKeys = map[ui.Key]bool{
 	ui.KeySpace: true, ui.KeyMinus: true, ui.KeyEqual: true, ui.KeyComma: true, ui.KeyPeriod: true, ui.KeySlash: true,
 	ui.KeySemicolon: true, ui.KeyQuote: true, ui.KeyBracketLeft: true, ui.KeyBracketRight: true, ui.KeyBackslash: true, ui.KeyBackquote: true,
@@ -62,6 +90,10 @@ func (w *Workspace) observeKey(ev ui.InputEvent) {
 	case ui.InputKeyUp:
 		w.keys.swallowText = false
 	case ui.InputText:
+		if code := &w.keys.code; code.active() && !code.taken && layoutTypes(code.stroke, ev.Text) {
+			code.taken, w.keys.swallowText = true, false
+			return
+		}
 		if w.keys.swallowText {
 			field.Swallow(ev.Text)
 		}

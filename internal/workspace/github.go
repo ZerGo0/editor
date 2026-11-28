@@ -3,12 +3,14 @@ package workspace
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 
 	"github.com/ZerGo0/editor/internal/design/detail"
 	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/insights"
 	"github.com/ZerGo0/editor/internal/issueui"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/ZerGo0/editor/internal/prui"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
@@ -29,7 +31,7 @@ const (
 )
 
 func (w *Workspace) initGitHub() {
-	w.addSideView(toolView{id: GitHubView, title: "GitHub", command: "workbench.view.github", icon: icons.Github, view: w.githubView, badge: w.githubBadge})
+	w.addSideView(toolView{id: GitHubView, title: "GitHub", command: "workbench.view.github", icon: icons.Github, view: w.githubView, badge: w.githubBadge, badgeTip: w.githubBadgeTip, focus: w.focusPullRequests})
 	w.statusLeft = append(w.statusLeft, w.githubStatusItems)
 	w.insights.todoList.EntryMenu = w.todoMenu
 }
@@ -77,6 +79,24 @@ func (w *Workspace) githubBadge() int {
 		return 0
 	}
 	return w.prs.Badge() + w.prs.NotificationsBadge()
+}
+
+func (w *Workspace) githubBadgeTip(int) string {
+	var parts []string
+	if n := w.prs.Badge(); n > 0 {
+		parts = append(parts, plural.Count(n, "pull request", "pull requests")+" waiting for your review")
+	}
+	if n := w.prs.NotificationsBadge(); n > 0 {
+		parts = append(parts, plural.Count(n, "notification", "notifications"))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func (w *Workspace) focusPullRequests() bool {
+	if w.prs == nil || w.githubPanes.Collapsed[sectionPullRequests] {
+		return false
+	}
+	return w.prs.FocusList()
 }
 
 func (w *Workspace) githubStatusItems(c *ui.Context) {

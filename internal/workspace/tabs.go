@@ -15,7 +15,11 @@ func (w *Workspace) OpenFile(path string, preview, focus bool) {
 
 func (w *Workspace) openIn(g *layout.Group, path string, preview, focus bool) *layout.Tab {
 	preview = preview && w.settings.Bool(settings.EnablePreview)
+	replaced := g.PreviewTab()
 	t := g.Open(path, preview, w.newID())
+	if replaced != nil && replaced != t && g.Index(replaced) < 0 {
+		w.rememberViewState(replaced)
+	}
 	w.active = g
 	w.touchRecent(path)
 	if focus {
@@ -134,6 +138,16 @@ func (w *Workspace) TogglePinActive() {
 	if t := w.active.ActiveTab(); t != nil {
 		w.active.SetPinned(t, !t.Pinned)
 	}
+}
+
+func (w *Workspace) OpenEditorAtIndex(i int) {
+	if g := w.active; i >= 0 && i < len(g.Tabs) {
+		w.activate(g, g.Tabs[i])
+	}
+}
+
+func (w *Workspace) LastEditorInGroup() {
+	w.OpenEditorAtIndex(len(w.active.Tabs) - 1)
 }
 
 func (w *Workspace) CycleTab(delta int) {

@@ -2,27 +2,33 @@ package workspace
 
 import (
 	"github.com/ZerGo0/editor/internal/design"
-	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/settings"
 	"github.com/egoist/mygo/ui"
 )
 
+const mainLabel = "Editor"
+
 var appearances = map[string]design.Appearance{
-	settings.ThemeLight: design.AppearanceLight,
-	settings.ThemeDark:  design.AppearanceDark,
+	settings.ThemeLight:     design.AppearanceLight,
+	settings.ThemeDark:      design.AppearanceDark,
+	settings.ThemeHighLight: design.AppearanceLight,
+	settings.ThemeHighDark:  design.AppearanceDark,
 }
 
 func ApplyTheme(c *ui.Context, s *settings.Store) *token.Palette {
-	return design.Apply(c, design.Settings{Appearance: appearances[s.String(settings.ColorTheme)], SystemAccent: true})
+	theme := s.String(settings.ColorTheme)
+	high := theme == settings.ThemeHighDark || theme == settings.ThemeHighLight
+	return design.Apply(c, design.Settings{Appearance: appearances[theme], HighContrast: high, FollowHighContrast: s.Bool(settings.AutoDetectContrast), SystemAccent: true})
 }
 
 func (w *Workspace) view(c *ui.Context) {
+	w.frames.BuildStarted()
 	w.runPendingUpdates()
 	c.SetZoom(w.zoom())
 	p := ApplyTheme(c, w.env.Settings)
-	c.Root().Background(p.Layer.Editor)
+	c.Root().Background(p.Layer.Editor).DrawOver(func(*ui.Painter, ui.Rect) { w.frames.Painted() })
 	w.syncEdited()
 	w.syncTitle()
 	w.updateProblems()
@@ -40,13 +46,7 @@ func (w *Workspace) view(c *ui.Context) {
 	ui.Column(c).Fill().ObserveInput(w.observeMainKey).Children(func() {
 		w.titleBar(c)
 		ui.Row(c).Grow(1).FillWidth().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
-			if w.sidebarHidden {
-				w.main(c)
-				return
-			}
-			w.clampSidebar(c)
-			ui.Split(c, &w.sidebarWidth, func() { w.sidebar(c) }, func() { w.main(c) }).
-				SplitReset(defaultSidebarWidth).Grow(1).FillHeight().MinWidth(0)
+			w.sidebarSplit(c).Grow(1).FillHeight().MinWidth(0)
 		})
 		w.statusBar(c)
 	})
@@ -62,8 +62,9 @@ func (w *Workspace) view(c *ui.Context) {
 	w.promptView(c)
 	w.releaseFocus(c)
 	w.showNotices(c)
-	feedback.ToastHost(c)
+	w.toastHost(c)
 	w.endKeyFrame()
+	w.publishStateChange()
 }
 
 func (w *Workspace) overlays(c *ui.Context) {
@@ -86,8 +87,14 @@ func (w *Workspace) syncEdited() {
 }
 
 func (w *Workspace) main(c *ui.Context) {
-	ui.Column(c).Fill().MinWidth(0).Background(token.Of(c).Layer.Editor).Children(func() {
-		w.withPanel(c, func() { w.node(c, w.layout) })
+	ui.Column(c).Fill().MinWidth(0).Background(token.Of(c).Layer.Editor).Role(ui.RoleMain).Label(mainLabel).Children(func() {
+		w.withPanel(c, func() {
+			if g := w.maximizedGroup(); g != nil {
+				w.group(c, g)
+				return
+			}
+			w.node(c, w.layout)
+		})
 	})
 }
 
@@ -99,9 +106,5 @@ func (w *Workspace) node(c *ui.Context, n *layout.Node) {
 	firstNode, secondNode := n.First, n.Second
 	first := func() { w.node(c, firstNode) }
 	second := func() { w.node(c, secondNode) }
-	if n.Vertical {
-		ui.SplitVerticalPercent(c, &n.Percent, first, second).SplitReset(halfPercent).Fill()
-		return
-	}
-	ui.SplitPercent(c, &n.Percent, first, second).SplitReset(halfPercent).Fill()
+	w.nodeSplit(c, n, first, second).Fill()
 }

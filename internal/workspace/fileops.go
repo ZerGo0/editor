@@ -1,18 +1,26 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ZerGo0/editor/internal/applog"
+	"github.com/ZerGo0/editor/internal/design/action"
+	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/search/finder"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
+	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -22,28 +30,47 @@ const (
 	dirPerm      = 0o755
 	copySuffix   = " copy"
 	maxCopyTries = 1000
+	ownerAccess  = 0o700
+
+	newFileLabel       = "New File"
+	newFolderLabel     = "New Folder"
+	renameLabel        = "Rename"
+	moveLabel          = "Move"
+	pasteLabel         = "Paste"
+	trashLabel         = "Move to Trash"
+	showHistoryLabel   = "Show History"
+	openToSideID       = "explorer.openToSide"
+	findInFolderID     = "filesExplorer.findInFolder"
+	selectForCompareID = "selectForCompare"
+	compareFilesID     = "compareFiles"
+	openFolderID       = "workbench.action.files.openFolder"
+	closeWindowID      = "workbench.action.closeWindow"
 )
 
 var (
 	errEmptyName  = errors.New("Enter a name.")
 	errBadName    = errors.New("The name must stay inside the project.")
+	errSlashName  = errors.New("A file or folder name cannot end with a slash.")
 	errIntoItself = errors.New("A folder cannot move into itself.")
 	errNoCopyName = errors.New("Cannot find a free name for the copy.")
 )
 
 func filetreeHandlers(w *Workspace) filetree.Handlers {
 	return filetree.Handlers{
-		Open:   w.openFromTree,
-		Menu:   w.treeMenu,
-		Create: w.createEntry,
-		Rename: w.renameEntry,
-		Trash:  w.trash,
-		Paste:  w.pasteEntries,
-		Move:   w.moveEntries,
-		Leave:  func() { w.focusTab = w.active.ActiveTab() },
-		Import: func(paths []string, dir string) { w.pasteEntries(paths, dir, false) },
-		Notify: w.setNotice,
-		Marker: w.problemMarker,
+		Open:       w.openFromTree,
+		Menu:       w.treeMenu,
+		Create:     w.createEntry,
+		Rename:     w.renameEntry,
+		Trash:      w.trash,
+		Paste:      w.pasteEntries,
+		Move:       w.moveEntries,
+		Leave:      func() { w.focusTab = w.active.ActiveTab() },
+		Import:     func(paths []string, dir string) { w.pasteEntries(paths, dir, false) },
+		Error:      func(title string, err error) { w.showError(title, err) },
+		Validate:   func(dir, name string) error { _, err := w.resolveName(dir, name); return err },
+		OpenFolder: func() { w.run(openFolderID) },
+		Close:      func() { w.run(closeWindowID) },
+		Marker:     w.problemMarker,
 	}
 }
 
@@ -51,28 +78,57 @@ func (w *Workspace) openFromTree(p string, preview, focus bool) {
 	w.OpenFile(p, preview, focus)
 }
 
+func (w *Workspace) openToSide(p string) {
+	w.openIn(w.sideGroup(), p, false, true)
+}
+
+func (w *Workspace) findInFolder(dir string) {
+	w.closeSearchPopups()
+	st := w.search.dialog.Snapshot()
+	st.Scope, st.Directory = finder.ScopeDirectory, w.rel(dir)
+	if dir == w.Root {
+		st.Scope, st.Directory = finder.ScopeProject, ""
+	}
+	w.search.dialog.Restore(st)
+	w.search.dialog.Open(finder.TabText, "")
+}
+
+func (w *Workspace) showFileHistory(p string) {
+	if h := w.historyUI(); h != nil {
+		h.ShowHistory(p)
+	}
+}
+
 func (w *Workspace) treeMenu(m *ui.Menu, p string) {
 	dir := w.dirOf(p)
-	if m.Item("New File...").Chosen() {
+	root := p == w.Root
+	file := !root && !w.tree.IsDir(p)
+	targets := w.tree.Targets(p)
+	if m.Item(newFileLabel + "...").Chosen() {
 		w.startCreate(dir, false)
 	}
-	if m.Item("New Folder...").Chosen() {
+	if m.Item(newFolderLabel + "...").Chosen() {
 		w.startCreate(dir, true)
 	}
 	m.Separator()
+	if file && commandItem(m, openToSideID).Chosen() {
+		w.openToSide(p)
+	}
 	if m.Item("Reveal in Finder").Chosen() {
 		w.revealInFinder(p)
 	}
 	if m.Item("Open in Terminal").Chosen() {
 		w.openInTerminal(dir)
 	}
+	if !file && commandItem(m, findInFolderID).Chosen() {
+		w.findInFolder(dir)
+	}
 	m.Separator()
-	root := p == w.Root
 	if m.Item("Cut").Shortcut(ui.Cmd, ui.KeyX).Disabled(root).Chosen() {
-		w.tree.SetClipboard([]string{p}, true)
+		w.tree.SetClipboard(targets, true)
 	}
 	if m.Item("Copy").Shortcut(ui.Cmd, ui.KeyC).Disabled(root).Chosen() {
-		w.tree.SetClipboard([]string{p}, false)
+		w.tree.SetClipboard(targets, false)
 	}
 	clip, cut := w.tree.Clipboard()
 	if m.Item("Paste").Shortcut(ui.Cmd, ui.KeyV).Disabled(len(clip) == 0).Chosen() {
@@ -81,18 +137,34 @@ func (w *Workspace) treeMenu(m *ui.Menu, p string) {
 			w.tree.ClearClipboard()
 		}
 	}
+	if file {
+		if commandItem(m, selectForCompareID).Chosen() {
+			w.compareSource = p
+		}
+		if w.canCompareWith(p) && commandItem(m, compareFilesID).Chosen() {
+			w.compareWith(p)
+		}
+	}
 	m.Separator()
 	w.pathItems(m, p)
+	if file && m.Item(showHistoryLabel).Chosen() {
+		w.showFileHistory(p)
+	}
 	if root {
 		return
 	}
 	m.Separator()
-	if m.Item("Rename...").Shortcut(0, ui.KeyF2).Chosen() {
+	if m.Item(renameLabel+"...").Shortcut(0, ui.KeyF2).Disabled(len(targets) > 1).Chosen() {
 		w.tree.StartRename(p)
 	}
-	if m.Item("Move to Trash").Shortcut(ui.Cmd, ui.KeyBackspace).Chosen() {
-		w.trash(p)
+	if m.Item(trashLabel).Shortcut(ui.Cmd, ui.KeyBackspace).Chosen() {
+		w.trash(targets)
 	}
+}
+
+func commandItem(m *ui.Menu, id string) *ui.MenuItem {
+	info, _ := action.Lookup(id)
+	return action.Item(m, info.Title, action.ItemOptions{Detail: info.Keys, Disabled: info.Disabled, ID: id})
 }
 
 func (w *Workspace) dirOf(p string) string {
@@ -134,6 +206,9 @@ func (w *Workspace) resolveName(dir, name string) (string, error) {
 	if name == "" {
 		return "", errEmptyName
 	}
+	if strings.HasSuffix(name, "/") {
+		return "", errSlashName
+	}
 	p := filepath.Join(dir, name)
 	if !filepath.IsLocal(name) || !fsutil.Within(w.Root, p) {
 		return "", errBadName
@@ -157,6 +232,11 @@ func (w *Workspace) createEntry(dir, name string, folder bool) error {
 	if err != nil {
 		return err
 	}
+	label := newFileLabel
+	if folder {
+		label = newFolderLabel
+	}
+	w.tree.Record(&filetree.Change{Label: label, Created: []filetree.Trashed{{Path: p}}})
 	w.tree.Invalidate(dir)
 	w.tree.Reveal(p)
 	if !folder {
@@ -181,42 +261,58 @@ func (w *Workspace) renameEntry(p, name string) error {
 	if err != nil {
 		return err
 	}
-	return w.movePath(p, to)
+	if err := w.movePath(p, to); err != nil {
+		return err
+	}
+	w.tree.Record(&filetree.Change{Label: renameLabel, Moves: []filetree.Move{{From: p, To: to}}})
+	return nil
 }
 
 func (w *Workspace) movePath(from, to string) error {
 	if err := os.Rename(from, to); err != nil {
 		return err
 	}
+	w.afterMove(from, to)
+	return nil
+}
+
+func (w *Workspace) afterMove(from, to string) {
 	w.moved(from, to)
 	w.historyRenamed(from, to)
 	w.tree.Invalidate(filepath.Dir(from))
 	w.tree.Invalidate(filepath.Dir(to))
 	w.tree.Reveal(to)
-	return nil
 }
 
 func (w *Workspace) moveEntries(paths []string, dir string) {
+	ch := &filetree.Change{Label: moveLabel}
+	defer func() {
+		if len(ch.Moves) > 0 {
+			w.tree.Record(ch)
+		}
+	}()
 	for _, p := range paths {
 		if filepath.Dir(p) == dir {
 			continue
 		}
-		if err := w.moveInto(p, dir); err != nil {
+		to, err := w.moveInto(p, dir)
+		if err != nil {
 			w.setNotice("Cannot move " + filepath.Base(p) + ": " + err.Error())
 			return
 		}
+		ch.Moves = append(ch.Moves, filetree.Move{From: p, To: to})
 	}
 }
 
-func (w *Workspace) moveInto(p, dir string) error {
+func (w *Workspace) moveInto(p, dir string) (string, error) {
 	if p == dir || fsutil.Within(p, dir) {
-		return errIntoItself
+		return "", errIntoItself
 	}
 	to, err := w.resolveName(dir, filepath.Base(p))
 	if err != nil {
-		return err
+		return "", err
 	}
-	return w.movePath(p, to)
+	return to, w.movePath(p, to)
 }
 
 func (w *Workspace) pasteEntries(paths []string, dir string, cut bool) {
@@ -224,26 +320,70 @@ func (w *Workspace) pasteEntries(paths []string, dir string, cut bool) {
 		w.moveEntries(paths, dir)
 		return
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	progress := &pasteProgress{}
+	timer := time.AfterFunc(token.SpinnerDelay, func() {
+		id := w.notify(notices.Notice{Tone: token.ToneInfo, Title: pasteTitle(paths), Busy: true, Actions: []notices.Action{{Label: cancelLabel, Run: cancel}}})
+		if !progress.show(id) {
+			w.notes.Close(id)
+		}
+	})
 	applog.Go(func() {
-		var last string
+		ch := &filetree.Change{Label: pasteLabel}
 		for _, p := range paths {
-			to, err := copyEntry(p, dir)
+			to, err := copyEntry(ctx, p, dir)
+			if errors.Is(err, context.Canceled) {
+				break
+			}
 			if err != nil {
 				w.showError("Cannot paste "+filepath.Base(p), err)
 				break
 			}
-			last = to
+			ch.Created = append(ch.Created, filetree.Trashed{Path: to})
+		}
+		timer.Stop()
+		cancel()
+		if id := progress.finish(); id != "" {
+			w.notes.Close(id)
 		}
 		w.update(func() {
 			w.tree.Invalidate(dir)
-			if last != "" {
-				w.tree.Reveal(last)
+			if n := len(ch.Created); n > 0 {
+				w.tree.Record(ch)
+				w.tree.Reveal(ch.Created[n-1].Path)
 			}
 		})
 	})
 }
 
-func copyEntry(src, dir string) (string, error) {
+type pasteProgress struct {
+	mu   sync.Mutex
+	id   string
+	done bool
+}
+
+func (p *pasteProgress) show(id string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.id = id
+	return !p.done
+}
+
+func (p *pasteProgress) finish() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.done = true
+	return p.id
+}
+
+func pasteTitle(paths []string) string {
+	if len(paths) == 1 {
+		return "Copying " + filepath.Base(paths[0]) + "..."
+	}
+	return "Copying " + strconv.Itoa(len(paths)) + " items..."
+}
+
+func copyEntry(ctx context.Context, src, dir string) (string, error) {
 	info, err := os.Stat(src)
 	if err != nil {
 		return "", err
@@ -259,9 +399,65 @@ func copyEntry(src, dir string) (string, error) {
 		if fsutil.Within(src, dir) {
 			return "", errIntoItself
 		}
-		return to, os.CopyFS(to, os.DirFS(src))
+		return to, copyTree(ctx, src, to, info.Mode().Perm())
 	}
-	return to, copyFile(src, to, info.Mode().Perm())
+	return to, copyFile(ctx, src, to, info.Mode().Perm())
+}
+
+func copyTree(ctx context.Context, src, dst string, perm os.FileMode) error {
+	if err := os.Mkdir(dst, perm|ownerAccess); err != nil {
+		return err
+	}
+	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil || rel == "." {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		switch {
+		case d.Type()&fs.ModeSymlink != 0:
+			link, err := os.Readlink(p)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(link, target)
+		case d.IsDir():
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			return os.Mkdir(target, info.Mode().Perm()|ownerAccess)
+		case d.Type().IsRegular():
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			return copyFile(ctx, p, target, info.Mode().Perm())
+		}
+		return nil
+	})
+	if err != nil {
+		_ = os.RemoveAll(dst)
+	}
+	return err
+}
+
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }
 
 func freeCopyName(dir, name string, exists func(string) bool) (string, error) {
@@ -285,7 +481,7 @@ func freeCopyName(dir, name string, exists func(string) bool) (string, error) {
 	return "", errNoCopyName
 }
 
-func copyFile(src, dst string, perm os.FileMode) error {
+func copyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -295,11 +491,14 @@ func copyFile(src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
+	_, err = io.Copy(out, ctxReader{ctx: ctx, r: in})
+	if cerr := out.Close(); err == nil {
+		err = cerr
 	}
-	return out.Close()
+	if err != nil {
+		_ = os.Remove(dst)
+	}
+	return err
 }
 
 func errorWithOutput(err error, out []byte) error {
@@ -337,26 +536,44 @@ func (w *Workspace) moved(from, to string) {
 	}
 }
 
-func (w *Workspace) trash(p string) {
-	name := filepath.Base(p)
+func (w *Workspace) trash(paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	message, detail := fmt.Sprintf("Move %q to the Trash?", filepath.Base(paths[0])), "You can restore it from the Trash."
+	if len(paths) > 1 {
+		message, detail = fmt.Sprintf("Move %d items to the Trash?", len(paths)), "You can restore them from the Trash."
+	}
 	applog.Go(func() {
 		res, err := mygo.Dialog.Message(mygo.MessageOptions{
 			Parent:             w.win,
 			Type:               mygo.MessageWarning,
-			Message:            fmt.Sprintf("Move %q to the Trash?", name),
-			Detail:             "You can restore it from the Trash.",
-			Buttons:            []string{"Move to Trash", "Cancel"},
+			Message:            message,
+			Detail:             detail,
+			Buttons:            []string{trashLabel, "Cancel"},
 			CancelButton:       1,
 			DestructiveButtons: []int{0},
 		})
 		if err != nil || res.Button != 0 {
 			return
 		}
-		if err := mygo.Shell.TrashItem(p); err != nil {
-			w.showError("Cannot move "+name+" to the Trash", err)
-			return
+		ch := &filetree.Change{Label: trashLabel}
+		for _, p := range paths {
+			trashed, err := mygo.Shell.TrashItemResult(p)
+			if err != nil {
+				w.showError("Cannot move "+filepath.Base(p)+" to the Trash", err)
+				break
+			}
+			ch.Removed = append(ch.Removed, filetree.Trashed{Path: p, Trash: trashed})
 		}
-		w.update(func() { w.removed(p) })
+		w.update(func() {
+			for _, e := range ch.Removed {
+				w.removed(e.Path)
+			}
+			if len(ch.Removed) > 0 {
+				w.tree.Record(ch)
+			}
+		})
 	})
 }
 

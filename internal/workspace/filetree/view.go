@@ -1,6 +1,8 @@
 package filetree
 
 import (
+	"errors"
+	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -8,30 +10,37 @@ import (
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
+	"github.com/ZerGo0/editor/internal/errtext"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	filesLabel   = "Files"
-	emptyMessage = "This folder is empty."
-	newFileLabel = "New File"
+	filesLabel       = "Files"
+	emptyMessage     = "This folder is empty."
+	newFileLabel     = "New File"
+	openFolderLabel  = "Open Folder..."
+	closeWindowLabel = "Close Window"
 )
 
 type Paths []string
 
 type Handlers struct {
-	Open   func(p string, preview, focus bool)
-	Menu   func(m *ui.Menu, p string)
-	Create func(dir, name string, folder bool) error
-	Rename func(from, name string) error
-	Trash  func(p string)
-	Paste  func(paths []string, dir string, cut bool)
-	Move   func(paths []string, dir string)
-	Leave  func()
-	Import func(paths []string, dir string)
-	Notify func(text string)
-	Marker func(p string) (count int, tone token.Tone)
+	Open       func(p string, preview, focus bool)
+	Menu       func(m *ui.Menu, p string)
+	Create     func(dir, name string, folder bool) error
+	Rename     func(from, name string) error
+	Trash      func(paths []string)
+	Paste      func(paths []string, dir string, cut bool)
+	Move       func(paths []string, dir string)
+	Leave      func()
+	Import     func(paths []string, dir string)
+	Error      func(title string, err error)
+	Validate   func(dir, name string) error
+	OpenFolder func()
+	Close      func()
+	Marker     func(p string) (count int, tone token.Tone)
 }
 
 func (t *Tree) Focus() {
@@ -55,9 +64,16 @@ func (t *Tree) View(c *ui.Context, h Handlers) ui.Element {
 			}
 			return out
 		}
+		if t.find != nil {
+			t.findBar(c)
+		}
 		roots := t.visibleRows(t.Root)
 		t.slotBuilt = false
-		outline := list.Tree(c, &t.state, roots, t.visibleRows, list.ViewOptions{Label: filesLabel, Empty: t.empty},
+		empty := func(c *ui.Context) { t.empty(c, h) }
+		if t.filter() != "" {
+			empty = t.noMatches
+		}
+		outline := list.Tree(c, &t.state, roots, t.visibleRows, list.ViewOptions{Label: filesLabel, Empty: empty},
 			func(p string) list.Item { return t.item(c, p, h) })
 		outline.ContextMenu(func(m *ui.Menu) { h.Menu(m, t.Root) })
 		if paths, ok := ui.Drop[Paths](outline); ok {
@@ -80,8 +96,19 @@ func (t *Tree) label(p string) string {
 	return t.name(p)
 }
 
-func (t *Tree) empty(c *ui.Context) {
-	feedback.Empty(c, feedback.EmptyOptions{Message: emptyMessage, Link: newFileLabel, OnLink: func() { t.StartCreate(t.Root, false, false) }})
+func (t *Tree) empty(c *ui.Context, h Handlers) {
+	if t.rootErr == nil {
+		feedback.Empty(c, feedback.EmptyOptions{Message: emptyMessage, Link: newFileLabel, OnLink: func() { t.StartCreate(t.Root, false, false) }})
+		return
+	}
+	name := filepath.Base(t.Root)
+	o := feedback.EmptyOptions{Icon: icons.Folder, Title: "Cannot read the folder " + name, Message: errtext.Text(t.rootErr),
+		Action: openFolderLabel, OnAction: h.OpenFolder, Link: closeWindowLabel, OnLink: h.Close}
+	if errors.Is(t.rootErr, fs.ErrNotExist) {
+		o.Title = "The folder " + name + " is no longer available"
+		o.Message = "It was moved, renamed or deleted, or its drive is not connected."
+	}
+	feedback.Empty(c, o)
 }
 
 func (t *Tree) placeEdit(c *ui.Context, box ui.Element, h Handlers) {
@@ -104,7 +131,7 @@ func (t *Tree) afterBuild(c *ui.Context, h Handlers, submitted bool) {
 	if t.pending != "" {
 		for i := range t.state.Rows() {
 			if t.state.Item(i) == t.pending {
-				t.row = i
+				t.choose(i)
 				t.state.List.ScrollIntoView(i)
 				break
 			}
@@ -119,33 +146,45 @@ func (t *Tree) afterBuild(c *ui.Context, h Handlers, submitted bool) {
 
 func (t *Tree) shortcuts(c *ui.Context, h Handlers, submitted bool) {
 	l := &t.state.List
+	key := func(mods ui.Modifiers, k ui.Key) bool { return l.Shortcut(c, mods, k) }
 	p := t.Selected()
 	switch {
-	case p == "":
-		if l.Shortcut(c, ui.Cmd, ui.KeyV) {
-			t.paste(t.Root, h)
-		}
-	case submitted:
-		t.activate(p, false, h)
-	case l.Shortcut(c, 0, ui.KeySpace):
-		t.activate(p, true, h)
-	case l.Shortcut(c, 0, ui.KeyF2):
-		t.StartRename(p)
-	case l.Shortcut(c, ui.Cmd, ui.KeyBackspace):
-		h.Trash(p)
-	case l.Shortcut(c, ui.Cmd, ui.KeyC):
-		t.SetClipboard([]string{p}, false)
-	case l.Shortcut(c, ui.Cmd, ui.KeyX):
-		t.SetClipboard([]string{p}, true)
-	case l.Shortcut(c, ui.Cmd, ui.KeyV):
+	case key(ui.Cmd, ui.KeyV):
 		t.paste(t.dirOf(p), h)
-	case t.cut && l.Shortcut(c, 0, ui.KeyEscape):
+	case p == "":
+	case submitted || key(ui.Cmd, ui.KeyDown):
+		t.activate(p, false, h)
+	case key(0, ui.KeySpace):
+		t.activate(p, true, h)
+	case key(0, ui.KeyF2):
+		t.StartRename(p)
+	case key(ui.Cmd, ui.KeyBackspace):
+		h.Trash(t.SelectedPaths())
+	case key(ui.Cmd, ui.KeyC):
+		t.SetClipboard(t.SelectedPaths(), false)
+	case key(ui.Cmd, ui.KeyX):
+		t.SetClipboard(t.SelectedPaths(), true)
+	case (t.cut || t.sel.Len() > 1 || t.find != nil) && key(0, ui.KeyEscape):
+		t.escape()
+	}
+}
+
+func (t *Tree) escape() {
+	switch {
+	case t.cut:
 		t.ClearClipboard()
+	case t.sel.Len() > 1 && t.row >= 0 && t.row < t.state.Rows():
+		t.choose(t.row)
+	case t.find != nil:
+		t.closeFind()
 	}
 }
 
 func (t *Tree) dirOf(p string) string {
-	if t.isDir[p] {
+	switch {
+	case p == "":
+		return t.Root
+	case t.isDir[p]:
 		return p
 	}
 	return filepath.Dir(p)
@@ -189,8 +228,10 @@ func (t *Tree) toggle(p string) {
 func (t *Tree) item(c *ui.Context, p string, h Handlers) list.Item {
 	dir := t.isDir[p]
 	name := t.name(p)
+	label, matches := tablabel.LTRMatches(name, t.matches(p))
 	it := list.Item{
-		Label: name,
+		Label:   label,
+		Matches: matches,
 		Leading: func(c *ui.Context) {
 			icons.FileIcon(c, filepath.Base(p), dir || t.isPlaceholder(p) && t.edit.folder, t.state.Open.Has(p), token.IconSize.Px())
 		},
@@ -244,6 +285,7 @@ func (t *Tree) editLabel() string {
 func (t *Tree) editInput(c *ui.Context, h Handlers) ui.Element {
 	e := t.edit
 	label := t.editLabel()
+	t.validate(h)
 	input := field.TextInput(c, label, &e.value, field.InputOptions{Placeholder: label, AutoFocus: true, Error: e.err})
 	if !e.selected && input.Focused() {
 		e.selected = true
@@ -270,6 +312,25 @@ func (t *Tree) editInput(c *ui.Context, h Handlers) ui.Element {
 	return input
 }
 
+func (t *Tree) validate(h Handlers) {
+	e := t.edit
+	if e.checked == e.value {
+		return
+	}
+	e.checked, e.err = e.value, ""
+	name := strings.TrimSpace(e.value)
+	if h.Validate == nil || name == "" || !e.create && name == filepath.Base(e.path) {
+		return
+	}
+	dir := e.path
+	if !e.create {
+		dir = filepath.Dir(e.path)
+	}
+	if err := h.Validate(dir, name); err != nil {
+		e.err = errtext.Text(err)
+	}
+}
+
 func (t *Tree) commit(h Handlers, keep bool) {
 	e := t.edit
 	name := strings.TrimSpace(e.value)
@@ -287,10 +348,19 @@ func (t *Tree) commit(h Handlers, keep bool) {
 		t.CancelEdit()
 		return
 	}
-	h.Notify(err.Error())
-	if !keep {
-		t.CancelEdit()
+	if keep {
+		e.err, e.checked = errtext.Text(err), e.value
 		return
 	}
-	e.err = err.Error()
+	t.CancelEdit()
+	if h.Error != nil {
+		h.Error(t.failTitle(e, name), err)
+	}
+}
+
+func (t *Tree) failTitle(e *edit, name string) string {
+	if e.create {
+		return "Cannot create " + name
+	}
+	return "Cannot rename " + filepath.Base(e.path)
 }

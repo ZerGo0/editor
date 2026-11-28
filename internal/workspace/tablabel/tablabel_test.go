@@ -2,6 +2,7 @@ package tablabel
 
 import (
 	"maps"
+	"slices"
 	"testing"
 )
 
@@ -45,5 +46,23 @@ func TestShortParentPaths(t *testing.T) {
 	got := Describe([]string{"/a/f.go", "/b/f.go"})
 	if got["/a/f.go"] != "a" || got["/b/f.go"] != "b" {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestLTRKeepsTheExtensionOnTheRight(t *testing.T) {
+	for _, tc := range []struct{ name, want string }{
+		{"שלום.txt", "\u200Eשלום.txt"},
+		{"مرحبا.md", "\u200Eمرحبا.md"},
+		{"123 שלום.txt", "\u200E123 שלום.txt"},
+		{"main.go", "main.go"},
+		{"a-שלום.txt", "a-שלום.txt"},
+	} {
+		if got := LTR(tc.name); got != tc.want {
+			t.Errorf("LTR(%q) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	label, matches := LTRMatches("שלום.txt", []int{0, 5})
+	if label != "\u200Eשלום.txt" || !slices.Equal(matches, []int{1, 6}) {
+		t.Fatalf("LTRMatches = %q %v", label, matches)
 	}
 }

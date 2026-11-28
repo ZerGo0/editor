@@ -10,6 +10,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/command"
+	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/glob"
 	"github.com/ZerGo0/editor/internal/history"
@@ -49,9 +50,11 @@ type searchState struct {
 	shiftAt     time.Time
 	engine      *everywhere.Search
 	symbols     *symbols.Index
+	widget      *findwidget.Shared
 }
 
 func (w *Workspace) initSearch(saved session.Project) {
+	w.initFindWidget()
 	w.palette.WindowKeys = w.modalKeys()
 	w.search.files = &files.Index{Root: w.Root}
 	syms := symbols.NewIndex()
@@ -77,6 +80,7 @@ func (w *Workspace) initSearch(saved session.Project) {
 		ToolWindows:     w.toolWindows,
 		BeforeWrite:     w.beforeReplace,
 		ShowFindResults: w.showFindResults,
+		Progress:        w.progress,
 		WindowKeys:      w.modalKeys(),
 	}
 	w.search.engine = engine

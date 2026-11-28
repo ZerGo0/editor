@@ -3,6 +3,7 @@ package workspace
 import (
 	"slices"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/pane"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -22,6 +23,7 @@ const (
 	closePanelLabel       = "Close Panel"
 	panelRightLabel       = "Move Panel Right"
 	panelBottomLabel      = "Move Panel to Bottom"
+	panelMoreLabel        = "Views and More Actions..."
 )
 
 type toolView struct {
@@ -32,6 +34,7 @@ type toolView struct {
 	badge     func() int
 	badgeTip  func(n int) string
 	actions   func(c *ui.Context)
+	focus     func() bool
 }
 
 type toolState struct {
@@ -48,12 +51,14 @@ type toolState struct {
 	explorerCollapsed bool
 	openEditors       bool
 	openList          ui.ListState
+	openRow           int
 	revealed          string
 	collapsed         map[string]bool
 }
 
 func (w *Workspace) initTools(saved session.Project) {
-	w.tools.sideViews = []toolView{{id: ExplorerView, title: "Explorer", command: "workbench.view.explorer", icon: icons.Explorer, view: w.explorerView, badge: w.unsavedCount, badgeTip: unsavedTip}}
+	w.tools.sideViews = []toolView{{id: ExplorerView, title: "Explorer", command: "workbench.view.explorer", icon: icons.Explorer, view: w.explorerView, badge: w.unsavedCount, badgeTip: unsavedTip,
+		focus: w.focusExplorerTree}}
 	w.tools.side = cmpOr(saved.SideView, ExplorerView)
 	w.tools.collapsed = map[string]bool{}
 	for _, id := range saved.Collapsed {
@@ -67,7 +72,10 @@ func (w *Workspace) initTools(saved session.Project) {
 		w.statusHidden[id] = true
 	}
 	w.tools.openEditors, w.tools.panelRight, w.tools.sidePercent = saved.OpenEditors, saved.PanelRight, defaultSidePanel
-	w.tools.panelOpen, w.tools.panel = saved.PanelOpen, saved.Panel
+	if saved.PanelSide > 0 {
+		w.tools.sidePercent = saved.PanelSide
+	}
+	w.tools.panelOpen, w.tools.panel, w.tools.panelMax = saved.PanelOpen, saved.Panel, saved.PanelMax && saved.PanelOpen
 	w.tools.panelPercent = saved.PanelPercent
 	if w.tools.panelPercent <= 0 {
 		w.tools.panelPercent = defaultPanelPercent
@@ -83,7 +91,7 @@ func cmpOr(a, b string) string {
 
 func (w *Workspace) snapshotTools(p *session.Project) {
 	p.SideView, p.PanelOpen, p.Panel, p.PanelPercent = w.tools.side, w.tools.panelOpen, w.tools.panel, w.tools.panelPercent
-	p.PanelRight, p.OpenEditors = w.tools.panelRight, w.tools.openEditors
+	p.PanelRight, p.OpenEditors, p.PanelSide, p.PanelMax = w.tools.panelRight, w.tools.openEditors, w.tools.sidePercent, w.tools.panelMax
 	p.Collapsed, p.HiddenViews, p.StatusHidden = trueKeys(w.tools.collapsed), trueKeys(w.tools.hiddenViews), trueKeys(w.statusHidden)
 }
 
@@ -126,6 +134,11 @@ func (w *Workspace) ShowSideView(id string) {
 	}
 }
 
+func (w *Workspace) FocusPanel(id string) {
+	w.ShowPanel(id)
+	w.focusPart(partPanel)
+}
+
 func (w *Workspace) ShowPanel(id string) {
 	if w.tools.panelOpen && w.tools.panel == id {
 		return
@@ -153,14 +166,12 @@ func (w *Workspace) TogglePanelPosition() {
 
 func (w *Workspace) withPanel(c *ui.Context, editors func()) {
 	switch {
-	case !w.tools.panelOpen || len(w.tools.panels) == 0:
+	case len(w.tools.panels) == 0:
 		ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(editors)
-	case w.tools.panelMax:
+	case w.tools.panelOpen && w.tools.panelMax:
 		ui.Column(c).Grow(1).FillWidth().MinHeight(0).MinWidth(0).Children(func() { w.panelView(c) })
-	case w.tools.panelRight:
-		ui.SplitPercent(c, &w.tools.sidePercent, editors, func() { w.panelView(c) }).SplitReset(defaultSidePanel).Grow(1).FillWidth().MinWidth(0)
 	default:
-		ui.SplitVerticalPercent(c, &w.tools.panelPercent, editors, func() { w.panelView(c) }).SplitReset(defaultPanelPercent).Grow(1).FillWidth().MinWidth(0)
+		w.panelSplit(c, editors).Grow(1).FillWidth().MinWidth(0).MinHeight(0)
 	}
 }
 
@@ -213,6 +224,7 @@ func (w *Workspace) panelActions(c *ui.Context) {
 	if w.tools.panelRight {
 		posIcon, posLabel = icons.Panel, panelBottomLabel
 	}
+	action.MenuIconButton(c, icons.More, panelMoreLabel, action.IconOptions{ID: "panel-more"}, w.panelMenu)
 	w.iconButton(c, posIcon, posLabel, togglePanelPositionID, false, w.TogglePanelPosition)
 	maxIcon, maxLabel := icons.ChevronUp, maximizePanelLabel
 	if w.tools.panelMax {

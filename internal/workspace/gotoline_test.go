@@ -178,7 +178,7 @@ func TestGoToLineOpensTheQuickInputFromEveryEntryPoint(t *testing.T) {
 	}
 }
 
-func TestGoToLineShowsThePromptAsPlaceholderAndRow(t *testing.T) {
+func TestGoToLineShowsThePromptAsRow(t *testing.T) {
 	b := newGoToLineBed(t)
 	b.tab.Editor.GoTo(editor.Pos{Line: 6, Col: 2})
 	b.open(t)

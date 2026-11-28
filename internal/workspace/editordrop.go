@@ -91,7 +91,7 @@ func (w *Workspace) areaDrop(c *ui.Context, area ui.Element, g *layout.Group) {
 		}
 	}
 	if files := area.DroppedFiles(); len(files) > 0 {
-		w.queueDrop(filetree.Paths(files), dropRequest{group: g, at: layout.AfterActive})
+		w.dropFiles(files, dropRequest{group: g, at: layout.AfterActive})
 	}
 }
 
@@ -110,12 +110,21 @@ func (w *Workspace) tabStripDrop(c *ui.Context, el ui.Element, g *layout.Group, 
 		w.queueDrop(dropped, req)
 	}
 	if len(files) > 0 {
-		w.queueDrop(filetree.Paths(files), req)
+		w.dropFiles(files, req)
 	}
 	if over == nil {
 		return chrome.DropNone
 	}
 	return mark
+}
+
+func (w *Workspace) dropFiles(files []string, r dropRequest) {
+	for _, p := range files {
+		if info, err := os.Stat(p); err == nil && info.IsDir() && w.env.OpenFolder != nil {
+			w.env.OpenFolder(w.win, p, false)
+		}
+	}
+	w.queueDrop(filetree.Paths(files), r)
 }
 
 func (w *Workspace) queueDrop(v any, r dropRequest) {

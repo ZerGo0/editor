@@ -20,7 +20,7 @@ func (w *Workspace) folderSettingsPath() string {
 
 func (w *Workspace) OpenFolderSettings() {
 	w.settingsView.ShowFolder()
-	w.OpenFile(SettingsTab, false, false)
+	w.OpenFile(SettingsTab, false, true)
 }
 
 func (w *Workspace) OpenFolderSettingsJSON() {

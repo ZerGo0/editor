@@ -1,6 +1,10 @@
 package workspace
 
 import (
+	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -8,7 +12,6 @@ import (
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/backup"
-	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/document"
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/largefile"
@@ -16,6 +19,12 @@ import (
 	"github.com/ZerGo0/editor/internal/viewer"
 	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo/ui/editor"
+)
+
+const (
+	revealInFinderLabel = "Reveal in Finder"
+	saveAsLabel         = "Save As..."
+	retryLabel          = "Retry"
 )
 
 type docEntry struct {
@@ -28,6 +37,8 @@ type docEntry struct {
 	kind      viewer.Kind
 	stamp     fileStamp
 	since     time.Time
+	deleted   bool
+	ready     []func()
 }
 
 func (w *Workspace) entry(path string) *docEntry {
@@ -77,6 +88,11 @@ func (w *Workspace) finishLoad(e *docEntry, path string, l loaded, meta backup.M
 	if restore {
 		w.restoreBackup(e, path, l.backup, meta, l.backupErr)
 	}
+	ready := e.ready
+	e.ready = nil
+	for _, fn := range ready {
+		fn()
+	}
 }
 
 func (w *Workspace) ensureEditor(t *layout.Tab) *docEntry {
@@ -89,15 +105,11 @@ func (w *Workspace) ensureEditor(t *layout.Tab) *docEntry {
 	w.attachCompletions(t.Editor)
 	w.configure(t.Editor, t.Path)
 	defer w.applyDiagnostics(t.Path)
-	if r := t.Restore; r != nil && r.Line < e.doc.Buffer.LineCount() {
-		t.Editor.GoTo(editor.Pos{Line: r.Line, Col: min(r.Col, len(e.doc.Buffer.Line(r.Line)))})
-		if !r.Reveal {
-			t.Editor.SetScrollY(r.ScrollY)
-		}
-		if r.End != nil {
-			buf := e.doc.Buffer
-			t.Editor.Select(buf.Offset(editor.Pos{Line: r.Line, Col: r.Col}), buf.Offset(*r.End))
-		}
+	if t.Restore == nil {
+		t.Restore = w.takeViewState(t.Path)
+	}
+	if t.Restore != nil {
+		applyPosition(t.Editor, e.doc.Buffer, t.Restore)
 	}
 	t.Restore = nil
 	return e
@@ -177,9 +189,14 @@ func (w *Workspace) save(docs []*document.Document) bool {
 			continue
 		}
 		w.prepareSave(d)
-		if err := d.Save(); err != nil {
-			w.showError("Cannot save "+filepath.Base(d.Path), err)
+		err := d.Save()
+		w.syncReadOnly(d)
+		if err != nil {
+			w.saveFailed(d, err)
 			return false
+		}
+		if e := w.docs[d.Path]; e != nil {
+			e.deleted = false
 		}
 		w.recordHistory(d.Path, "")
 	}
@@ -199,7 +216,61 @@ func (w *Workspace) SaveAll() {
 	w.saveThen(w.modified(), nil)
 }
 
+func (w *Workspace) saveFailed(d *document.Document, err error) {
+	var notUTF8 *document.NotUTF8Error
+	title := "Cannot save " + filepath.Base(d.Path)
+	reveal := notices.Action{Label: revealInFinderLabel, Run: func() { w.revealInFinder(d.Path) }}
+	saveAs := notices.Action{Label: saveAsLabel, Run: func() { w.saveAs(d) }}
+	switch {
+	case errors.As(err, &notUTF8):
+		w.showError(title, err, reveal)
+	case errors.Is(err, fs.ErrPermission):
+		w.showError(title, err, saveAs, reveal)
+	default:
+		w.showError(title, err, saveAs, notices.Action{Label: retryLabel, Run: func() { w.saveThen([]*document.Document{d}, nil) }})
+	}
+}
+
+func (w *Workspace) syncReadOnly(d *document.Document) {
+	for _, t := range w.tabs() {
+		if t.Path == d.Path && t.Editor != nil {
+			t.Editor.ReadOnly = d.ReadOnly
+		}
+	}
+}
+
+func (w *Workspace) deleted(path string) bool {
+	e := w.docs[path]
+	return e != nil && e.deleted
+}
+
+func (w *Workspace) checkFiles(dir string) {
+	for path, e := range w.docs {
+		d := e.doc
+		if d == nil || !onDisk(path) || !fsutil.Within(dir, path) {
+			continue
+		}
+		wasDeleted, wasLocked := e.deleted, d.Locked
+		applog.Go(func() {
+			_, err := os.Stat(path)
+			gone := errors.Is(err, fs.ErrNotExist)
+			locked := err == nil && d.Large == nil && !fsutil.Writable(path)
+			if gone == wasDeleted && (gone || locked == wasLocked) {
+				return
+			}
+			w.update(func() {
+				e.deleted = gone
+				if !gone {
+					d.SetLocked(locked)
+					w.syncReadOnly(d)
+				}
+			})
+		})
+	}
+}
+
 func (w *Workspace) reloadChanged(dir string) {
+	w.checkFiles(dir)
 	for path, e := range w.docs {
 		d := e.doc
 		if d == nil || !d.Editable() || d.Modified() || !fsutil.Within(dir, path) || !d.ChangedOnDisk() {
@@ -226,17 +297,22 @@ func (w *Workspace) saveLarge(d *document.Document) {
 	}
 	e.saving = true
 	name := filepath.Base(d.Path)
-	id := w.notify(notices.Notice{Tone: token.ToneInfo, Title: "Saving " + name + "...", Busy: true})
+	ctx, cancel := context.WithCancel(w.ctx)
+	id := w.busyNotice("Saving "+name+"...", cancel)
 	applog.Go(func() {
-		err := d.SaveLarge(w.ctx, nil)
+		err := d.SaveLarge(ctx, nil)
+		cancel()
 		w.update(func() {
 			e.saving = false
 			w.notes.Close(id)
-			if err != nil {
-				w.showError("Cannot save "+name, err)
-				return
+			switch {
+			case errors.Is(err, context.Canceled):
+				w.setNotice("Canceled saving " + name)
+			case err != nil:
+				w.saveFailed(d, err)
+			default:
+				w.setNotice("Saved " + name)
 			}
-			w.setNotice("Saved " + name)
 		})
 	})
 }

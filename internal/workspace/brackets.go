@@ -39,6 +39,8 @@ type bracketView struct {
 	dark     bool
 }
 
+func isBracketColor(r editor.Replacement) bool { return r.Content == nil }
+
 func (w *Workspace) initBrackets() {
 	w.brackets = bracketState{scans: map[string]*bracketScan{}, views: map[*editor.State]bracketView{}}
 }
@@ -47,16 +49,16 @@ func bracketPalette(p *token.Palette) []ui.Color {
 	return []ui.Color{p.Severity.Warning, p.Accent.Base, p.Severity.Success}
 }
 
-func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
+func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) ([]editor.Replacement, bool) {
 	st := tab.Editor
 	buf := st.Buffer
 	lang := buf.Language()
 	if !w.settings.Bool(settings.BracketColors) || !bracketcolor.Supports(lang) || buf.Len() > bracketMaxBytes {
 		if _, ok := w.brackets.views[st]; ok {
-			st.SetReplacements(nil)
 			delete(w.brackets.views, st)
+			return nil, true
 		}
-		return
+		return nil, false
 	}
 	scan := w.brackets.scans[tab.Path]
 	if scan == nil {
@@ -67,14 +69,14 @@ func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
 	if scan.version != version || scan.lang != lang || scan.brackets == nil {
 		w.startBracketScan(scan, buf, lang)
 		if scan.version != version || scan.lang != lang {
-			return
+			return nil, false
 		}
 	}
 	first, last := st.VisibleLines()
 	t := token.Of(c)
 	v, ok := w.brackets.views[st]
 	if ok && v.version == version && v.lang == lang && v.dark == t.Dark && first >= v.from && last <= v.to {
-		return
+		return nil, false
 	}
 	v = bracketView{version: version, lang: lang, dark: t.Dark, from: max(0, first-bracketMargin), to: last + bracketMargin}
 	w.brackets.views[st] = v
@@ -95,7 +97,7 @@ func (w *Workspace) colorBrackets(c *ui.Context, tab *layout.Tab) {
 		}
 		rs = append(rs, editor.Replacement{Start: b.Offset, End: b.Offset + 1, Text: string(b.Char), Color: color})
 	}
-	st.SetReplacements(rs)
+	return rs, true
 }
 
 func (w *Workspace) startBracketScan(scan *bracketScan, buf *editor.Buffer, lang *editor.Language) {
@@ -146,6 +148,11 @@ func (w *Workspace) dropUnusedBrackets(open map[string]bool) {
 	for st := range w.brackets.views {
 		if !editors[st] {
 			delete(w.brackets.views, st)
+		}
+	}
+	for st := range w.unicode.views {
+		if !editors[st] {
+			delete(w.unicode.views, st)
 		}
 	}
 }

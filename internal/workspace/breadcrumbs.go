@@ -15,6 +15,7 @@ import (
 	"github.com/ZerGo0/editor/internal/problems"
 	"github.com/ZerGo0/editor/internal/search/symbols"
 	"github.com/ZerGo0/editor/internal/session"
+	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -22,6 +23,10 @@ const (
 	breadcrumbLabel = "Breadcrumbs"
 	maxCrumbEntries = 200
 )
+
+type crumbFocus struct {
+	want, open, menu bool
+}
 
 type symbolEntry struct {
 	version uint64
@@ -38,7 +43,7 @@ func (w *Workspace) breadcrumbs(c *ui.Context, g *layout.Group, tab *layout.Tab)
 	for i, seg := range segments {
 		last := i == len(segments)-1
 		p := dirs[i]
-		cr := chrome.Crumb{Label: seg, Leading: func(c *ui.Context) { icons.FileIcon(c, seg, !last, false, token.IconSize.Px()) }}
+		cr := chrome.Crumb{Label: tablabel.LTR(seg), Leading: func(c *ui.Context) { icons.FileIcon(c, seg, !last, false, token.IconSize.Px()) }}
 		if last {
 			cr.Menu = func(m *ui.Menu) { w.fileCrumbMenu(m, g, tab) }
 		} else {
@@ -49,9 +54,25 @@ func (w *Workspace) breadcrumbs(c *ui.Context, g *layout.Group, tab *layout.Tab)
 	if sym := w.symbolAt(tab); sym != "" {
 		crumbs = append(crumbs, chrome.Crumb{Label: sym, Icon: icons.ListView, Menu: func(m *ui.Menu) { w.symbolCrumbMenu(m, g, tab) }})
 	}
+	if g == w.active && len(crumbs) > 0 {
+		last := &crumbs[len(crumbs)-1]
+		last.Open, last.Focus = &w.crumbs.menu, w.crumbs.want
+		if w.crumbs.want && w.crumbs.open {
+			w.crumbs.menu = true
+		}
+		w.crumbs.want, w.crumbs.open = false, false
+	}
 	ui.Row(c).FillWidth().Shrink(0).Background(token.Of(c).Layer.Editor).Clip().Children(func() {
-		chrome.Breadcrumbs(c, breadcrumbLabel, crumbs)
+		if chrome.Breadcrumbs(c, breadcrumbLabel, crumbs).Shortcut(0, ui.KeyEscape) {
+			w.focusTab = tab
+		}
 	})
+}
+
+func (w *Workspace) FocusBreadcrumbs(open bool) {
+	if t := w.active.ActiveTab(); t != nil && onDisk(t.Path) {
+		w.crumbs = crumbFocus{want: true, open: open}
+	}
 }
 
 func (w *Workspace) crumbPath(file string) (names, paths []string) {

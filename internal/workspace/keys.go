@@ -50,7 +50,7 @@ func (w *Workspace) shortcuts(c *ui.Context, call keyScope) {
 		}
 	}
 	for _, b := range active.Singles() {
-		if _, ok := keymap.EditorCommand(b.Command); ok && !b.Chord[0].ByCode() && w.editorRunsItsKeys() {
+		if _, ok := keymap.EditorCommand(b.Command); ok && !b.Chord[0].ByCode() && w.editorRunsItsKeys() && !w.explorerFocused() {
 			continue
 		}
 		if s, ok := km.MenuStroke(b.Command); ok && s == b.Chord[0] && w.env.Commands.InMenu(b.Command) {
@@ -88,6 +88,10 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 	t := w.active.ActiveTab()
 	providers := t != nil && w.hasSymbolProviders(t.Editor)
 	peekOpen := w.referenceSearchVisible()
+	diffActive, inDiff := w.diffContext()
+	inEditorPart := !w.focus.side && !w.focus.panel
+	inKeybindings := t != nil && t.Path == KeybindingsTab && inEditorPart
+	groups := len(w.layout.Groups())
 	ctx := maps.Clone(keymap.DefaultContext())
 	for key, on := range map[string]bool{
 		"editorTextFocus":           editorText,
@@ -99,15 +103,20 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 		"panelFocus":                w.focus.panel,
 		"explorerViewletFocus":      w.focus.side && w.tools.side == ExplorerView,
 		"filesExplorerFocus":        w.focus.side && w.tools.side == ExplorerView,
+		"explorerResourceIsFolder":  w.selectionIsFolder(),
 		"listFocus":                 w.focus.side && !textFocus,
 		"editorIsOpen":              t != nil,
 		"canNavigateBack":           w.canNavigate(true),
 		"canNavigateForward":        w.canNavigate(false),
-		"multipleEditorGroups":      len(w.layout.Groups()) > 1,
+		"multipleEditorGroups":      groups > 1,
 		"activeEditorIsPinned":      t != nil && t.Pinned,
 		"inQuickOpen":               w.palette.IsOpen() || w.searchOpen(),
 		"notificationCenterVisible": w.noteCenter,
+		"notificationToastsVisible": w.toastsVisible(),
 		"sideBarVisible":            !w.sidebarHidden,
+		"reviewEditorActive":        w.activeReview() != nil,
+		"textCompareEditorActive":   diffActive,
+		"isInDiffEditor":            inDiff,
 
 		"editorHasDefinitionProvider":     providers,
 		"editorHasReferenceProvider":      providers,
@@ -115,6 +124,12 @@ func (w *Workspace) whenContext(c *ui.Context) when.Context {
 		"editorHasTypeDefinitionProvider": providers,
 		"referenceSearchVisible":          peekOpen,
 		"hasSearchResult":                 !peekOpen,
+		"inKeybindings":                   inKeybindings,
+		"inKeybindingsSearch":             inKeybindings && w.keysView.SearchFocused(),
+		"inSettingsEditor":                t != nil && t.Path == SettingsTab && inEditorPart,
+		"breadcrumbsPossible":             t != nil && onDisk(t.Path),
+		"editorPartMultipleEditorGroups":  groups > 1,
+		"editorPartMaximizedEditorGroup":  w.maxGroup != nil,
 	} {
 		ctx[key] = on
 	}

@@ -269,7 +269,7 @@ func TestShiftF12ListsReferencesWithoutCommentsAndStrings(t *testing.T) {
 	b.open(t, "use.go", editor.Pos{Line: 2, Col: useCol})
 	b.peekOn(t, ui.Shift, ui.KeyF12, "use")
 	rows := b.rows()
-	want := []string{"use.go 1", "func use() { foo() } line 3", "defs.go 1", "func foo() {} line 4 Definition"}
+	want := []string{"use.go, 1", "line 3: func use() { foo() }", "defs.go, 1", "line 4: func foo() {}, Definition"}
 	if len(rows) != len(want) {
 		t.Fatalf("reference rows %q, want %q", rows, want)
 	}
@@ -286,7 +286,7 @@ func TestReferencesPutTheDeclarationFirstInItsFile(t *testing.T) {
 	b.open(t, "a.go", editor.Pos{Line: 2, Col: len("func early() { ")})
 	b.peekOn(t, ui.Shift, ui.KeyF12, "func foo")
 	rows := b.rows()
-	if len(rows) != 4 || rows[1] != "func foo() {} line 5 Definition" || rows[2] != "func early() { foo() } line 3" {
+	if len(rows) != 4 || rows[1] != "line 5: func foo() {}, Definition" || rows[2] != "line 3: func early() { foo() }" {
 		t.Fatalf("rows %q", rows)
 	}
 }
@@ -326,12 +326,7 @@ func TestFindAllReferencesFillsTheFindPanel(t *testing.T) {
 func TestContextMenuOffersDefinitionReferencesAndPeek(t *testing.T) {
 	b := newPeekBed(t, map[string]string{"defs.go": otherSource, "use.go": "foo()\n", "notes.txt": "foo\n"})
 	b.open(t, "use.go", editor.Pos{})
-	var area ui.Rect
-	for _, a := range b.tt.AccessAll() {
-		if a.Name == "Code editor" {
-			area = a.Bounds
-		}
-	}
+	area := editorBounds(b.tt)
 	b.tt.RightClickAt(area.X+mouseTextX, area.Y+mouseRowInset)
 	b.tt.Frame()
 	menu := strings.Join(b.tt.Menu(), "|")
@@ -365,7 +360,7 @@ func (b *peekBed) bounds(name string) ui.Rect {
 func TestPeekSitsUnderTheCursorLineAcrossTheEditor(t *testing.T) {
 	b, st := newPeekedBed(t)
 	b.tt.Frame()
-	area, panel, preview, results := b.bounds("Code editor"), b.bounds("Peek"), b.bounds(peekPreview), b.bounds(peekResults)
+	area, panel, preview, results := editorBounds(b.tt), b.bounds("Peek"), b.bounds(peekPreview), b.bounds(peekResults)
 	lineBottom := area.Y + float32(st.LineTop(3)-st.ScrollY())
 	if panel.X != area.X || panel.W != area.W || panel.Y != lineBottom {
 		t.Fatalf("the peek is at %+v, want the width of the editor %+v under y %v", panel, area, lineBottom)

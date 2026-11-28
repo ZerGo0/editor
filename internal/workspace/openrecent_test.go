@@ -46,9 +46,9 @@ func TestOpenRecentListsTheCurrentFolderLikeVSCode(t *testing.T) {
 	}
 	want := []string{
 		"folders:current:" + openedHereLabel,
-		"folders:alpha:Remove alpha from Recently Opened",
+		"folders:alpha:Remove alpha from Recent",
 		"folders:beta:" + openedElsewhereLabel,
-		"files:notes.txt:Remove notes.txt from Recently Opened",
+		"files:notes.txt:Remove notes.txt from Recent",
 	}
 	if !slices.Equal(labels, want) {
 		t.Fatalf("entries = %v, want %v", labels, want)
@@ -88,7 +88,7 @@ func TestOpenRecentRemoveButtonForgetsTheEntry(t *testing.T) {
 	w, tt, folders, _ := openRecentHarness(t)
 	w.ShowOpenRecent()
 	tt.Frame()
-	if err := tt.Click("Remove alpha from Recently Opened"); err != nil {
+	if err := tt.Click("Remove alpha from Recent"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
@@ -99,7 +99,7 @@ func TestOpenRecentRemoveButtonForgetsTheEntry(t *testing.T) {
 		t.Error("the list still shows alpha or lost beta")
 	}
 	tt.Key(0, ui.KeyDown)
-	if err := tt.Click("Remove notes.txt from Recently Opened"); err != nil || len(w.search.recent) != 0 {
+	if err := tt.Click("Remove notes.txt from Recent"); err != nil || len(w.search.recent) != 0 {
 		t.Fatalf("remove file: %v, recent %v", err, w.search.recent)
 	}
 }

@@ -18,6 +18,14 @@ func (w *Workspace) RunEditor(cmd editor.Command) {
 		w.ToggleWordWrap()
 		return
 	}
+	switch {
+	case cmd == editor.Undo && w.explorerFocused():
+		w.UndoFileOperation()
+		return
+	case cmd == editor.Redo && w.explorerFocused():
+		w.RedoFileOperation()
+		return
+	}
 	t := w.active.ActiveTab()
 	if t == nil || t.Editor == nil {
 		return
@@ -29,11 +37,23 @@ func (w *Workspace) RunEditor(cmd editor.Command) {
 }
 
 func (w *Workspace) OpenSettings() {
-	w.OpenFile(SettingsTab, false, false)
+	w.OpenFile(SettingsTab, false, true)
 }
 
 func (w *Workspace) OpenKeybindings() {
-	w.OpenFile(KeybindingsTab, false, false)
+	w.OpenFile(KeybindingsTab, false, true)
+}
+
+func (w *Workspace) SearchKeybindings() {
+	w.keysView.Focus()
+}
+
+func (w *Workspace) RecordKeybindingSearchKeys() {
+	w.keysView.ToggleRecordKeys()
+}
+
+func (w *Workspace) SearchSettings() {
+	w.settingsView.Focus()
 }
 
 const (
@@ -92,6 +112,7 @@ func (w *Workspace) ReopenClosed() {
 
 func (w *Workspace) rememberClosed(tabs []*layout.Tab) {
 	for _, t := range tabs {
+		w.rememberViewState(t)
 		w.closed = append(slices.DeleteFunc(w.closed, func(p string) bool { return p == t.Path }), t.Path)
 	}
 	if over := len(w.closed) - maxClosed; over > 0 {
@@ -161,8 +182,5 @@ func (w *Workspace) CopyActivePath(relative bool) {
 }
 
 func (w *Workspace) keyLabel(id string) string {
-	if chords := w.env.Keys.Current.For(id); len(chords) > 0 {
-		return chords[0].Label()
-	}
-	return ""
+	return w.env.Keys.Current.Label(id)
 }

@@ -4,9 +4,43 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"golang.org/x/text/unicode/bidi"
 )
 
-const ellipsis = "…" + string(filepath.Separator)
+const (
+	ellipsis      = "…" + string(filepath.Separator)
+	leftToRightMk = "\u200E"
+)
+
+func LTR(name string) string {
+	label, _ := LTRMatches(name, nil)
+	return label
+}
+
+func LTRMatches(name string, matches []int) (string, []int) {
+	if !startsRightToLeft(name) {
+		return name, matches
+	}
+	shifted := make([]int, len(matches))
+	for i, m := range matches {
+		shifted[i] = m + 1
+	}
+	return leftToRightMk + name, shifted
+}
+
+func startsRightToLeft(s string) bool {
+	for _, r := range s {
+		p, _ := bidi.LookupRune(r)
+		switch p.Class() {
+		case bidi.L:
+			return false
+		case bidi.R, bidi.AL:
+			return true
+		}
+	}
+	return false
+}
 
 func Describe(paths []string) map[string]string {
 	byName := map[string][]string{}

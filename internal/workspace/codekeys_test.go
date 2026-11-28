@@ -48,10 +48,20 @@ func pressCode(tt *ui.Tester, code ui.KeyCode) {
 }
 
 func focusedText(tt *ui.Tester) (string, bool) {
+	var fields []ui.AccessInfo
+	optionFocused := false
 	for _, a := range tt.AccessAll() {
-		if a.Focused && a.Role == ui.RoleTextField {
+		switch {
+		case a.Focused && a.Role == ui.RoleTextField:
 			return a.Value, true
+		case a.Focused && a.Role == ui.RoleOption:
+			optionFocused = true
+		case a.Role == ui.RoleTextField:
+			fields = append(fields, a)
 		}
+	}
+	if optionFocused && len(fields) == 1 {
+		return fields[0].Value, true
 	}
 	return "", false
 }
@@ -418,5 +428,36 @@ func TestBoundTypingKeyRunsInsteadOfTyping(t *testing.T) {
 	tt.Frame()
 	if got := tab.Editor.Buffer.String(); !strings.Contains(got, "¬") {
 		t.Errorf("an unbound Alt+L must still type its character, got %q", got)
+	}
+}
+
+func TestOptionTextWinsOnLayoutsThatTypeWithOption(t *testing.T) {
+	if n, a, b := len([]rune(usKeys)), len([]rune(usOption)), len([]rune(usShiftOption)); n != a || n != b {
+		t.Fatalf("US Option table lengths %d, %d, %d differ", n, a, b)
+	}
+	stroke := func(s string) keymap.Stroke {
+		chord, err := keymap.ParseChord(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return chord[0]
+	}
+	for _, tc := range []struct {
+		stroke, text string
+		types        bool
+	}{
+		{"alt+z", "ż", true},
+		{"alt+x", "ź", true},
+		{"alt+5", "[", true},
+		{"alt+l", "@", true},
+		{"alt+z", "Ω", false},
+		{"shift+alt+a", "Å", false},
+		{"shift+alt+a", "Ą", true},
+		{"cmd+alt+z", "ż", false},
+		{"z", "z", false},
+	} {
+		if got := layoutTypes(stroke(tc.stroke), tc.text); got != tc.types {
+			t.Errorf("layoutTypes(%s, %q) = %v, want %v", tc.stroke, tc.text, got, tc.types)
+		}
 	}
 }

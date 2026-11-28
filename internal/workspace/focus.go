@@ -60,11 +60,20 @@ func (w *Workspace) focusPart(p part) {
 	switch {
 	case p == partEditor:
 		w.focusTab = w.active.ActiveTab()
-	case p == partSide && w.tools.side == ExplorerView:
-		w.tree.Focus()
+	case p == partSide && focusView(findView(w.tools.sideViews, w.tools.side)):
+	case p == partPanel && focusView(findView(w.tools.panels, w.tools.panel)):
 	default:
 		w.focus.want = p
 	}
+}
+
+func focusView(v *toolView) bool {
+	return v != nil && v.focus != nil && v.focus()
+}
+
+func (w *Workspace) focusExplorerTree() bool {
+	w.tree.Focus()
+	return true
 }
 
 func (w *Workspace) FocusSideBar() {

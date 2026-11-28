@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"os/exec"
+	"slices"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
@@ -12,6 +13,7 @@ import (
 	"github.com/ZerGo0/editor/internal/fsutil"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/layout"
+	"github.com/ZerGo0/editor/internal/workspace/tablabel"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
@@ -20,16 +22,12 @@ const (
 	terminalApp      = "Terminal"
 	sideBarLabel     = "Primary Side Bar"
 	openEditorsTitle = "Open Editors"
+	openEditorsPane  = "openEditors"
+	foldersPane      = "folders"
+	explorerSizesKey = "workbench.explorer.sizes"
+	githubSizesKey   = "workbench.github.sizes"
 	unsavedLabel     = "Unsaved changes"
 )
-
-func (w *Workspace) clampSidebar(c *ui.Context) {
-	floor := token.SidebarMinWidth.Px()
-	if width, _ := c.Size(); width > 0 {
-		w.sidebarWidth = min(w.sidebarWidth, width-floor)
-	}
-	w.sidebarWidth = max(w.sidebarWidth, floor)
-}
 
 func (w *Workspace) sidebar(c *ui.Context) {
 	p := token.Of(c)
@@ -48,12 +46,16 @@ func (w *Workspace) sidebar(c *ui.Context) {
 
 func (w *Workspace) explorerView(c *ui.Context) {
 	w.autoReveal()
-	pane.Section(c, openEditorsTitle, &w.tools.openEditors, pane.SectionOptions{Actions: w.openEditorsActions}, w.openEditorsView)
-	open := !w.tools.explorerCollapsed
-	pane.Section(c, w.Name, &open, pane.SectionOptions{Border: true, Actions: w.explorerActions}, func(c *ui.Context) {
-		w.tree.View(c, filetreeHandlers(w))
+	s := &w.explorerPanes
+	if s.Collapsed == nil {
+		s.Collapsed = map[string]bool{}
+	}
+	s.Collapsed[openEditorsPane], s.Collapsed[foldersPane] = !w.tools.openEditors, w.tools.explorerCollapsed
+	pane.Stack(c, s, []pane.Pane{
+		{ID: openEditorsPane, Title: openEditorsTitle, Actions: w.openEditorsActions, Body: w.openEditorsView},
+		{ID: foldersPane, Title: w.Name, Actions: w.explorerActions, Body: func(c *ui.Context) { w.tree.View(c, filetreeHandlers(w)) }},
 	})
-	w.tools.explorerCollapsed = !open
+	w.tools.openEditors, w.tools.explorerCollapsed = !s.Collapsed[openEditorsPane], s.Collapsed[foldersPane]
 }
 
 func (w *Workspace) explorerActions(c *ui.Context) {
@@ -97,7 +99,9 @@ func (w *Workspace) openEditorsActions(c *ui.Context) {
 func (w *Workspace) openEditorsView(c *ui.Context) {
 	entries := w.openEditors()
 	labels := w.tabLabels()
-	list.View(c, &w.tools.openList, len(entries), list.ViewOptions{Label: openEditorsTitle, Empty: func(c *ui.Context) {
+	w.tools.openList.Selected = &w.tools.openRow
+	w.tools.openList.Label = func(i int) string { return w.tabTitle(entries[i].tab.Path) }
+	l := list.View(c, &w.tools.openList, len(entries), list.ViewOptions{Label: openEditorsTitle, Empty: func(c *ui.Context) {
 		feedback.Empty(c, feedback.EmptyOptions{Message: watermarkLabel})
 	}}, func(i int) list.Item {
 		e := entries[i]
@@ -105,11 +109,12 @@ func (w *Workspace) openEditorsView(c *ui.Context) {
 		d := w.doc(e.tab.Path)
 		dirty := d != nil && d.Modified()
 		it := list.Item{
-			Label:       name,
+			Label:       tablabel.LTR(name),
 			Description: labels[e.tab.Path],
 			Leading:     func(c *ui.Context) { w.tabIcon(c, e.tab.Path) },
 			Tooltip:     w.tabTooltip(e.tab.Path),
 			OnClick:     func() { w.activate(e.group, e.tab) },
+			OnAuxClick:  func() { w.requestClose(e.group, []*layout.Tab{e.tab}) },
 			Menu:        func(m *ui.Menu) { w.tabMenu(m, e.group, e.tab) },
 			Actions: func(c *ui.Context) {
 				if action.IconButton(c, icons.Close, "Close "+name, action.IconOptions{ID: "close-open-editor", Tooltip: "Close"}).Clicked() {
@@ -125,6 +130,31 @@ func (w *Workspace) openEditorsView(c *ui.Context) {
 		}
 		return it
 	})
+	w.openEditorsKeys(c, l, entries)
+}
+
+func (w *Workspace) openEditorsKeys(c *ui.Context, l ui.Element, entries []openEditor) {
+	if !l.FocusWithin() {
+		active := slices.IndexFunc(entries, func(e openEditor) bool { return e.group == w.active && e.tab == w.active.ActiveTab() })
+		if active != w.tools.openRow {
+			w.tools.openRow = active
+			c.Invalidate()
+		}
+		return
+	}
+	row := w.tools.openRow
+	if row < 0 || row >= len(entries) {
+		return
+	}
+	e := entries[row]
+	switch {
+	case l.Submitted():
+		w.activate(e.group, e.tab)
+	case l.Shortcut(0, ui.KeyBackspace) || l.Shortcut(0, ui.KeyDelete) || l.Shortcut(ui.Cmd, ui.KeyBackspace):
+		w.requestClose(e.group, []*layout.Tab{e.tab})
+		w.focusTab = nil
+		w.tools.openRow = min(row, len(entries)-2)
+	}
 }
 
 func (w *Workspace) RefreshExplorer() {

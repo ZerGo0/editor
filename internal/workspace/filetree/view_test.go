@@ -1,8 +1,10 @@
 package filetree
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -11,9 +13,12 @@ import (
 )
 
 const (
-	testViewW = 320
-	testViewH = 400
+	testViewW     = 320
+	testViewH     = 400
+	invalidSuffix = "!"
 )
+
+var errInvalidName = errors.New("That name is not allowed.")
 
 type calls struct {
 	opened  []string
@@ -21,6 +26,7 @@ type calls struct {
 	created []string
 	renamed []string
 	pasted  []string
+	trashed []string
 }
 
 func newTestTree(t *testing.T, files ...string) (*Tree, *ui.Tester, *calls, string) {
@@ -51,13 +57,21 @@ func newTestTree(t *testing.T, files ...string) (*Tree, *ui.Tester, *calls, stri
 			got.renamed = append(got.renamed, from+"->"+name)
 			return nil
 		},
-		Trash: func(string) {},
+		Trash: func(paths []string) { got.trashed = append(got.trashed, paths...) },
 		Paste: func(paths []string, dir string, _ bool) {
 			got.pasted = append(got.pasted, paths...)
 			got.pasted = append(got.pasted, dir)
 		},
-		Move:   func([]string, string) {},
-		Notify: func(string) {},
+		Move:       func([]string, string) {},
+		Error:      func(string, error) {},
+		OpenFolder: func() {},
+		Close:      func() {},
+		Validate: func(_, name string) error {
+			if strings.HasSuffix(name, invalidSuffix) {
+				return errInvalidName
+			}
+			return nil
+		},
 	}
 	tt := ui.NewTester(func(c *ui.Context) { tree.View(c, h) }, testViewW, testViewH)
 	return tree, tt, got, root
@@ -194,6 +208,42 @@ func TestTreeTwistieOnlyForFolders(t *testing.T) {
 		}
 		if row.Expandable != branch {
 			t.Errorf("row %q expandable = %v, want %v", name, row.Expandable, branch)
+		}
+	}
+}
+
+func TestTreeValidatesNameWhileTyping(t *testing.T) {
+	tree, tt, got, root := newTestTree(t, "a.txt")
+	tree.StartCreate(root, false, false)
+	tt.Frame()
+	tt.Type("b" + invalidSuffix)
+	tt.Frame()
+	if !tt.HasText(errInvalidName.Error()) {
+		t.Fatalf("no inline error in %q", tt.Texts())
+	}
+	tt.Key(0, ui.KeyBackspace)
+	tt.Frame()
+	if tt.HasText(errInvalidName.Error()) {
+		t.Fatal("the error stays after the name became valid")
+	}
+	tt.Key(0, ui.KeyEnter)
+	if want := filepath.Join(root, "b"); len(got.created) != 1 || got.created[0] != want {
+		t.Fatalf("created %v, want %s", got.created, want)
+	}
+}
+
+func TestTreeMissingRootShowsRecovery(t *testing.T) {
+	tree, tt, _, root := newTestTree(t)
+	if err := os.Remove(root); err != nil {
+		t.Fatal(err)
+	}
+	tree.InvalidateAll()
+	tt.Frame()
+	tt.Frame()
+	name := filepath.Base(root)
+	for _, s := range []string{"The folder " + name + " is no longer available", openFolderLabel, closeWindowLabel} {
+		if !tt.HasText(s) {
+			t.Errorf("no %q in %q", s, tt.Texts())
 		}
 	}
 }

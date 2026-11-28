@@ -6,6 +6,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/dialog"
 	"github.com/ZerGo0/editor/internal/design/field"
+	"github.com/ZerGo0/editor/internal/errtext"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -17,6 +18,7 @@ type prompt struct {
 	action string
 	value  string
 	err    string
+	failed string
 	submit func(string) error
 }
 
@@ -28,6 +30,9 @@ func (w *Workspace) promptView(c *ui.Context) {
 	p := &w.prompt
 	if !p.open {
 		return
+	}
+	if p.err != "" && p.value != p.failed {
+		p.err = ""
 	}
 	dialog.Modal(c, &p.open, p.title, dialog.Options{}, func() {
 		input := field.TextInput(c, p.title, &p.value, field.InputOptions{AutoFocus: true, Error: p.err})
@@ -41,7 +46,7 @@ func (w *Workspace) promptView(c *ui.Context) {
 			p.open = false
 		case input.Submitted() || ok.Clicked():
 			if err := p.submit(strings.TrimSpace(p.value)); err != nil {
-				p.err = err.Error()
+				p.err, p.failed = errtext.Text(err), p.value
 				return
 			}
 			p.open = false

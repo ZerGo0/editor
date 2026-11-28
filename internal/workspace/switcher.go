@@ -10,7 +10,10 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const switcherTitle = "Open Editors"
+const (
+	switcherTitle   = "Open Editors"
+	allEditorsTitle = "All Editors"
+)
 
 type switcherPick struct {
 	group *layout.Group
@@ -18,6 +21,8 @@ type switcherPick struct {
 }
 
 func (w *Workspace) observeInput(ev ui.InputEvent) {
+	w.frames.Input(ev)
+	w.observeStateInput(ev)
 	w.observeShift(ev)
 	w.observeSwitcher(ev)
 	w.observeKey(ev)
@@ -44,6 +49,14 @@ func (w *Workspace) observeSwitcher(ev ui.InputEvent) {
 }
 
 func (w *Workspace) showSwitcher() {
+	w.showEditors(switcherTitle, true)
+}
+
+func (w *Workspace) ShowAllEditors() {
+	w.showEditors(allEditorsTitle, false)
+}
+
+func (w *Workspace) showEditors(title string, byRecent bool) {
 	var picks []switcherPick
 	for _, g := range w.layout.Groups() {
 		for _, t := range g.Tabs {
@@ -59,7 +72,9 @@ func (w *Workspace) showSwitcher() {
 		}
 		return len(w.search.recent)
 	}
-	slices.SortStableFunc(picks, func(a, b switcherPick) int { return rank(a) - rank(b) })
+	if byRecent {
+		slices.SortStableFunc(picks, func(a, b switcherPick) int { return rank(a) - rank(b) })
+	}
 	labels := w.tabLabels()
 	items := make([]palette.Item, len(picks))
 	for i, p := range picks {
@@ -73,7 +88,7 @@ func (w *Workspace) showSwitcher() {
 		}
 	}
 	w.palette.Show(palette.Mode{
-		Label:       switcherTitle,
+		Label:       title,
 		Placeholder: "Select an open editor",
 		Search:      palette.Static(items),
 		Accept:      func(it palette.Item) { w.openPick(it.Value.(switcherPick)) },

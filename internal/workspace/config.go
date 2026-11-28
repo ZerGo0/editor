@@ -29,7 +29,11 @@ var (
 )
 
 func (w *Workspace) zoom() float32 {
-	return float32(math.Pow(ZoomFactor, float64(w.settings.Int(settings.ZoomLevel))))
+	return Zoom(w.settings.Int(settings.ZoomLevel))
+}
+
+func Zoom(level int) float32 {
+	return float32(math.Pow(ZoomFactor, float64(level)))
 }
 
 func (w *Workspace) configure(st *editor.State, path string) {
@@ -40,7 +44,7 @@ func (w *Workspace) configure(st *editor.State, path string) {
 		st.OnDefinition = func(int) { w.goToDefinition(st) }
 	}
 	st.ContextMenu = w.editorMenu
-	st.RenderFindBar = findwidget.ForEditor(st)
+	st.RenderFindBar = findwidget.ForEditor(st, w.search.widget)
 }
 
 func (w *Workspace) ConfigureEditor(st *editor.State, path string) {
@@ -148,7 +152,7 @@ func (w *Workspace) autoSave(focused *layout.Tab) {
 	mode := w.settings.String(settings.AutoSave)
 	if mode == settings.AutoSaveFocusChange && focused != w.lastFocused {
 		if t := w.lastFocused; t != nil {
-			if d := w.doc(t.Path); d != nil && d.Modified() {
+			if d := w.doc(t.Path); d != nil && d.Modified() && !w.deleted(t.Path) {
 				w.save([]*document.Document{d})
 			}
 		}
@@ -170,7 +174,7 @@ func (w *Workspace) autoSave(focused *layout.Tab) {
 		e.autoSaved = version
 		time.AfterFunc(delay, func() {
 			w.update(func() {
-				if d.Modified() && d.Buffer.Version() == version {
+				if d.Modified() && d.Buffer.Version() == version && !w.deleted(d.Path) {
 					w.save([]*document.Document{d})
 				}
 			})

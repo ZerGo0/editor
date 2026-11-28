@@ -4,6 +4,7 @@ import (
 	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/layout"
 	"github.com/ZerGo0/editor/internal/search/finder"
+	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/syntax"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui/editor"
@@ -76,4 +77,15 @@ func (w *Workspace) Language(path, text string) *editor.Language {
 
 func (w *Workspace) UserDataDir() string {
 	return w.env.UserData
+}
+
+func (w *Workspace) ProjectState() *session.Memento {
+	return w.views
+}
+
+func (w *Workspace) GlobalState() *session.Memento {
+	if w.env.Global == nil {
+		w.env.Global = session.NewMemento(nil)
+	}
+	return w.env.Global
 }

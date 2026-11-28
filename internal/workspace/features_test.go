@@ -124,7 +124,7 @@ func TestHotExitRestoresUnsavedText(t *testing.T) {
 			t.Fatalf("%s did not restore %q", path, want)
 		}
 	}
-	if notes := w2.notes.List(); len(notes) == 0 || !strings.Contains(notes[0].Title, "changed on disk") {
+	if notes := w2.notes.List(); len(notes) == 0 || !strings.Contains(notes[0].Detail, "changed on disk") {
 		t.Fatalf("notices = %v", notes)
 	}
 	if !w2.save([]*document.Document{w2.doc(p)}) {
@@ -245,18 +245,23 @@ func TestFolderSettingsOverrideUserSettings(t *testing.T) {
 	}
 }
 
+func decoratedTester(w *Workspace, tab *layout.Tab) *ui.Tester {
+	tt := ui.NewTester(func(c *ui.Context) {
+		editor.View(c, tab.Editor).Fill()
+		w.decorateCode(c, tab)
+	}, testViewW, testViewH)
+	tt.Frame()
+	tt.Frame()
+	return tt
+}
+
 func TestBracketColorsFollowSetting(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFiles(t, root, map[string]string{"a.go": "f(a[b{c}])"})
 	env := newTestEnv(t)
 	w := newTestWorkspace(t, root, env, session.Project{})
 	tab, _ := openTab(t, w, filepath.Join(root, "a.go"))
-	tt := ui.NewTester(func(c *ui.Context) {
-		editor.View(c, tab.Editor).Fill()
-		w.colorBrackets(c, tab)
-	}, testViewW, testViewH)
-	tt.Frame()
-	tt.Frame()
+	tt := decoratedTester(w, tab)
 	rs := tab.Editor.Replacements()
 	if len(rs) != 6 || rs[0].Color != rs[5].Color || rs[0].Color == rs[1].Color {
 		t.Fatalf("replacements %+v", rs)

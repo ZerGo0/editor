@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
 	"github.com/ZerGo0/editor/internal/insights"
+	"github.com/ZerGo0/editor/internal/jsonc"
 	"github.com/ZerGo0/editor/internal/problems"
 	"github.com/ZerGo0/editor/internal/todo"
 	"github.com/egoist/mygo/ui"
@@ -35,13 +37,15 @@ type insightState struct {
 	problems     map[string]*problemEntry
 	problemsGen  uint64
 	configErrors string
+	configShown  map[string]string
 }
 
 func (w *Workspace) initInsights() {
 	w.insights.todos = todo.NewIndex()
 	w.insights.problems = map[string]*problemEntry{}
-	w.addPanel(toolView{id: ProblemsPanel, title: "Problems", command: "workbench.actions.view.problems", icon: icons.Problems, view: w.problemsView, badge: w.problemCount, actions: w.problemsActions})
-	w.addPanel(toolView{id: TODOPanel, title: "TODO", command: "todo.show", icon: icons.Todo, view: w.todoView, badge: w.todoCount, actions: w.todoActions})
+	w.insights.configShown = map[string]string{}
+	w.addPanel(toolView{id: ProblemsPanel, title: "Problems", command: "workbench.actions.view.problems", icon: icons.Problems, view: w.problemsView, badge: w.problemCount, actions: w.problemsActions, focus: w.insights.problemList.Focus})
+	w.addPanel(toolView{id: TODOPanel, title: "TODO", command: "todo.show", icon: icons.Todo, view: w.todoView, badge: w.todoCount, actions: w.todoActions, focus: w.insights.todoList.Focus})
 }
 
 func (w *Workspace) todoView(c *ui.Context) {
@@ -93,18 +97,21 @@ func (w *Workspace) problemCount() int {
 	for _, e := range w.insights.problems {
 		n += len(e.items)
 	}
-	return n + len(w.configProblems())
+	for _, g := range w.configProblems() {
+		n += len(g.Entries)
+	}
+	return n
 }
 
 func (w *Workspace) configProblems() []insights.Group {
 	var out []insights.Group
-	add := func(path string, errs []string) {
+	add := func(path string, errs []jsonc.Problem) {
 		if len(errs) == 0 {
 			return
 		}
 		g := insights.Group{Path: path}
 		for _, e := range errs {
-			g.Entries = append(g.Entries, insights.Entry{Icon: icons.Error, Tone: token.ToneError, Title: e})
+			g.Entries = append(g.Entries, insights.Entry{Icon: icons.Error, Tone: token.ToneError, Title: e.Text, Line: e.Line, Col: e.Col})
 		}
 		out = append(out, g)
 	}
@@ -120,7 +127,7 @@ func (w *Workspace) problemsView(c *ui.Context) {
 	var sig strings.Builder
 	for _, g := range config {
 		for _, e := range g.Entries {
-			sig.WriteString(e.Title)
+			fmt.Fprintf(&sig, "%s:%d:%d;", e.Title, e.Line, e.Col)
 		}
 	}
 	if s := sig.String(); s != w.insights.configErrors {
@@ -168,6 +175,7 @@ func problemEntryOf(p problems.Problem) insights.Entry {
 }
 
 func (w *Workspace) updateProblems() {
+	w.noticeConfigErrors()
 	for path, d := range w.docs {
 		if d.doc == nil || d.doc.Buffer == nil {
 			continue

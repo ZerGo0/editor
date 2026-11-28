@@ -16,8 +16,10 @@ import (
 	"github.com/ZerGo0/editor/internal/palette"
 	"github.com/ZerGo0/editor/internal/prefs"
 	"github.com/ZerGo0/editor/internal/prui"
+	"github.com/ZerGo0/editor/internal/reviewui"
 	"github.com/ZerGo0/editor/internal/session"
 	"github.com/ZerGo0/editor/internal/settings"
+	"github.com/ZerGo0/editor/internal/telemetry"
 	"github.com/ZerGo0/editor/internal/workspace/filetree"
 	"github.com/ZerGo0/editor/internal/workspace/notices"
 	"github.com/egoist/mygo"
@@ -30,70 +32,88 @@ const defaultSidebarWidth = 260
 var TitleBarHeight = int(token.TitleBarHeight.Px())
 
 type Workspace struct {
-	codeTheme     *editor.Theme
-	wrapOverrides map[string]bool
-	diffPath      string
-	lastDiffPath  string
-	viewState     ViewState
-	OnViewState   func(ViewState)
-	OnPanicLoop   func()
-	failedBuilds  int
-	Root          string
-	Name          string
-	win           *mygo.Window
-	updates       updateQueue
-	env           *Env
-	docs          map[string]*docEntry
-	layout        *layout.Node
-	active        *layout.Group
-	tree          *filetree.Tree
-	sidebarWidth  float32
-	sidebarHidden bool
-	font          fontChoice
-	nextID        int
-	focusTab      *layout.Tab
-	lastFocused   *layout.Tab
-	focusedTab    *layout.Tab
-	edited        bool
-	ctx           context.Context
-	cancel        context.CancelFunc
-	search        searchState
-	tools         toolState
-	virtual       map[string]*virtualTab
-	insights      insightState
-	history       *history.UI
-	palette       palette.Palette
-	goTo          *goToLine
-	prompt        prompt
-	back          focusReturn
-	keys          keyState
-	notes         notices.Store
-	noteCenter    bool
-	nav           navState
-	focus         focusFlags
-	title         titleState
-	gutter        *gutterDrag
-	closed        []string
-	settingsView  *prefs.SettingsView
-	keysView      *prefs.KeysView
-	ignored       ignoredState
-	statusLeft    []func(c *ui.Context)
-	statusHidden  map[string]bool
-	indents       map[string]indentOverride
-	symbols       map[string]*symbolEntry
-	git           *gitui.Git
-	prs           *prui.PRs
-	issues        *issueui.Issues
-	issueSettings issueui.Settings
-	githubPanes   pane.StackState
-	viewers       viewerState
-	settings      *settings.Store
-	folderStamp   fileStamp
-	hot           hotExitState
-	outside       map[string]context.CancelFunc
-	ec            editorConfigState
-	brackets      bracketState
-	peek          peekState
+	codeTheme      *editor.Theme
+	wrapOverrides  map[string]bool
+	diffPath       string
+	compareSource  string
+	lastDiffPath   string
+	drawingTab     string
+	viewState      ViewState
+	OnViewState    func(ViewState)
+	OnPanicLoop    func()
+	failedBuilds   int
+	frames         telemetry.FrameClock
+	Root           string
+	Name           string
+	win            *mygo.Window
+	updates        updateQueue
+	env            *Env
+	docs           map[string]*docEntry
+	layout         *layout.Node
+	active         *layout.Group
+	tree           *filetree.Tree
+	sidebarWidth   float32
+	sidebarHidden  bool
+	font           fontChoice
+	nextID         int
+	focusTab       *layout.Tab
+	lastFocused    *layout.Tab
+	focusedTab     *layout.Tab
+	edited         bool
+	ctx            context.Context
+	cancel         context.CancelFunc
+	search         searchState
+	tools          toolState
+	virtual        map[string]*virtualTab
+	insights       insightState
+	reviews        map[string]*reviewui.Tab
+	history        *history.UI
+	palette        palette.Palette
+	goTo           *goToLine
+	prompt         prompt
+	back           focusReturn
+	keys           keyState
+	notes          notices.Store
+	noteCenter     bool
+	maxGroup       *layout.Group
+	hidden         *hiddenParts
+	crumbs         crumbFocus
+	nav            navState
+	focus          focusFlags
+	title          titleState
+	gutter         *gutterDrag
+	closed         []string
+	closedViews    []session.Tab
+	views          *session.Memento
+	pendingViews   map[string]string
+	restorers      map[string]viewRestorer
+	stateTouched   bool
+	sashes         sashStates
+	groupsExpanded bool
+	OnStateChange  func()
+	settingsView   *prefs.SettingsView
+	keysView       *prefs.KeysView
+	ignored        ignoredState
+	statusLeft     []func(c *ui.Context)
+	statusHidden   map[string]bool
+	indents        map[string]indentOverride
+	symbols        map[string]*symbolEntry
+	git            *gitui.Git
+	prs            *prui.PRs
+	issues         *issueui.Issues
+	issueSettings  issueui.Settings
+	githubPanes    pane.StackState
+	explorerPanes  pane.StackState
+	viewers        viewerState
+	settings       *settings.Store
+	folderStamp    fileStamp
+	hot            hotExitState
+	outside        map[string]context.CancelFunc
+	ec             editorConfigState
+	brackets       bracketState
+	unicode        unicodeState
+	peek           peekState
+	toasts         toastState
 }
 
 func New(root string, saved session.Project, env *Env) *Workspace {
@@ -106,9 +126,13 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 		indents:       map[string]indentOverride{},
 		symbols:       map[string]*symbolEntry{},
 		viewers:       newViewerState(),
+		pendingViews:  map[string]string{},
+		restorers:     map[string]viewRestorer{},
 		sidebarWidth:  defaultSidebarWidth,
 		sidebarHidden: saved.SidebarHidden,
 	}
+	w.views = session.NewMemento(saved.Views)
+	w.closedViews = slices.Clone(saved.ClosedTabs)
 	w.settings = settings.LoadFolder(w.folderSettingsPath(), env.Settings)
 	w.folderStamp = stampOrZero(w.folderSettingsPath())
 	if saved.SidebarWidth > 0 {
@@ -120,8 +144,11 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	}
 	w.tree = filetree.New(root, expanded)
 	w.tree.Hidden = w.excluded
+	w.tree.ScrollToRow(saved.TreeTop)
 	w.settingsView = &prefs.SettingsView{Store: env.Settings, Folder: w.settings, OpenJSON: w.OpenSettingsJSON, OpenFolderJSON: w.OpenFolderSettingsJSON}
 	w.keysView = &prefs.KeysView{Keys: env.Keys, Commands: env.Commands, OpenJSON: w.OpenKeybindingsJSON}
+	w.trackPrefsState()
+	w.trackPaneSizes()
 	w.initVirtual()
 	w.initEditorConfig()
 	w.initBrackets()
@@ -140,6 +167,9 @@ func New(root string, saved session.Project, env *Env) *Workspace {
 	groups := w.layout.Groups()
 	w.active = groups[min(max(saved.ActiveGroup, 0), len(groups)-1)]
 	w.focusTab = w.active.ActiveTab()
+	if t := w.focusTab; t != nil && saved.TreeTop > 0 {
+		w.tools.revealed = t.Path
+	}
 	w.initHotExit()
 	return w
 }
@@ -153,6 +183,7 @@ func (w *Workspace) Attach(win *mygo.Window) {
 	w.refreshIgnored()
 	w.attachGit()
 	w.attachGitHub()
+	w.dropUnrestoredViews()
 }
 
 func (w *Workspace) Close() {
@@ -173,6 +204,7 @@ func (w *Workspace) Close() {
 	if w.issues != nil {
 		w.issues.Close()
 	}
+	w.abandonReviews()
 	w.closeViewers()
 }
 
@@ -219,12 +251,16 @@ func (w *Workspace) restoreNode(n *session.Node) *layout.Node {
 	case n.Group != nil:
 		g := w.newGroup()
 		for _, t := range n.Group.Tabs {
+			p := w.abs(t.Path)
+			if isVirtual(p) && w.virtual[p] == nil {
+				w.pendingViews[p] = t.Title
+			}
 			g.Tabs = append(g.Tabs, &layout.Tab{
 				ID:      w.newID(),
-				Path:    w.abs(t.Path),
+				Path:    p,
 				Preview: t.Preview && !t.Pinned,
 				Pinned:  t.Pinned,
-				Restore: &layout.Position{Line: t.Line, Col: t.Col, ScrollY: t.ScrollY},
+				Restore: restorePosition(t),
 			})
 		}
 		g.Active = min(max(n.Group.Active, 0), max(len(g.Tabs)-1, 0))
@@ -251,6 +287,9 @@ func (w *Workspace) Snapshot() session.Project {
 		ActiveGroup:   slices.Index(w.layout.Groups(), w.active),
 		LastEdit:      w.lastEditSnapshot(),
 		RecentFiles:   w.snapshotRecentFiles(),
+		TreeTop:       w.tree.TopRow(),
+		ClosedTabs:    w.snapshotClosedViews(),
+		Views:         w.views.Snapshot(),
 	}
 	w.snapshotTools(&p)
 	w.snapshotSearch(&p)
@@ -261,20 +300,15 @@ func (w *Workspace) snapshotNode(n *layout.Node) *session.Node {
 	if n.Group == nil {
 		return &session.Node{Vertical: n.Vertical, Percent: n.Percent, First: w.snapshotNode(n.First), Second: w.snapshotNode(n.Second)}
 	}
-	g := &session.Group{Active: n.Group.Active, Tabs: make([]session.Tab, 0, len(n.Group.Tabs))}
-	for _, t := range n.Group.Tabs {
+	g := &session.Group{Tabs: make([]session.Tab, 0, len(n.Group.Tabs))}
+	for i, t := range n.Group.Tabs {
 		if !w.restorable(t.Path) {
 			continue
 		}
-		st := session.Tab{Path: w.rel(t.Path), Preview: t.Preview, Pinned: t.Pinned}
-		switch {
-		case t.Editor != nil:
-			p := t.Editor.CursorPos()
-			st.Line, st.Col, st.ScrollY = p.Line, p.Col, t.Editor.ScrollY()
-		case t.Restore != nil:
-			st.Line, st.Col, st.ScrollY = t.Restore.Line, t.Restore.Col, t.Restore.ScrollY
+		if i <= n.Group.Active {
+			g.Active = len(g.Tabs)
 		}
-		g.Tabs = append(g.Tabs, st)
+		g.Tabs = append(g.Tabs, w.tabState(t))
 	}
 	w.snapshotNav(n.Group, g)
 	return &session.Node{Group: g}

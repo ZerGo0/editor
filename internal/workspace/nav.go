@@ -109,6 +109,8 @@ func (w *Workspace) CommandEnabled(id string) bool {
 		return w.canNavigate(true)
 	case navigateFwdID:
 		return w.canNavigate(false)
+	case compareFilesID:
+		return w.canCompareWith(w.selectedFile())
 	}
 	return true
 }

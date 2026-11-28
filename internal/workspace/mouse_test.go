@@ -84,9 +84,9 @@ func (b *mouseBed) bounds(role ui.Role, name string) ui.Rect {
 
 func (b *mouseBed) tab(name string) ui.Rect { return b.bounds(ui.RoleTab, name) }
 
-func (b *mouseBed) editorRect() ui.Rect {
-	for _, a := range b.tt.AccessAll() {
-		if a.Name == "Code editor" {
+func editorBounds(tt *ui.Tester) ui.Rect {
+	for _, a := range tt.AccessAll() {
+		if a.Role == ui.RoleTextField && a.Multiline {
 			return a.Bounds
 		}
 	}
@@ -212,7 +212,7 @@ func TestDraggingATabToTheEdgeSplitsTheEditor(t *testing.T) {
 	b := newMouseBed(t, map[string]string{"a.txt": "a\n", "b.txt": "b\n"})
 	b.open("a.txt", "b.txt")
 	fx, fy := center(b.tab("a.txt"))
-	area := b.editorRect()
+	area := editorBounds(b.tt)
 	b.drag(fx, fy, area.X+area.W-mouseEdgeInset, area.Y+area.H/2)
 	groups := b.w.layout.Groups()
 	if len(groups) != 2 || len(groups[1].Tabs) != 1 || filepath.Base(groups[1].Tabs[0].Path) != "a.txt" {
@@ -223,7 +223,7 @@ func TestDraggingATabToTheEdgeSplitsTheEditor(t *testing.T) {
 func (b *mouseBed) editorRects() []ui.Rect {
 	var out []ui.Rect
 	for _, a := range b.tt.AccessAll() {
-		if a.Name == "Code editor" {
+		if a.Role == ui.RoleTextField && a.Multiline {
 			out = append(out, a.Bounds)
 		}
 	}
@@ -317,7 +317,7 @@ func TestDroppingTheOnlyTabOfAGroupOnAnotherGroupRendersCleanly(t *testing.T) {
 func TestClickAndDragOnLineNumbersSelectsLines(t *testing.T) {
 	b := newMouseBed(t, map[string]string{"a.txt": "l1\nl2\nl3\nl4\n"})
 	b.open("a.txt")
-	area := b.editorRect()
+	area := editorBounds(b.tt)
 	st := b.w.active.ActiveTab().Editor
 	x := area.X + mouseGutterX
 	row := func(line int) float32 { return area.Y + float32(st.LineTop(line)) + mouseRowInset }
@@ -355,7 +355,7 @@ func TestCmdClickGoesToTheDefinition(t *testing.T) {
 	b := newMouseBed(t, map[string]string{"defs.go": defs, "use.go": "foo\n", "other.go": "zzz\n"})
 	b.w.search.symbols.Update(filepath.Join(b.root, "defs.go"), "Go", defs)
 	b.open("other.go")
-	area := b.editorRect()
+	area := editorBounds(b.tt)
 	b.tt.ClickAtWith(ui.Cmd, area.X+mouseTextX, area.Y+mouseRowInset)
 	if got := b.tabs(); got != "*other.go" {
 		t.Fatalf("a symbol without a definition opened %s", got)

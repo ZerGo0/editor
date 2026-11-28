@@ -78,12 +78,20 @@ func (w *Workspace) saveUntitled(docs []*document.Document, done func()) {
 		return
 	}
 	d := docs[0]
-	name := w.tabTitle(d.Path) + extensionOf(d.Buffer.Language())
+	w.askSavePath(filepath.Join(w.Root, w.tabTitle(d.Path)+extensionOf(d.Buffer.Language())), func(p string) {
+		if w.finishSaveAs(d, p) {
+			w.saveUntitled(docs[1:], done)
+		}
+	})
+}
+
+func (w *Workspace) askSavePath(defaultPath string, then func(p string)) {
+	name := filepath.Base(defaultPath)
 	applog.Go(func() {
 		p, err := mygo.Dialog.Save(mygo.SaveDialogOptions{
 			Parent:            w.win,
 			Title:             saveAsTitle,
-			DefaultPath:       filepath.Join(w.Root, name),
+			DefaultPath:       defaultPath,
 			CreateDirectories: true,
 		})
 		if err != nil {
@@ -93,11 +101,7 @@ func (w *Workspace) saveUntitled(docs []*document.Document, done func()) {
 		if p == "" {
 			return
 		}
-		w.update(func() {
-			if w.finishSaveAs(d, p) {
-				w.saveUntitled(docs[1:], done)
-			}
-		})
+		w.update(func() { then(p) })
 	})
 }
 

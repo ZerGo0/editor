@@ -132,6 +132,23 @@ func TestAltZTogglesTheEditorAndStaysToggled(t *testing.T) {
 	}
 }
 
+func TestSecondAltZGoesBackToTheSetting(t *testing.T) {
+	t.Parallel()
+	w, tt, st := openWrapEditor(t, nil)
+	toggleWrap(w, tt)
+	toggleWrap(w, tt)
+	if _, ok := w.wrapOverrides[filepath.Join(w.Root, wrapFile)]; ok {
+		t.Fatal("a second Alt+Z kept an override, want the file back on the setting")
+	}
+	if err := w.env.Settings.Set(settings.WordWrap, settings.WrapOn); err != nil {
+		t.Fatal(err)
+	}
+	frames(tt, wrapFramesAfter)
+	if !editorWraps(st) {
+		t.Fatal("after two Alt+Z the file does not follow editor.wordWrap")
+	}
+}
+
 func TestDiffWrapFollowsTheSettings(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -266,5 +283,41 @@ func TestViewStateFollowsTheFocusedFileAndIsPublishedOnChange(t *testing.T) {
 	w.publishViewState()
 	if w.ViewState().WordWrap || len(published) != 2 || published[1].WordWrap {
 		t.Fatalf("on the other file state %v, published %v", w.ViewState(), published)
+	}
+}
+
+func TestToggleWordWrapInAMultiFileDiffWrapsEveryFileOfTheTab(t *testing.T) {
+	t.Parallel()
+	w := newWrapWorkspace(t, nil)
+	tt := ui.NewTester(w.View, testWideW, testViewH)
+	frames(tt, 2)
+	newDiff := func() *editor.DiffState {
+		return &editor.DiffState{Old: editor.NewBuffer(wrapText), New: editor.NewBuffer(strings.Replace(wrapText, "end", "END", 1)), Layout: editor.DiffSplit, FitContent: true}
+	}
+	first, second := newDiff(), newDiff()
+	w.OpenView("changes", "Changes", func(c *ui.Context) {
+		ui.Column(c).Fill().Children(func() {
+			w.ConfigureDiff(first, filepath.Join(w.Root, wrapFile))
+			editor.DiffView(c.Key("first"), first).FillWidth()
+			w.ConfigureDiff(second, filepath.Join(w.Root, otherWrapFile))
+			editor.DiffView(c.Key("second"), second).FillWidth()
+		})
+	})
+	frames(tt, wrapFramesAfter)
+	if diffWraps(first) || diffWraps(second) {
+		t.Fatal("the diffs wrap before the toggle")
+	}
+	w.RunEditor(editor.ToggleSoftWrap)
+	frames(tt, wrapFramesAfter)
+	if !diffWraps(first) || !diffWraps(second) {
+		t.Fatalf("after the toggle: first wraps %v, second wraps %v, want both", diffWraps(first), diffWraps(second))
+	}
+	if !w.ViewState().WordWrap {
+		t.Error("View > Word Wrap is not checked for the wrapped tab")
+	}
+	w.RunEditor(editor.ToggleSoftWrap)
+	frames(tt, wrapFramesAfter)
+	if diffWraps(first) || diffWraps(second) {
+		t.Fatal("a second toggle did not unwrap the tab")
 	}
 }

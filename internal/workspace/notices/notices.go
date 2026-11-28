@@ -14,16 +14,25 @@ const (
 	idPrefix = "notice-"
 )
 
+type Action struct {
+	Label string
+	Run   func()
+}
+
 type Notice struct {
-	ID       string
-	Tone     token.Tone
-	Title    string
-	Detail   string
-	Action   string
-	OnAction func()
-	Busy     bool
-	Sticky   bool
-	At       time.Time
+	ID      string
+	Tone    token.Tone
+	Title   string
+	Detail  string
+	Raw     string
+	Actions []Action
+	Busy    bool
+	Sticky  bool
+	At      time.Time
+}
+
+func (n Notice) sameAs(o Notice) bool {
+	return !n.Busy && !o.Busy && n.Tone == o.Tone && n.Title == o.Title && n.Detail == o.Detail && n.Raw == o.Raw
 }
 
 type Store struct {
@@ -31,7 +40,7 @@ type Store struct {
 	list    []Notice
 	pending []Notice
 	closing []string
-	unread  int
+	unread  map[string]bool
 	next    int
 }
 
@@ -39,19 +48,29 @@ func (s *Store) Add(n Notice) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if n.ID == "" {
-		s.next++
-		n.ID = idPrefix + strconv.Itoa(s.next)
+		if i := slices.IndexFunc(s.list, n.sameAs); i >= 0 {
+			n.ID = s.list[i].ID
+		} else {
+			s.next++
+			n.ID = idPrefix + strconv.Itoa(s.next)
+		}
 	}
 	if n.At.IsZero() {
 		n.At = time.Now()
 	}
-	s.list = slices.DeleteFunc(s.list, func(o Notice) bool { return o.ID == n.ID })
+	s.remove(n.ID)
 	s.list = append(s.list, n)
 	if over := len(s.list) - Limit; over > 0 {
+		for _, o := range s.list[:over] {
+			delete(s.unread, o.ID)
+		}
 		s.list = slices.Delete(s.list, 0, over)
 	}
 	s.pending = append(s.pending, n)
-	s.unread++
+	if s.unread == nil {
+		s.unread = map[string]bool{}
+	}
+	s.unread[n.ID] = true
 	return n.ID
 }
 
@@ -59,6 +78,7 @@ func (s *Store) Close(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.remove(id)
+	delete(s.unread, id)
 	s.closing = append(s.closing, id)
 }
 
@@ -73,7 +93,7 @@ func (s *Store) Clear() {
 	for _, n := range s.list {
 		s.closing = append(s.closing, n.ID)
 	}
-	s.list, s.pending, s.unread = nil, nil, 0
+	s.list, s.pending, s.unread = nil, nil, nil
 }
 
 func (s *Store) Take() (show []Notice, closed []string) {
@@ -95,11 +115,11 @@ func (s *Store) List() []Notice {
 func (s *Store) Unread() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.unread
+	return len(s.unread)
 }
 
 func (s *Store) MarkRead() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.unread = 0
+	s.unread = nil
 }

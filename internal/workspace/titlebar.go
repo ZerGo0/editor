@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"path/filepath"
+
 	"github.com/ZerGo0/editor/internal/design/chrome"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/icons"
@@ -37,11 +39,15 @@ func (w *Workspace) titleBar(c *ui.Context) {
 		Background(p.Layer.TitleBar).BorderWidth(0, 0, token.BorderWidth.Px(), 0).BorderColor(p.Border.Default).DragWindow()
 	row.Children(func() {
 		ui.Box(c).Grow(1).Basis(0)
-		ui.Row(c).Width(token.CommandCenterWidth.Px()).MaxWidthPercent(halfPercent).Shrink(1).MinWidth(0).AlignItems(ui.Center).
-			Gap(token.GapInline.Px()).Children(func() {
+		center := ui.Row(c).Width(token.CommandCenterWidth.Px()).MaxWidthPercent(halfPercent).Shrink(1).MinWidth(0).AlignItems(ui.Center).
+			Gap(token.GapInline.Px())
+		room := center.Bounds().W
+		center.Children(func() {
 			chrome.NavButton(c, icons.ArrowLeft, navigateBackID, func(m *ui.Menu) { w.historyMenu(m, true) })
 			chrome.NavButton(c, icons.ArrowRight, navigateFwdID, func(m *ui.Menu) { w.historyMenu(m, false) })
-			chrome.CommandCenter(c, w.Name, searchID)
+			if room == 0 || room >= commandCenterRoom() {
+				chrome.CommandCenter(c, w.Name, searchID, w.titlePathMenu)
+			}
 		})
 		ui.Row(c).Grow(1).Basis(max(left-right, 0)).Justify(ui.End).AlignItems(ui.Center).Gap(token.GapTight.Px()).
 			Role(ui.RoleToolbar).Label("Layout Controls").Children(func() {
@@ -50,6 +56,10 @@ func (w *Workspace) titleBar(c *ui.Context) {
 			w.iconButton(c, icons.Split, splitRightLabel, splitRightID, false, func() { w.SplitEditor(layout.Right) })
 		})
 	})
+}
+
+func commandCenterRoom() float32 {
+	return 2*(token.IconButtonSize.Px()+token.GapInline.Px()) + token.CommandCenterMinWidth.Px()
 }
 
 type titleState struct {
@@ -74,5 +84,23 @@ func (w *Workspace) syncTitle() {
 	if file != w.title.file {
 		w.title.file = file
 		w.win.SetRepresentedFile(file)
+	}
+}
+
+func (w *Workspace) titlePathMenu(m *ui.Menu) {
+	p := w.Root
+	if t := w.active.ActiveTab(); t != nil && onDisk(t.Path) {
+		p = t.Path
+	}
+	shown := p
+	for dir := p; ; dir = filepath.Dir(dir) {
+		name := filepath.Base(dir)
+		if m.Item(name).ID(dir).Chosen() {
+			w.revealInFinder(shown)
+		}
+		shown = dir
+		if filepath.Dir(dir) == dir {
+			return
+		}
 	}
 }

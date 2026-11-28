@@ -8,19 +8,16 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	watermarkLabel   = "No open files"
-	doubleShiftLabel = "⇧ ⇧"
-)
+const watermarkLabel = "No open files"
 
 type watermarkHint struct {
-	label, command, keys string
+	label, command string
 }
 
 var watermarkHints = []watermarkHint{
 	{label: "Show All Commands", command: "workbench.action.showCommands"},
 	{label: "Go to File", command: "workbench.action.quickOpen"},
-	{label: "Search Everywhere", command: "workbench.action.searchEverywhere", keys: doubleShiftLabel},
+	{label: "Search Everywhere", command: "workbench.action.searchEverywhere"},
 	{label: "Find in Files", command: "workbench.action.findInFiles"},
 	{label: "Open Settings", command: "workbench.action.openSettings"},
 }
@@ -33,10 +30,7 @@ func (w *Workspace) watermark(c *ui.Context) {
 		}
 		ui.Column(c).Width(token.WatermarkWidth.Px()).Gap(token.GapStack.Px()).Children(func() {
 			for _, h := range watermarkHints {
-				keys := h.keys
-				if keys == "" {
-					keys = w.keyLabel(h.command)
-				}
+				keys := w.keyLabel(h.command)
 				if keys == "" {
 					continue
 				}

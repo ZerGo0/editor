@@ -84,7 +84,7 @@ func (w *Workspace) viewerContent(c *ui.Context, g *layout.Group, tab *layout.Ta
 		opts.OpenAsText = func() { w.openAsText(path) }
 		opened, err := viewer.Open(w, path, e.kind, opts)
 		if err != nil {
-			placeholder(c, "Cannot open this file", err.Error())
+			w.openFailed(c, path, err)
 			return
 		}
 		v = opened

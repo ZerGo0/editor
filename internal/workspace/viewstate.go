@@ -1,13 +1,34 @@
 package workspace
 
 type ViewState struct {
-	WordWrap bool
+	Project    bool
+	Editor     bool
+	TextEditor bool
+	OnDisk     bool
+	Git        bool
+	Sidebar    bool
+	Panel      bool
+	Back       bool
+	Forward    bool
+	WordWrap   bool
 }
 
 func (w *Workspace) ViewState() ViewState {
 	path, diff := w.wrapTarget()
 	wrap, _ := w.wrapping(diff, path)
-	return ViewState{WordWrap: wrap}
+	s := ViewState{
+		Project:  true,
+		Git:      w.git != nil && w.git.Ready(),
+		Sidebar:  !w.sidebarHidden,
+		Panel:    w.tools.panelOpen,
+		Back:     w.canNavigate(true),
+		Forward:  w.canNavigate(false),
+		WordWrap: wrap,
+	}
+	if t := w.active.ActiveTab(); t != nil {
+		s.Editor, s.TextEditor, s.OnDisk = true, t.Editor != nil, onDisk(t.Path)
+	}
+	return s
 }
 
 func (w *Workspace) publishViewState() {
