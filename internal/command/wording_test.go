@@ -200,13 +200,6 @@ func tableEntries() []entry {
 	return out
 }
 
-func titleOf(e entry, commands map[string]string) string {
-	if e.Menu && e.Title == "" {
-		return commands[e.ID]
-	}
-	return e.Title
-}
-
 func checkEntry(e entry, title string) []qa.Issue {
 	opens, classified := qa.OpensInput[e.ID]
 	issues := qa.CheckTitle(title, opens, classified)

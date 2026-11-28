@@ -198,21 +198,6 @@ func (q *QAApp) Press(keys ...string) {
 	}
 }
 
-func (q *QAApp) Measure(do func()) Sample {
-	q.t.Helper()
-	offset := len(q.Output())
-	start := time.Now()
-	do()
-	settled := q.Settle()
-	elapsed := time.Since(start)
-	frames := qa.ParseFrames(q.Output()[offset:])
-	var sum time.Duration
-	for _, f := range frames {
-		sum += f.Total
-	}
-	return Sample{Elapsed: elapsed, Settled: settled, Frames: frames, FrameSum: sum}
-}
-
 func (q *QAApp) outputFrom(offset int) string {
 	q.output.mu.Lock()
 	defer q.output.mu.Unlock()

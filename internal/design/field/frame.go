@@ -6,10 +6,6 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	messageFocusInset = 0
-)
-
 type Toggle struct {
 	Icon  *ui.SVG
 	Label string

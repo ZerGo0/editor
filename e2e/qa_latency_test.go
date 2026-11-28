@@ -146,15 +146,6 @@ func menuOrFail(q *QAApp, path ...string) {
 	}
 }
 
-func clickLabel(q *QAApp, role, label string) error {
-	n, err := q.TryWait(RoleLabel(role, label), navTimeout)
-	if err != nil {
-		return fmt.Errorf("%s %q: %w", role, label, err)
-	}
-	q.ClickNode(n)
-	return nil
-}
-
 func latencyActions() []latencyAction {
 	return []latencyAction{
 		typeCharAction(bigFileOptions).with("type a character in a 5k-line file", latencySamples, burstQuietShort),

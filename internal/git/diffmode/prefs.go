@@ -20,12 +20,3 @@ var WhitespaceChoices = []WhitespaceChoice{
 	{git.WhitespaceIgnore, "Ignore whitespaces"},
 	{git.WhitespaceIgnoreBlank, "Ignore whitespaces and empty lines"},
 }
-
-func WhitespaceLabel(m git.WhitespaceMode) string {
-	for _, c := range WhitespaceChoices {
-		if c.Mode == m {
-			return c.Label
-		}
-	}
-	return WhitespaceChoices[0].Label
-}

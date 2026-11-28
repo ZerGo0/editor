@@ -99,7 +99,6 @@ type env struct {
 	path  string
 	root  string
 	tt    *ui.Tester
-	asked bool
 }
 
 func newEnv(t *testing.T) *env {

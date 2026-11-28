@@ -97,18 +97,6 @@ func isMatchRow(n qa.Node) bool {
 	return strings.HasPrefix(n.Label, matchRowPrefix) || strings.Contains(n.Label, matchRowInfix)
 }
 
-func countRoles(t *qa.Tree, roles ...string) int {
-	count := 0
-	for _, n := range t.Nodes {
-		for _, r := range roles {
-			if n.Role == r {
-				count++
-			}
-		}
-	}
-	return count
-}
-
 func (q *QAApp) FocusNode(n qa.Node) {
 	q.t.Helper()
 	q.Act(q.Win, n.ID, "focus", "")

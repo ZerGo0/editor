@@ -178,16 +178,6 @@ func (s ink) rows(cols span) []float64 {
 	return out
 }
 
-func (s ink) rowSums(cols span) []float64 {
-	out := make([]float64, s.r.Dy())
-	for y := range out {
-		for x := cols.from; x < cols.to; x++ {
-			out[y] += s.at(x, y)
-		}
-	}
-	return out
-}
-
 func extent(profile []float64) (float64, float64, bool) {
 	first, last := -1, -1
 	for i, v := range profile {

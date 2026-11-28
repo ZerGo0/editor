@@ -25,7 +25,6 @@ type gallery struct {
 	tab, activity                    int
 	list                             ui.ListState
 	tree                             ui.OutlineState[string]
-	stack                            pane.StackState
 	sectionOpen, sectionClosed       bool
 	selectedRow, treeRow             int
 	features                         featureState

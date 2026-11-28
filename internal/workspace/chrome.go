@@ -13,10 +13,6 @@ func (w *Workspace) iconButton(c *ui.Context, icon *ui.SVG, label, command strin
 	return b
 }
 
-func (w *Workspace) withKeys(label, command string) string {
-	return action.Hint(label, w.keyLabel(command))
-}
-
 func (w *Workspace) commandItem(m *ui.Menu, label, command string) {
 	o := action.ItemOptions{ID: command}
 	if chords := w.env.Keys.Current.For(command); len(chords) > 0 && len(chords[0]) == 1 && !chords[0][0].ByCode() {

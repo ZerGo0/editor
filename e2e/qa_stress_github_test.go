@@ -37,8 +37,6 @@ func stressGitHubProjectOf(repo string) func(t *testing.T) DemoProject {
 	}
 }
 
-var stressGitHubProject = stressGitHubProjectOf(githubStressRepo)
-
 func stressGitHubOptions(d DemoProject) QAOptions {
 	return QAOptions{Width: normalWindowW, Height: normalWindowH, SidebarWidth: defaultSidebar, Theme: themeDark, FrameStats: true, QuietTimeout: stressQuietTimeout, WaitTimeout: stressWaitTimeout, GitHub: true}
 }
