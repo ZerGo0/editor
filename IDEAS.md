@@ -24,7 +24,4 @@ Features we chose not to build now. Each one comes from the [IDE research](docs/
 ## Extras
 
 - **Zen mode (S):** full-screen editing without distractions.
-
-## Review
-
-- **Annotated review for agents (L):** owner request, modeled on [Plannotator](https://plannotator.ai/). Annotate local changes (PR-style diff with a file tree and staging), Markdown plans (rendered preview, with versions and diffs between them), GitHub PR diffs and any open file. Annotation types as in Plannotator: comments, replacements or code suggestions, deletions, and a global comment. The finished review goes straight to a running agent, for example Claude Code through a hook or a watched file, as structured feedback. When we build it, read how Plannotator sends feedback to each agent in its code ([backnotprop/plannotator](https://github.com/backnotprop/plannotator), MIT or Apache 2.0).
+- **Review over MCP (M):** an `editor mcp` stdio server with `review` and `annotate` tools and a review skill (MCP Skills extension), so agents other than Claude Code can ask for a review. Wait until MCP tasks (long-running tool calls) are stable in the clients and the Go SDK: the CLI, the ExitPlanMode hook and a skill file cover Claude Code today.
