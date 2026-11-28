@@ -9,21 +9,29 @@ import (
 )
 
 func (g *Git) StatusItems(c *ui.Context) {
-	if !g.ready() || g.snap.status == nil {
+	ready := g.ready() && g.snap.status != nil
+	if ready {
+		if st := g.snap.op; st.Kind != git.StateNone {
+			title := opTitle(st)
+			chrome.StatusItem(c, title, chrome.StatusOptions{Icon: icons.Warning, Label: "Git Operation: " + title, Tooltip: "Git Operation " + title, Tone: token.ToneWarning, Menu: g.operationMenu, ID: "git-op"})
+		}
+		name := g.headLabel()
+		chrome.StatusItem(c, name, chrome.StatusOptions{Icon: icons.GitBranch, Label: "Git Branch: " + name, Tooltip: "Git Branch " + name, OnClick: g.openBranches, ID: "git-branch"})
+	}
+	if t := g.currentTask(); t != nil {
+		chrome.StatusItem(c, t.statusText(), chrome.StatusOptions{Busy: true, Tooltip: t.label(), ID: "git-sync"})
+		if t.cancelable {
+			chrome.StatusItem(c, "", chrome.StatusOptions{Icon: icons.Close, Tooltip: t.cancelLabel(), Command: cancelCommand, ID: "git-cancel"})
+		}
 		return
 	}
-	if st := g.snap.op; st.Kind != git.StateNone {
-		title := opTitle(st)
-		chrome.StatusItem(c, title, chrome.StatusOptions{Icon: icons.Warning, Tooltip: "Git Operation " + title, Tone: token.ToneWarning, Menu: g.operationMenu, ID: "git-op"})
+	if !ready {
+		return
 	}
-	name := g.headLabel()
-	chrome.StatusItem(c, name, chrome.StatusOptions{Icon: icons.GitBranch, Tooltip: "Git Branch " + name, OnClick: g.openBranches, ID: "git-branch"})
 	st := g.snap.status
 	switch {
-	case g.busy != "":
-		chrome.StatusItem(c, g.busy+"...", chrome.StatusOptions{Icon: icons.Refresh, Tooltip: g.busyLabel(), ID: "git-sync"})
 	case st.Upstream != "":
-		chrome.StatusItem(c, syncLabel(st.Ahead, st.Behind), chrome.StatusOptions{Icon: icons.Refresh, Tooltip: "Synchronize Changes", OnClick: g.syncChanges, ID: "git-sync"})
+		chrome.StatusItem(c, syncLabel(st.Ahead, st.Behind), chrome.StatusOptions{Icon: icons.Refresh, Label: syncName(st.Ahead, st.Behind), Tooltip: syncChangesLabel, OnClick: g.syncChanges, ID: "git-sync"})
 	case len(g.snap.remotes) > 0 && !st.Detached && st.Branch != "":
 		chrome.StatusItem(c, "", chrome.StatusOptions{Icon: icons.Push, Tooltip: "Publish Branch", OnClick: g.openPush, ID: "git-sync"})
 	}

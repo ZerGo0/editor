@@ -9,11 +9,13 @@ import (
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -105,7 +107,10 @@ func (g *Git) stashesDialog(c *ui.Context) {
 				return stashItem(git.Stash{Ref: placeholderWord(i), Message: placeholderSubject(i), Time: placeholderTime(c.Now(), i)}, nil)
 			})
 		case len(s.items) == 0:
-			emptyState(c, "No stashes", "Stash your changes to see them here.")
+			feedback.Empty(c, feedback.EmptyOptions{Title: "No stashes", Message: "Stash your changes to see them here.", Action: "Stash Changes...", OnAction: func() {
+				s.open = false
+				g.openStash()
+			}})
 		default:
 			items := s.items
 			s.list.Key = func(i int) any { return items[i].OID }
@@ -125,7 +130,7 @@ func (g *Git) stashesDialog(c *ui.Context) {
 			if button(c, "Drop", !ok || busy) {
 				g.dropStash(st)
 			}
-			if button(c, "Clear", len(s.items) == 0 || busy) {
+			if button(c, "Drop All", len(s.items) == 0 || busy) {
 				g.clearStashes()
 			}
 			design.Spacer(c)
@@ -197,9 +202,9 @@ func (g *Git) dropStash(st git.Stash) {
 func (g *Git) clearStashes() {
 	n := len(g.stashes.items)
 	g.confirm(question{
-		message:     fmt.Sprintf("Drop all %d stashes?", n),
+		message:     "Drop all " + plural.Count(n, "stash", "stashes") + "?",
 		detail:      "The stashed changes are lost.",
-		action:      "Clear",
+		action:      "Drop All",
 		destructive: true,
 	}, func() {
 		g.doSimple("Clear Stashes", func(ctx context.Context, r repo) error {

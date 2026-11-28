@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ZerGo0/editor/internal/design/feedback"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/list"
@@ -55,6 +54,10 @@ type patchTab struct {
 	err     error
 	gen     int
 	view    *multidiff.View
+
+	decorate func([]multidiff.Entry) []multidiff.Entry
+
+	placeholder *multidiff.View
 }
 
 func (g *Git) openPatchTab(id, title string, load func(ctx context.Context, r repo) ([]patchItem, error)) {
@@ -65,17 +68,7 @@ func (g *Git) openPatchTabWith(id, title string, load func(ctx context.Context, 
 	if !g.ready() {
 		return
 	}
-	t, ok := g.patchTabs[id]
-	if !ok {
-		t = &patchTab{g: g, id: id, title: title, view: multidiff.New()}
-		g.patchTabs[id] = t
-		g.patchOrder = append(g.patchOrder, id)
-		if len(g.patchOrder) > maxKeptTabs {
-			g.patchTabs[g.patchOrder[0]].view.Close()
-			delete(g.patchTabs, g.patchOrder[0])
-			g.patchOrder = g.patchOrder[1:]
-		}
-	}
+	t := g.patchTabFor(id, title)
 	t.load = load
 	if o.prepare != nil {
 		o.prepare(t)
@@ -83,8 +76,26 @@ func (g *Git) openPatchTabWith(id, title string, load func(ctx context.Context, 
 	if o.reveal != "" {
 		t.view.RevealPath(o.reveal)
 	}
+	if o.focus {
+		t.view.Focus()
+	}
 	t.reload()
 	g.openView(id, title, t.render, o.preview, o.focus)
+}
+
+func (g *Git) patchTabFor(id, title string) *patchTab {
+	if t, ok := g.patchTabs[id]; ok {
+		return t
+	}
+	t := &patchTab{g: g, id: id, title: title, view: g.newDiffView()}
+	g.patchTabs[id] = t
+	g.patchOrder = append(g.patchOrder, id)
+	if len(g.patchOrder) > maxKeptTabs {
+		g.patchTabs[g.patchOrder[0]].view.Close()
+		delete(g.patchTabs, g.patchOrder[0])
+		g.patchOrder = g.patchOrder[1:]
+	}
+	return t
 }
 
 func (g *Git) reloadGroupTabs() {
@@ -92,6 +103,9 @@ func (g *Git) reloadGroupTabs() {
 		if t.prepare != nil && t.loaded {
 			t.reload()
 		}
+	}
+	for _, t := range g.reviews {
+		t.reload()
 	}
 }
 
@@ -127,9 +141,6 @@ func (t *patchTab) reload() {
 
 func (t *patchTab) options() multidiff.Options {
 	g := t.g
-	if g.viewed == nil {
-		g.viewed = multidiff.NewMemory()
-	}
 	return multidiff.Options{
 		Label: t.title,
 		Set:   t.id,
@@ -141,7 +152,7 @@ func (t *patchTab) options() multidiff.Options {
 		},
 		Language: func(rel, text string) *editor.Language { return g.h.Language(g.paths.abs(rel), text) },
 		Viewed:   g.viewed,
-		OpenFile: func(rel string) { g.h.OpenAt(g.paths.abs(rel), -1, -1) },
+		OpenFile: t.openFile,
 		Busy:     t.loading,
 		Toolbar: func(c *ui.Context) {
 			g.diffOptionsButton(c)
@@ -152,17 +163,36 @@ func (t *patchTab) options() multidiff.Options {
 	}
 }
 
+func (t *patchTab) openFile(rel string) {
+	line := -1
+	if path, at, ok := t.view.Caret(); ok && path == rel {
+		line = at
+	}
+	t.g.openSources([]sourceLine{{rel: rel, line: line}})
+}
+
 func (t *patchTab) render(c *ui.Context) {
+	g := t.g
+	if g.unavailable(c) {
+		return
+	}
+	if !t.loaded && !t.loading && t.err == nil && (t.load != nil || t.prepare != nil) && g.ready() && g.snap.status != nil {
+		t.reload()
+	}
 	ui.Column(c).Fill().Children(func() {
 		switch {
 		case t.err != nil:
 			errorState(c, "Cannot load the changes", t.err, t.reload)
 		case !t.loaded:
-			feedback.CodeSkeleton(c, "Loading changes")
+			t.skeleton(c)
 		case len(t.items) == 0:
 			emptyState(c, "No changes", "")
 		default:
+			before := currentDiffChoice(t.view.Layout())
+			width, shown := t.view.Tree()
 			t.view.Render(c, t.options())
+			g.noteDiffChoice(before, t.view.Layout())
+			g.noteTree(t.view, width, shown)
 		}
 	})
 }
@@ -191,6 +221,9 @@ func (t *patchTab) entries(r repo) []multidiff.Entry {
 			e.Key = uniqueKey(seen, it.src.id())
 		}
 		entries = append(entries, e)
+	}
+	if t.decorate != nil {
+		return t.decorate(entries)
 	}
 	return entries
 }
@@ -249,7 +282,7 @@ func (t *patchTab) fileActions(c *ui.Context, it patchItem, src diffSource) {
 	g := t.g
 	busy := g.busy != ""
 	switch src.kind {
-	case diffWorkTree, diffUntracked:
+	case diffWorkTree, diffUntracked, diffHead:
 		if iconButton(c, "Stage Changes", icons.Plus, busy) {
 			g.stage(src.path)
 		}

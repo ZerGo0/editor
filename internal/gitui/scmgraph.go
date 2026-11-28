@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design/action"
@@ -18,10 +19,11 @@ import (
 )
 
 const (
-	graphAuto      = ""
-	graphNearEnd   = 40
-	fileRowLoading = -1
-	commitRow      = -2
+	graphAuto          = ""
+	graphNearEnd       = 40
+	graphOutdatedLabel = "Refresh Graph (Outdated)"
+	fileRowLoading     = -1
+	commitRow          = -2
 )
 
 type graphFiles struct {
@@ -50,6 +52,8 @@ type graphState struct {
 	cursor   int
 	expanded map[string]*graphFiles
 	upstream string
+	reset    bool
+	outdated bool
 }
 
 func (g *Git) graphOptions(skip int) git.LogOptions {
@@ -74,10 +78,10 @@ func (g *Git) graphOptions(skip int) git.LogOptions {
 func (g *Git) reloadGraph() {
 	s := &g.graph
 	s.gen++
-	s.commits, s.rows, s.done, s.err, s.loading = nil, nil, false, nil, false
-	s.incoming, s.outgoing = nil, nil
+	s.reset, s.outdated = true, false
+	s.done, s.err, s.loading = false, nil, false
 	s.expanded = map[string]*graphFiles{}
-	s.cursor = -1
+	s.list.Choose(-1)
 	if st := g.snap.status; st != nil {
 		s.upstream = st.Upstream
 	}
@@ -90,7 +94,11 @@ func (g *Git) loadGraphPage() {
 		return
 	}
 	s.loading = true
-	gen, skip, r := s.gen, len(s.commits), g.repo
+	skip := len(s.commits)
+	if s.reset {
+		skip = 0
+	}
+	gen, r := s.gen, g.repo
 	opts := g.graphOptions(skip)
 	if skip == 0 {
 		applog.Go(func() {
@@ -114,7 +122,12 @@ func (g *Git) loadGraphPage() {
 				return
 			}
 			s.err = nil
-			s.commits = append(s.commits, page...)
+			if s.reset {
+				s.commits, s.reset = page, false
+				s.list.ScrollTo(0, ui.Start)
+			} else {
+				s.commits = append(s.commits, page...)
+			}
 			s.done = len(page) < opts.Max
 			s.rows = git.Lanes(s.commits)
 		})
@@ -137,6 +150,15 @@ func syncSets(g *Git, r repo) (in, out map[string]bool) {
 		return nil, nil
 	}
 	return toSet(incoming, err), toSet(r.OutgoingCommits(g.ctx))
+}
+
+func (g *Git) reloadGraphQuietly() {
+	s := &g.graph
+	if first, _ := s.list.Visible(); first > 0 {
+		s.outdated = true
+		return
+	}
+	g.reloadGraph()
 }
 
 func (g *Git) graphEntries() []graphEntry {
@@ -209,7 +231,8 @@ func (g *Git) graphPane(c *ui.Context) {
 		}
 		return fmt.Sprintf("%s:%d", commits[e.commit].OID, e.file)
 	}
-	s.list.Label = func(i int) string { return g.graphLabel(entries[i]) }
+	now := c.Now()
+	s.list.Label = func(i int) string { return g.graphLabel(entries[i], remotes, now) }
 	s.list.Selected = &s.cursor
 	s.list.RowHeight = token.RowHeight.Px()
 	s.list.NearEnd = graphNearEnd
@@ -228,22 +251,29 @@ func (g *Git) graphPane(c *ui.Context) {
 		}
 		list.Row(rc, st, g.graphFileItem(rc, e, gw))
 	})
-	if s.cursor >= 0 && s.cursor < len(entries) && l.Submitted() {
-		e := entries[s.cursor]
-		cm := commits[e.commit]
-		if f := s.expanded[cm.OID]; e.file >= 0 && f != nil && e.file < len(f.files) {
-			g.openDiffWith(commitSource(cm, f.files[e.file]), false, true)
-		} else if e.file == commitRow {
-			g.toggleCommitFiles(cm)
-		}
+	if s.cursor < 0 || s.cursor >= len(entries) {
+		return
 	}
+	e := entries[s.cursor]
+	cm := commits[e.commit]
+	f := s.expanded[cm.OID]
+	isFile := e.file >= 0 && f != nil && e.file < len(f.files)
+	switch {
+	case isFile && l.Submitted():
+		g.openDiffWith(commitSource(cm, f.files[e.file]), false, true)
+	case e.file == commitRow && l.Submitted():
+		g.toggleCommitFiles(cm)
+	case isFile:
+		g.commitFileKeys(l, cm, f.files[e.file])
+	}
+	copyRevisionShortcut(c, l, cm)
 }
 
-func (g *Git) graphLabel(e graphEntry) string {
+func (g *Git) graphLabel(e graphEntry, remotes map[string]bool, now time.Time) string {
 	s := &g.graph
 	cm := s.commits[e.commit]
 	if e.file == commitRow {
-		return cm.Subject
+		return commitAccessName(cm, remotes, now)
 	}
 	if f := s.expanded[cm.OID]; f != nil && e.file >= 0 && e.file < len(f.files) {
 		return f.files[e.file].Path
@@ -430,7 +460,11 @@ func (g *Git) graphActions(c *ui.Context) {
 	if iconButton(c, "Push", icons.Push, busy) {
 		g.pushOrOpen()
 	}
-	if iconButton(c, "Refresh Graph", icons.Refresh, g.graph.loading) {
+	refreshLabel := "Refresh Graph"
+	if g.graph.outdated {
+		refreshLabel = graphOutdatedLabel
+	}
+	if iconButton(c, refreshLabel, icons.Refresh, g.graph.loading) {
 		g.reloadGraph()
 	}
 	action.MenuIconButton(c, icons.More, "Graph Actions", action.IconOptions{}, g.graphMenu)

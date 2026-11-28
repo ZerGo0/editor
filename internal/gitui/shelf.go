@@ -153,7 +153,7 @@ func (g *Git) shelfDialog(c *ui.Context) {
 				return shelfItem(git.ShelfEntry{Name: placeholderSubject(i), Created: placeholderTime(c.Now(), i)}, nil)
 			})
 		case len(s.items) == 0:
-			emptyState(c, "The shelf is empty", "Shelve changes from the Commit window to see them here.")
+			emptyState(c, "The shelf is empty", "Shelve changes from the Source Control view to see them here.")
 		default:
 			items := s.items
 			s.list.Key = func(i int) any { return items[i].ID }

@@ -21,6 +21,7 @@ type Settings struct {
 	AutoFetch   time.Duration
 	PullMode    PullMode
 	LogPageSize int
+	Unified     bool
 }
 
 func DefaultSettings() Settings {
@@ -33,6 +34,12 @@ func (g *Git) SetSettings(s Settings) {
 	}
 	changed := g.settings.AutoFetch != s.AutoFetch
 	g.settings = s
+	if !g.diffOpts.layoutSet {
+		g.diffOpts.layout = layoutSideBySide
+		if s.Unified {
+			g.diffOpts.layout = layoutUnified
+		}
+	}
 	if changed {
 		g.scheduleAutoFetch()
 	}
@@ -64,7 +71,7 @@ func (g *Git) fetchQuietly() {
 	if !g.ready() {
 		return
 	}
-	if g.busy != "" {
+	if g.busy != "" || g.remoteTask() != nil {
 		g.scheduleAutoFetch()
 		return
 	}

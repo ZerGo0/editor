@@ -42,7 +42,7 @@ var Actions = []Action{
 	{ID: "git.rollback", Title: "Rollback Current File...", Category: category},
 	{ID: "git.rollbackLines", Title: "Rollback Changed Lines", Category: category},
 	{ID: "git.showChange", Title: "Show Change at Caret", Category: category},
-	{ID: "git.openFile2", Title: "Open File", Category: category},
+	{ID: openFileCommand, Title: "Open File", Category: category},
 	{ID: "git.stageFile", Title: "Stage Current File", Category: category},
 	{ID: "git.showDiff", Title: "Show Diff with HEAD", Category: category},
 	{ID: "git.compareWithBranch", Title: "Compare with Branch...", Category: category},
@@ -56,6 +56,12 @@ var Actions = []Action{
 	{ID: "git.worktrees", Title: "Worktrees...", Category: category},
 	{ID: "git.submodules", Title: "Submodules...", Category: category},
 	{ID: "git.init", Title: "Initialize Repository", Category: category},
+	{ID: cloneCommand, Title: "Clone", Category: category},
+	{ID: cancelCommand, Title: "Cancel Running Operation", Category: category},
+	{ID: nextDifferenceCommand, Title: "Go to Next Difference", Category: diffCategory},
+	{ID: previousDifferenceCommand, Title: "Go to Previous Difference", Category: diffCategory},
+	{ID: nextChangeCommand, Title: "Go to Next Change", Category: diffCategory},
+	{ID: previousChangeCommand, Title: "Go to Previous Change", Category: diffCategory},
 }
 
 func (g *Git) Run(id string) bool {
@@ -67,7 +73,7 @@ func (g *Git) Run(id string) bool {
 	if !ok {
 		return false
 	}
-	if !g.ready() {
+	if !g.ready() && id != cloneCommand && id != cancelCommand {
 		g.notReady()
 		return true
 	}
@@ -83,6 +89,8 @@ func (g *Git) notReady() {
 		g.h.Notify("This folder is not a Git repository. Run Initialize Repository first.")
 	case phaseLoading:
 		g.h.Notify("The repository is still loading.")
+	case phaseError:
+		g.showError("Cannot open the repository", g.openErr)
 	default:
 		g.h.Notify("Cannot open the repository.")
 	}
@@ -90,47 +98,53 @@ func (g *Git) notReady() {
 
 func (g *Git) actionTable() map[string]func() {
 	return map[string]func(){
-		"git.commit":            g.focusCommit,
-		"git.commitAndPush":     func() { g.doCommit(commitSmart, afterPush) },
-		"git.amend":             g.toggleAmend,
-		"git.refresh":           g.refreshNow,
-		"git.fetch":             g.fetch,
-		"git.pull":              g.pull,
-		"git.pullRebase":        func() { g.pullWith(git.PullOptions{Rebase: true}) },
-		"git.update":            g.update,
-		"git.push":              g.openPush,
-		"git.branches":          g.openBranches,
-		"git.newBranch":         func() { g.newBranch("") },
-		"git.branchFrom":        func() { g.openBranchPicker("Create Branch From", g.newBranch) },
-		"git.checkoutRevision":  g.checkoutRevision,
-		"git.merge":             func() { g.openBranchPicker("Merge into "+g.headLabel(), g.mergeInto) },
-		"git.rebase":            func() { g.openBranchPicker("Rebase "+g.headLabel()+" onto", g.rebaseOnto) },
-		"git.newTag":            func() { g.newTag("") },
-		"git.remotes":           g.openRemotes,
-		"git.stash":             g.openStash,
-		"git.stashes":           g.openStashes,
-		"git.shelve":            func() { g.askShelve(g.changedTrackedPaths()) },
-		"git.shelf":             g.openShelf,
-		"git.showLog":           g.showLog,
-		"git.fileHistory":       g.activeFileHistory,
-		"git.selectionHistory":  g.selectionHistory,
-		"git.annotate":          g.annotateActive,
-		"git.rollback":          g.rollbackActive,
-		"git.rollbackLines":     g.rollbackLines,
-		"git.showChange":        g.showChange,
-		"git.openFile2":         g.openWorkingFile,
-		"git.stageFile":         g.stageActive,
-		"git.showDiff":          g.showActiveDiff,
-		"git.compareWithBranch": g.compareWithBranch,
-		"git.rebaseInteractive": g.startRebase,
-		"git.resolveConflicts":  g.openConflicts,
-		"git.continue":          g.continueOp,
-		"git.skip":              g.skipOp,
-		"git.abort":             g.abortOp,
-		"git.addToIgnore":       func() { g.ignoreActive(false) },
-		"git.addToExclude":      func() { g.ignoreActive(true) },
-		"git.worktrees":         g.openWorktrees,
-		"git.submodules":        g.openSubmodules,
+		"git.commit":              g.focusCommit,
+		"git.commitAndPush":       func() { g.doCommit(commitSmart, afterPush) },
+		"git.amend":               g.toggleAmend,
+		"git.refresh":             g.refreshNow,
+		"git.fetch":               g.fetch,
+		"git.pull":                g.pull,
+		"git.pullRebase":          func() { g.pullWith(git.PullOptions{Rebase: true}) },
+		"git.update":              g.update,
+		"git.push":                g.openPush,
+		"git.branches":            g.openBranches,
+		"git.newBranch":           func() { g.newBranch("") },
+		"git.branchFrom":          func() { g.openBranchPicker("Create Branch From", g.newBranch) },
+		"git.checkoutRevision":    g.checkoutRevision,
+		"git.merge":               func() { g.openBranchPicker("Merge into "+g.headLabel(), g.mergeInto) },
+		"git.rebase":              func() { g.openBranchPicker("Rebase "+g.headLabel()+" onto", g.rebaseOnto) },
+		"git.newTag":              func() { g.newTag("") },
+		"git.remotes":             g.openRemotes,
+		"git.stash":               g.openStash,
+		"git.stashes":             g.openStashes,
+		"git.shelve":              func() { g.askShelve(g.changedTrackedPaths()) },
+		"git.shelf":               g.openShelf,
+		"git.showLog":             g.showLog,
+		"git.fileHistory":         g.activeFileHistory,
+		"git.selectionHistory":    g.selectionHistory,
+		"git.annotate":            g.annotateActive,
+		"git.rollback":            g.rollbackActive,
+		"git.rollbackLines":       g.rollbackLines,
+		"git.showChange":          g.showChange,
+		openFileCommand:           g.openWorkingFile,
+		"git.stageFile":           g.stageActive,
+		"git.showDiff":            g.showActiveDiff,
+		"git.compareWithBranch":   g.compareWithBranch,
+		"git.rebaseInteractive":   g.startRebase,
+		"git.resolveConflicts":    g.openConflicts,
+		"git.continue":            g.continueOp,
+		"git.skip":                g.skipOp,
+		"git.abort":               g.abortOp,
+		"git.addToIgnore":         func() { g.ignoreActive(false) },
+		"git.addToExclude":        func() { g.ignoreActive(true) },
+		"git.worktrees":           g.openWorktrees,
+		"git.submodules":          g.openSubmodules,
+		cloneCommand:              g.cloneRepository,
+		cancelCommand:             g.cancelTask,
+		nextDifferenceCommand:     func() { g.stepActiveDiff(1) },
+		previousDifferenceCommand: func() { g.stepActiveDiff(-1) },
+		nextChangeCommand:         func() { g.stepActiveDiff(1) },
+		previousChangeCommand:     func() { g.stepActiveDiff(-1) },
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ZerGo0/editor/internal/design"
 	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -44,7 +45,9 @@ func (g *Git) remotesDialog(c *ui.Context) {
 		}
 		remotes := g.snap.remotes
 		if len(remotes) == 0 {
-			emptyState(c, "No remotes", "Add a remote to fetch and push.")
+			feedback.Empty(c, feedback.EmptyOptions{Title: "No remotes", Message: "Add a remote to fetch and push.", Action: "Add Remote...", OnAction: func() {
+				s.editing, s.original, s.name, s.url = true, "", "", ""
+			}})
 		} else {
 			s.list.Key = func(i int) any { return remotes[i].Name }
 			s.list.Label = func(i int) string { return remotes[i].Name }

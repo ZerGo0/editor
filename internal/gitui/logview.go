@@ -23,6 +23,7 @@ const (
 	defaultLogSplit = 64
 	filterDelay     = 300 * time.Millisecond
 	maxBadges       = 3
+	labelSeparator  = ", "
 	focusPageLimit  = 20
 	allBranches     = "All Branches"
 	currentBranch   = "Current Branch"
@@ -56,6 +57,7 @@ type logState struct {
 	focus      string
 	focusPages int
 	details    commitDetails
+	focusList  bool
 	listWidth  float32
 	measured   bool
 }
@@ -333,7 +335,7 @@ func (s *logState) listView(c *ui.Context) {
 		s.skeleton(c, "Loading commits")
 		return
 	case len(s.commits) == 0 && s.filtered():
-		emptyState(c, "No commits match the filters", "Change or reset the filters.")
+		emptyState(c, "No matching results", "Change or reset the filters.")
 		return
 	case len(s.commits) == 0:
 		emptyState(c, "No commits yet", "Commit your changes to start the history.")
@@ -341,7 +343,8 @@ func (s *logState) listView(c *ui.Context) {
 	}
 	commits := s.commits
 	s.list.Key = func(i int) any { return commits[i].OID }
-	s.list.Label = func(i int) string { return commits[i].Subject }
+	now, remotes := c.Now(), s.g.remoteSet()
+	s.list.Label = func(i int) string { return commitAccessName(commits[i], remotes, now) }
 	s.list.Selected = &s.selected
 	s.list.RowHeight = token.RowHeight.Px()
 	s.list.NearEnd = logNearEnd
@@ -350,18 +353,23 @@ func (s *logState) listView(c *ui.Context) {
 	if s.graph != nil {
 		lanes.width = graphWidth(s.graph)
 	}
-	remotes := s.g.remoteSet()
 	ui.Column(c).Fill().Children(func() {
+		s.columnHeader(c, lanes.width)
 		l := ui.List(c.Key("log"), &s.list, len(commits)).Grow(1).FillWidth().MinHeight(0).Label("Commits").Background(ui.Transparent)
 		l.Rows(func(row ui.ListRow) {
 			rc := row.Context
 			st := list.State{Selected: row.Selected(), Focused: row.ListFocused(), Hovered: row.Hovered()}
 			list.Row(rc, st, s.item(rc, row.Index, commits[row.Index], lanes, remotes, st.Selected && st.Focused))
 		})
-		if l.Submitted() {
-			if cm, ok := s.selectedCommit(); ok {
+		if cm, ok := s.selectedCommit(); ok {
+			if l.Submitted() {
 				s.open(cm)
 			}
+			copyRevisionShortcut(c, l, cm)
+		}
+		if s.focusList {
+			l.Focus()
+			s.focusList = false
 		}
 		if w := l.Bounds().W; w != s.listWidth || !s.measured {
 			s.listWidth, s.measured = w, true
@@ -382,11 +390,25 @@ func (s *logState) listView(c *ui.Context) {
 	}
 }
 
+func commitAccessName(cm git.Commit, remotes map[string]bool, now time.Time) string {
+	parts := []string{cm.Subject}
+	for _, r := range refBadges(cm.Refs, remotes) {
+		parts = append(parts, r.name)
+	}
+	for _, s := range []string{cm.Author, formatTime(cm.AuthorTime, now)} {
+		if s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, labelSeparator)
+}
+
 type logColumns struct {
 	tags   int
 	author bool
 	date   bool
 	hash   bool
+	slack  float32
 }
 
 func (s *logState) rowRoom(gw float32) float32 {
@@ -399,6 +421,23 @@ func tagSlot() float32 { return authorWidth() + token.GapInline.Px() }
 
 func subjectMin() float32 { return 2 * token.ColumnMedium.Px() }
 
+func (s *logState) widths() logWidths {
+	if s.g == nil {
+		return logWidths{}
+	}
+	return s.g.layout.Columns
+}
+
+func (cols *logColumns) shown(col logColumn) *bool {
+	switch col {
+	case colAuthor:
+		return &cols.author
+	case colDate:
+		return &cols.date
+	}
+	return &cols.hash
+}
+
 func (s *logState) columns(gw float32, refs int) logColumns {
 	if s.listWidth == 0 {
 		return logColumns{}
@@ -406,16 +445,15 @@ func (s *logState) columns(gw float32, refs int) logColumns {
 	room := s.rowRoom(gw)
 	budget := room - subjectMin()
 	gap := token.GapInline.Px()
+	widths := s.widths()
 	var cols logColumns
-	for _, col := range []struct {
-		width float32
-		on    *bool
-	}{{authorWidth(), &cols.author}, {token.ColumnMedium.Px(), &cols.date}, {token.ColumnSmall.Px(), &cols.hash}} {
-		if budget-tagSlot() >= col.width+gap {
-			*col.on = true
-			budget -= col.width + gap
+	for col := range logColumnCount {
+		if w := widths.of(col); budget-tagSlot() >= w+gap {
+			*cols.shown(col) = true
+			budget -= w + gap
 		}
 	}
+	cols.slack = max(budget-tagSlot(), 0)
 	cols.tags = min(refs, max(int(budget/tagSlot()), 0))
 	return cols
 }
@@ -464,15 +502,15 @@ func (s *logState) rowContent(c *ui.Context, cm git.Commit, gw float32, cols log
 		if cols.tags > 0 {
 			ui.Row(c).Gap(token.GapInline.Px()).AlignItems(ui.Center).Shrink(0).Children(func() { refTags(c, cm.Refs, remotes, cols.tags) })
 		}
-		author := authorWidth()
+		widths := s.widths()
 		if cols.author {
-			secondary(c, cm.Author).SingleLine().Width(author).Shrink(0)
+			secondary(c, cm.Author).SingleLine().Width(widths.of(colAuthor)).Shrink(0)
 		}
 		if cols.date {
-			secondary(c, formatTime(cm.AuthorTime, c.Now())).SingleLine().Width(token.ColumnMedium.Px()).Shrink(0)
+			secondary(c, formatTime(cm.AuthorTime, c.Now())).SingleLine().Width(widths.of(colDate)).Shrink(0)
 		}
 		if cols.hash {
-			secondary(c, shortHash(cm.OID)).SingleLine().Width(token.ColumnSmall.Px()).Shrink(0)
+			secondary(c, shortHash(cm.OID)).SingleLine().Width(widths.of(colHash)).Shrink(0)
 		}
 	})
 }

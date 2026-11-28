@@ -14,6 +14,8 @@ import (
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/git/diffmode"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/multidiff"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
@@ -21,6 +23,11 @@ import (
 const (
 	maxKeptTabs  = 32
 	readOnlyNote = "Read only"
+)
+
+const (
+	layoutSideBySide = iota
+	layoutUnified
 )
 
 var layoutNames = []string{"Side by Side", "Unified"}
@@ -38,6 +45,8 @@ type diffTab struct {
 	gen     int
 	bar     diffBar
 	ops     *hunkOps
+	focused bool
+	focus   bool
 }
 
 func (g *Git) openDiff(kind diffKind, rel string) {
@@ -66,6 +75,7 @@ func (g *Git) openSingleDiff(src diffSource, preview, focus bool) {
 		return
 	}
 	t := g.diffTabFor(src)
+	t.focus = t.focus || focus
 	t.load()
 	g.openView(src.id(), src.title(), t.view, preview, focus)
 }
@@ -87,7 +97,7 @@ func (g *Git) diffTabFor(src diffSource) *diffTab {
 	if t, ok := g.tabs[id]; ok {
 		return t
 	}
-	t := &diffTab{g: g, src: src}
+	t := &diffTab{g: g, src: src, layout: g.diffOpts.layout}
 	t.ops = &hunkOps{g: g, src: src, live: func() bool { return t.live }, reload: t.load}
 	g.tabs[id] = t
 	g.tabOrder = append(g.tabOrder, id)
@@ -119,6 +129,9 @@ func (t *diffTab) load() {
 	}
 	r, src, abs := g.repo, t.src, t.abs()
 	applog.Go(func() {
+		if src.kind == diffCommit && src.parent == "" {
+			src.parent = commitParent(g.ctx, r, src.rev)
+		}
 		oldText, newText, err := loadDiffTexts(g.ctx, r, src, abs, live == nil)
 		g.post(func() {
 			if gen != t.gen {
@@ -135,7 +148,7 @@ func (t *diffTab) load() {
 func (t *diffTab) apply(oldText, newText string, live *editor.Buffer) {
 	if t.state == nil || t.liveBuf != live {
 		t.dropState()
-		d := &editor.DiffState{Layout: editor.DiffLayout(t.layout)}
+		d := &editor.DiffState{Layout: editor.DiffLayout(t.layout), SplitPercent: t.g.layout.DiffSplit}
 		t.ops.d = d
 		d.RenderHunkActions = t.ops.render
 		d.RenderFindBar = findwidget.Render
@@ -154,6 +167,12 @@ func (t *diffTab) dropState() {
 }
 
 func (t *diffTab) view(c *ui.Context) {
+	if t.g.unavailable(c) {
+		return
+	}
+	if t.state == nil && !t.loading && t.err == nil {
+		t.load()
+	}
 	if t.live && t.state != nil && t.g.h.Buffer(t.abs()) != t.liveBuf && !t.loading {
 		t.dropState()
 		t.load()
@@ -161,8 +180,12 @@ func (t *diffTab) view(c *ui.Context) {
 	if t.engine != nil {
 		t.engine.Refresh()
 	}
-	ui.Column(c).Fill().Children(func() {
+	col := ui.Column(c).Fill()
+	t.focused = col.FocusWithin()
+	col.Children(func() {
+		before := currentDiffChoice(t.layout)
 		t.toolbar(c)
+		t.g.noteDiffChoice(before, t.layout)
 		t.body(c)
 	})
 }
@@ -170,19 +193,31 @@ func (t *diffTab) view(c *ui.Context) {
 func (t *diffTab) body(c *ui.Context) {
 	switch {
 	case t.err != nil && (errors.Is(t.err, errBinary) || errors.Is(t.err, errTooLarge)):
-		emptyState(c, t.err.Error(), "")
+		emptyState(c, "Cannot show the diff", t.err.Error())
 	case t.err != nil:
 		errorState(c, "Cannot load the diff", t.err, t.load)
 	case t.state == nil || !t.engine.Ready():
-		feedback.CodeSkeleton(c, "Loading diff")
+		feedback.DiffSkeleton(c, "Loading diff", multidiff.CountUnknown, multidiff.CountUnknown, t.configure)
 	default:
-		t.state.Layout = editor.DiffLayout(t.layout)
-		t.g.h.ConfigureDiff(t.state, t.abs())
-		t.g.diffOpts.apply(t.state)
+		t.configure(t.state)
 		t.state.HunkActions = t.ops.enabled() && !t.engine.Filtered()
 		t.state.Annotations = t.engine.Annotations(nil)
+		if t.focus {
+			t.state.Focus()
+			t.focus = false
+		}
+		split := t.state.SplitPercent
 		t.diffWithBars(c)
+		if t.state.SplitPercent != split {
+			t.g.layout.DiffSplit = t.state.SplitPercent
+		}
 	}
+}
+
+func (t *diffTab) configure(d *editor.DiffState) {
+	d.Layout = editor.DiffLayout(t.layout)
+	t.g.h.ConfigureDiff(d, t.abs())
+	t.g.diffOpts.apply(d)
 }
 
 func (t *diffTab) toolbar(c *ui.Context) {
@@ -197,17 +232,13 @@ func (t *diffTab) toolbar(c *ui.Context) {
 			secondary(c, fmt.Sprintf("+%d \u2212%d", added, deleted)).SingleLine().Shrink(0)
 			hunks := d.Hunks()
 			i, _ := d.CurrentHunk()
-			label := fmt.Sprintf("%d changes", len(hunks))
+			label := plural.Count(len(hunks), "change", "changes")
 			if i >= 0 && len(hunks) > 0 {
 				label = fmt.Sprintf("%d of %d", i+1, len(hunks))
 			}
 			secondary(c, label).SingleLine().Shrink(0)
-			if iconButton(c, "Previous Change", icons.ChevronUp, i <= 0) {
-				d.GoToHunk(i - 1)
-			}
-			if iconButton(c, "Next Change", icons.ChevronDown, i >= len(hunks)-1) {
-				d.GoToHunk(i + 1)
-			}
+			t.changeButton(c, previousChangeCommand, "Previous Change", icons.ChevronUp, -1)
+			t.changeButton(c, nextChangeCommand, "Next Change", icons.ChevronDown, 1)
 		}
 		pane.Separator(c, true)
 		action.Segmented(c, "Diff Layout", &t.layout, layoutNames, action.SegmentedOptions{})
@@ -217,6 +248,7 @@ func (t *diffTab) toolbar(c *ui.Context) {
 		}
 		t.g.diffOptionsButton(c)
 		t.fileActions(c)
+		action.CommandIconButton(c, icons.File, openFileCommand)
 		if iconButton(c, "Reload Diff", icons.Refresh, t.loading) {
 			t.load()
 		}

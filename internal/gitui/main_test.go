@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/host"
 	"github.com/ZerGo0/editor/internal/testutil"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -52,6 +53,7 @@ func commitAll(t testing.TB, dir, msg string) {
 }
 
 type fakeHost struct {
+	host.MemoryState
 	root    string
 	updates chan func()
 	mu      sync.Mutex
@@ -64,6 +66,7 @@ type fakeHost struct {
 	active  string
 	editor  *editor.State
 	opened  []string
+	lines   []int
 	viewID  string
 	scmOn   bool
 }
@@ -72,10 +75,12 @@ func newFakeHost(root string) *fakeHost {
 	return &fakeHost{root: root, updates: make(chan func(), 256), views: map[string]string{}, buffers: map[string]*editor.Buffer{}}
 }
 
-func (h *fakeHost) RootDir() string                { return h.root }
-func (h *fakeHost) Window() *mygo.Window           { return nil }
-func (h *fakeHost) Update(fn func())               { h.updates <- fn }
-func (h *fakeHost) OpenAt(path string, _, _ int)   { h.opened = append(h.opened, path) }
+func (h *fakeHost) RootDir() string      { return h.root }
+func (h *fakeHost) Window() *mygo.Window { return nil }
+func (h *fakeHost) Update(fn func())     { h.updates <- fn }
+func (h *fakeHost) OpenAt(path string, line, _ int) {
+	h.opened, h.lines = append(h.opened, path), append(h.lines, line)
+}
 func (h *fakeHost) ActiveViewID() string           { return h.viewID }
 func (h *fakeHost) SourceControlFocused() bool     { return h.scmOn }
 func (h *fakeHost) CloseView(id string)            { delete(h.views, id) }
@@ -152,6 +157,7 @@ type fakeRepo struct {
 	shows    map[string]string
 	remotes  []git.Remote
 	versions [3]string
+	conflict []git.ConflictFile
 	blame    []git.BlameLine
 	pushed   git.PushOptions
 }
@@ -233,7 +239,11 @@ func newFakeGit(t *testing.T, r *fakeRepo) (*Git, *fakeHost) {
 	if r.dir == "" {
 		r.dir = tempDir(t)
 	}
-	h := newFakeHost(r.dir)
+	return newFakeGitOn(t, r, newFakeHost(r.dir))
+}
+
+func newFakeGitOn(t *testing.T, r *fakeRepo, h *fakeHost) (*Git, *fakeHost) {
+	t.Helper()
 	d := deps{
 		available: func() bool { return true },
 		open:      func(context.Context, string, string) (repo, error) { return r, nil },
@@ -258,6 +268,8 @@ func (r *fakeRepo) Show(_ context.Context, rev, path string) ([]byte, error) {
 func (r *fakeRepo) MergeVersions(context.Context, string) ([]byte, []byte, []byte, error) {
 	return []byte(r.versions[0]), []byte(r.versions[1]), []byte(r.versions[2]), nil
 }
+
+func (r *fakeRepo) Conflicts(context.Context) ([]git.ConflictFile, error) { return r.conflict, nil }
 
 func (r *fakeRepo) MarkResolved(_ context.Context, paths ...string) error {
 	r.record("resolved " + strings.Join(paths, ","))

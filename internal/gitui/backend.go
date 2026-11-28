@@ -91,6 +91,8 @@ type repo interface {
 	RemoveRemote(ctx context.Context, name string) error
 	BranchesContaining(ctx context.Context, oid string) ([]string, error)
 	ChangedSince(ctx context.Context, rev string) ([]git.ChangedFile, error)
+	MergeBase(ctx context.Context, a, b string) (string, error)
+	DefaultBranch(ctx context.Context) string
 	Shelve(ctx context.Context, name string, paths []string) (git.ShelfEntry, error)
 	Unshelve(ctx context.Context, id string, remove bool) (git.OpResult, error)
 	ShelfList() ([]git.ShelfEntry, error)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -29,10 +30,10 @@ func (g *Git) changeMenu(c *ui.Context, m *ui.Menu, e changeEntry) {
 			if m.Item("Open Merge Editor").Chosen() {
 				g.openMergeTool(r.file.Path)
 			}
-		} else if m.Item("Open Changes").Chosen() {
+		} else if m.Item("Open Changes").Shortcut(showDiffMods, showDiffKey).Chosen() {
 			g.openRowDiff(r)
 		}
-		if m.Item("Open File").Disabled(r.code() == codeDeleted).Chosen() {
+		if m.Item("Open File").Shortcut(0, jumpToSourceKey).Disabled(r.code() == codeDeleted).Chosen() {
 			g.openFile(r)
 		}
 	} else if e.kind == entryGroup && e.group != groupMerge {
@@ -114,7 +115,7 @@ func (g *Git) rollback(rows []changeRow) {
 	}
 	p := planRollback(rows)
 	q := question{
-		message:     fmt.Sprintf("Discard the changes in %d files?", len(rows)),
+		message:     "Discard the changes in " + plural.Count(len(rows), "file", "files") + "?",
 		detail:      "Your local changes are lost.",
 		action:      "Discard",
 		destructive: true,
@@ -123,7 +124,7 @@ func (g *Git) rollback(rows []changeRow) {
 		q.message = fmt.Sprintf("Discard the changes in %s?", rows[0].file.Path)
 	}
 	if len(p.untracked) == len(rows) {
-		q.message, q.detail, q.action = fmt.Sprintf("Delete %d untracked files?", len(rows)), "The files are deleted from the disk.", "Delete"
+		q.message, q.detail, q.action = "Delete "+plural.Count(len(rows), "untracked file", "untracked files")+"?", "The files are deleted from the disk.", "Delete"
 	}
 	g.confirm(q, func() {
 		g.doSimple("Discard", func(ctx context.Context, r repo) error {

@@ -10,6 +10,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/badge"
 	"github.com/ZerGo0/editor/internal/design/dialog"
+	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/field"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/token"
@@ -91,7 +92,7 @@ func (g *Git) worktreesDialog(c *ui.Context) {
 		w, ok := s.selectedWorktree()
 		main := ok && s.selected == 0
 		dialog.Actions(c, func() {
-			if button(c, "New Worktree...", false) {
+			if button(c, "Add Worktree...", false) {
 				s.adding, s.path, s.branch, s.newBranch = true, g.suggestWorktreePath(""), "", false
 			}
 			if button(c, "Copy Path", !ok) {
@@ -112,7 +113,9 @@ func (g *Git) worktreeList(c *ui.Context) {
 	s := &g.worktrees
 	items := s.items
 	if len(items) == 0 {
-		emptyState(c, "No worktrees", "")
+		feedback.Empty(c, feedback.EmptyOptions{Title: "No worktrees", Action: "Add Worktree...", OnAction: func() {
+			s.adding, s.path, s.branch, s.newBranch = true, g.suggestWorktreePath(""), "", false
+		}})
 		return
 	}
 	s.list.Key = func(i int) any { return items[i].Path }

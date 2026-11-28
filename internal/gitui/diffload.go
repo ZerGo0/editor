@@ -51,7 +51,7 @@ func (s diffSource) usesWorkTree() bool {
 }
 
 func (s diffSource) id() string {
-	return fmt.Sprintf("git-diff:%d:%s:%s:%s", s.kind, s.rev, s.oldPath, s.path)
+	return fmt.Sprintf("%s%d:%s:%s:%s", diffViewPrefix, s.kind, s.rev, s.oldPath, s.path)
 }
 
 func (s diffSource) title() string {
@@ -106,7 +106,7 @@ func loadDiffTexts(ctx context.Context, r repo, s diffSource, abs string, readDi
 	case diffUntracked:
 		newData, err = disk()
 	case diffHead:
-		if oldData, err = show(headRev, s.path); err == nil {
+		if oldData, err = show(headRev, s.old()); err == nil {
 			newData, err = disk()
 		}
 	case diffCommit:

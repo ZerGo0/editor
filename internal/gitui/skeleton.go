@@ -7,6 +7,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/multidiff"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -15,9 +16,16 @@ const (
 	subjectWordsMin  = 3
 	subjectWordsSpan = 4
 	pathSeparator    = "/"
+	statusUnchanged  = '.'
+
+	mergeSkeletonLead     = 8
+	mergeSkeletonConflict = 3
 )
 
-var skeletonCodes = []byte{codeModified, codeModified, codeAdded, codeModified, codeDeleted, codeUntracked}
+var (
+	skeletonCodes  = []byte{codeModified, codeModified, codeAdded, codeModified, codeDeleted, codeUntracked}
+	skeletonCounts = []int{3, 1, 5, 2, 4, 1}
+)
 
 func boxedSkeleton(c *ui.Context, label string, item func(i int) list.Item) {
 	boxFrame(c, func() { list.Skeleton(c, label, list.SkeletonRows, item) })
@@ -52,15 +60,62 @@ func filesSkeleton(c *ui.Context, label string) ui.Element {
 	})
 }
 
-func changesSkeleton(c *ui.Context, label string) {
-	list.Skeleton(c, label, list.SkeletonRows+1, func(i int) list.Item {
-		if i == 0 {
-			return list.Item{Label: placeholderWord(i), Branch: true, Open: true, Strong: true, Count: list.SkeletonRows}
+func placeholderStatus() *git.Status {
+	st := &git.Status{Files: make([]git.FileStatus, list.SkeletonRows)}
+	for i := range st.Files {
+		f := git.FileStatus{Path: placeholderPath(i), Index: statusUnchanged, WorkTree: skeletonCodes[i%len(skeletonCodes)]}
+		if f.WorkTree == codeUntracked {
+			f.Index = codeUntracked
 		}
-		it := changedFileItem(placeholderPath(i), skeletonCodes[i%len(skeletonCodes)], nil)
-		it.Depth = 1
-		return it
+		st.Files[i] = f
+	}
+	return st
+}
+
+func (g *Git) changesSkeleton(c *ui.Context, label string) {
+	entries := flattenChanges(changeGroups(placeholderStatus()), !g.changes.listMode, nil)
+	feedback.Skeleton(c, label, func() {
+		g.commitBox(c)
+		list.Rows(c, len(entries), func(i int) list.Item { return g.changeItem(c, entries[i]) })
 	})
+}
+
+func placeholderEntries() []multidiff.Entry {
+	entries := make([]multidiff.Entry, list.SkeletonRows)
+	for i := range entries {
+		p := placeholderPath(i)
+		entries[i] = multidiff.Entry{Key: p, Path: p, Status: gitStatus(skeletonCodes[i%len(skeletonCodes)]),
+			Adds: skeletonCounts[i%len(skeletonCounts)], Dels: skeletonCounts[(i+1)%len(skeletonCounts)]}
+	}
+	return entries
+}
+
+func (t *patchTab) skeleton(c *ui.Context) {
+	if t.placeholder == nil {
+		t.placeholder = t.g.newDiffView()
+		t.placeholder.SetEntries(placeholderEntries())
+	}
+	feedback.Skeleton(c, "Loading changes", func() { t.placeholder.Render(c, t.options()) }).Grow(1)
+}
+
+func placeholderMerge() (base, ours, theirs string) {
+	lead := feedback.SkeletonCode(0, mergeSkeletonLead, feedback.SkeletonBase)
+	tail := feedback.SkeletonCode(mergeSkeletonLead+mergeSkeletonConflict, feedback.SkeletonCodeLines-mergeSkeletonLead-mergeSkeletonConflict, feedback.SkeletonBase)
+	side := func(version int) string {
+		return lead + feedback.SkeletonCode(mergeSkeletonLead, mergeSkeletonConflict, version) + tail
+	}
+	return side(feedback.SkeletonBase), side(feedback.SkeletonOld), side(feedback.SkeletonNew)
+}
+
+func (t *mergeTool) skeleton(c *ui.Context) {
+	if t.placeholder == nil {
+		t.placeholder = &mergeTool{g: t.g, rel: t.rel, rebasing: t.rebasing}
+		t.placeholder.setup(placeholderMerge())
+	}
+	feedback.Skeleton(c, "Loading conflict", func() {
+		t.placeholder.toolbar(c)
+		t.placeholder.panes(c)
+	}).Grow(1)
 }
 
 func (g *Git) graphSkeleton(c *ui.Context) {

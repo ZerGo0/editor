@@ -99,7 +99,7 @@ func TestStageButton(t *testing.T) {
 	r := &fakeRepo{status: st}
 	g, h := newFakeGit(t, r)
 	tt := newTester(g, g.SideView)
-	hover(t, tt, "Changes")
+	hover(t, tt, "Changes, 3")
 	if err := tt.Click("Stage All Changes"); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestChangesTreeAndPreview(t *testing.T) {
 	if !tt.HasText("util.go") || !tt.HasText("src/app") {
 		t.Fatalf("list mode = %v", tt.Texts())
 	}
-	hover(t, tt, "util.go")
+	hover(t, tt, "util.go, Deleted, src/app")
 	if err := tt.Click("Stage Changes"); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestRunActions(t *testing.T) {
 	}
 	table := g.actionTable()
 	for _, a := range Actions {
-		if !strings.HasPrefix(a.ID, "git.") {
+		if !strings.HasPrefix(a.ID, "git.") && a.Category != diffCategory {
 			t.Errorf("action %s has no git. prefix", a.ID)
 		}
 		if _, ok := table[a.ID]; !ok && a.ID != "git.init" {

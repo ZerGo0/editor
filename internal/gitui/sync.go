@@ -8,9 +8,10 @@ import (
 
 func (g *Git) fetch() {
 	g.do(op{
-		title:   "Fetch",
-		banner:  true,
-		network: true,
+		title:      "Fetch",
+		banner:     true,
+		background: true,
+		network:    true,
 		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
 			return git.OpResult{}, r.Fetch(ctx, "", true, progress)
 		},
@@ -26,6 +27,7 @@ func (g *Git) pullWith(o git.PullOptions) {
 	g.do(op{
 		title:  "Pull",
 		banner: true,
+		remote: true,
 		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
 			o.Progress = progress
 			return r.Pull(ctx, o)
@@ -83,6 +85,7 @@ func (g *Git) update() {
 	g.do(op{
 		title:  "Update Project",
 		banner: true,
+		remote: true,
 		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
 			if err := r.Fetch(ctx, "", true, progress); err != nil {
 				return git.OpResult{}, err
@@ -116,6 +119,7 @@ func (g *Git) syncChanges() {
 	g.do(op{
 		title:  "Sync",
 		banner: true,
+		remote: true,
 		run: func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error) {
 			o := g.pullOptions()
 			o.Progress = progress

@@ -105,7 +105,7 @@ func (g *Git) branchesPopup(c *ui.Context) {
 		items = append(items, branchItem(e, group))
 		refs = append(refs, i)
 	}
-	empty := "No matching branches"
+	empty := "No matching results"
 	if s.tagsErr != nil {
 		empty = "Cannot load tags: " + s.tagsErr.Error()
 	}

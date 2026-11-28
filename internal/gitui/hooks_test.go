@@ -1,6 +1,7 @@
 package gitui
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -23,6 +24,19 @@ func TestHasChangeAt(t *testing.T) {
 	}
 	if g.HasChangeAt(abs, nil, 1) || g.HasChangeAt(g.paths.abs("other.go"), buf, 1) {
 		t.Error("change without a base")
+	}
+}
+
+func TestStatusHookReceivesFiles(t *testing.T) {
+	t.Parallel()
+	files := []git.FileStatus{{Path: "a.go", Index: '.', WorkTree: 'M'}}
+	g, h := newFakeGit(t, &fakeRepo{status: &git.Status{Branch: "main", OID: "head1", Files: files}})
+	var got []git.FileStatus
+	g.OnStatus(func(f []git.FileStatus) { got = f })
+	g.refreshNow()
+	h.drain(t, func() bool { return got != nil })
+	if !slices.Equal(got, files) {
+		t.Fatalf("files = %+v", got)
 	}
 }
 

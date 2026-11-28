@@ -7,6 +7,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"io/fs"
 	"os"
+	"slices"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/design"
@@ -15,11 +16,29 @@ import (
 	"github.com/ZerGo0/editor/internal/findwidget"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 )
 
-const mergeFileMode = 0o644
+const (
+	mergeFileMode   = 0o644
+	keyNextConflict = "F7"
+	keyPrevConflict = "\u21e7F7"
+	keyAcceptLeft   = "\u2303\u21e7\u2192"
+	keyAcceptRight  = "\u2303\u21e7\u2190"
+	acceptMods      = ui.Ctrl | ui.Shift
+
+	fullPercent        float32 = 100
+	mergePaneCount             = 3
+	mergeSplitDefault          = fullPercent / mergePaneCount
+	resultSplitDefault         = fullPercent / half
+)
+
+var mergeKeysOff = []editor.Binding{
+	{Mods: acceptMods, Key: ui.KeyLeft, Command: editor.NoCommand},
+	{Mods: acceptMods, Key: ui.KeyRight, Command: editor.NoCommand},
+}
 
 type mergeTool struct {
 	g        *Git
@@ -35,6 +54,11 @@ type mergeTool struct {
 	version  uint64
 	current  int
 	rebasing bool
+	focus    bool
+	keysBase []editor.Binding
+	keys     []editor.Binding
+
+	placeholder *mergeTool
 }
 
 func (g *Git) openMergeTool(rel string) {
@@ -48,6 +72,7 @@ func (g *Git) openMergeTool(rel string) {
 		g.mergeTools[id] = t
 	}
 	t.rebasing = g.rebasing()
+	t.focus = true
 	t.load()
 	name, _ := splitPath(rel)
 	g.h.OpenView(id, "Merge: "+name, t.view)
@@ -124,14 +149,21 @@ func (t *mergeTool) act(fn func()) {
 }
 
 func (t *mergeTool) view(c *ui.Context) {
-	ui.Column(c).Fill().Children(func() {
+	col := ui.Column(c).Fill()
+	if t.model != nil {
+		col.OnShortcut(0, ui.KeyF7, func() { t.move(t.model.changes(), 1) })
+		col.OnShortcut(ui.Shift, ui.KeyF7, func() { t.move(t.model.changes(), -1) })
+		col.OnShortcut(acceptMods, ui.KeyRight, func() { t.acceptCurrent(choiceOurs) })
+		col.OnShortcut(acceptMods, ui.KeyLeft, func() { t.acceptCurrent(choiceTheirs) })
+	}
+	col.Children(func() {
 		switch {
 		case t.err != nil && (errors.Is(t.err, errBinary) || errors.Is(t.err, errTooLarge)):
-			emptyState(c, t.err.Error(), "Use Accept Yours or Accept Theirs in the Conflicts dialog.")
+			emptyState(c, "Cannot merge this file", t.err.Error()+" Use Accept Yours or Accept Theirs in the Conflicts dialog.")
 		case t.err != nil:
 			errorState(c, "Cannot load the conflict", t.err, t.load)
 		case t.model == nil:
-			feedback.CodeSkeleton(c, "Loading conflict")
+			t.skeleton(c)
 		default:
 			t.toolbar(c)
 			t.panes(c)
@@ -147,13 +179,13 @@ func (t *mergeTool) toolbar(c *ui.Context) {
 		left := m.unresolved()
 		status := "All conflicts are resolved"
 		if left > 0 {
-			status = fmt.Sprintf("%d conflicts left", left)
+			status = plural.Count(left, "conflict", "conflicts") + " left"
 		}
 		token.TextLabel.Apply(ui.Text(c, status)).TextColor(token.Of(c).Text.Primary).SingleLine().Shrink(0).Role(ui.RoleStatus)
-		if iconButton(c, "Previous Change", icons.ChevronUp, len(changes) == 0) {
+		if iconButton(c, "Previous Change", icons.ChevronUp, len(changes) == 0, keyPrevConflict) {
 			t.move(changes, -1)
 		}
-		if iconButton(c, "Next Change", icons.ChevronDown, len(changes) == 0) {
+		if iconButton(c, "Next Change", icons.ChevronDown, len(changes) == 0, keyNextConflict) {
 			t.move(changes, 1)
 		}
 		design.Spacer(c)
@@ -188,6 +220,25 @@ func (t *mergeTool) move(changes []int, step int) {
 	t.result.ScrollTo(r.start)
 }
 
+func (t *mergeTool) acceptCurrent(choice mergeChoice) {
+	changes := t.model.changes()
+	if len(changes) == 0 {
+		return
+	}
+	if !slices.Contains(changes, t.current) {
+		t.current = changes[0]
+	}
+	idx := t.current
+	t.act(func() { t.model.choose(idx, choice) })
+}
+
+func (t *mergeTool) mergeKeys(base []editor.Binding) []editor.Binding {
+	if t.keys == nil || len(base) != len(t.keysBase) || len(base) > 0 && &base[0] != &t.keysBase[0] {
+		t.keysBase, t.keys = base, append(slices.Clip(base), mergeKeysOff...)
+	}
+	return t.keys
+}
+
 func (t *mergeTool) chunkColor(c *ui.Context, i int) ui.Color {
 	p := token.Of(c)
 	ch := t.model.chunks[i]
@@ -219,13 +270,22 @@ func (t *mergeTool) panes(c *ui.Context) {
 	if t.result.Buffer.Version() == t.version {
 		t.result.LineBackgrounds = t.backgrounds(c, sideResult)
 	}
-	ui.Row(c).Grow(1).FillWidth().MinHeight(0).Children(func() {
-		t.pane(c, left, t.ours)
-		t.arrows(c, t.ours, sideOurs, icons.ChevronRight, choiceOurs)
-		t.pane(c, "Result", t.result)
-		t.arrows(c, t.theirs, sideTheirs, icons.ChevronLeft, choiceTheirs)
-		t.pane(c, right, t.theirs)
-	})
+	l := &t.g.layout
+	ui.SplitPercent(c, &l.MergeSplit, func() {
+		ui.Row(c).Fill().Children(func() {
+			t.pane(c, left, t.ours)
+			t.arrows(c, t.ours, sideOurs, icons.ChevronRight, choiceOurs)
+		})
+	}, func() {
+		ui.SplitPercent(c, &l.ResultSplit, func() {
+			ui.Row(c).Fill().Children(func() { t.pane(c, "Result", t.result) })
+		}, func() {
+			ui.Row(c).Fill().Children(func() {
+				t.arrows(c, t.theirs, sideTheirs, icons.ChevronLeft, choiceTheirs)
+				t.pane(c, right, t.theirs)
+			})
+		}).SplitReset(resultSplitDefault).Fill()
+	}).SplitReset(mergeSplitDefault).Grow(1).FillWidth().MinHeight(0)
 }
 
 func (t *mergeTool) pane(c *ui.Context, title string, st *editor.State) {
@@ -234,7 +294,13 @@ func (t *mergeTool) pane(c *ui.Context, title string, st *editor.State) {
 			token.TextCaption.Apply(ui.Text(c, title)).FontWeight(token.WeightSemibold).TextColor(token.Of(c).Text.Secondary).SingleLine()
 		})
 		t.g.h.ConfigureEditor(st, t.g.paths.abs(t.rel))
-		editor.View(c.Key("editor"), st).Grow(1).FillWidth().MinHeight(0).Label(title)
+		st.Bindings = t.mergeKeys(st.Bindings)
+		feedback.SkeletonEditor(c, st)
+		ed := editor.View(c.Key("editor"), st).Grow(1).FillWidth().MinHeight(0).Label(title)
+		if st == t.result && t.focus {
+			ed.Focus()
+			t.focus = false
+		}
 	})
 }
 
@@ -258,7 +324,11 @@ func (t *mergeTool) arrowButtons(c *ui.Context, st *editor.State, side mergeSide
 			continue
 		}
 		label := fmt.Sprintf("Accept change %d from %s", i+1, sideLabel(side))
-		b := action.IconButton(c, icon, label, action.IconOptions{}).Absolute().Top(y).Left(inset)
+		keys := ""
+		if i == t.current {
+			keys = acceptKeys[side]
+		}
+		b := action.IconButton(c, icon, label, action.IconOptions{Keys: keys}).Absolute().Top(y).Left(inset)
 		if b.Clicked() {
 			idx := i
 			t.current = idx
@@ -272,6 +342,8 @@ func (t *mergeTool) arrowButtons(c *ui.Context, st *editor.State, side mergeSide
 		})
 	}
 }
+
+var acceptKeys = map[mergeSide]string{sideOurs: keyAcceptLeft, sideTheirs: keyAcceptRight}
 
 func sideLabel(side mergeSide) string {
 	if side == sideOurs {
@@ -290,7 +362,7 @@ func (t *mergeTool) apply() {
 		return
 	}
 	t.g.confirm(question{
-		message: fmt.Sprintf("%d conflicts are not resolved. Save the result and mark the file as resolved?", left),
+		message: plural.Count(left, "conflict", "conflicts") + " " + plural.Word(left, "is", "are") + " not resolved. Save the result and mark the file as resolved?",
 		detail:  "Unresolved changes keep the base version.",
 		action:  "Save Anyway",
 	}, t.save)

@@ -3,6 +3,7 @@ package gitui
 import (
 	"strings"
 
+	"github.com/ZerGo0/editor/internal/git"
 	"github.com/egoist/mygo/ui/editor"
 )
 
@@ -12,6 +13,14 @@ func (g *Git) SetCommitTemplate(fn func() string) {
 
 func (g *Git) OnHeadChange(fn func()) {
 	g.headHook = fn
+}
+
+func (g *Git) OnStatus(fn func([]git.FileStatus)) {
+	g.statusHook = fn
+}
+
+func (g *Git) OnToggleWrap(fn func()) {
+	g.toggleWrap = fn
 }
 
 func (g *Git) ShowCommit(oid string) {

@@ -23,7 +23,7 @@ func (g *Git) commitActions(c *ui.Context, m *ui.Menu, cm git.Commit) {
 	root := len(cm.Parents) == 0
 	merge := len(cm.Parents) > 1
 	head := g.snap.status != nil && g.snap.status.OID == cm.OID
-	if m.Item("Copy Revision Number").Chosen() {
+	if m.Item("Copy Revision Number").Shortcut(copyRevisionMods, copyRevisionKey).Chosen() {
 		c.WriteClipboard(cm.OID)
 	}
 	if m.Item("Create Patch").Chosen() {

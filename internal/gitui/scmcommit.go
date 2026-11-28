@@ -14,6 +14,7 @@ import (
 	"github.com/ZerGo0/editor/internal/design/token"
 	"github.com/ZerGo0/editor/internal/git"
 	"github.com/ZerGo0/editor/internal/icons"
+	"github.com/ZerGo0/editor/internal/plural"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -89,16 +90,8 @@ func (g *Git) commitBox(c *ui.Context) {
 			MaxLines:    messageMaxLines,
 			ID:          "message",
 		})
-		in.Bind(&g.commit.handle).OnTextKey(func(k ui.TextKey) bool {
-			if k.Key == ui.KeyEnter && k.Mods == ui.Cmd {
-				g.commit.requested = true
-				return true
-			}
-			return false
-		})
-		if g.commit.focus {
-			g.commit.focus = false
-			g.commit.handle.Focus()
+		if !token.Of(c).IsSkeleton() {
+			g.bindMessage(in)
 		}
 		g.primaryButton(c, st)
 		if g.commit.author != "" {
@@ -108,6 +101,20 @@ func (g *Git) commitBox(c *ui.Context) {
 	if g.commit.requested {
 		g.commit.requested = false
 		g.doCommit(commitSmart, afterNone)
+	}
+}
+
+func (g *Git) bindMessage(in ui.Element) {
+	in.Bind(&g.commit.handle).OnTextKey(func(k ui.TextKey) bool {
+		if k.Key == ui.KeyEnter && k.Mods == ui.Cmd {
+			g.commit.requested = true
+			return true
+		}
+		return false
+	})
+	if g.commit.focus {
+		g.commit.focus = false
+		g.commit.handle.Focus()
 	}
 }
 
@@ -130,7 +137,7 @@ func (g *Git) primaryButton(c *ui.Context, st *git.Status) {
 	case primarySync:
 		o.Icon, o.Disabled = icons.Refresh, busy
 		label := "Sync Changes " + syncLabel(st.Ahead, st.Behind)
-		o.Tooltip = fmt.Sprintf("Pull %d and push %d commits", st.Behind, st.Ahead)
+		o.Tooltip = fmt.Sprintf("Pull %d and push %s", st.Behind, plural.Count(st.Ahead, "commit", "commits"))
 		if action.SplitButton(c, label, o).Clicked() && !busy {
 			g.syncChanges()
 		}
@@ -265,7 +272,8 @@ func (g *Git) doCommit(mode commitMode, after afterCommit) {
 	upstream := st.Upstream != ""
 	var oid string
 	g.do(op{
-		title: "Commit",
+		title:  "Commit",
+		banner: true,
 		run: func(ctx context.Context, r repo, _ func(string)) (git.OpResult, error) {
 			var err error
 			oid, err = r.Commit(ctx, opts)
@@ -290,6 +298,14 @@ func (g *Git) doCommit(mode commitMode, after afterCommit) {
 
 func (g *Git) focusCommit() {
 	g.commit.focus = true
+}
+
+func (g *Git) FocusCommitMessage() bool {
+	if !g.ready() || g.snap.status == nil {
+		return false
+	}
+	g.focusCommit()
+	return true
 }
 
 func (g *Git) conflictCount() int {
@@ -410,7 +426,7 @@ func (g *Git) operationCard(c *ui.Context, st git.RepoState) {
 		})
 		if conflicts > 0 {
 			ui.Row(c).FillWidth().Height(token.IconSize.Px()).AlignItems(ui.Center).Children(func() {
-				secondary(c, fmt.Sprintf("%d conflicted files", conflicts))
+				secondary(c, plural.Count(conflicts, "conflicted file", "conflicted files"))
 			})
 		}
 		switch {

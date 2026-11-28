@@ -12,11 +12,13 @@ import (
 )
 
 type diffOptions struct {
-	inline      editor.DiffInline
-	expandAll   bool
-	wrapSet     bool
-	wrap        bool
-	hideNumbers bool
+	layout        int
+	layoutSet     bool
+	inline        editor.DiffInline
+	expandAll     bool
+	hideNumbers   bool
+	whitespaceSet bool
+	movesSet      bool
 }
 
 var inlineModes = []struct {
@@ -32,9 +34,6 @@ var inlineModes = []struct {
 func (o diffOptions) apply(d *editor.DiffState) {
 	d.Inline = o.inline
 	d.ExpandUnchanged = o.expandAll
-	if o.wrapSet {
-		d.Wrap = o.wrap
-	}
 	d.NoLineNumbers = o.hideNumbers
 }
 
@@ -44,23 +43,22 @@ func (g *Git) diffOptionsButton(c *ui.Context) {
 		for _, im := range inlineModes {
 			if m.Item(im.label).Radio(o.inline == im.mode).Chosen() {
 				o.inline = im.mode
+				g.saveDiffPrefs()
 			}
 		}
 		m.Separator()
 		if m.Item("Collapse Unchanged Fragments").Checked(!o.expandAll).Chosen() {
 			o.expandAll = !o.expandAll
+			g.saveDiffPrefs()
 		}
-		wrapped := o.wrap
-		if !o.wrapSet {
-			var configured editor.DiffState
-			g.h.ConfigureDiff(&configured, "")
-			wrapped = configured.Wrap
-		}
-		if m.Item("Wrap Lines").Checked(wrapped).Chosen() {
-			o.wrapSet, o.wrap = true, !wrapped
+		var configured editor.DiffState
+		g.h.ConfigureDiff(&configured, "")
+		if m.Item("Wrap Lines").Checked(configured.Wrap).Disabled(g.toggleWrap == nil).Chosen() {
+			g.toggleWrap()
 		}
 		if m.Item("Show Line Numbers").Checked(!o.hideNumbers).Chosen() {
 			o.hideNumbers = !o.hideNumbers
+			g.saveDiffPrefs()
 		}
 	})
 }

@@ -3,12 +3,15 @@ package gitui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/ZerGo0/editor/internal/applog"
 	"github.com/ZerGo0/editor/internal/git"
 )
+
+const pushUpToErrorTitle = "Cannot push up to this commit"
 
 type resetMode struct {
 	mode   git.ResetMode
@@ -163,12 +166,12 @@ func (g *Git) rewriteCommit(title string, cm git.Commit, action git.TodoAction, 
 func (g *Git) pushUpTo(cm git.Commit) {
 	st := g.snap.status
 	if st == nil || st.Upstream == "" {
-		g.h.Notify("The current branch has no upstream. Push it once from the Push dialog.")
+		g.h.ShowError(pushUpToErrorTitle, errors.New("The current branch has no upstream. Push it once from the Push dialog."))
 		return
 	}
 	remote, branch, ok := strings.Cut(st.Upstream, "/")
 	if !ok {
-		g.h.Notify("Cannot read the upstream branch " + st.Upstream + ".")
+		g.h.ShowError(pushUpToErrorTitle, errors.New("Cannot read the upstream branch "+st.Upstream+"."))
 		return
 	}
 	refspec := cm.OID + ":refs/heads/" + branch

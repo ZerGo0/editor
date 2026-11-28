@@ -23,23 +23,28 @@ func (g *Git) fileHistory(rel string) {
 	if !g.ready() || rel == "" {
 		return
 	}
-	id := "git-history:" + rel
+	id := historyViewPrefix + rel
 	s, ok := g.histories[id]
-	switch {
-	case !ok:
-		s = newLogState(g, rel)
-		g.histories[id] = s
-	case s.started:
+	if ok && s.started {
 		s.reload()
 	}
 	name, _ := splitPath(rel)
-	g.h.OpenView(id, "History: "+name, func(c *ui.Context) {
+	g.h.OpenView(id, "History: "+name, g.historyView(id, rel))
+}
+
+func (g *Git) historyView(id, rel string) func(c *ui.Context) {
+	s, ok := g.histories[id]
+	if !ok {
+		s = newLogState(g, rel)
+		g.histories[id] = s
+	}
+	return func(c *ui.Context) {
 		ui.Column(c).Fill().Children(func() {
 			if g.gate(c) {
 				s.view(c)
 			}
 		})
-	})
+	}
 }
 
 func (s *logState) open(cm git.Commit) {
@@ -72,9 +77,13 @@ func (g *Git) selectionHistory() {
 	}
 	start, last := from.Line+1, end+1
 	name, _ := splitPath(rel)
-	id := fmt.Sprintf("git-lines:%s:%d-%d", rel, start, last)
+	id := fmt.Sprintf("%s%s:%d-%d", linesViewPrefix, rel, start, last)
 	title := fmt.Sprintf("History: %s:%d-%d", name, start, last)
-	g.openPatchTab(id, title, func(ctx context.Context, r repo) ([]patchItem, error) {
+	g.openPatchTab(id, title, lineLoader(rel, start, last))
+}
+
+func lineLoader(rel string, start, last int) func(ctx context.Context, r repo) ([]patchItem, error) {
+	return func(ctx context.Context, r repo) ([]patchItem, error) {
 		entries, err := r.LineLog(ctx, rel, start, last)
 		if err != nil {
 			return nil, err
@@ -86,5 +95,5 @@ func (g *Git) selectionHistory() {
 			items = append(items, fileDiffItems(e.Diffs)...)
 		}
 		return items, nil
-	})
+	}
 }

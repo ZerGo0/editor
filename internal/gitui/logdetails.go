@@ -87,7 +87,7 @@ func (s *logState) filesView(c *ui.Context, cm git.Commit) {
 		filesSkeleton(c, "Loading files")
 		return
 	case len(d.files) == 0:
-		emptyState(c, "No changed files", "")
+		emptyState(c, "No changes", "")
 		return
 	}
 	files := d.files
@@ -100,15 +100,18 @@ func (s *logState) filesView(c *ui.Context, cm git.Commit) {
 		it.Menu = func(m *ui.Menu) { s.g.commitFileMenu(c, m, cm, f) }
 		return it
 	})
-	if l.Submitted() && d.selected >= 0 && d.selected < len(files) {
+	if d.selected < 0 || d.selected >= len(files) {
+		return
+	}
+	if l.Submitted() {
 		s.g.openDiffWith(commitSource(cm, files[d.selected]), false, true)
 	}
+	s.g.commitFileKeys(l, cm, files[d.selected])
 }
 
 func (g *Git) commitFileMenu(c *ui.Context, m *ui.Menu, cm git.Commit, f git.ChangedFile) {
 	src := commitSource(cm, f)
-	abs := g.paths.abs(f.Path)
-	if m.Item("Show Diff").Chosen() {
+	if m.Item("Show Diff").Shortcut(showDiffMods, showDiffKey).Chosen() {
 		g.openDiffSource(src)
 	}
 	if m.Item("Compare with Local").Chosen() {
@@ -117,8 +120,8 @@ func (g *Git) commitFileMenu(c *ui.Context, m *ui.Menu, cm git.Commit, f git.Cha
 	if m.Item("Compare Before with Local").Disabled(src.parent == "").Chosen() {
 		g.openDiffSource(diffSource{kind: diffCompare, path: beforePath(f), rev: src.parent})
 	}
-	if m.Item("Open File").Chosen() {
-		g.h.OpenAt(abs, -1, -1)
+	if m.Item("Open File").Shortcut(0, jumpToSourceKey).Chosen() {
+		g.jumpToSource(f.Path)
 	}
 	if m.Item("Revert Selected Changes").Disabled(src.parent == "").Chosen() {
 		g.revertCommitFile(cm, f)

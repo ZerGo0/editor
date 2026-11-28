@@ -123,6 +123,13 @@ func (g *Git) applySnapshot(s snapshot) {
 	old := g.snap.status
 	g.snap = s
 	g.reloadGroupTabs()
+	if g.statusHook != nil {
+		var files []git.FileStatus
+		if s.status != nil {
+			files = s.status.Files
+		}
+		g.statusHook(files)
+	}
 	if s.status == nil || old == nil {
 		return
 	}
@@ -130,7 +137,9 @@ func (g *Git) applySnapshot(s snapshot) {
 	case old.OID != s.status.OID || old.Branch != s.status.Branch:
 		g.headChanged()
 	case old.Upstream != s.status.Upstream || old.Ahead != s.status.Ahead || old.Behind != s.status.Behind:
-		g.reloadGraphIfStarted()
+		if g.graph.started {
+			g.reloadGraphQuietly()
+		}
 	}
 }
 

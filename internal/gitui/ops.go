@@ -2,6 +2,7 @@ package gitui
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -13,43 +14,49 @@ import (
 const progressInterval = 150 * time.Millisecond
 
 type op struct {
-	title   string
-	banner  bool
-	network bool
-	run     func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error)
-	done    func(res git.OpResult)
+	title      string
+	banner     bool
+	background bool
+	network    bool
+	remote     bool
+	run        func(ctx context.Context, r repo, progress func(string)) (git.OpResult, error)
+	done       func(res git.OpResult)
+}
+
+func (o op) cancelable() bool {
+	return o.network || o.remote
 }
 
 func (g *Git) do(o op) {
 	if !g.ready() {
 		return
 	}
+	if reason := g.blocked(o); reason != "" {
+		g.h.Notify(reason)
+		return
+	}
+	ctx, cancel := context.WithCancel(g.ctx)
+	var t *task
 	if o.banner {
-		if g.busy != "" {
-			g.h.Notify(g.busy + " is still running.")
-			return
-		}
-		g.busy, g.progress = o.title, ""
+		t = g.addTask(o.title, cancel, o.cancelable(), !o.background)
 	}
 	r := g.repo
-	sink := &progressSink{post: g.post, set: func(line string) {
-		if o.banner {
-			g.progress = line
-		}
-	}}
+	sink := &progressSink{post: g.post, set: t.report}
 	applog.Go(func() {
 		if !o.network {
 			g.writeMu.Lock()
 			defer g.writeMu.Unlock()
 		}
-		res, err := o.run(g.ctx, r, sink.line)
+		res, err := o.run(ctx, r, sink.line)
+		cancel()
 		g.post(func() {
-			if o.banner {
-				g.busy, g.progress = "", ""
-			}
+			g.removeTask(t)
 			g.refreshNow()
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			if err != nil {
-				g.h.ShowError(o.title+" failed", err)
+				g.showError(o.title+" failed", err)
 				return
 			}
 			if res.Stopped {
@@ -60,6 +67,19 @@ func (g *Git) do(o op) {
 			}
 		})
 	})
+}
+
+func (g *Git) blocked(o op) string {
+	switch {
+	case !o.banner:
+		return ""
+	case g.busy != "":
+		return g.busy + " is still running."
+	}
+	if t := g.remoteTask(); t != nil && o.cancelable() {
+		return t.title + " is still running."
+	}
+	return ""
 }
 
 func (g *Git) doSimple(title string, run func(ctx context.Context, r repo) error, done func()) {
@@ -79,6 +99,25 @@ func (g *Git) doSimple(title string, run func(ctx context.Context, r repo) error
 func (g *Git) stopped(title string) {
 	g.h.Notify(title + " stopped. Resolve the conflicts or finish the edit, then continue.")
 	g.openConflictsIfAny()
+}
+
+func (g *Git) showError(title string, err error) {
+	g.h.ShowError(title, describe(err))
+}
+
+type describedError struct {
+	text string
+	err  error
+}
+
+func (e describedError) Error() string { return e.text }
+func (e describedError) Unwrap() error { return e.err }
+
+func describe(err error) error {
+	if text, ok := git.Describe(err); ok {
+		return describedError{text: text, err: err}
+	}
+	return err
 }
 
 type progressSink struct {

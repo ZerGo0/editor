@@ -13,10 +13,16 @@ import (
 )
 
 const (
-	gitCommand   = "git"
-	commandDelay = 3 * time.Second
-	nameStatusZ  = "\x00"
+	gitCommand     = "git"
+	commandDelay   = 3 * time.Second
+	nameStatusZ    = "\x00"
+	originHead     = "refs/remotes/origin/HEAD"
+	remoteRefs     = "refs/remotes/"
+	localRefs      = "refs/heads/"
+	fallbackBranch = "master"
 )
+
+var defaultBranchRefs = []string{remoteRefs + "origin/main", localRefs + "main", remoteRefs + "origin/master"}
 
 func checkName(s string) error {
 	if s == "" || strings.HasPrefix(s, "-") || strings.ContainsAny(s, "\x00\n ") {
@@ -148,6 +154,35 @@ func (r *cliRepo) ChangedSince(ctx context.Context, rev string) ([]git.ChangedFi
 		return nil, err
 	}
 	return parseNameStatus(out)
+}
+
+func (r *cliRepo) MergeBase(ctx context.Context, a, b string) (string, error) {
+	if err := checkName(a); err != nil {
+		return "", err
+	}
+	if err := checkName(b); err != nil {
+		return "", err
+	}
+	out, err := gitOutput(ctx, r.Root, "merge-base", "--end-of-options", a, b)
+	return strings.TrimSpace(out), err
+}
+
+func (r *cliRepo) DefaultBranch(ctx context.Context) string {
+	if out, err := gitOutput(ctx, r.Root, "symbolic-ref", originHead); err == nil {
+		if ref := strings.TrimSpace(out); ref != "" && r.hasRef(ctx, ref) {
+			return strings.TrimPrefix(ref, remoteRefs)
+		}
+	}
+	for _, name := range defaultBranchRefs {
+		if r.hasRef(ctx, name) {
+			return strings.TrimPrefix(strings.TrimPrefix(name, remoteRefs), localRefs)
+		}
+	}
+	return fallbackBranch
+}
+
+func (r *cliRepo) hasRef(ctx context.Context, ref string) bool {
+	return runGit(ctx, r.Root, "show-ref", "--verify", "--quiet", ref) == nil
 }
 
 func parseNameStatus(out string) ([]git.ChangedFile, error) {

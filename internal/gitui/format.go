@@ -78,6 +78,22 @@ func syncLabel(ahead, behind int) string {
 	return strings.Join(parts, " ")
 }
 
+const syncChangesLabel = "Synchronize Changes"
+
+func syncName(ahead, behind int) string {
+	var parts []string
+	if ahead > 0 {
+		parts = append(parts, fmt.Sprintf("%d to push", ahead))
+	}
+	if behind > 0 {
+		parts = append(parts, fmt.Sprintf("%d to pull", behind))
+	}
+	if len(parts) == 0 {
+		return syncChangesLabel
+	}
+	return syncChangesLabel + ": " + strings.Join(parts, ", ")
+}
+
 type refKind int
 
 const (

@@ -18,7 +18,8 @@ import (
 
 type conflictsState struct {
 	listState[git.ConflictFile]
-	auto bool
+	auto      bool
+	focusList bool
 }
 
 func (g *Git) openConflicts() { g.showConflicts(false) }
@@ -48,7 +49,7 @@ func (g *Git) showConflicts(auto bool) {
 	if !g.ready() {
 		return
 	}
-	g.conflicts = conflictsState{listState: openList[git.ConflictFile](), auto: auto}
+	g.conflicts = conflictsState{listState: openList[git.ConflictFile](), auto: auto, focusList: true}
 	g.loadConflicts()
 }
 
@@ -116,13 +117,21 @@ func (g *Git) conflictList(c *ui.Context) {
 	s.list.Label = func(i int) string { return items[i].Path }
 	s.list.Selected = &s.selected
 	conflictHeader(c)
-	boxedList(c, "Conflicted Files", &s.list, len(items), func(i int) list.Item {
+	merge := func(f git.ConflictFile) {
+		s.open = false
+		g.openMergeTool(f.Path)
+	}
+	l := boxedList(c, "Conflicted Files", &s.list, len(items), func(i int) list.Item {
 		f := items[i]
-		return conflictItem(f, func() {
-			s.open = false
-			g.openMergeTool(f.Path)
-		})
+		return conflictItem(f, func() { merge(f) })
 	})
+	if s.focusList {
+		l.Focus()
+		s.focusList = false
+	}
+	if f, ok := s.selectedFile(); ok && l.Submitted() && f.Ours && f.Theirs {
+		merge(f)
+	}
 }
 
 func conflictHeader(c *ui.Context) {

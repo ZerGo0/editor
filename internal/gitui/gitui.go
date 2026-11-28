@@ -37,9 +37,9 @@ type Git struct {
 	snap    snapshot
 	refresh refresher
 
-	writeMu  sync.Mutex
-	busy     string
-	progress string
+	writeMu sync.Mutex
+	busy    string
+	tasks   []*task
 
 	commit     commitState
 	changes    changesState
@@ -66,19 +66,23 @@ type Git struct {
 	blames     map[string]*blameState
 	blameOpts  blameOptions
 	diffOpts   diffOptions
+	layout     viewLayout
 	tabs       map[string]*diffTab
 	tabOrder   []string
 	patchTabs  map[string]*patchTab
 	patchOrder []string
+	reviews    []*patchTab
 	histories  map[string]*logState
 	mergeTools map[string]*mergeTool
 	clipboard  string
 	wantsPanel bool
 
-	settings  Settings
-	autoFetch *time.Timer
-	template  func() string
-	headHook  func()
+	settings   Settings
+	autoFetch  *time.Timer
+	template   func() string
+	headHook   func()
+	statusHook func([]git.FileStatus)
+	toggleWrap func()
 }
 
 func New(h host.Host) *Git {
@@ -107,6 +111,8 @@ func (g *Git) initViews() {
 	g.changes.cursor = -1
 	g.graph.cursor = -1
 	g.changes.stack.Weights = map[string]float32{paneChanges: changesPaneWeight, paneGraph: graphPaneWeight}
+	g.restoreState()
+	g.registerRestorers()
 }
 
 func (g *Git) open() {
@@ -168,6 +174,10 @@ func (g *Git) post(fn func()) {
 
 func (g *Git) ready() bool {
 	return g.phase == phaseReady && g.repo != nil
+}
+
+func (g *Git) Ready() bool {
+	return g.ready()
 }
 
 func (g *Git) ChangeCount() int {

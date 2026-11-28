@@ -29,7 +29,7 @@ func emptyState(c *ui.Context, title, detail string) {
 }
 
 func errorState(c *ui.Context, title string, err error, retry func()) {
-	feedback.Error(c, title, err, retry)
+	feedback.Error(c, title, describe(err), retry)
 }
 
 func button(c *ui.Context, label string, disabled bool) bool {
@@ -44,8 +44,12 @@ func smallButton(c *ui.Context, label string, disabled bool) bool {
 	return action.Button(c, label, action.ButtonOptions{Small: true, Disabled: disabled}).Clicked() && !disabled
 }
 
-func iconButton(c *ui.Context, label string, svg *ui.SVG, disabled bool) bool {
-	return action.IconButton(c, svg, label, action.IconOptions{Disabled: disabled}).Clicked() && !disabled
+func iconButton(c *ui.Context, label string, svg *ui.SVG, disabled bool, keys ...string) bool {
+	opts := action.IconOptions{Disabled: disabled}
+	if len(keys) > 0 {
+		opts.Keys = keys[0]
+	}
+	return action.IconClicked(c, svg, label, opts)
 }
 
 func dialogButtons(c *ui.Context, cancel func(), label string, disabled bool, ok func()) {

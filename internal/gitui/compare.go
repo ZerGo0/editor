@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ZerGo0/editor/internal/git"
+	"github.com/ZerGo0/editor/internal/plural"
 )
 
 const compareCommitLimit = 200
@@ -22,6 +23,7 @@ func (g *Git) showLog() {
 		return
 	}
 	g.wantsPanel = true
+	g.log.focusList = true
 }
 
 func (g *Git) compareWithLocal(rev string) {
@@ -56,7 +58,7 @@ func (g *Git) compareBranches(base, other string) {
 		}
 		var items []patchItem
 		add := func(name string, commits []git.Commit) {
-			items = append(items, patchItem{header: true, title: fmt.Sprintf("Commits only in %s", name), detail: fmt.Sprintf("%d commits", len(commits))})
+			items = append(items, patchItem{header: true, title: fmt.Sprintf("Commits only in %s", name), detail: plural.Count(len(commits), "commit", "commits")})
 			for i := range commits[:min(len(commits), compareCommitLimit)] {
 				cm := commits[i]
 				items = append(items, patchItem{title: cm.Subject, commit: &cm})
@@ -64,7 +66,7 @@ func (g *Git) compareBranches(base, other string) {
 		}
 		add(other, cmp.BOnly)
 		add(base, cmp.AOnly)
-		items = append(items, patchItem{header: true, title: "Changed Files", detail: fmt.Sprintf("%d files", len(fds))})
+		items = append(items, patchItem{header: true, title: "Changed Files", detail: plural.Count(len(fds), "file", "files")})
 		return append(items, fileDiffItems(fds)...), nil
 	})
 }

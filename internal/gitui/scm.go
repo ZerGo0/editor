@@ -4,6 +4,7 @@ import (
 	"context"
 	"path"
 
+	"github.com/ZerGo0/editor/internal/design/action"
 	"github.com/ZerGo0/editor/internal/design/feedback"
 	"github.com/ZerGo0/editor/internal/design/list"
 	"github.com/ZerGo0/editor/internal/design/pane"
@@ -65,6 +66,7 @@ func (s *changesState) setListMode(on bool) {
 
 func (g *Git) SideView(c *ui.Context) {
 	ui.Column(c).Fill().Children(func() {
+		g.taskBars(c)
 		if g.gate(c) {
 			g.scmView(c)
 		}
@@ -74,9 +76,14 @@ func (g *Git) SideView(c *ui.Context) {
 func (g *Git) gate(c *ui.Context) bool {
 	switch g.phase {
 	case phaseLoading:
-		changesSkeleton(c, "Loading repository")
+		g.changesSkeleton(c, "Loading repository")
 	case phaseNoGit:
-		emptyState(c, "Git is not installed", "Install Git, then reopen this folder.")
+		feedback.Empty(c, feedback.EmptyOptions{
+			Title:    "Git is not installed",
+			Message:  "Install Git or the Xcode Command Line Tools (xcode-select --install), then check again.",
+			Action:   "Check Again",
+			OnAction: g.open,
+		})
 	case phaseNoRepo:
 		feedback.Empty(c, feedback.EmptyOptions{
 			Title:    "This folder is not a Git repository",
@@ -92,17 +99,31 @@ func (g *Git) gate(c *ui.Context) bool {
 	return false
 }
 
-func (g *Git) busyLabel() string {
-	if g.progress != "" {
-		return g.busy + ": " + g.progress
+func (g *Git) unavailable(c *ui.Context) bool {
+	if g.phase == phaseLoading || g.ready() {
+		return false
 	}
-	return g.busy + "..."
+	return !g.gate(c)
+}
+
+func (g *Git) taskBars(c *ui.Context) {
+	keys := ""
+	if info, ok := action.Lookup(cancelCommand); ok {
+		keys = info.Keys
+	}
+	for _, t := range g.tasks {
+		if t.cancelable {
+			feedback.Task(c.Key(t), t.label(), feedback.TaskOptions{Value: t.value, Cancel: t.cancelLabel(), Keys: keys, OnCancel: t.cancel})
+		}
+	}
 }
 
 func (g *Git) scmView(c *ui.Context) {
-	if g.busy != "" {
-		feedback.ProgressBar(c, g.busyLabel()).Absolute().Top(token.Space0.Px()).Left(token.Space0.Px()).Right(token.Space0.Px()).
-			ZIndex(token.LayerSticky.Z()).Tooltip(g.busyLabel())
+	for _, t := range g.tasks {
+		if !t.cancelable {
+			feedback.Progress(c.Key(t), t.label(), t.value).Absolute().Top(token.Space0.Px()).Left(token.Space0.Px()).Right(token.Space0.Px()).
+				ZIndex(token.LayerSticky.Z()).Tooltip(t.label())
+		}
 	}
 	g.operationBanner(c)
 	ui.Column(c).FillWidth().Grow(1).MinHeight(0).Children(func() {
@@ -120,12 +141,12 @@ func (g *Git) changesPane(c *ui.Context) {
 		errorState(c, "Cannot read the status", g.snap.err, g.refreshNow)
 		return
 	case st == nil:
-		changesSkeleton(c, "Loading changes")
+		g.changesSkeleton(c, "Loading changes")
 		return
 	}
 	g.commitBox(c)
 	if g.snap.err != nil {
-		errorText(c, g.snap.err.Error()).Padding(token.Space0.Px(), token.PadView.Px())
+		errorText(c, describe(g.snap.err).Error()).Padding(token.Space0.Px(), token.PadView.Px())
 	}
 	g.changesList(c)
 }
@@ -138,7 +159,6 @@ func (g *Git) changesList(c *ui.Context) {
 		return
 	}
 	s.list.Key = func(i int) any { return entries[i].key }
-	s.list.Label = func(i int) string { return entries[i].label }
 	s.list.Selection = &s.sel
 	s.list.Selected = &s.cursor
 	l := list.View(c.Key("changes"), &s.list, len(entries), list.ViewOptions{Label: "Changes", Tree: true}, func(i int) list.Item {
@@ -157,6 +177,10 @@ func (g *Git) changesList(c *ui.Context) {
 		s.setOpen(e.key, false)
 	case e.kind != entryFile && l.Shortcut(0, ui.KeyRight):
 		s.setOpen(e.key, true)
+	case e.kind == entryFile && l.Shortcut(0, jumpToSourceKey):
+		g.jumpToSource(rowFilePaths(g.targets(e))...)
+	case e.kind == entryFile && l.Shortcut(showDiffMods, showDiffKey):
+		g.openRowDiffWith(e.rows[0], false, true)
 	}
 }
 

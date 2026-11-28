@@ -20,7 +20,7 @@ func TestMergeToolApply(t *testing.T) {
 	tool := g.mergeTools["git-merge:m.txt"]
 	h.drain(t, func() bool { return tool.model != nil })
 	tt := newTester(g, tool.view)
-	if !tt.HasText("1 conflicts left") {
+	if !tt.HasText("1 conflict left") {
 		t.Fatalf("texts = %v", tt.Texts())
 	}
 	if err := tt.Click("Accept Left"); err != nil {

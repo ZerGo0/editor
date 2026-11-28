@@ -60,16 +60,21 @@ func TestGraphSubjectKeepsItsShareInNarrowSideBars(t *testing.T) {
 		if rect.W >= natural {
 			t.Errorf("%d px: the subject is %.0f px wide, want it cut below %.0f px with an ellipsis", width, rect.W, natural)
 		}
-		if tt.HasText(fitAuthor) {
+		if _, drawn := tt.AccessByRole(ui.RoleText, fitAuthor); drawn {
 			t.Errorf("%d px: the author is drawn, want it hidden", width)
 		}
 		if name, ok := tt.Access(fitBranch); ok && name.Bounds.X+name.Bounds.W > float32(width) {
 			t.Errorf("%d px: the branch pill ends at %.0f, outside the row", width, name.Bounds.X+name.Bounds.W)
 		}
-		if tt.HasText("tag: v1.0.0") || tt.HasText("feature/one") {
+		if drawnText(tt, "tag: v1.0.0") || drawnText(tt, "feature/one") {
 			t.Errorf("%d px: refs without a color are drawn in the row", width)
 		}
 	}
+}
+
+func drawnText(tt *ui.Tester, s string) bool {
+	_, ok := tt.AccessByRole(ui.RoleText, s)
+	return ok
 }
 
 func TestGraphShowsTheCurrentBranchAsAnIconPill(t *testing.T) {

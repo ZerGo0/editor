@@ -21,14 +21,17 @@ import (
 const errNoCommit = "The commit was not found."
 
 func (g *Git) openGroupAt(gr group, rel string, preview, focus bool) {
-	id, title := "git-changes:"+groupIDs[gr], groupTitles[gr]
-	g.openPatchTabWith(id, title, nil, patchOpen{reveal: rel, preview: preview, focus: focus, prepare: func(t *patchTab) {
-		t.prepare = func() {
-			rows := changeGroups(g.snap.status)[gr]
-			t.quick = func() []patchItem { return rowItems(rows) }
-			t.load = func(ctx context.Context, r repo) ([]patchItem, error) { return g.groupItems(ctx, r, gr, rows) }
-		}
+	g.openPatchTabWith(changesViewPrefix+groupIDs[gr], groupTitles[gr], nil, patchOpen{reveal: rel, preview: preview, focus: focus, prepare: func(t *patchTab) {
+		g.prepareGroup(t, gr)
 	}})
+}
+
+func (g *Git) prepareGroup(t *patchTab, gr group) {
+	t.prepare = func() {
+		rows := changeGroups(g.snap.status)[gr]
+		t.quick = func() []patchItem { return rowItems(rows) }
+		t.load = func(ctx context.Context, r repo) ([]patchItem, error) { return g.groupItems(ctx, r, gr, rows) }
+	}
 }
 
 func (g *Git) groupItems(ctx context.Context, r repo, gr group, rows []changeRow) ([]patchItem, error) {
@@ -55,12 +58,18 @@ func (g *Git) groupItems(ctx context.Context, r repo, gr group, rows []changeRow
 		if fd, ok := counts[row.file.Path]; ok {
 			it.adds, it.dels, it.counted, it.binary = diffCounts(fd), diffDels(fd), true, fd.Binary
 			it.fingerprint = diffFingerprint(fd)
-		} else if info, err := os.Stat(g.paths.abs(row.file.Path)); err == nil {
-			it.size = info.Size()
-			it.fingerprint = strconv.FormatInt(info.Size(), 36) + ":" + strconv.FormatInt(info.ModTime().UnixNano(), 36)
+		} else {
+			g.statItem(it, row.file.Path)
 		}
 	}
 	return items, nil
+}
+
+func (g *Git) statItem(it *patchItem, rel string) {
+	if info, err := os.Stat(g.paths.abs(rel)); err == nil {
+		it.size = info.Size()
+		it.fingerprint = strconv.FormatInt(info.Size(), 36) + ":" + strconv.FormatInt(info.ModTime().UnixNano(), 36)
+	}
 }
 
 func rowItems(rows []changeRow) []patchItem {
@@ -130,39 +139,44 @@ func (g *Git) openCommitTabAt(cm git.Commit, rel string, preview, focus bool) {
 	if cm.Subject != "" {
 		title = shortHash(cm.OID) + " " + cm.Subject
 	}
-	oid := cm.OID
-	g.openPatchTabWith("git-commit:"+oid, title, func(ctx context.Context, r repo) ([]patchItem, error) {
-		commits, err := r.Log(ctx, git.LogOptions{Revs: []string{oid}, Max: 1})
-		if err != nil {
-			return nil, err
-		}
-		if len(commits) == 0 {
-			return nil, errors.New(errNoCommit)
-		}
-		full := commits[0]
-		files, err := r.CommitFiles(ctx, oid)
-		if err != nil {
-			return nil, err
-		}
-		counts := map[string]git.FileDiff{}
-		if len(full.Parents) > 0 {
-			if fds, err := r.DiffCommits(ctx, full.Parents[0], oid); err == nil {
-				for _, fd := range fds {
-					counts[fd.Path()] = fd
-				}
+	g.openPatchTabWith(commitViewPrefix+cm.OID, title, commitLoader(cm.OID), patchOpen{reveal: rel, preview: preview, focus: focus})
+}
+
+func commitLoader(oid string) func(ctx context.Context, r repo) ([]patchItem, error) {
+	return func(ctx context.Context, r repo) ([]patchItem, error) { return commitItems(ctx, r, oid) }
+}
+
+func commitItems(ctx context.Context, r repo, rev string) ([]patchItem, error) {
+	commits, err := r.Log(ctx, git.LogOptions{Revs: []string{rev}, Max: 1})
+	if err != nil {
+		return nil, err
+	}
+	if len(commits) == 0 {
+		return nil, errors.New(errNoCommit)
+	}
+	full := commits[0]
+	files, err := r.CommitFiles(ctx, full.OID)
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]git.FileDiff{}
+	if len(full.Parents) > 0 {
+		if fds, err := r.DiffCommits(ctx, full.Parents[0], full.OID); err == nil {
+			for _, fd := range fds {
+				counts[fd.Path()] = fd
 			}
 		}
-		items := []patchItem{{title: full.Subject, commit: &full, full: true}}
-		for _, f := range files {
-			src := commitSource(full, f)
-			it := patchItem{title: f.Path, detail: f.OrigPath, code: f.Status, src: &src}
-			if fd, ok := counts[f.Path]; ok {
-				it.adds, it.dels, it.counted, it.binary = diffCounts(fd), diffDels(fd), true, fd.Binary
-			}
-			items = append(items, it)
+	}
+	items := []patchItem{{title: full.Subject, commit: &full, full: true}}
+	for _, f := range files {
+		src := commitSource(full, f)
+		it := patchItem{title: f.Path, detail: f.OrigPath, code: f.Status, src: &src}
+		if fd, ok := counts[f.Path]; ok {
+			it.adds, it.dels, it.counted, it.binary = diffCounts(fd), diffDels(fd), true, fd.Binary
 		}
-		return items, nil
-	}, patchOpen{reveal: rel, preview: preview, focus: focus})
+		items = append(items, it)
+	}
+	return items, nil
 }
 
 func (g *Git) commitSection(cm git.Commit, full bool) func(c *ui.Context) {
