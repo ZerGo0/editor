@@ -64,6 +64,9 @@ func New(host, token string) *Client {
 		c.restURL = fmt.Sprintf(enterpriseRESTFmt, host)
 		c.graphqlURL = fmt.Sprintf(enterpriseGraphQLFmt, host)
 	}
+	if rest, graphql, ok := OverrideURLs(); ok {
+		c.restURL, c.graphqlURL = rest, graphql
+	}
 	return c
 }
 

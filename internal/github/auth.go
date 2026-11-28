@@ -14,6 +14,9 @@ var (
 )
 
 func Token(ctx context.Context, host string) (string, error) {
+	if override.token != "" {
+		return override.token, nil
+	}
 	if host == "" || strings.HasPrefix(host, "-") {
 		return "", fmt.Errorf("github: invalid host %q", host)
 	}

@@ -8,10 +8,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
+
+	"github.com/ZerGo0/editor/internal/telemetry"
 )
 
 var (
@@ -21,6 +25,7 @@ var (
 	ErrUnavailable = errors.New("git: executable not found on PATH")
 	ErrEmptyPatch  = errors.New("git: empty patch")
 	ErrNoOperation = errors.New("git: no operation in progress")
+	ErrDamaged     = errors.New("git: damaged repository")
 )
 
 const (
@@ -31,6 +36,8 @@ const (
 	openOutputLines   = 2
 	progressFlag      = "--progress"
 	nulSeparator      = "\x00"
+	gitEntry          = ".git"
+	xcrunMarker       = "xcrun: error"
 )
 
 var (
@@ -46,23 +53,22 @@ var (
 	readOnlyEnv = "GIT_OPTIONAL_LOCKS=0"
 )
 
-var (
-	availableOnce sync.Once
-	available     bool
-)
+var found atomic.Bool
 
 func Available() bool {
-	availableOnce.Do(func() {
-		_, err := exec.LookPath(gitBinary)
-		available = err == nil
-	})
-	return available
+	if found.Load() {
+		return true
+	}
+	_, err := exec.LookPath(gitBinary)
+	found.Store(err == nil)
+	return err == nil
 }
 
 type Error struct {
 	Args     []string
 	Stderr   string
 	ExitCode int
+	Dir      string
 }
 
 func (e *Error) Error() string {
@@ -95,7 +101,12 @@ func Open(ctx context.Context, dir string) (*Repo, error) {
 	out, err := execGit(ctx, dir, readOnly, "rev-parse", "--show-toplevel", "--absolute-git-dir")
 	if err != nil {
 		var ge *Error
-		if errors.As(err, &ge) && (strings.Contains(ge.Stderr, notRepoMessage) || strings.Contains(ge.Stderr, notWorkTreeMarker)) {
+		switch {
+		case errors.As(err, &ge) && strings.Contains(ge.Stderr, xcrunMarker):
+			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
+		case errors.As(err, &ge) && strings.Contains(ge.Stderr, notRepoMessage) && hasGitEntry(dir):
+			return nil, fmt.Errorf("%w: %w", ErrDamaged, err)
+		case errors.As(err, &ge) && (strings.Contains(ge.Stderr, notRepoMessage) || strings.Contains(ge.Stderr, notWorkTreeMarker)):
 			return nil, fmt.Errorf("%w: %s", ErrNotRepo, dir)
 		}
 		return nil, err
@@ -105,6 +116,19 @@ func Open(ctx context.Context, dir string) (*Repo, error) {
 		return nil, fmt.Errorf("git rev-parse: unexpected output %q", out)
 	}
 	return &Repo{Root: lines[0], GitDir: lines[1]}, nil
+}
+
+func hasGitEntry(dir string) bool {
+	for {
+		if _, err := os.Lstat(filepath.Join(dir, gitEntry)); err == nil {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }
 
 func (r *Repo) read(ctx context.Context, args ...string) ([]byte, error) {
@@ -128,9 +152,13 @@ func execGit(ctx context.Context, dir string, c call, args ...string) ([]byte, e
 	if !Available() {
 		return nil, ErrUnavailable
 	}
+	ctx, span := telemetry.Start(ctx, telemetry.SpanGitPrefix+argName(args))
+	defer span.End()
 	cmd := exec.CommandContext(ctx, gitBinary, append(slices.Clone(baseConfig), args...)...)
 	cmd.Dir = dir
 	cmd.WaitDelay = processWaitDelay
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
 	env := append(os.Environ(), baseEnv...)
 	if c.readOnly {
 		env = append(env, readOnlyEnv)
@@ -161,7 +189,7 @@ func execGit(ctx context.Context, dir string, c call, args ...string) ([]byte, e
 		if msg == "" {
 			msg = strings.TrimSpace(stdout.String())
 		}
-		return stdout.Bytes(), &Error{Args: args, Stderr: msg, ExitCode: exitErr.ExitCode()}
+		return stdout.Bytes(), &Error{Args: args, Stderr: msg, ExitCode: exitErr.ExitCode(), Dir: dir}
 	}
 	return nil, fmt.Errorf("git %s: %w", argName(args), err)
 }

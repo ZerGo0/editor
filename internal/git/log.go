@@ -25,6 +25,7 @@ const (
 	fieldBody        = 10
 
 	noCommitsMarker = "does not have any commits yet"
+	headArgMarker   = "'HEAD'"
 	refSeparator    = ", "
 )
 
@@ -99,7 +100,7 @@ func (r *Repo) logRaw(ctx context.Context, args []string) ([]Commit, error) {
 	out, err := r.read(ctx, append(base, args...)...)
 	if err != nil {
 		var ge *Error
-		if errors.As(err, &ge) && strings.Contains(ge.Stderr, noCommitsMarker) {
+		if errors.As(err, &ge) && (strings.Contains(ge.Stderr, noCommitsMarker) || r.unbornHead(ctx, ge)) {
 			return nil, nil
 		}
 		return nil, err
@@ -117,6 +118,14 @@ func (r *Repo) logRaw(ctx context.Context, args []string) ([]Commit, error) {
 		commits = append(commits, c)
 	}
 	return commits, nil
+}
+
+func (r *Repo) unbornHead(ctx context.Context, ge *Error) bool {
+	if !strings.Contains(ge.Stderr, headArgMarker) {
+		return false
+	}
+	ok, err := r.hasHead(ctx)
+	return err == nil && !ok
 }
 
 func parseCommitFields(f []string) (Commit, error) {
